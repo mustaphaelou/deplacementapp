@@ -1,0 +1,181 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  EMPLOYEE
+  MANAGER
+  FINANCE_ADMIN
+  GENERAL_DIRECTION
+
+  @@map("roles")
+}
+
+enum StatutDemande {
+  BROUILLON
+  SOUMISE
+  APPROUVEE_MANAGER
+  APPROUVEE_FINANCE
+  APPROUVEE
+  REJETEE_MANAGER
+  REJETEE_FINANCE
+  REJETEE_DIRECTION
+  RETIREE
+
+  @@map("statuts_demande")
+}
+
+enum TypeTransport {
+  VOITURE_PERSONNELLE
+  VOITURE_SOCIETE
+  BUS
+  AVION
+  TRAIN
+  AUTRE
+
+  @@map("types_transport")
+}
+
+model Utilisateur {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  motDePasse    String
+  nom           String
+  prenom        String
+  poste         String
+  role          Role      @default(EMPLOYEE)
+  departementId String
+  departement   Departement @relation(fields: [departementId], references: [id])
+  telephone     String?
+  dateEmbauche  DateTime?
+  actif         Boolean   @default(true)
+  creeLe        DateTime  @default(now())
+  modifieLe     DateTime  @updatedAt
+
+  demandes          DemandeDeplacement[] @relation("DemandeEmploye")
+  demandesAssignees DemandeDeplacement[] @relation("DemandeAssignee")
+  notifications     Notification[]
+  journalAudits     JournalAudit[]
+
+  @@map("utilisateurs")
+}
+
+model Departement {
+  id   String @id @default(cuid())
+  nom  String @unique
+  creeLe DateTime @default(now())
+
+  utilisateurs Utilisateur[]
+
+  @@map("departements")
+}
+
+model DemandeDeplacement {
+  id        String        @id @default(cuid())
+  numero    String        @unique
+  employeId String
+  employe   Utilisateur   @relation("DemandeEmploye", fields: [employeId], references: [id])
+  assigneAId String?
+  assigneA  Utilisateur?  @relation("DemandeAssignee", fields: [assigneAId], references: [id])
+  statut    StatutDemande @default(BROUILLON)
+
+  employeNom        String
+  employePrenom     String
+  employePoste      String
+  employeDepartement String
+
+  motif          String
+  dateDepart     DateTime
+  dateRetour     DateTime
+  destination    String
+  typeTransport  TypeTransport
+  autreTransport String?
+  vehiculeId     String?
+  vehicule       VehiculeEntreprise? @relation(fields: [vehiculeId], references: [id])
+
+  fraisTransport   Decimal? @default(0) @db.Decimal(10, 2)
+  fraisHebergement Decimal? @default(0) @db.Decimal(10, 2)
+  fraisRepas       Decimal? @default(0) @db.Decimal(10, 2)
+  fraisDivers      Decimal? @default(0) @db.Decimal(10, 2)
+  totalEstime      Decimal? @default(0) @db.Decimal(10, 2)
+
+  avanceRequise Boolean  @default(false)
+  montantAvance Decimal? @db.Decimal(10, 2)
+
+  description String?
+
+  commentaireManager   String?
+  commentaireFinance   String?
+  commentaireDirection String?
+
+  soumiseLe             DateTime?
+  approuveeManagerLe    DateTime?
+  approuveeFinanceLe    DateTime?
+  approuveeDirectionLe  DateTime?
+  rejeteeLe             DateTime?
+  retireeLe             DateTime?
+
+  deletedAt DateTime?
+
+  creeLe    DateTime @default(now())
+  modifieLe DateTime @updatedAt
+
+  notifications Notification[]
+  documents    Document[]
+
+  @@map("demandes_deplacement")
+}
+
+model VehiculeEntreprise {
+  id              String   @id @default(cuid())
+  nom             String
+  immatriculation String   @unique
+  disponible      Boolean  @default(true)
+  creeLe          DateTime @default(now())
+
+  demandes DemandeDeplacement[]
+
+  @@map("vehicules_entreprise")
+}
+
+model Notification {
+  id            String   @id @default(cuid())
+  utilisateurId String
+  utilisateur   Utilisateur   @relation(fields: [utilisateurId], references: [id])
+  demandeId     String?
+  demande       DemandeDeplacement? @relation(fields: [demandeId], references: [id])
+  titre         String
+  message       String
+  lu            Boolean  @default(false)
+  creeLe        DateTime @default(now())
+
+  @@map("notifications")
+}
+
+model JournalAudit {
+  id            String   @id @default(cuid())
+  utilisateurId String
+  utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id])
+  action        String
+  entite        String
+  entiteId      String?
+  details       String?
+  creeLe        DateTime @default(now())
+
+  @@map("journal_audit")
+}
+
+model Document {
+  id        String   @id @default(cuid())
+  demandeId String
+  demande   DemandeDeplacement @relation(fields: [demandeId], references: [id])
+  type      String
+  chemin    String
+  creeLe    DateTime @default(now())
+
+  @@map("documents")
+}

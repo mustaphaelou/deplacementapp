@@ -1,0 +1,16 @@
+▲ Next.js 16.1.7 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://26.39.104.143:3000
+- Environments: .env
+
+✓ Starting...
+✓ Ready in 932ms
+ GET /login?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2F 200 in 992ms (compile: 780ms, render: 212ms)
+ GET /api/auth/session 200 in 941ms (compile: 914ms, render: 27ms)
+ GET /api/auth/session 200 in 20ms (compile: 13ms, render: 7ms)
+ GET /api/auth/providers 200 in 23ms (compile: 13ms, render: 10ms)
+ GET /api/auth/csrf 200 in 10ms (compile: 4ms, render: 6ms)
+ POST /api/auth/callback/credentials? 200 in 546ms (compile: 3ms, render: 543ms)
+ GET /api/auth/session 200 in 18ms (compile: 3ms, render: 15ms)
+ GET / 200 in 606ms (compile: 505ms, proxy.ts: 71ms, render: 31ms)
+ GET / 200 in 70ms (compile: 6ms, proxy.ts: 37ms, render: 27ms)
