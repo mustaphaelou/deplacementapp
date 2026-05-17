@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { ajouterAudit } from "@/lib/audit"
-import { notifyOnWithdraw } from "@/lib/notifications"
+import { notificationBus } from "@/lib/notification-bus"
 
 export async function POST(
   req: NextRequest,
@@ -30,7 +30,12 @@ export async function POST(
   })
 
   await ajouterAudit(userId, "RETRAIT", "DemandeDeplacement", id, { numero: demande.numero })
-  await notifyOnWithdraw(demande as any)
+  await notificationBus.dispatch("DEMANDE_RETIREE", {
+    demandeId: demande.id,
+    numero: demande.numero,
+    employe: { id: demande.employe.id, prenom: demande.employe.prenom, nom: demande.employe.nom },
+    assigneAId: demande.assigneAId,
+  })
 
   return NextResponse.json({ demande: updated })
 }

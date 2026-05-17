@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { ajouterAudit } from "@/lib/audit"
-import { notifyOnManagerApprove } from "@/lib/notifications"
+import { notificationBus } from "@/lib/notification-bus"
 
 export async function POST(
   req: NextRequest,
@@ -34,7 +34,11 @@ export async function POST(
       },
     })
     await ajouterAudit(userId, "APPROBATION_MANAGER", "DemandeDeplacement", id, { numero: demande.numero })
-    await notifyOnManagerApprove(demande as any)
+    await notificationBus.dispatch("DEMANDE_APPAROUM_MANAGERIAL", {
+      demandeId: demande.id,
+      numero: demande.numero,
+      employe: { id: demande.employe.id, prenom: demande.employe.prenom, nom: demande.employe.nom },
+    })
     return NextResponse.json({ demande: updated })
   }
 
@@ -48,8 +52,11 @@ export async function POST(
       },
     })
     await ajouterAudit(userId, "APPROBATION_FINANCE", "DemandeDeplacement", id, { numero: demande.numero })
-    const { notifyOnFinanceApprove } = await import("@/lib/notifications")
-    await notifyOnFinanceApprove(demande as any)
+    await notificationBus.dispatch("DEMANDE_APPAROUM_FINANCE", {
+      demandeId: demande.id,
+      numero: demande.numero,
+      employe: { id: demande.employe.id, prenom: demande.employe.prenom, nom: demande.employe.nom },
+    })
     return NextResponse.json({ demande: updated })
   }
 
@@ -63,8 +70,11 @@ export async function POST(
       },
     })
     await ajouterAudit(userId, "APPROBATION_DIRECTION", "DemandeDeplacement", id, { numero: demande.numero })
-    const { notifyOnFinalApprove } = await import("@/lib/notifications")
-    await notifyOnFinalApprove(demande as any)
+    await notificationBus.dispatch("DEMANDE_APPAROUM_FINALE", {
+      demandeId: demande.id,
+      numero: demande.numero,
+      employe: { id: demande.employe.id, prenom: demande.employe.prenom, nom: demande.employe.nom },
+    })
     return NextResponse.json({ demande: updated })
   }
 

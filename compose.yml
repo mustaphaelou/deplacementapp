@@ -11,7 +11,7 @@ services:
       - SMTP_PORT=${SMTP_PORT}
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASS=${SMTP_PASS}
-      - SMTP_FROM=noreply@hay2010.com
+      - SMTP_FROM=noreply@hay2010.ma
     depends_on:
       db:
         condition: service_healthy

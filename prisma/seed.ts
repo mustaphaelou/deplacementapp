@@ -42,11 +42,11 @@ async function main() {
   })
 
   const users = [
-    { email: "directeur@hay2010.com", nom: "Directeur", prenom: "Ahmed", poste: "Directeur Général", role: "GENERAL_DIRECTION" as Role, departementId: deptDG.id },
-    { email: "finance@hay2010.com", nom: "Comptable", prenom: "Fatima", poste: "Responsable Financier", role: "FINANCE_ADMIN" as Role, departementId: deptFin.id },
-    { email: "manager@hay2010.com", nom: "Chef", prenom: "Hassan", poste: "Chef de projet", role: "MANAGER" as Role, departementId: deptTech.id },
-    { email: "employe@hay2010.com", nom: "Employe", prenom: "Youssef", poste: "Conducteur", role: "EMPLOYEE" as Role, departementId: deptTech.id },
-    { email: "commercial@hay2010.com", nom: "Commercial", prenom: "Karim", poste: "Commercial", role: "EMPLOYEE" as Role, departementId: deptCom.id },
+    { email: "directeur@hay2010.ma", nom: "Directeur", prenom: "Ahmed", poste: "Directeur Général", role: "GENERAL_DIRECTION" as Role, departementId: deptDG.id },
+    { email: "finance@hay2010.ma", nom: "Comptable", prenom: "Fatima", poste: "Responsable Financier", role: "FINANCE_ADMIN" as Role, departementId: deptFin.id },
+    { email: "manager@hay2010.ma", nom: "Chef", prenom: "Hassan", poste: "Chef de projet", role: "MANAGER" as Role, departementId: deptTech.id },
+    { email: "employe@hay2010.ma", nom: "Employe", prenom: "Youssef", poste: "Conducteur", role: "EMPLOYEE" as Role, departementId: deptTech.id },
+    { email: "commercial@hay2010.ma", nom: "Commercial", prenom: "Karim", poste: "Commercial", role: "EMPLOYEE" as Role, departementId: deptCom.id },
   ]
 
   for (const user of users) {

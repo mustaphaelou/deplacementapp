@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { ajouterAudit } from "@/lib/audit"
-import { notifyOnReject } from "@/lib/notifications"
+import { notificationBus } from "@/lib/notification-bus"
 
 export async function POST(
   req: NextRequest,
@@ -45,7 +45,11 @@ export async function POST(
 
   const updated = await prisma.demandeDeplacement.update({ where: { id }, data: updateData })
   await ajouterAudit(userId, "REJET", "DemandeDeplacement", id, { numero: demande.numero })
-  await notifyOnReject(demande as any)
+  await notificationBus.dispatch("DEMANDE_REJETEE", {
+    demandeId: demande.id,
+    numero: demande.numero,
+    employe: { id: demande.employe.id, prenom: demande.employe.prenom, nom: demande.employe.nom },
+  })
 
   return NextResponse.json({ demande: updated })
 }
