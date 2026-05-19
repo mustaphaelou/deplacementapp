@@ -46,7 +46,6 @@ export const NAV_ITEMS: Record<string, { label: string; href: string; icon: stri
   ],
   GENERAL_DIRECTION: [
     { label: "Approbations Finales", href: "/demandes?statut=APPROUVEE_FINANCE", icon: "checkmark-circle" },
-    { label: "Tableau de Bord", href: "/", icon: "dashboard-square-01" },
     { label: "Rapports", href: "/administration/rapports", icon: "chart" },
   ],
 }
