@@ -3,6 +3,8 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { ajouterAudit } from "@/lib/audit"
 import { notificationBus } from "@/lib/notification-bus"
+import { buildTransition } from "@/lib/workflow"
+import type { Role } from "@prisma/client"
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -74,42 +76,57 @@ export async function POST(req: NextRequest) {
     motifArray[idx] = `Autre: ${data.motifAutre}`
   }
 
-  const demande = await prisma.demandeDeplacement.create({
-    data: {
-      numero,
-      employeId: user.id,
-      statut: action === "submit" ? "SOUMISE" : "BROUILLON",
-      employeNom: user.nom,
-      employePrenom: user.prenom,
-      employePoste: user.poste,
-      employeDepartement: user.departement.nom,
-      motif: JSON.stringify(motifArray),
-      dateDepart: new Date(data.dateDepart),
-      dateRetour: new Date(data.dateRetour),
-      destination: data.destination,
-      typeTransport: data.typeTransport,
-      autreTransport: data.autreTransport || null,
-      vehiculeId: data.vehiculeId || null,
-      fraisTransport: parseFloat(data.fraisTransport || "0"),
-      fraisHebergement: parseFloat(data.fraisHebergement || "0"),
-      fraisRepas: parseFloat(data.fraisRepas || "0"),
-      fraisDivers: parseFloat(data.fraisDivers || "0"),
-      totalEstime:
-        parseFloat(data.fraisTransport || "0") +
-        parseFloat(data.fraisHebergement || "0") +
-        parseFloat(data.fraisRepas || "0") +
-        parseFloat(data.fraisDivers || "0"),
-      avanceRequise: data.avanceRequise || false,
-      montantAvance: data.avanceRequise ? parseFloat(data.montantAvance || "0") : null,
-      description: data.description || null,
-      soumiseLe: action === "submit" ? new Date() : null,
-    },
-  })
+  const isSubmit = action === "submit"
+  const submitResult = isSubmit
+    ? buildTransition("EMPLOYEE" as Role, "BROUILLON", "submit")
+    : null
 
-  await ajouterAudit(user.id, action === "submit" ? "SOUMISSION" : "CREATION", "DemandeDeplacement", demande.id, { numero })
+  const createData: any = {
+    numero,
+    employeId: user.id,
+    statut: "BROUILLON",
+    employeNom: user.nom,
+    employePrenom: user.prenom,
+    employePoste: user.poste,
+    employeDepartement: user.departement.nom,
+    motif: JSON.stringify(motifArray),
+    dateDepart: new Date(data.dateDepart),
+    dateRetour: new Date(data.dateRetour),
+    destination: data.destination,
+    typeTransport: data.typeTransport,
+    autreTransport: data.autreTransport || null,
+    vehiculeId: data.vehiculeId || null,
+    fraisTransport: parseFloat(data.fraisTransport || "0"),
+    fraisHebergement: parseFloat(data.fraisHebergement || "0"),
+    fraisRepas: parseFloat(data.fraisRepas || "0"),
+    fraisDivers: parseFloat(data.fraisDivers || "0"),
+    totalEstime:
+      parseFloat(data.fraisTransport || "0") +
+      parseFloat(data.fraisHebergement || "0") +
+      parseFloat(data.fraisRepas || "0") +
+      parseFloat(data.fraisDivers || "0"),
+    avanceRequise: data.avanceRequise || false,
+    montantAvance: data.avanceRequise ? parseFloat(data.montantAvance || "0") : null,
+    description: data.description || null,
+    soumiseLe: null,
+  }
 
-  if (action === "submit") {
-    await notificationBus.dispatch("DEMANDE_SOUMISE", {
+  if (submitResult) {
+    Object.assign(createData, submitResult.transition.fields)
+  }
+
+  const demande = await prisma.demandeDeplacement.create({ data: createData })
+
+  await ajouterAudit(
+    user.id,
+    submitResult ? submitResult.auditAction : "CREATION",
+    "DemandeDeplacement",
+    demande.id,
+    { numero }
+  )
+
+  if (submitResult) {
+    await notificationBus.dispatch(submitResult.notificationEvent, {
       demandeId: demande.id,
       numero: demande.numero,
       employe: { id: user.id, prenom: user.prenom, nom: user.nom },

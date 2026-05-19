@@ -3,6 +3,8 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { ajouterAudit } from "@/lib/audit"
 import { notificationBus } from "@/lib/notification-bus"
+import { canTransition, buildTransition } from "@/lib/workflow"
+import type { Role } from "@prisma/client"
 
 export async function POST(
   req: NextRequest,
@@ -21,62 +23,28 @@ export async function POST(
   if (!demande) return NextResponse.json({ error: "Demande introuvable" }, { status: 404 })
 
   const userId = session.user.id
-  const userRole = session.user.role
+  const userRole = session.user.role as Role
 
-  if (userRole === "MANAGER" && demande.statut === "SOUMISE") {
-    const updated = await prisma.demandeDeplacement.update({
-      where: { id },
-      data: {
-        statut: "APPROUVEE_MANAGER",
-        approuveeManagerLe: new Date(),
-        assigneAId: userId,
-        commentaireManager: body.commentaire || null,
-      },
-    })
-    await ajouterAudit(userId, "APPROBATION_MANAGER", "DemandeDeplacement", id, { numero: demande.numero })
-    await notificationBus.dispatch("DEMANDE_APPAROUM_MANAGERIAL", {
-      demandeId: demande.id,
-      numero: demande.numero,
-      employe: { id: demande.employe.id, prenom: demande.employe.prenom, nom: demande.employe.nom },
-    })
-    return NextResponse.json({ demande: updated })
+  if (!canTransition(userRole, demande.statut, "approuver")) {
+    return NextResponse.json({ error: "Action non autorisée" }, { status: 403 })
   }
 
-  if (userRole === "FINANCE_ADMIN" && demande.statut === "APPROUVEE_MANAGER") {
-    const updated = await prisma.demandeDeplacement.update({
-      where: { id },
-      data: {
-        statut: "APPROUVEE_FINANCE",
-        approuveeFinanceLe: new Date(),
-        commentaireFinance: body.commentaire || null,
-      },
-    })
-    await ajouterAudit(userId, "APPROBATION_FINANCE", "DemandeDeplacement", id, { numero: demande.numero })
-    await notificationBus.dispatch("DEMANDE_APPAROUM_FINANCE", {
-      demandeId: demande.id,
-      numero: demande.numero,
-      employe: { id: demande.employe.id, prenom: demande.employe.prenom, nom: demande.employe.nom },
-    })
-    return NextResponse.json({ demande: updated })
-  }
+  const result = buildTransition(userRole, demande.statut, "approuver", {
+    comment: body.commentaire,
+    assigneAId: userId,
+  })!
 
-  if (userRole === "GENERAL_DIRECTION" && demande.statut === "APPROUVEE_FINANCE") {
-    const updated = await prisma.demandeDeplacement.update({
-      where: { id },
-      data: {
-        statut: "APPROUVEE",
-        approuveeDirectionLe: new Date(),
-        commentaireDirection: body.commentaire || null,
-      },
-    })
-    await ajouterAudit(userId, "APPROBATION_DIRECTION", "DemandeDeplacement", id, { numero: demande.numero })
-    await notificationBus.dispatch("DEMANDE_APPAROUM_FINALE", {
-      demandeId: demande.id,
-      numero: demande.numero,
-      employe: { id: demande.employe.id, prenom: demande.employe.prenom, nom: demande.employe.nom },
-    })
-    return NextResponse.json({ demande: updated })
-  }
+  const updated = await prisma.demandeDeplacement.update({
+    where: { id },
+    data: result.transition.fields as any,
+  })
 
-  return NextResponse.json({ error: "Action non autorisée" }, { status: 403 })
+  await ajouterAudit(userId, result.auditAction, "DemandeDeplacement", id, { numero: demande.numero })
+  await notificationBus.dispatch(result.notificationEvent, {
+    demandeId: demande.id,
+    numero: demande.numero,
+    employe: { id: demande.employe.id, prenom: demande.employe.prenom, nom: demande.employe.nom },
+  })
+
+  return NextResponse.json({ demande: updated })
 }

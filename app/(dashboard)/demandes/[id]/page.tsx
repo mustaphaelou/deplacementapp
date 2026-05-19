@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import { DemandeDetail } from "@/components/demande-detail"
 import { notFound } from "next/navigation"
+import { getAllowedActions } from "@/lib/workflow"
 
 export default async function DemandeDetailPage({
   params,
@@ -27,31 +28,12 @@ export default async function DemandeDetailPage({
 
   const userRole = session.user.role
   const userId = session.user.id
-
-  let canApprove = false
-  let canReject = false
-  let canWithdraw = false
-
-  if (userRole === "MANAGER" && demande.statut === "SOUMISE") {
-    canApprove = true
-    canReject = true
-  }
-  if (userRole === "FINANCE_ADMIN" && demande.statut === "APPROUVEE_MANAGER") {
-    canApprove = true
-    canReject = true
-  }
-  if (userRole === "GENERAL_DIRECTION" && demande.statut === "APPROUVEE_FINANCE") {
-    canApprove = true
-    canReject = true
-  }
-  if (
-    userRole === "EMPLOYEE" &&
-    demande.employeId === userId &&
-    demande.statut === "BROUILLON"
-  ) {
-    canWithdraw = true
-  }
   const isOwner = demande.employeId === userId
+
+  const { canApprove, canReject, canWithdraw } = getAllowedActions(userRole, userId, {
+    statut: demande.statut,
+    employeId: demande.employeId,
+  })
 
   return (
     <DemandeDetail
