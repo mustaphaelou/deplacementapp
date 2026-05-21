@@ -23,6 +23,19 @@ export interface DashboardData {
   budgetTotal?: number
 }
 
+function mapToDashboardDemande(demande: any): DashboardDemande {
+  return {
+    id: demande.id,
+    numero: demande.numero,
+    destination: demande.destination,
+    dateDepart: demande.dateDepart,
+    dateRetour: demande.dateRetour,
+    totalEstime: demande.totalEstime ? Number(demande.totalEstime) : null,
+    statut: demande.statut,
+    employe: demande.employe ? { prenom: demande.employe.prenom, nom: demande.employe.nom } : undefined,
+  }
+}
+
 export async function getDashboardData(
   userId: string,
   role: string
@@ -50,7 +63,7 @@ export async function getDashboardData(
       ])
 
     return {
-      demandes,
+      demandes: demandes.map(mapToDashboardDemande),
       stats: { total, brouillon, soumises, approuvees },
     }
   }
@@ -70,7 +83,7 @@ export async function getDashboardData(
       }),
     ])
 
-    return { demandes, enAttente }
+    return { demandes: demandes.map(mapToDashboardDemande), enAttente }
   }
 
   if (role === "FINANCE_ADMIN") {
@@ -88,7 +101,7 @@ export async function getDashboardData(
       }),
     ])
 
-    return { demandes, enAttente }
+    return { demandes: demandes.map(mapToDashboardDemande), enAttente }
   }
 
   if (role === "GENERAL_DIRECTION") {
@@ -116,7 +129,7 @@ export async function getDashboardData(
     ])
 
     return {
-      demandes,
+      demandes: demandes.map(mapToDashboardDemande),
       enAttente,
       budgetTotal: Number(totalBudget._sum.totalEstime ?? 0),
     }

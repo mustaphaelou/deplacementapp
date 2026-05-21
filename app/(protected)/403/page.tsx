@@ -1,9 +1,11 @@
 import Link from "next/link"
-import { requireAuth } from "@/lib/auth-utils"
+import { auth } from "@/lib/auth"
+import { redirect } from "next/navigation"
 import { Button } from "@/components/ui/button"
 
 export default async function ForbiddenPage() {
-  await requireAuth()
+  const session = await auth()
+  if (!session?.user) redirect("/login")
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-4">
