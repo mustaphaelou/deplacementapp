@@ -1,6 +1,7 @@
-import { prisma } from "@/lib/prisma"
+import type { PrismaClient } from "@prisma/client"
 
 export async function ajouterAudit(
+  prisma: PrismaClient,
   utilisateurId: string,
   action: string,
   entite: string,

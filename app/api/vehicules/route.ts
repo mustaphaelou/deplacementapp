@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     },
   })
 
-  await ajouterAudit(session.user.id, "CREATION_VEHICULE", "VehiculeEntreprise", vehicule.id, { nom: vehicule.nom })
+  await ajouterAudit(prisma, session.user.id, "CREATION_VEHICULE", "VehiculeEntreprise", vehicule.id, { nom: vehicule.nom })
 
   return NextResponse.json({ vehicule })
 }
@@ -52,7 +52,7 @@ export async function PUT(req: NextRequest) {
     },
   })
 
-  await ajouterAudit(session.user.id, "MODIFICATION_VEHICULE", "VehiculeEntreprise", vehicule.id, { nom: vehicule.nom })
+  await ajouterAudit(prisma, session.user.id, "MODIFICATION_VEHICULE", "VehiculeEntreprise", vehicule.id, { nom: vehicule.nom })
 
   return NextResponse.json({ vehicule })
 }
@@ -66,7 +66,7 @@ export async function DELETE(req: NextRequest) {
   const { id } = await req.json()
 
   await prisma.vehiculeEntreprise.delete({ where: { id } })
-  await ajouterAudit(session.user.id, "SUPPRESSION_VEHICULE", "VehiculeEntreprise", id)
+  await ajouterAudit(prisma, session.user.id, "SUPPRESSION_VEHICULE", "VehiculeEntreprise", id)
 
   return NextResponse.json({ success: true })
 }

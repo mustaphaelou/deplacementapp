@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { ajouterAudit } from "@/lib/audit"
 import { notificationBus } from "@/lib/notification-bus"
-import { canTransition, buildTransition } from "@/lib/workflow"
+import { canTransitionFromLegacy, buildTransitionFromLegacy } from "@/lib/workflow"
 import type { Role } from "@prisma/client"
 
 export async function POST(
@@ -23,7 +23,7 @@ export async function POST(
   const userId = session.user.id
   const userRole = session.user.role as Role
 
-  if (!canTransition(userRole, demande.statut, "retirer")) {
+  if (!canTransitionFromLegacy(userRole, demande.statut, "retirer")) {
     return NextResponse.json({ error: "Action non autorisée" }, { status: 403 })
   }
 
@@ -32,14 +32,14 @@ export async function POST(
     return NextResponse.json({ error: "Action non autorisée" }, { status: 403 })
   }
 
-  const result = buildTransition(userRole, demande.statut, "retirer")!
+  const result = buildTransitionFromLegacy(userRole, demande.statut, "retirer")!
 
   const updated = await prisma.demandeDeplacement.update({
     where: { id },
     data: result.transition.fields as any,
   })
 
-  await ajouterAudit(userId, result.auditAction, "DemandeDeplacement", id, { numero: demande.numero })
+  await ajouterAudit(prisma, userId, result.auditAction, "DemandeDeplacement", id, { numero: demande.numero })
   await notificationBus.dispatch(result.notificationEvent, {
     demandeId: demande.id,
     numero: demande.numero,

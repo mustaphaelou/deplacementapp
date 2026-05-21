@@ -11,7 +11,7 @@ export default function NotFound() {
       <p className="text-sm text-muted-foreground">
         La page que vous recherchez n&apos;existe pas ou a ete deplacee.
       </p>
-      <Button render={<Link href="/dashboard" />}>
+      <Button render={<Link href="/dashboard" />} nativeButton={false}>
         Retour au tableau de bord
       </Button>
     </div>

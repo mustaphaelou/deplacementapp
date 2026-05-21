@@ -1,14 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "sonner"
-import { Plus, Loader2, Pencil, Trash2 } from "lucide-react"
+import { Plus, Loader2, Pencil, Trash2, Search } from "lucide-react"
 
 interface Vehicule {
   id: string
@@ -24,6 +23,7 @@ export default function VehiculesPage() {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Vehicule | null>(null)
   const [form, setForm] = useState({ nom: "", immatriculation: "", disponible: true })
+  const [search, setSearch] = useState("")
 
   async function fetchVehicules() {
     setLoading(true)
@@ -86,6 +86,12 @@ export default function VehiculesPage() {
     }
   }
 
+  const filtered = vehicules.filter(
+    (v) =>
+      v.nom.toLowerCase().includes(search.toLowerCase()) ||
+      v.immatriculation.toLowerCase().includes(search.toLowerCase())
+  )
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -99,43 +105,59 @@ export default function VehiculesPage() {
         </Button>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="p-8 text-center text-sm text-muted-foreground">Chargement...</div>
-          ) : vehicules.length === 0 ? (
-            <div className="p-8 text-center text-sm text-muted-foreground">Aucun véhicule</div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-muted-foreground">
-                  <th className="p-3 font-medium">Nom</th>
-                  <th className="p-3 font-medium">Immatriculation</th>
-                  <th className="p-3 font-medium">Disponible</th>
-                  <th className="p-3 font-medium">Actions</th>
+      <div className="rounded-xl border bg-background">
+        <div className="border-b p-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Rechercher véhicule ou immatriculation..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="p-8 text-center text-sm text-muted-foreground">Chargement...</div>
+        ) : filtered.length === 0 ? (
+          <div className="p-8 text-center text-sm text-muted-foreground">
+            {search ? "Aucun résultat" : "Aucun véhicule"}
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/50 text-left text-muted-foreground">
+                <th className="p-3 font-medium">Nom</th>
+                <th className="p-3 font-medium">Immatriculation</th>
+                <th className="p-3 font-medium">Statut</th>
+                <th className="p-3 font-medium">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((v) => (
+                <tr key={v.id} className="border-b last:border-0 hover:bg-muted/30">
+                  <td className="p-3 font-medium">{v.nom}</td>
+                  <td className="p-3 font-mono text-xs">{v.immatriculation}</td>
+                  <td className="p-3">
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${v.disponible ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300" : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"}`}>
+                      {v.disponible ? "Disponible" : "En mission"}
+                    </span>
+                  </td>
+                  <td className="p-3 flex gap-1">
+                    <Button variant="ghost" size="icon" onClick={() => openEdit(v)}>
+                      <Pencil className="size-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => handleDelete(v.id)}>
+                      <Trash2 className="size-4 text-destructive" />
+                    </Button>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {vehicules.map((v) => (
-                  <tr key={v.id} className="border-b last:border-0 hover:bg-muted/30">
-                    <td className="p-3">{v.nom}</td>
-                    <td className="p-3">{v.immatriculation}</td>
-                    <td className="p-3">{v.disponible ? "Oui" : "Non"}</td>
-                    <td className="p-3 flex gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(v)}>
-                        <Pencil className="size-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(v.id)}>
-                        <Trash2 className="size-4 text-destructive" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </CardContent>
-      </Card>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>

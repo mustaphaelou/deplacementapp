@@ -3,7 +3,7 @@ import { DashboardCard } from "@/components/ui/dashboard-card"
 import { DashboardData } from "@/lib/dashboard"
 import { formatCurrency } from "@/lib/constants"
 import { DemandeStatusBadge } from "@/components/demande-status-badge"
-import { AlertCircle } from "lucide-react"
+import { AlertCircle, Users, Car, FileBarChart } from "lucide-react"
 import Link from "next/link"
 
 interface FinanceDashboardProps {
@@ -26,6 +26,33 @@ export function FinanceDashboard({ data }: FinanceDashboardProps) {
           label="En attente d&apos;approbation"
           value={enAttente!}
         />
+      </div>
+
+      <div>
+        <h2 className="mb-3 text-sm font-semibold text-muted-foreground uppercase tracking-wide">Administration</h2>
+        <div className="grid gap-4 md:grid-cols-3">
+          <Link href="/administration/utilisateurs" className="group rounded-xl border bg-background p-5 shadow-sm transition hover:border-primary/50 hover:shadow-md">
+            <div className="mb-3 flex size-10 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300">
+              <Users className="size-5" />
+            </div>
+            <p className="font-medium">Utilisateurs</p>
+            <p className="text-xs text-muted-foreground">Gérer les comptes et rôles</p>
+          </Link>
+          <Link href="/administration/vehicules" className="group rounded-xl border bg-background p-5 shadow-sm transition hover:border-primary/50 hover:shadow-md">
+            <div className="mb-3 flex size-10 items-center justify-center rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300">
+              <Car className="size-5" />
+            </div>
+            <p className="font-medium">Véhicules</p>
+            <p className="text-xs text-muted-foreground">Parc automobile</p>
+          </Link>
+          <Link href="/administration/rapports" className="group rounded-xl border bg-background p-5 shadow-sm transition hover:border-primary/50 hover:shadow-md">
+            <div className="mb-3 flex size-10 items-center justify-center rounded-lg bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-300">
+              <FileBarChart className="size-5" />
+            </div>
+            <p className="font-medium">Rapports</p>
+            <p className="text-xs text-muted-foreground">Statistiques et exports</p>
+          </Link>
+        </div>
       </div>
 
       <Card>

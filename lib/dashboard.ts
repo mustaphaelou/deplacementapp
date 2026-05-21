@@ -41,30 +41,29 @@ export async function getDashboardData(
   role: string
 ): Promise<DashboardData> {
   if (role === "EMPLOYEE") {
-    const [demandes, total, brouillon, soumises, approuvees] =
+    const [demandes, statutCounts] =
       await Promise.all([
         prisma.demandeDeplacement.findMany({
           where: { employeId: userId, deletedAt: null },
           orderBy: { creeLe: "desc" },
           take: 5,
         }),
-        prisma.demandeDeplacement.count({
+        prisma.demandeDeplacement.groupBy({
+          by: ["statut"],
           where: { employeId: userId, deletedAt: null },
-        }),
-        prisma.demandeDeplacement.count({
-          where: { employeId: userId, statut: "BROUILLON", deletedAt: null },
-        }),
-        prisma.demandeDeplacement.count({
-          where: { employeId: userId, statut: "SOUMISE", deletedAt: null },
-        }),
-        prisma.demandeDeplacement.count({
-          where: { employeId: userId, statut: "APPROUVEE", deletedAt: null },
+          _count: true,
         }),
       ])
 
+    const byStatut = Object.fromEntries(statutCounts.map((g) => [g.statut, g._count]))
     return {
       demandes: demandes.map(mapToDashboardDemande),
-      stats: { total, brouillon, soumises, approuvees },
+      stats: {
+        total: Object.values(byStatut).reduce((a, b) => a + b, 0),
+        brouillon: byStatut["BROUILLON"] ?? 0,
+        soumises: byStatut["SOUMISE"] ?? 0,
+        approuvees: byStatut["APPROUVEE"] ?? 0,
+      },
     }
   }
 

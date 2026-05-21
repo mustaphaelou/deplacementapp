@@ -3,7 +3,7 @@ import { DashboardCard } from "@/components/ui/dashboard-card"
 import { DashboardData } from "@/lib/dashboard"
 import { formatCurrency } from "@/lib/constants"
 import { DemandeStatusBadge } from "@/components/demande-status-badge"
-import { AlertCircle, TrendingUp } from "lucide-react"
+import { AlertCircle, TrendingUp, FileBarChart } from "lucide-react"
 import Link from "next/link"
 
 interface DirectionDashboardProps {
@@ -33,6 +33,19 @@ export function DirectionDashboard({ data }: DirectionDashboardProps) {
           label="Budget total engagé"
           value={formatCurrency(budgetTotal!)}
         />
+      </div>
+
+      <div>
+        <h2 className="mb-3 text-sm font-semibold text-muted-foreground uppercase tracking-wide">Administration</h2>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Link href="/administration/rapports" className="group rounded-xl border bg-background p-5 shadow-sm transition hover:border-primary/50 hover:shadow-md">
+            <div className="mb-3 flex size-10 items-center justify-center rounded-lg bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-300">
+              <FileBarChart className="size-5" />
+            </div>
+            <p className="font-medium">Rapports</p>
+            <p className="text-xs text-muted-foreground">Statistiques et exports</p>
+          </Link>
+        </div>
       </div>
 
       <Card>

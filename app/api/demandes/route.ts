@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { ajouterAudit } from "@/lib/audit"
 import { notificationBus } from "@/lib/notification-bus"
-import { buildTransition } from "@/lib/workflow"
+import { buildTransitionFromLegacy } from "@/lib/workflow"
 import type { Role } from "@prisma/client"
 
 export async function GET(req: NextRequest) {
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
 
   const isSubmit = action === "submit"
   const submitResult = isSubmit
-    ? buildTransition("EMPLOYEE" as Role, "BROUILLON", "submit")
+    ? buildTransitionFromLegacy("EMPLOYEE" as Role, "BROUILLON", "submit")
     : null
 
   const createData: any = {
@@ -118,6 +118,7 @@ export async function POST(req: NextRequest) {
   const demande = await prisma.demandeDeplacement.create({ data: createData })
 
   await ajouterAudit(
+    prisma,
     user.id,
     submitResult ? submitResult.auditAction : "CREATION",
     "DemandeDeplacement",

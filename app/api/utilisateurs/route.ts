@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     },
   })
 
-  await ajouterAudit(session.user.id, "CREATION_UTILISATEUR", "Utilisateur", user.id, { email: user.email })
+  await ajouterAudit(prisma, session.user.id, "CREATION_UTILISATEUR", "Utilisateur", user.id, { email: user.email })
 
   return NextResponse.json({ user })
 }
@@ -71,7 +71,7 @@ export async function PUT(req: NextRequest) {
     data: updateData,
   })
 
-  await ajouterAudit(session.user.id, "MODIFICATION_UTILISATEUR", "Utilisateur", user.id, { email: user.email })
+  await ajouterAudit(prisma, session.user.id, "MODIFICATION_UTILISATEUR", "Utilisateur", user.id, { email: user.email })
 
   return NextResponse.json({ user })
 }

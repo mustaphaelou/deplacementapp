@@ -1,39 +1,78 @@
 # Context: DemandeDeplacement (Travel Request)
 
-## Domain Terms
+A travel request system where employees submit trip requests that flow through a multi-stage approval pipeline.
 
-- **DemandeDeplacement** — A travel request submitted by an employee. Has a lifecycle from draft (BROUILLON) through multi-level approval to final approval (APPROUVEE) or rejection.
-- **Utilisateur** — A user of the system. Has a role and belongs to a Departement.
-- **Departement** — Organizational department (e.g. HR, IT, Finance).
-- **VehiculeEntreprise** — A company-owned vehicle that can be assigned to a travel request.
-- **StatutDemande** — The status of a DemandeDeplacement in its workflow lifecycle.
-- **TypeTransport** — The mode of transport for a travel request.
-- **Notification** — An in-app notification sent to a Utilisateur about a DemandeDeplacement event.
-- **JournalAudit** — An audit log entry recording who did what to which entity.
-- **Document** — A file (e.g. PDF) attached to a DemandeDeplacement.
+## Language
 
-## Workflow
+### Core domain
 
-The DemandeDeplacement approval workflow is a three-stage pipeline:
+**DemandeDeplacement**:
+A request submitted by an employee to travel for business purposes. Has a lifecycle through a multi-stage approval pipeline.
+_Avoid_: Trip, request, travel form
 
-1. **EMPLOYEE** creates a DemandeDeplacement (BROUILLON) and submits it (SOUMISE).
-2. **MANAGER** reviews and approves (APPROUVEE_MANAGER) or rejects (REJETEE_MANAGER).
-3. **FINANCE_ADMIN** reviews budget and approves (APPROUVEE_FINANCE) or rejects (REJETEE_FINANCE).
-4. **GENERAL_DIRECTION** gives final approval (APPROUVEE) or rejects (REJETEE_DIRECTION).
+**Utilisateur**:
+A person who uses the system. Has a role and belongs to exactly one Departement.
+_Avoid_: User, account, person
 
-At any point before submission, the EMPLOYEE can withdraw a BROUILLON (RETIREE).
+**Departement**:
+An organizational unit within the company (e.g. HR, IT, Finance).
+_Avoid_: Division, team, unit
 
-## Roles
+**Role**:
+The set of permissions and responsibilities assigned to a Utilisateur. One of EMPLOYEE, MANAGER, FINANCE_ADMIN, GENERAL_DIRECTION.
+_Avoid_: Position, title, permission level
 
-- **EMPLOYEE** — Creates and submits travel requests. Sees only their own demandes.
-- **MANAGER** — Approves/rejects submitted demandes (first stage).
-- **FINANCE_ADMIN** — Approves/rejects budget (second stage). Also manages users and vehicles.
-- **GENERAL_DIRECTION** — Gives final approval (third stage). Also has admin oversight.
+**VehiculeEntreprise**:
+A company-owned vehicle that can be assigned to a DemandeDeplacement.
+_Avoid_: Company car, fleet vehicle
 
-## Dashboard
+### Workflow
 
-The dashboard (route `/`) is the landing page after login. It shows role-specific summary statistics and recent demandes. Each role sees different data:
-- EMPLOYEE: personal stats (total, drafts, pending, approved) + 5 recent demandes.
-- MANAGER: pending count + 10 demandes awaiting approval.
-- FINANCE_ADMIN: pending budget approvals count + 10 demandes awaiting financial review.
-- GENERAL_DIRECTION: pending final approvals count + total committed budget + 10 demandes awaiting final approval.
+**Etape (Stage)**:
+The current position of a DemandeDeplacement in the approval pipeline. One of: DRAFT, MANAGER_REVIEW, FINANCE_REVIEW, DIRECTION_REVIEW, FINAL.
+
+**Decision**:
+The outcome recorded at a given Etape. One of: PENDING, APPROVED, REJECTED, WITHDRAWN.
+
+**StatutDemande (Legacy)**:
+The single-field representation of a DemandeDeplacement's state. Retained for backward compatibility and computed from Etape + Decision. Examples: BROUILLON, SOUMISE, APPROUVEE_MANAGER, REJETEE_FINANCE, APPROUVEE, RETIREE.
+_Avoid_: Using in new code; prefer Etape + Decision.
+
+**TypeTransport**:
+The mode of transport for a DemandeDeplacement. One of: VOITURE_PERSONNELLE, VOITURE_SOCIETE, BUS, AVION, TRAIN, AUTRE.
+
+### Supporting
+
+**Notification**:
+An in-app message sent to a Utilisateur about a DemandeDeplacement event.
+
+**JournalAudit**:
+A timestamped record of who performed what action on which entity.
+
+**Document**:
+A file attached to a DemandeDeplacement (e.g., invoice, receipt, PDF).
+
+## Relationships
+
+- A **DemandeDeplacement** is created by exactly one **Utilisateur** (the employee).
+- A **DemandeDeplacement** can be assigned to at most one **Utilisateur** (the approver who last acted on it).
+- A **DemandeDeplacement** may be associated with zero or one **VehiculeEntreprise**.
+- A **DemandeDeplacement** has exactly one **Etape** and exactly one current **Decision**.
+- A **Utilisateur** belongs to exactly one **Departement**.
+- An **Utilisateur** can create zero or more **DemandeDeplacement** requests.
+- A **Notification** pertains to exactly one **DemandeDeplacement** and one receiving **Utilisateur**.
+- A **JournalAudit** entry pertains to one **Utilisateur** (the actor).
+- A **Document** belongs to exactly one **DemandeDeplacement**.
+
+## Example dialogue
+
+> **Dev:** "When a manager rejects a demande, does the sequence start over?"
+> **Domain expert:** "No — the demande stops. The employee must create a new one."
+> **Dev:** "Can we show 'pending at manager' and 'pending at finance' using the same word?"
+> **Domain expert:** "Not really. 'Pending' is too generic. One is waiting for the manager, the other for finance. Those are different places in the pipeline."
+
+## Flagged ambiguities
+
+- "approved" was used to mean both a stage-level outcome (manager said yes) and a terminal outcome (whole pipeline complete). Resolved by splitting into **Etape** (where we are) and **Decision** (what happened there). Terminal approval is `Etape: FINAL, Decision: APPROVED`.
+- "status" / "statut" was used for both the single-field legacy representation and the conceptual state machine. Resolved: **StatutDemande** is the legacy computed field; **Etape** + **Decision** are the canonical model.
+- "retirée" (withdrawn) was treated as a separate StatutDemande value. Resolved: withdrawal is a **Decision** (`WITHDRAWN`) and a terminal outcome, not a stage.

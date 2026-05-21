@@ -3,11 +3,13 @@ import { prisma } from "./prisma"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+// ─── Types ───────────────────────────────────────────────────────────────────
+
 export type NotificationEventType =
   | "DEMANDE_SOUMISE"
-  | "DEMANDE_APPAROUM_MANAGERIAL"
-  | "DEMANDE_APPAROUM_FINANCE"
-  | "DEMANDE_APPAROUM_FINALE"
+  | "DEMANDE_APPROBATION_MANAGER"
+  | "DEMANDE_APPROBATION_FINANCE"
+  | "DEMANDE_APPROBATION_FINALE"
   | "DEMANDE_REJETEE"
   | "DEMANDE_RETIREE"
 
@@ -35,9 +37,14 @@ export type NotificationMessage = {
 
 // ─── Adapter interface ─────────────────────────────────────────────────────
 
+export interface AdapterResult {
+  success: boolean
+  error?: Error
+}
+
 export interface NotificationAdapter {
-  /** Persist a single notification. Must throw on failure so the caller can decide to rollback. */
-  send(notification: NotificationMessage): Promise<void>
+  /** Persist a single notification. Returns result so the caller can aggregate. */
+  send(notification: NotificationMessage): Promise<AdapterResult>
 }
 
 // ─── Default Prisma adapter (the only production adapter for now) ──────────
@@ -45,15 +52,20 @@ export interface NotificationAdapter {
 class PrismaNotificationAdapter implements NotificationAdapter {
   constructor(private db: PrismaClient) {}
 
-  async send(notification: NotificationMessage): Promise<void> {
-    await this.db.notification.create({
-      data: {
-        utilisateurId: notification.utilisateurId,
-        titre: notification.titre,
-        message: notification.message,
-        demandeId: notification.demandeId,
-      },
-    })
+  async send(notification: NotificationMessage): Promise<AdapterResult> {
+    try {
+      await this.db.notification.create({
+        data: {
+          utilisateurId: notification.utilisateurId,
+          titre: notification.titre,
+          message: notification.message,
+          demandeId: notification.demandeId,
+        },
+      })
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: error as Error }
+    }
   }
 }
 
@@ -62,16 +74,16 @@ class PrismaNotificationAdapter implements NotificationAdapter {
 // Map each event to the roles that should be notified.
 const EVENT_ROLE_MAP: Record<NotificationEventType, Role[]> = {
   DEMANDE_SOUMISE: ["MANAGER"],
-  DEMANDE_APPAROUM_MANAGERIAL: ["FINANCE_ADMIN"],
-  DEMANDE_APPAROUM_FINANCE: ["GENERAL_DIRECTION"],
-  DEMANDE_APPAROUM_FINALE: [],
+  DEMANDE_APPROBATION_MANAGER: ["FINANCE_ADMIN"],
+  DEMANDE_APPROBATION_FINANCE: ["GENERAL_DIRECTION"],
+  DEMANDE_APPROBATION_FINALE: [],
   DEMANDE_REJETEE: [],
   DEMANDE_RETIREE: [],
 }
 
 // Events that go to the employee who owns the request.
 const EMPLOYEE_EVENTS: NotificationEventType[] = [
-  "DEMANDE_APPAROUM_FINALE",
+  "DEMANDE_APPROBATION_FINALE",
   "DEMANDE_REJETEE",
 ]
 
@@ -123,17 +135,17 @@ function buildMessage(
         titre: "Nouvelle demande de déplacement",
         message: `${fullName} a soumis une demande de déplacement.`,
       }
-    case "DEMANDE_APPAROUM_MANAGERIAL":
+    case "DEMANDE_APPROBATION_MANAGER":
       return {
         titre: "Demande approuvée par le manager",
         message: `La demande ${numero} de ${fullName} a été approuvée par le manager.`,
       }
-    case "DEMANDE_APPAROUM_FINANCE":
+    case "DEMANDE_APPROBATION_FINANCE":
       return {
         titre: "Demande approuvée par les finances",
         message: `La demande ${numero} de ${fullName} est en attente d'approbation finale.`,
       }
-    case "DEMANDE_APPAROUM_FINALE":
+    case "DEMANDE_APPROBATION_FINALE":
       return {
         titre: "Demande approuvée",
         message: `Votre demande ${numero} a été approuvée.`,
@@ -156,6 +168,20 @@ function buildMessage(
   }
 }
 
+// ─── Dispatch result ─────────────────────────────────────────────────────
+
+export interface DispatchFailure {
+  utilisateurId: string
+  error: string
+}
+
+export interface DispatchResult {
+  total: number
+  succeeded: number
+  failed: number
+  failures: DispatchFailure[]
+}
+
 // ─── Notification Bus (the deep module) ─────────────────────────────────────
 
 /**
@@ -175,13 +201,11 @@ export class NotificationBus {
     private db: PrismaClient
   ) {}
 
-  async dispatch(event: NotificationEventType, payload: NotificationPayload): Promise<void> {
+  async dispatch(event: NotificationEventType, payload: NotificationPayload): Promise<DispatchResult> {
     const recipients = await resolveRecipients(event, payload, this.db)
     const { titre, message } = buildMessage(event, payload)
 
-    // If any notification fails, we throw so the caller (e.g. an approval
-    // transaction) can decide to rollback.
-    await Promise.all(
+    const results = await Promise.allSettled(
       recipients.map((utilisateurId) =>
         this.adapter.send({
           titre,
@@ -191,6 +215,26 @@ export class NotificationBus {
         })
       )
     )
+
+    const failures: DispatchFailure[] = []
+    let succeeded = 0
+    let failed = 0
+
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i]
+      if (r.status === "fulfilled" && r.value.success) {
+        succeeded++
+      } else {
+        failed++
+        const error =
+          r.status === "fulfilled"
+            ? (r.value.error?.message ?? "Unknown adapter error")
+            : (r.reason?.message ?? "Unknown rejection")
+        failures.push({ utilisateurId: recipients[i], error })
+      }
+    }
+
+    return { total: recipients.length, succeeded, failed, failures }
   }
 }
 
