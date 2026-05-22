@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { ajouterAudit } from "@/lib/audit"
-import { notificationBus } from "@/lib/notification-bus"
-import { buildTransitionFromLegacy } from "@/lib/workflow"
-import type { Role } from "@prisma/client"
+import { demandeService } from "@/lib/demande-service"
+import {
+  UnauthorizedActionError,
+  DemandeNotFoundError,
+  InvalidTransitionError,
+} from "@/lib/demande-service"
+import type { Role, TypeTransport } from "@prisma/client"
 
 export async function GET(req: NextRequest) {
   const session = await auth()
-  if (!session?.user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
+  if (!session?.user) return NextResponse.json({ error: "Non autorise" }, { status: 401 })
 
   const { searchParams } = new URL(req.url)
   const page = parseInt(searchParams.get("page") || "1")
@@ -55,84 +58,28 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session?.user || session.user.role !== "EMPLOYEE") {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
+    return NextResponse.json({ error: "Non autorise" }, { status: 401 })
   }
 
   const body = await req.json()
   const { action, ...data } = body
 
-  const user = await prisma.utilisateur.findUnique({
-    where: { id: session.user.id },
-    include: { departement: true },
-  })
-  if (!user) return NextResponse.json({ error: "Utilisateur introuvable" }, { status: 404 })
+  const serviceAction = action === "submit" ? "submit" as const : "create" as const
 
-  const nextNum = (await prisma.demandeDeplacement.count()) + 1
-  const numero = `DD-${new Date().getFullYear()}-${String(nextNum).padStart(4, "0")}`
-
-  const motifArray = data.motif || []
-  if (motifArray.includes("autre") && data.motifAutre) {
-    const idx = motifArray.indexOf("autre")
-    motifArray[idx] = `Autre: ${data.motifAutre}`
-  }
-
-  const isSubmit = action === "submit"
-  const submitResult = isSubmit
-    ? buildTransitionFromLegacy("EMPLOYEE" as Role, "BROUILLON", "submit")
-    : null
-
-  const createData: any = {
-    numero,
-    employeId: user.id,
-    statut: "BROUILLON",
-    employeNom: user.nom,
-    employePrenom: user.prenom,
-    employePoste: user.poste,
-    employeDepartement: user.departement.nom,
-    motif: JSON.stringify(motifArray),
-    dateDepart: new Date(data.dateDepart),
-    dateRetour: new Date(data.dateRetour),
-    destination: data.destination,
-    typeTransport: data.typeTransport,
-    autreTransport: data.autreTransport || null,
-    vehiculeId: data.vehiculeId || null,
-    fraisTransport: parseFloat(data.fraisTransport || "0"),
-    fraisHebergement: parseFloat(data.fraisHebergement || "0"),
-    fraisRepas: parseFloat(data.fraisRepas || "0"),
-    fraisDivers: parseFloat(data.fraisDivers || "0"),
-    totalEstime:
-      parseFloat(data.fraisTransport || "0") +
-      parseFloat(data.fraisHebergement || "0") +
-      parseFloat(data.fraisRepas || "0") +
-      parseFloat(data.fraisDivers || "0"),
-    avanceRequise: data.avanceRequise || false,
-    montantAvance: data.avanceRequise ? parseFloat(data.montantAvance || "0") : null,
-    description: data.description || null,
-    soumiseLe: null,
-  }
-
-  if (submitResult) {
-    Object.assign(createData, submitResult.transition.fields)
-  }
-
-  const demande = await prisma.demandeDeplacement.create({ data: createData })
-
-  await ajouterAudit(
-    prisma,
-    user.id,
-    submitResult ? submitResult.auditAction : "CREATION",
-    "DemandeDeplacement",
-    demande.id,
-    { numero }
-  )
-
-  if (submitResult) {
-    await notificationBus.dispatch(submitResult.notificationEvent, {
-      demandeId: demande.id,
-      numero: demande.numero,
-      employe: { id: user.id, prenom: user.prenom, nom: user.nom },
+  try {
+    const result = await demandeService.executeAction({
+      action: serviceAction,
+      data: {
+        ...data,
+        typeTransport: data.typeTransport as TypeTransport,
+      },
+      actor: { id: session.user.id, role: session.user.role as Role },
     })
+    return NextResponse.json({ demande: result.demande })
+  } catch (e) {
+    if (e instanceof DemandeNotFoundError) return NextResponse.json({ error: e.message }, { status: 404 })
+    if (e instanceof UnauthorizedActionError) return NextResponse.json({ error: e.message }, { status: 403 })
+    if (e instanceof InvalidTransitionError) return NextResponse.json({ error: e.message }, { status: 422 })
+    throw e
   }
-
-  return NextResponse.json({ demande })
 }
