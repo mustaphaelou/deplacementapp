@@ -1,13 +1,13 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { DashboardCard } from "@/components/ui/dashboard-card"
-import { DashboardData } from "@/lib/dashboard"
-import { formatCurrency } from "@/lib/constants"
-import { DemandeStatusBadge } from "@/components/demande-status-badge"
 import { AlertCircle, TrendingUp, FileBarChart } from "lucide-react"
 import Link from "next/link"
+import { formatCurrency } from "@/lib/constants"
+import { DemandeStatusBadge } from "@/components/demande-status-badge"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { DashboardCard } from "@/components/ui/dashboard-card"
+import { DirectionDashboardData } from "@/lib/dashboard"
 
 interface DirectionDashboardProps {
-  data: DashboardData
+  data: DirectionDashboardData
 }
 
 export function DirectionDashboard({ data }: DirectionDashboardProps) {
@@ -82,7 +82,7 @@ export function DirectionDashboard({ data }: DirectionDashboardProps) {
                       </Link>
                     </td>
                     <td className="py-2">
-                      {d.employe!.prenom} {d.employe!.nom}
+                      {d.employe ? `${d.employe.prenom} ${d.employe.nom}` : "N/A"}
                     </td>
                     <td className="py-2">{d.destination}</td>
                     <td className="py-2">

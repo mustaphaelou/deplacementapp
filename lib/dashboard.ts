@@ -1,6 +1,9 @@
 import { prisma } from "@/lib/prisma"
+import type { StatutDemande } from "@prisma/client"
 
-export interface DashboardDemande {
+// ─── Shared types ───────────────────────────────────────────
+
+export interface DashboardDemandeSummary {
   id: string
   numero: string
   destination: string
@@ -8,22 +11,29 @@ export interface DashboardDemande {
   dateRetour: Date
   totalEstime: number | null
   statut: string
-  employe?: { prenom: string; nom: string }
+  employe: { prenom: string; nom: string } | null
 }
 
-export interface DashboardData {
-  demandes: DashboardDemande[]
-  stats?: {
-    total: number
-    brouillon: number
-    soumises: number
-    approuvees: number
+// ─── Pure function: stats aggregation ───────────────────────
+
+export interface DemandesStats {
+  total: number
+  brouillon: number
+  soumises: number
+  approuvees: number
+}
+
+export function computeStats(counts: { statut: string; _count: number }[]): DemandesStats {
+  const byStatut = Object.fromEntries(counts.map((g) => [g.statut, g._count]))
+  return {
+    total: Object.values(byStatut).reduce((a, b) => a + b, 0),
+    brouillon: byStatut["BROUILLON"] ?? 0,
+    soumises: byStatut["SOUMISE"] ?? 0,
+    approuvees: byStatut["APPROUVEE"] ?? 0,
   }
-  enAttente?: number
-  budgetTotal?: number
 }
 
-function mapToDashboardDemande(demande: any): DashboardDemande {
+function mapToSummary(demande: any): DashboardDemandeSummary {
   return {
     id: demande.id,
     numero: demande.numero,
@@ -32,107 +42,107 @@ function mapToDashboardDemande(demande: any): DashboardDemande {
     dateRetour: demande.dateRetour,
     totalEstime: demande.totalEstime ? Number(demande.totalEstime) : null,
     statut: demande.statut,
-    employe: demande.employe ? { prenom: demande.employe.prenom, nom: demande.employe.nom } : undefined,
+    employe: demande.employe ? { prenom: demande.employe.prenom, nom: demande.employe.nom } : null,
   }
 }
 
-export async function getDashboardData(
-  userId: string,
-  role: string
-): Promise<DashboardData> {
-  if (role === "EMPLOYEE") {
-    const [demandes, statutCounts] =
-      await Promise.all([
-        prisma.demandeDeplacement.findMany({
-          where: { employeId: userId, deletedAt: null },
-          orderBy: { creeLe: "desc" },
-          take: 5,
-        }),
-        prisma.demandeDeplacement.groupBy({
-          by: ["statut"],
-          where: { employeId: userId, deletedAt: null },
-          _count: true,
-        }),
-      ])
+// ─── Query module (internal, policy-agnostic) ───────────────
 
-    const byStatut = Object.fromEntries(statutCounts.map((g) => [g.statut, g._count]))
-    return {
-      demandes: demandes.map(mapToDashboardDemande),
-      stats: {
-        total: Object.values(byStatut).reduce((a, b) => a + b, 0),
-        brouillon: byStatut["BROUILLON"] ?? 0,
-        soumises: byStatut["SOUMISE"] ?? 0,
-        approuvees: byStatut["APPROUVEE"] ?? 0,
-      },
-    }
+async function fetchDemandesByStatuts(
+  statuts: StatutDemande[],
+  opts: { limit?: number; includeEmployee?: boolean; orderBy?: any } = {}
+): Promise<DashboardDemandeSummary[]> {
+  const { limit = 10, includeEmployee = false, orderBy = { creeLe: "desc" } } = opts
+
+  const demandes = await prisma.demandeDeplacement.findMany({
+    where: { statut: { in: statuts }, deletedAt: null },
+    orderBy,
+    take: limit,
+    include: includeEmployee ? { employe: { select: { prenom: true, nom: true } } } : undefined,
+  })
+
+  return demandes.map(mapToSummary)
+}
+
+async function countByStatut(statut: StatutDemande): Promise<number> {
+  return prisma.demandeDeplacement.count({ where: { statut, deletedAt: null } })
+}
+
+async function aggregateBudget(statuses: StatutDemande[]): Promise<number> {
+  const result = await prisma.demandeDeplacement.aggregate({
+    _sum: { totalEstime: true },
+    where: { statut: { in: statuses }, deletedAt: null },
+  })
+  return Number(result._sum?.totalEstime ?? 0)
+}
+
+// ─── Role-specific adapters ─────────────────────────────────
+
+export interface EmployeeDashboardData {
+  demandes: DashboardDemandeSummary[]
+  stats: DemandesStats
+}
+
+export async function getEmployeeDashboard(userId: string): Promise<EmployeeDashboardData> {
+  const [demandes, statutCounts] = await Promise.all([
+    prisma.demandeDeplacement.findMany({
+      where: { employeId: userId, deletedAt: null },
+      orderBy: { creeLe: "desc" },
+      take: 5,
+    }),
+    prisma.demandeDeplacement.groupBy({
+      by: ["statut"],
+      where: { employeId: userId, deletedAt: null },
+      _count: true,
+    }),
+  ])
+
+  return {
+    demandes: demandes.map(mapToSummary),
+    stats: computeStats(statutCounts),
   }
+}
 
-  if (role === "MANAGER") {
-    const [enAttente, demandes] = await Promise.all([
-      prisma.demandeDeplacement.count({
-        where: { statut: "SOUMISE", deletedAt: null },
-      }),
-      prisma.demandeDeplacement.findMany({
-        where: { statut: "SOUMISE", deletedAt: null },
-        orderBy: { soumiseLe: "desc" },
-        take: 10,
-        include: {
-          employe: { select: { prenom: true, nom: true } },
-        },
-      }),
-    ])
+export interface ManagerDashboardData {
+  demandes: DashboardDemandeSummary[]
+  enAttente: number
+}
 
-    return { demandes: demandes.map(mapToDashboardDemande), enAttente }
-  }
+export async function getManagerDashboard(): Promise<ManagerDashboardData> {
+  const [demandes, enAttente] = await Promise.all([
+    fetchDemandesByStatuts(["SOUMISE"], { includeEmployee: true, limit: 10, orderBy: { soumiseLe: "desc" } }),
+    countByStatut("SOUMISE"),
+  ])
 
-  if (role === "FINANCE_ADMIN") {
-    const [enAttente, demandes] = await Promise.all([
-      prisma.demandeDeplacement.count({
-        where: { statut: "APPROUVEE_MANAGER", deletedAt: null },
-      }),
-      prisma.demandeDeplacement.findMany({
-        where: { statut: "APPROUVEE_MANAGER", deletedAt: null },
-        orderBy: { approuveeManagerLe: "desc" },
-        take: 10,
-        include: {
-          employe: { select: { prenom: true, nom: true } },
-        },
-      }),
-    ])
+  return { demandes, enAttente }
+}
 
-    return { demandes: demandes.map(mapToDashboardDemande), enAttente }
-  }
+export interface FinanceDashboardData {
+  demandes: DashboardDemandeSummary[]
+  enAttente: number
+}
 
-  if (role === "GENERAL_DIRECTION") {
-    const [enAttente, totalBudget, demandes] = await Promise.all([
-      prisma.demandeDeplacement.count({
-        where: { statut: "APPROUVEE_FINANCE", deletedAt: null },
-      }),
-      prisma.demandeDeplacement.aggregate({
-        _sum: { totalEstime: true },
-        where: {
-          statut: {
-            in: ["APPROUVEE", "APPROUVEE_FINANCE", "APPROUVEE_MANAGER"],
-          },
-          deletedAt: null,
-        },
-      }),
-      prisma.demandeDeplacement.findMany({
-        where: { statut: "APPROUVEE_FINANCE", deletedAt: null },
-        orderBy: { approuveeFinanceLe: "desc" },
-        take: 10,
-        include: {
-          employe: { select: { prenom: true, nom: true } },
-        },
-      }),
-    ])
+export async function getFinanceDashboard(): Promise<FinanceDashboardData> {
+  const [demandes, enAttente] = await Promise.all([
+    fetchDemandesByStatuts(["APPROUVEE_MANAGER"], { includeEmployee: true, limit: 10, orderBy: { approuveeManagerLe: "desc" } }),
+    countByStatut("APPROUVEE_MANAGER"),
+  ])
 
-    return {
-      demandes: demandes.map(mapToDashboardDemande),
-      enAttente,
-      budgetTotal: Number(totalBudget._sum.totalEstime ?? 0),
-    }
-  }
+  return { demandes, enAttente }
+}
 
-  return { demandes: [] }
+export interface DirectionDashboardData {
+  demandes: DashboardDemandeSummary[]
+  enAttente: number
+  budgetTotal: number
+}
+
+export async function getDirectionDashboard(): Promise<DirectionDashboardData> {
+  const [demandes, enAttente, budgetTotal] = await Promise.all([
+    fetchDemandesByStatuts(["APPROUVEE_FINANCE"], { includeEmployee: true, limit: 10, orderBy: { approuveeFinanceLe: "desc" } }),
+    countByStatut("APPROUVEE_FINANCE"),
+    aggregateBudget(["APPROUVEE", "APPROUVEE_FINANCE", "APPROUVEE_MANAGER"]),
+  ])
+
+  return { demandes, enAttente, budgetTotal }
 }

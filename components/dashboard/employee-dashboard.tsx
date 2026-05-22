@@ -1,13 +1,13 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { DashboardCard } from "@/components/ui/dashboard-card"
-import { DashboardData } from "@/lib/dashboard"
-import { formatCurrency, formatDate } from "@/lib/constants"
-import { DemandeStatusBadge } from "@/components/demande-status-badge"
 import { FileText, Clock, AlertCircle, CheckCircle } from "lucide-react"
 import Link from "next/link"
+import { formatCurrency, formatDate } from "@/lib/constants"
+import { DemandeStatusBadge } from "@/components/demande-status-badge"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { DashboardCard } from "@/components/ui/dashboard-card"
+import { EmployeeDashboardData } from "@/lib/dashboard"
 
 interface EmployeeDashboardProps {
-  data: DashboardData
+  data: EmployeeDashboardData
 }
 
 export function EmployeeDashboard({ data }: EmployeeDashboardProps) {
