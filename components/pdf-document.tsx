@@ -1,11 +1,6 @@
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer"
 import { formatCurrency, formatDate, TRANSPORT_LABELS, STATUT_LABELS } from "@/lib/constants"
-import type { DemandeDeplacement, Utilisateur, VehiculeEntreprise } from "@prisma/client"
-
-type DemandeWithRelations = DemandeDeplacement & {
-  employe: Utilisateur
-  vehicule: VehiculeEntreprise | null
-}
+import type { PdfRenderData } from "@/lib/pdf-types"
 
 const styles = StyleSheet.create({
   page: { padding: 40, fontSize: 10, fontFamily: "Helvetica" },
@@ -23,77 +18,67 @@ const styles = StyleSheet.create({
   footer: { position: "absolute", bottom: 40, left: 40, right: 40, textAlign: "center", color: "#999", fontSize: 8 },
 })
 
-function parseMotif(motif: string): string[] {
-  try {
-    return JSON.parse(motif)
-  } catch {
-    return [motif]
-  }
-}
-
-export default function PdfDocument({ demande }: { demande: DemandeWithRelations }) {
-  const motifs = parseMotif(demande.motif)
-
+export default function PdfDocument({ data }: { data: PdfRenderData }) {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
           <Text style={styles.title}>HAY 2010 SARL</Text>
           <Text style={styles.subtitle}>Formulaire de Demande de Déplacement</Text>
-          <Text style={styles.subtitle}>N° {demande.numero}</Text>
+          <Text style={styles.subtitle}>N° {data.numero}</Text>
         </View>
 
         <Text style={styles.sectionTitle}>Statut</Text>
         <View style={styles.row}>
           <Text style={styles.label}>Statut actuel :</Text>
-          <Text style={styles.value}>{STATUT_LABELS[demande.statut]}</Text>
+          <Text style={styles.value}>{STATUT_LABELS[data.statut]}</Text>
         </View>
 
         <Text style={styles.sectionTitle}>Informations Employé</Text>
         <View style={styles.row}>
           <Text style={styles.label}>Nom complet :</Text>
-          <Text style={styles.value}>{demande.employePrenom} {demande.employeNom}</Text>
+          <Text style={styles.value}>{data.employePrenom} {data.employeNom}</Text>
         </View>
         <View style={styles.row}>
           <Text style={styles.label}>Poste :</Text>
-          <Text style={styles.value}>{demande.employePoste}</Text>
+          <Text style={styles.value}>{data.employePoste}</Text>
         </View>
         <View style={styles.row}>
           <Text style={styles.label}>Département :</Text>
-          <Text style={styles.value}>{demande.employeDepartement}</Text>
+          <Text style={styles.value}>{data.employeDepartement}</Text>
         </View>
 
         <Text style={styles.sectionTitle}>Détails du Déplacement</Text>
         <View style={styles.row}>
           <Text style={styles.label}>Motif(s) :</Text>
-          <Text style={styles.value}>{motifs.join(", ")}</Text>
+          <Text style={styles.value}>{data.motif.join(", ")}</Text>
         </View>
         <View style={styles.row}>
           <Text style={styles.label}>Date de départ :</Text>
-          <Text style={styles.value}>{formatDate(demande.dateDepart)}</Text>
+          <Text style={styles.value}>{formatDate(data.dateDepart)}</Text>
         </View>
         <View style={styles.row}>
           <Text style={styles.label}>Date de retour :</Text>
-          <Text style={styles.value}>{formatDate(demande.dateRetour)}</Text>
+          <Text style={styles.value}>{formatDate(data.dateRetour)}</Text>
         </View>
         <View style={styles.row}>
           <Text style={styles.label}>Destination :</Text>
-          <Text style={styles.value}>{demande.destination}</Text>
+          <Text style={styles.value}>{data.destination}</Text>
         </View>
         <View style={styles.row}>
           <Text style={styles.label}>Transport :</Text>
-          <Text style={styles.value}>{TRANSPORT_LABELS[demande.typeTransport]}</Text>
+          <Text style={styles.value}>{TRANSPORT_LABELS[data.typeTransport]}</Text>
         </View>
-        {demande.vehicule && (
+        {data.vehicule && (
           <View style={styles.row}>
             <Text style={styles.label}>Véhicule :</Text>
-            <Text style={styles.value}>{demande.vehicule.nom} ({demande.vehicule.immatriculation})</Text>
+            <Text style={styles.value}>{data.vehicule.nom} ({data.vehicule.immatriculation})</Text>
           </View>
         )}
-        {demande.autreTransport && (
+        {data.autreTransport && (
           <View style={styles.row}>
             <Text style={styles.label}>Autre transport :</Text>
-            <Text style={styles.value}>{demande.autreTransport}</Text>
+            <Text style={styles.value}>{data.autreTransport}</Text>
           </View>
         )}
 
@@ -105,40 +90,40 @@ export default function PdfDocument({ demande }: { demande: DemandeWithRelations
           </View>
           <View style={styles.tableRow}>
             <Text style={styles.tableCell}>Transport</Text>
-            <Text style={styles.tableCell}>{formatCurrency(Number(demande.fraisTransport ?? 0))}</Text>
+            <Text style={styles.tableCell}>{formatCurrency(data.couts.transport)}</Text>
           </View>
           <View style={styles.tableRow}>
             <Text style={styles.tableCell}>Hébergement</Text>
-            <Text style={styles.tableCell}>{formatCurrency(Number(demande.fraisHebergement ?? 0))}</Text>
+            <Text style={styles.tableCell}>{formatCurrency(data.couts.hebergement)}</Text>
           </View>
           <View style={styles.tableRow}>
             <Text style={styles.tableCell}>Repas</Text>
-            <Text style={styles.tableCell}>{formatCurrency(Number(demande.fraisRepas ?? 0))}</Text>
+            <Text style={styles.tableCell}>{formatCurrency(data.couts.repas)}</Text>
           </View>
           <View style={styles.tableRow}>
             <Text style={styles.tableCell}>Divers</Text>
-            <Text style={styles.tableCell}>{formatCurrency(Number(demande.fraisDivers ?? 0))}</Text>
+            <Text style={styles.tableCell}>{formatCurrency(data.couts.divers)}</Text>
           </View>
           <View style={[styles.tableRow, { fontWeight: "bold" }]}>
             <Text style={styles.tableCell}>Total estimé</Text>
-            <Text style={styles.tableCell}>{formatCurrency(Number(demande.totalEstime ?? 0))}</Text>
+            <Text style={styles.tableCell}>{formatCurrency(data.couts.total)}</Text>
           </View>
         </View>
 
-        {demande.avanceRequise && (
+        {data.avanceRequise && (
           <>
             <Text style={styles.sectionTitle}>Avance</Text>
             <View style={styles.row}>
               <Text style={styles.label}>Montant avance :</Text>
-              <Text style={styles.value}>{formatCurrency(Number(demande.montantAvance ?? 0))}</Text>
+              <Text style={styles.value}>{formatCurrency(data.montantAvance ?? 0)}</Text>
             </View>
           </>
         )}
 
-        {demande.description && (
+        {data.description && (
           <>
             <Text style={styles.sectionTitle}>Description</Text>
-            <Text>{demande.description}</Text>
+            <Text>{data.description}</Text>
           </>
         )}
 

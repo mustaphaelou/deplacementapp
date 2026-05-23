@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { toPdfRenderData } from "@/lib/pdf-mapper"
+import { pdfRenderer } from "@/lib/pdf-renderer"
 
 export async function GET(
   req: NextRequest,
@@ -15,14 +17,15 @@ export async function GET(
     include: {
       employe: true,
       vehicule: true,
+      assigneA: true,
     },
   })
 
   if (!demande) return NextResponse.json({ error: "Introuvable" }, { status: 404 })
 
   try {
-    const { generatePdfBuffer } = await import("@/lib/pdf")
-    const buffer = await generatePdfBuffer(demande as any)
+    const data = toPdfRenderData(demande)
+    const buffer = await pdfRenderer.render(data)
 
     await prisma.document.create({
       data: {

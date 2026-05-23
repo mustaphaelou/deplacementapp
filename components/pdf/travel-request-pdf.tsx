@@ -1,6 +1,7 @@
 import ReactPDF from "@react-pdf/renderer"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
+import type { PdfRenderData } from "@/lib/pdf-types"
 
 const { Document, Page, Text, View, StyleSheet } = ReactPDF
 
@@ -54,13 +55,6 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: "bold",
   },
-  statusBadge: {
-    fontSize: 10,
-    fontWeight: "bold",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 3,
-  },
   sectionTitle: {
     fontSize: 12,
     fontWeight: "bold",
@@ -95,49 +89,6 @@ const styles = StyleSheet.create({
   fieldValue: {
     fontSize: 10,
   },
-  approvalRow: {
-    flexDirection: "row",
-    marginBottom: 8,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eeeeee",
-    borderBottomStyle: "solid",
-  },
-  approvalIcon: {
-    width: 16,
-    height: 16,
-    marginRight: 8,
-    marginTop: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  approvalIconApproved: {
-    color: "#16a34a",
-    fontWeight: "bold",
-  },
-  approvalIconRejected: {
-    color: "#dc2626",
-    fontWeight: "bold",
-  },
-  approvalContent: {
-    flex: 1,
-  },
-  approvalDecision: {
-    fontSize: 10,
-    fontWeight: "bold",
-    marginBottom: 1,
-  },
-  approvalMeta: {
-    fontSize: 8,
-    color: borders.medium,
-    marginBottom: 2,
-  },
-  approvalComment: {
-    fontSize: 9,
-    fontStyle: "italic",
-    color: "#444444",
-    marginTop: 2,
-  },
   footer: {
     position: "absolute",
     bottom: 30,
@@ -155,6 +106,24 @@ const styles = StyleSheet.create({
     fontSize: 9,
     color: borders.medium,
     fontStyle: "italic",
+  },
+  table: {
+    marginTop: 8,
+    marginBottom: 10,
+  },
+  tableRow: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+    paddingVertical: 4,
+  },
+  tableHeader: {
+    backgroundColor: "#f3f4f6",
+    fontWeight: "bold",
+  },
+  tableCell: {
+    flex: 1,
+    paddingHorizontal: 4,
   },
 })
 
@@ -179,40 +148,24 @@ const watermarkStyles = StyleSheet.create({
 })
 
 const STATUS_LABELS: Record<string, string> = {
-  DRAFT: "BROUILLON",
-  PENDING: "EN ATTENTE",
-  APPROVED: "APPROUVEE",
-  REJECTED: "REJETEE",
-  ARCHIVED: "ARCHIVEE",
+  BROUILLON: "BROUILLON",
+  SOUMISE: "SOUMISE",
+  APPROUVEE_MANAGER: "APPROUVEE MANAGER",
+  APPROUVEE_FINANCE: "APPROUVEE FINANCE",
+  APPROUVEE: "APPROUVEE",
+  REJETEE_MANAGER: "REJETEE MANAGER",
+  REJETEE_FINANCE: "REJETEE FINANCE",
+  REJETEE_DIRECTION: "REJETEE DIRECTION",
+  RETIREE: "RETIREE",
 }
 
-const DECISION_LABELS: Record<string, string> = {
-  APPROVED: "Approuvee",
-  REJECTED: "Rejetee",
-}
-
-interface ApprovalWithApprover {
-  id: string
-  decision: string
-  comment: string | null
-  createdAt: Date
-  approver: { id: string; name: string }
-}
-
-interface RequestData {
-  id: string
-  destination: string
-  purpose: string
-  departureDate: Date
-  returnDate: Date
-  transportMode: string
-  accommodation: string | null
-  estimatedBudget: unknown
-  status: string
-  createdAt: Date
-  requester: { id: string; name: string; email: string }
-  manager: { id: string; name: string } | null
-  approvals: ApprovalWithApprover[]
+const TRANSPORT_LABELS: Record<string, string> = {
+  VOITURE_PERSONNELLE: "Voiture personnelle",
+  VOITURE_SOCIETE: "Véhicule de société",
+  BUS: "Bus",
+  AVION: "Avion",
+  TRAIN: "Train",
+  AUTRE: "Autre",
 }
 
 function formatDate(date: Date): string {
@@ -224,29 +177,23 @@ function formatDateTime(date: Date): string {
 }
 
 function getStatusColor(status: string): string {
-  switch (status) {
-    case "APPROVED":
-      return "#16a34a"
-    case "REJECTED":
-      return "#dc2626"
-    case "PENDING":
-      return "#d97706"
-    default:
-      return borders.medium
-  }
+  if (status.startsWith("APPROUVEE")) return "#16a34a"
+  if (status.startsWith("REJETEE")) return "#dc2626"
+  if (status === "SOUMISE") return "#d97706"
+  return borders.medium
 }
 
-export function TravelRequestPdf({ request }: { request: RequestData }) {
-  const isDraft = request.status === "DRAFT"
-  const isRejected = request.status === "REJECTED"
-  const statusLabel = STATUS_LABELS[request.status] || request.status
-  const statusColor = getStatusColor(request.status)
+export function TravelRequestPdf({ data }: { data: PdfRenderData }) {
+  const isDraft = data.statut === "BROUILLON"
+  const statusLabel = STATUS_LABELS[data.statut] || data.statut
+  const statusColor = getStatusColor(data.statut)
+  const transportLabel = TRANSPORT_LABELS[data.typeTransport] || data.typeTransport
 
   return (
     <Document
-      title={`Deplacement - ${request.destination}`}
+      title={`Deplacement - ${data.destination}`}
       author="HAY 2010 SARL"
-      subject={`Demande de deplacement: ${request.destination}`}
+      subject={`Demande de deplacement: ${data.destination}`}
       creator="HAY 2010 SARL - Systeme de Gestion des Deplacements"
     >
       <Page size="A4" style={styles.page}>
@@ -264,11 +211,10 @@ export function TravelRequestPdf({ request }: { request: RequestData }) {
         <View style={styles.metaBar}>
           <View>
             <Text style={styles.metaLabel}>REFERENCE</Text>
-            <Text style={styles.metaValue}>{request.id}</Text>
+            <Text style={styles.metaValue}>{data.numero}</Text>
           </View>
           <View>
             <Text style={styles.metaLabel}>STATUT</Text>
-            {/* Using inline style for dynamic color since StyleSheet.create doesn't support dynamic values well */}
             <View
               style={{
                 paddingHorizontal: 8,
@@ -284,7 +230,7 @@ export function TravelRequestPdf({ request }: { request: RequestData }) {
           </View>
           <View>
             <Text style={styles.metaLabel}>DATE DE CREATION</Text>
-            <Text style={styles.metaValue}>{formatDateTime(request.createdAt)}</Text>
+            <Text style={styles.metaValue}>{formatDateTime(data.creeLe)}</Text>
           </View>
         </View>
 
@@ -293,41 +239,72 @@ export function TravelRequestPdf({ request }: { request: RequestData }) {
         <View style={styles.detailsGrid}>
           <View style={styles.fieldFull}>
             <Text style={styles.fieldLabel}>Destination</Text>
-            <Text style={styles.fieldValue}>{request.destination}</Text>
+            <Text style={styles.fieldValue}>{data.destination}</Text>
           </View>
 
           <View style={styles.fieldFull}>
             <Text style={styles.fieldLabel}>Motif du deplacement</Text>
-            <Text style={styles.fieldValue}>{request.purpose}</Text>
+            <Text style={styles.fieldValue}>{data.motif.join(", ")}</Text>
           </View>
 
           <View style={styles.field}>
             <Text style={styles.fieldLabel}>Date de depart</Text>
-            <Text style={styles.fieldValue}>{formatDate(request.departureDate)}</Text>
+            <Text style={styles.fieldValue}>{formatDate(data.dateDepart)}</Text>
           </View>
 
           <View style={styles.field}>
             <Text style={styles.fieldLabel}>Date de retour</Text>
-            <Text style={styles.fieldValue}>{formatDate(request.returnDate)}</Text>
+            <Text style={styles.fieldValue}>{formatDate(data.dateRetour)}</Text>
           </View>
 
           <View style={styles.field}>
             <Text style={styles.fieldLabel}>Mode de transport</Text>
-            <Text style={styles.fieldValue}>{request.transportMode}</Text>
+            <Text style={styles.fieldValue}>{transportLabel}</Text>
           </View>
 
-          <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Hebergement</Text>
-            <Text style={styles.fieldValue}>{request.accommodation || "\u2014"}</Text>
-          </View>
+          {data.vehicule && (
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>Vehicule</Text>
+              <Text style={styles.fieldValue}>
+                {data.vehicule.nom} ({data.vehicule.immatriculation})
+              </Text>
+            </View>
+          )}
 
-          <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Budget estime</Text>
-            <Text style={styles.fieldValue}>
-              {request.estimatedBudget
-                ? `${Number(request.estimatedBudget).toLocaleString("fr-FR")} EUR`
-                : "\u2014"}
-            </Text>
+          {data.autreTransport && (
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>Autre transport</Text>
+              <Text style={styles.fieldValue}>{data.autreTransport}</Text>
+            </View>
+          )}
+        </View>
+
+        <Text style={styles.sectionTitle}>FRAIS ESTIMES</Text>
+
+        <View style={styles.table}>
+          <View style={[styles.tableRow, styles.tableHeader]}>
+            <Text style={styles.tableCell}>Type</Text>
+            <Text style={styles.tableCell}>Montant</Text>
+          </View>
+          <View style={styles.tableRow}>
+            <Text style={styles.tableCell}>Transport</Text>
+            <Text style={styles.tableCell}>{data.couts.transport.toLocaleString("fr-FR")} EUR</Text>
+          </View>
+          <View style={styles.tableRow}>
+            <Text style={styles.tableCell}>Hebergement</Text>
+            <Text style={styles.tableCell}>{data.couts.hebergement.toLocaleString("fr-FR")} EUR</Text>
+          </View>
+          <View style={styles.tableRow}>
+            <Text style={styles.tableCell}>Repas</Text>
+            <Text style={styles.tableCell}>{data.couts.repas.toLocaleString("fr-FR")} EUR</Text>
+          </View>
+          <View style={styles.tableRow}>
+            <Text style={styles.tableCell}>Divers</Text>
+            <Text style={styles.tableCell}>{data.couts.divers.toLocaleString("fr-FR")} EUR</Text>
+          </View>
+          <View style={[styles.tableRow, { fontWeight: "bold" }]}>
+            <Text style={styles.tableCell}>Total estime</Text>
+            <Text style={styles.tableCell}>{data.couts.total.toLocaleString("fr-FR")} EUR</Text>
           </View>
         </View>
 
@@ -335,66 +312,41 @@ export function TravelRequestPdf({ request }: { request: RequestData }) {
 
         <View style={styles.detailsGrid}>
           <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Nom</Text>
-            <Text style={styles.fieldValue}>{request.requester.name}</Text>
+            <Text style={styles.fieldLabel}>Nom complet</Text>
+            <Text style={styles.fieldValue}>{data.employePrenom} {data.employeNom}</Text>
           </View>
           <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Email</Text>
-            <Text style={styles.fieldValue}>{request.requester.email}</Text>
+            <Text style={styles.fieldLabel}>Poste</Text>
+            <Text style={styles.fieldValue}>{data.employePoste}</Text>
           </View>
-          {request.manager && (
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Departement</Text>
+            <Text style={styles.fieldValue}>{data.employeDepartement}</Text>
+          </View>
+          {data.assigneA && (
             <View style={styles.field}>
               <Text style={styles.fieldLabel}>Traite par</Text>
-              <Text style={styles.fieldValue}>{request.manager.name}</Text>
+              <Text style={styles.fieldValue}>{data.assigneA.prenom} {data.assigneA.nom}</Text>
             </View>
           )}
         </View>
 
-        {request.approvals.length > 0 && (
+        {data.avanceRequise && (
           <>
-            <Text style={styles.sectionTitle}>HISTORIQUE DES DECISIONS</Text>
-            {request.approvals.map((approval) => (
-              <View key={approval.id} style={styles.approvalRow}>
-                <View style={styles.approvalIcon}>
-                  <Text
-                    style={
-                      approval.decision === "APPROVED"
-                        ? styles.approvalIconApproved
-                        : styles.approvalIconRejected
-                    }
-                  >
-                    {approval.decision === "APPROVED" ? "\u2714" : "\u2718"}
-                  </Text>
-                </View>
-                <View style={styles.approvalContent}>
-                  <Text style={styles.approvalDecision}>
-                    {DECISION_LABELS[approval.decision]} par {approval.approver.name}
-                  </Text>
-                  <Text style={styles.approvalMeta}>
-                    {formatDateTime(approval.createdAt)}
-                  </Text>
-                  {approval.comment && (
-                    <Text style={styles.approvalComment}>{approval.comment}</Text>
-                  )}
-                </View>
-              </View>
-            ))}
+            <Text style={styles.sectionTitle}>AVANCE</Text>
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>Montant avance</Text>
+              <Text style={styles.fieldValue}>
+                {(data.montantAvance ?? 0).toLocaleString("fr-FR")} EUR
+              </Text>
+            </View>
           </>
         )}
 
-        {request.approvals.length === 0 && !isDraft && (
+        {data.description && (
           <>
-            {isRejected ? (
-              <>
-                <Text style={styles.sectionTitle}>DECISION</Text>
-                <Text style={styles.noData}>Cette demande a ete rejetee sans commentaire.</Text>
-              </>
-            ) : (
-              <>
-                <Text style={styles.sectionTitle}>DECISION</Text>
-                <Text style={styles.noData}>Aucune decision n{"\u2019"}a encore ete prise sur cette demande.</Text>
-              </>
-            )}
+            <Text style={styles.sectionTitle}>DESCRIPTION</Text>
+            <Text style={styles.fieldValue}>{data.description}</Text>
           </>
         )}
 
