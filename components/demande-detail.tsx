@@ -88,10 +88,10 @@ export function DemandeDetail({ demande, canApprove, canReject, canWithdraw, isO
     setActionLoading(action)
 
     try {
-      const res = await fetch(`/api/demandes/${demande.id}/${action}`, {
+      const res = await fetch(`/api/demandes/${demande.id}/action`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ commentaire }),
+        body: JSON.stringify({ action, commentaire }),
       })
 
       if (!res.ok) {

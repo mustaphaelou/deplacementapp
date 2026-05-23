@@ -8,6 +8,8 @@ import {
 } from "@/lib/demande-service"
 import type { Role } from "@prisma/client"
 
+const REQUIRED_COMMENT_ACTIONS = ["rejeter"]
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -17,18 +19,27 @@ export async function POST(
   if (!session?.user) return NextResponse.json({ error: "Non autorise" }, { status: 401 })
 
   const body = await req.json().catch(() => ({}))
-  const commentaire = body.commentaire?.trim()
+  const action = body.action as "approuver" | "rejeter" | "retirer"
 
-  if (!commentaire) {
-    return NextResponse.json({ error: "Le commentaire est obligatoire pour le rejet" }, { status: 400 })
+  if (!action || !["approuver", "rejeter", "retirer"].includes(action)) {
+    return NextResponse.json({ error: "Action invalide" }, { status: 400 })
   }
+
+  if (REQUIRED_COMMENT_ACTIONS.includes(action)) {
+    const commentaire = body.commentaire?.trim()
+    if (!commentaire) {
+      return NextResponse.json({ error: "Le commentaire est obligatoire pour le rejet" }, { status: 400 })
+    }
+  }
+
+  const comment = action === "approuver" ? body.commentaire?.trim() : undefined
 
   try {
     const result = await demandeService.executeAction({
-      action: "rejeter",
+      action,
       demandeId: id,
       actor: { id: session.user.id, role: session.user.role as Role },
-      comment: commentaire,
+      comment,
     })
     return NextResponse.json({ demande: result.demande })
   } catch (e) {
