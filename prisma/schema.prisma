@@ -50,6 +50,7 @@ model Utilisateur {
   role          Role      @default(EMPLOYEE)
   departementId String
   departement   Departement @relation(fields: [departementId], references: [id])
+  avatarUrl     String?
   telephone     String?
   dateEmbauche  DateTime?
   actif         Boolean   @default(true)

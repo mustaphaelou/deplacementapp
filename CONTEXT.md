@@ -49,6 +49,10 @@ An in-app message sent to a Utilisateur about a DemandeDeplacement event.
 **JournalAudit**:
 A timestamped record of who performed what action on which entity.
 
+**AvatarProfil**:
+An optional profile image uploaded by a Utilisateur. Stored as a file on the local filesystem under `/uploads/avatars/` with the URL path saved in `Utilisateur.avatarUrl`.
+_Avoid_: Profile picture, profile photo, user image
+
 **Document**:
 A file attached to a DemandeDeplacement (e.g., invoice, receipt, PDF).
 
