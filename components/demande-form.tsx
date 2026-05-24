@@ -87,7 +87,7 @@ export function DemandeForm() {
         <CardContent className="space-y-6">
           <div>
             <Label>Motif du déplacement</Label>
-            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            <div className="mt-2 grid gap-4 sm:gap-2 sm:grid-cols-2">
               {PURPOSE_OPTIONS.map((opt) => (
                 <label key={opt.value} className="flex items-center gap-2 text-sm">
                   <Checkbox
@@ -108,7 +108,7 @@ export function DemandeForm() {
             {errors.motif && <p className="mt-1 text-xs text-destructive">{errors.motif.message}</p>}
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:gap-2 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="dateDepart">Date de départ</Label>
               <Input id="dateDepart" type="date" {...register("dateDepart")} />
@@ -129,7 +129,7 @@ export function DemandeForm() {
 
           <div className="space-y-2">
             <Label>Moyen de transport</Label>
-            <div className="grid gap-2 sm:grid-cols-3">
+            <div className="grid gap-4 sm:gap-2 sm:grid-cols-3">
               {Object.entries(TRANSPORT_LABELS).map(([value, label]) => (
                 <label key={value} className="flex items-center gap-2 text-sm">
                   <input
@@ -172,7 +172,7 @@ export function DemandeForm() {
 
           <div>
             <Label>Frais estimés (Dhs)</Label>
-            <div className="mt-2 grid gap-3 sm:grid-cols-4">
+            <div className="mt-2 grid gap-4 sm:gap-3 sm:grid-cols-4">
               <div>
                 <Label className="text-xs text-muted-foreground">Transport</Label>
                 <Input type="number" min="0" step="0.01" {...register("fraisTransport")} />

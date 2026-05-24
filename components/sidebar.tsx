@@ -3,9 +3,11 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { X } from "lucide-react"
 
 interface SidebarProps {
   items: { label: string; href: string; icon: string }[]
+  closeNav?: () => void
 }
 
 const iconMap: Record<string, React.ReactNode> = {
@@ -23,7 +25,7 @@ const iconMap: Record<string, React.ReactNode> = {
   "checkmark-circle": <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>,
 }
 
-export function Sidebar({ items }: SidebarProps) {
+export function Sidebar({ items, closeNav }: SidebarProps) {
   const pathname = usePathname()
 
   return (
@@ -32,7 +34,16 @@ export function Sidebar({ items }: SidebarProps) {
         <div className="bg-primary flex size-8 items-center justify-center rounded-lg text-primary-foreground text-sm font-bold">
           H
         </div>
-        <span className="text-sm font-semibold">HAY 2010 SARL</span>
+        <span className="text-sm font-semibold flex-1">HAY 2010 SARL</span>
+        {closeNav && (
+          <button
+            onClick={closeNav}
+            className="rounded-sm opacity-70 hover:opacity-100 focus:outline-none md:hidden"
+            aria-label="Fermer le menu"
+          >
+            <X className="size-5" />
+          </button>
+        )}
       </div>
       <nav className="flex-1 space-y-1 p-3">
         {items.map((item) => {
@@ -41,8 +52,9 @@ export function Sidebar({ items }: SidebarProps) {
             <Link
               key={item.href}
               href={item.href}
+              onClick={closeNav}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors max-md:min-h-[44px]",
                 isActive
                   ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
                   : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"

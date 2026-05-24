@@ -32,7 +32,7 @@ export function NotificationBell() {
     return (
       <Link href="/notifications">
         <Button variant="ghost" size="icon">
-          <Bell className="size-4" />
+          <Bell className="size-5 md:size-4" />
         </Button>
       </Link>
     )
@@ -41,7 +41,7 @@ export function NotificationBell() {
   return (
     <Link href="/notifications" className="relative">
       <Button variant="ghost" size="icon">
-        <Bell className="size-4" />
+        <Bell className="size-5 md:size-4" />
       </Button>
       <span className="bg-destructive text-destructive-foreground pointer-events-none absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full text-[10px] font-bold">
         {count > 9 ? "9+" : count}

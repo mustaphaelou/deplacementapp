@@ -157,13 +157,14 @@ export default function UtilisateursPage() {
             {search ? "Aucun résultat" : "Aucun utilisateur"}
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[500px]">
             <thead>
               <tr className="border-b bg-muted/50 text-left text-muted-foreground">
                 <th className="p-3 font-medium">Nom complet</th>
-                <th className="p-3 font-medium">Email</th>
-                <th className="p-3 font-medium">Poste</th>
-                <th className="p-3 font-medium">Département</th>
+                <th className="p-3 font-medium hidden md:table-cell">Email</th>
+                <th className="p-3 font-medium hidden md:table-cell">Poste</th>
+                <th className="p-3 font-medium hidden lg:table-cell">Département</th>
                 <th className="p-3 font-medium">Rôle</th>
                 <th className="p-3 font-medium">Statut</th>
                 <th className="p-3 font-medium">Actions</th>
@@ -180,9 +181,9 @@ export default function UtilisateursPage() {
                       <span className="font-medium">{u.prenom} {u.nom}</span>
                     </div>
                   </td>
-                  <td className="p-3 text-xs">{u.email}</td>
-                  <td className="p-3">{u.poste}</td>
-                  <td className="p-3">{u.departement.nom}</td>
+                  <td className="p-3 text-xs hidden md:table-cell">{u.email}</td>
+                  <td className="p-3 hidden md:table-cell">{u.poste}</td>
+                  <td className="p-3 hidden lg:table-cell">{u.departement.nom}</td>
                   <td className="p-3">
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${ROLE_COLORS[u.role]}`}>
                       {ROLE_LABELS[u.role]}
@@ -202,6 +203,7 @@ export default function UtilisateursPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

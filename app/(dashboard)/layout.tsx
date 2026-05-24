@@ -1,7 +1,6 @@
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
-import { Navbar } from "@/components/navbar"
-import { Sidebar } from "@/components/sidebar"
+import { DashboardShell } from "@/components/dashboard-shell"
 import { NAV_ITEMS } from "@/lib/roles"
 
 export default async function DashboardLayout({
@@ -18,15 +17,5 @@ export default async function DashboardLayout({
     ...(NAV_ITEMS[role as keyof typeof NAV_ITEMS] ?? []),
   ]
 
-  return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar items={navItems} />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Navbar />
-        <main className="flex-1 overflow-y-auto bg-muted/20 p-6">
-          {children}
-        </main>
-      </div>
-    </div>
-  )
+  return <DashboardShell navItems={navItems}>{children}</DashboardShell>
 }

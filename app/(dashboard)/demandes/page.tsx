@@ -133,14 +133,15 @@ export default function DemandesListPage() {
               <p className="text-sm text-muted-foreground">Aucune demande trouvée.</p>
             </div>
           ) : (
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[400px]">
               <thead>
                 <tr className="border-b text-left text-muted-foreground">
                   <th className="p-3 font-medium">N°</th>
-                  {role !== "EMPLOYEE" && <th className="p-3 font-medium">Employé</th>}
+                  {role !== "EMPLOYEE" && <th className="p-3 font-medium hidden sm:table-cell">Employé</th>}
                   <th className="p-3 font-medium">Destination</th>
-                  <th className="p-3 font-medium">Dates</th>
-                  <th className="p-3 font-medium">Total</th>
+                  <th className="p-3 font-medium hidden md:table-cell">Dates</th>
+                  <th className="p-3 font-medium hidden lg:table-cell">Total</th>
                   <th className="p-3 font-medium">Statut</th>
                   <th className="p-3 font-medium">Actions</th>
                 </tr>
@@ -150,11 +151,11 @@ export default function DemandesListPage() {
                   <tr key={d.id} className="border-b last:border-0 hover:bg-muted/30">
                     <td className="p-3 font-medium">{d.numero}</td>
                     {role !== "EMPLOYEE" && (
-                      <td className="p-3">{d.employe.prenom} {d.employe.nom}</td>
+                      <td className="p-3 hidden sm:table-cell">{d.employe.prenom} {d.employe.nom}</td>
                     )}
                     <td className="p-3">{d.destination}</td>
-                    <td className="p-3">{formatDate(d.dateDepart)}</td>
-                    <td className="p-3">{formatCurrency(Number(d.totalEstime ?? 0))}</td>
+                    <td className="p-3 hidden md:table-cell">{formatDate(d.dateDepart)}</td>
+                    <td className="p-3 hidden lg:table-cell">{formatCurrency(Number(d.totalEstime ?? 0))}</td>
                     <td className="p-3"><DemandeStatusBadge statut={d.statut} /></td>
                     <td className="p-3">
                       <Link href={`/demandes/${d.id}`}>
@@ -165,6 +166,7 @@ export default function DemandesListPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </CardContent>
       </Card>

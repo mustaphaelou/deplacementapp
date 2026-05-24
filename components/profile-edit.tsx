@@ -222,7 +222,7 @@ export default function ProfileEdit({ user }: { user: UserData }) {
               </div>
             </div>
           ) : (
-            <div className="grid gap-6 sm:grid-cols-2">
+            <div className="grid gap-4 sm:gap-2 sm:grid-cols-2">
               <div className="flex items-start gap-3">
                 <div className="bg-muted mt-0.5 flex size-8 items-center justify-center rounded-lg">
                   <Mail className="text-muted-foreground size-4" />

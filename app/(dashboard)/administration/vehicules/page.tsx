@@ -125,12 +125,13 @@ export default function VehiculesPage() {
             {search ? "Aucun résultat" : "Aucun véhicule"}
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[300px]">
             <thead>
               <tr className="border-b bg-muted/50 text-left text-muted-foreground">
                 <th className="p-3 font-medium">Nom</th>
                 <th className="p-3 font-medium">Immatriculation</th>
-                <th className="p-3 font-medium">Statut</th>
+                <th className="p-3 font-medium hidden sm:table-cell">Statut</th>
                 <th className="p-3 font-medium">Actions</th>
               </tr>
             </thead>
@@ -139,7 +140,7 @@ export default function VehiculesPage() {
                 <tr key={v.id} className="border-b last:border-0 hover:bg-muted/30">
                   <td className="p-3 font-medium">{v.nom}</td>
                   <td className="p-3 font-mono text-xs">{v.immatriculation}</td>
-                  <td className="p-3">
+                  <td className="p-3 hidden sm:table-cell">
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${v.disponible ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300" : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"}`}>
                       {v.disponible ? "Disponible" : "En mission"}
                     </span>
@@ -156,6 +157,7 @@ export default function VehiculesPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

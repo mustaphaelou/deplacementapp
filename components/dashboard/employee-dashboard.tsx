@@ -47,7 +47,7 @@ export function EmployeeDashboard({ data }: EmployeeDashboardProps) {
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           Accès rapide
         </h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid gap-4 grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {navItems.filter(i => i.href !== "/").map((item) => (
             <Link
               key={item.href}
@@ -89,8 +89,8 @@ export function EmployeeDashboard({ data }: EmployeeDashboardProps) {
             </Link>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl border bg-card">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-xl border bg-card">
+            <table className="w-full text-sm min-w-[300px]">
               <thead>
                 <tr className="border-b bg-muted/50 text-left text-muted-foreground">
                   <th className="px-4 py-2.5 font-medium">N°</th>
