@@ -102,6 +102,13 @@ export const passwordChangeSchema = z.object({
   newPassword: z.string().min(6, "Le nouveau mot de passe doit contenir au moins 6 caractères"),
 })
 
+export const demandeQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(10),
+  statut: z.string().optional(),
+  recherche: z.string().optional(),
+})
+
 export const actionBodySchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("approuver"), commentaire: z.string().optional() }),
   z.object({ action: z.literal("rejeter"), commentaire: z.string().min(1, "Le commentaire est obligatoire pour le rejet") }),

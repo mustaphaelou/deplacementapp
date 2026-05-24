@@ -2,19 +2,18 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth-utils"
 import { prisma } from "@/lib/prisma"
 import { demandeService } from "@/lib/demande-service"
-import { demandeSchema } from "@/lib/schemas"
-import { withValidation } from "@/lib/api-utils"
+import { demandeSchema, demandeQuerySchema } from "@/lib/schemas"
+import { withValidation, validateQueryParams } from "@/lib/api-utils"
 import { handleServiceError } from "@/lib/errors"
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuth()
   if (!auth.ok) return auth.response
 
-  const { searchParams } = new URL(req.url)
-  const page = parseInt(searchParams.get("page") || "1")
-  const limit = parseInt(searchParams.get("limit") || "10")
-  const statut = searchParams.get("statut") || undefined
-  const recherche = searchParams.get("recherche") || undefined
+  const query = validateQueryParams(demandeQuerySchema, req)
+  if (!query.ok) return query.response
+
+  const { page, limit, statut, recherche } = query.data
 
   const role = auth.user.role
   const userId = auth.user.id

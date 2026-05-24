@@ -1,4 +1,4 @@
-import type { PrismaClient, Utilisateur } from "@prisma/client"
+import type { Prisma, PrismaClient, Utilisateur, Role } from "@prisma/client"
 import { hash, compare } from "bcryptjs"
 import { prisma } from "./prisma"
 import { auditBus } from "./audit-bus"
@@ -32,7 +32,7 @@ export class UtilisateurService {
       nom: string
       prenom: string
       poste: string
-      role: string
+      role: Role
       departementId: string
       telephone?: string
     },
@@ -47,7 +47,7 @@ export class UtilisateurService {
         nom: data.nom,
         prenom: data.prenom,
         poste: data.poste,
-        role: data.role as any,
+        role: data.role,
         departementId: data.departementId,
         telephone: data.telephone || null,
       },
@@ -72,24 +72,22 @@ export class UtilisateurService {
       nom?: string
       prenom?: string
       poste?: string
-      role?: string
+      role?: Role
       departementId?: string
       telephone?: string | null
     },
     actorId: string
   ): Promise<Utilisateur> {
-    const updateData: Record<string, unknown> = { ...data }
-
-    if (data.motDePasse) {
-      updateData.motDePasse = await hash(data.motDePasse, 12)
-    } else {
-      delete updateData.motDePasse
+    const { motDePasse, ...rest } = data
+    const updateData: Prisma.UtilisateurUpdateInput = {
+      ...rest,
+      ...(motDePasse ? { motDePasse: await hash(motDePasse, 12) } : {}),
     }
 
     try {
       const user = await this.db.utilisateur.update({
         where: { id },
-        data: updateData as any,
+        data: updateData,
       })
 
       await this.audit.log({
@@ -136,17 +134,12 @@ export class UtilisateurService {
 
   async updateProfile(
     userId: string,
-    data: {
-      email?: string
-      telephone?: string | null
-      poste?: string
-      avatarUrl?: string | null
-    }
+    data: Prisma.UtilisateurUpdateInput
   ): Promise<Utilisateur> {
     try {
       const updated = await this.db.utilisateur.update({
         where: { id: userId },
-        data: data as any,
+        data,
         select: { id: true, email: true, telephone: true, poste: true, avatarUrl: true },
       })
 

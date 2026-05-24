@@ -2,13 +2,9 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { compare } from "bcryptjs"
 import { utilisateurService } from "@/lib/utilisateur-service"
-import { writeFile, unlink } from "fs/promises"
-import { join } from "path"
 import { profilUpdateSchema } from "@/lib/schemas"
 import { withValidation } from "@/lib/api-utils"
-
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"]
-const MAX_SIZE = 2 * 1024 * 1024
+import { avatarStorage, AvatarError } from "@/lib/avatar-storage"
 
 export const PUT = withValidation(profilUpdateSchema, async (_req, auth, data) => {
   const updateData: Record<string, string | null> = {}
@@ -45,54 +41,22 @@ export const PUT = withValidation(profilUpdateSchema, async (_req, auth, data) =
   }
 
   if (data.avatarData !== undefined) {
-    if (data.avatarData) {
-      const matches = data.avatarData.match(/^data:(image\/\w+);base64,(.+)$/)
-      if (!matches) {
-        return NextResponse.json(
-          { error: "Format d'image invalide" },
-          { status: 400 }
-        )
-      }
-      const mime = matches[1]
-      const base64 = matches[2]
-      if (!ALLOWED_TYPES.includes(mime)) {
-        return NextResponse.json(
-          { error: "Type d'image non autorisé (JPG, PNG, WebP uniquement)" },
-          { status: 400 }
-        )
-      }
-      const buffer = Buffer.from(base64, "base64")
-      if (buffer.length > MAX_SIZE) {
-        return NextResponse.json(
-          { error: "L'image ne doit pas dépasser 2 Mo" },
-          { status: 400 }
-        )
-      }
-      const ext = mime.split("/")[1]
-      const filename = `avatar-${auth.id}-${Date.now()}.${ext}`
-      const filepath = join(process.cwd(), "public", "uploads", "avatars", filename)
-      await writeFile(filepath, buffer)
-
+    try {
       const oldUser = await prisma.utilisateur.findUnique({
         where: { id: auth.id },
         select: { avatarUrl: true },
       })
       if (oldUser?.avatarUrl) {
-        const oldPath = join(process.cwd(), "public", oldUser.avatarUrl)
-        try { await unlink(oldPath) } catch {}
+        await avatarStorage.delete(oldUser.avatarUrl)
       }
-
-      updateData.avatarUrl = `/uploads/avatars/${filename}`
-    } else {
-      const oldUser = await prisma.utilisateur.findUnique({
-        where: { id: auth.id },
-        select: { avatarUrl: true },
-      })
-      if (oldUser?.avatarUrl) {
-        const oldPath = join(process.cwd(), "public", oldUser.avatarUrl)
-        try { await unlink(oldPath) } catch {}
+      updateData.avatarUrl = data.avatarData
+        ? await avatarStorage.save(data.avatarData, auth.id)
+        : null
+    } catch (e) {
+      if (e instanceof AvatarError) {
+        return NextResponse.json({ error: e.message }, { status: e.status })
       }
-      updateData.avatarUrl = null
+      throw e
     }
   }
 

@@ -1,5 +1,5 @@
-import type { PrismaClient, TypeTransport, Role } from "@prisma/client"
-import type { NotificationEventType } from "./notification-bus"
+import type { Prisma, PrismaClient, TypeTransport, Role } from "@prisma/client"
+import type { NotificationEventType, NotificationPayload } from "./notification-bus"
 import { prisma } from "./prisma"
 import { notificationBus } from "./notification-bus"
 import { auditBus } from "./audit-bus"
@@ -89,7 +89,7 @@ export class DemandeDeplacementService {
     const motifArray = this.processMotif(data.motif, data.motifAutre)
     const totalEstime = this.computeTotalEstime(data)
 
-    const createData: Record<string, unknown> = {
+    const createData: Prisma.DemandeDeplacementUncheckedCreateInput = {
       numero,
       employeId: user.id,
       statut: "BROUILLON",
@@ -131,7 +131,7 @@ export class DemandeDeplacementService {
     }
 
     const demande = await this.db.demandeDeplacement.create({
-      data: createData as any,
+      data: createData,
     })
 
     await this.audit.log({
@@ -195,7 +195,7 @@ export class DemandeDeplacementService {
 
     const updated = await this.db.demandeDeplacement.update({
       where: { id: demandeId },
-      data: transition.transition.fields as any,
+      data: transition.transition.fields as Prisma.DemandeDeplacementUncheckedUpdateInput,
     })
 
     await this.audit.log({
@@ -206,7 +206,7 @@ export class DemandeDeplacementService {
       details: { numero: demande.numero },
     })
 
-    const notificationPayload: Record<string, unknown> = {
+    const notificationPayload: NotificationPayload = {
       demandeId: demande.id,
       numero: demande.numero,
       employe: {
@@ -222,7 +222,7 @@ export class DemandeDeplacementService {
 
     await this.notifications.dispatch(
       transition.notificationEvent,
-      notificationPayload as any
+      notificationPayload
     )
 
     return { demande: updated }

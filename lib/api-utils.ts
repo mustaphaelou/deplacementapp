@@ -24,6 +24,28 @@ export function validateRequest<T>(
   return { ok: true, data: result.data }
 }
 
+export function validateQueryParams<T>(
+  schema: z.ZodType<T>,
+  req: NextRequest
+): ValidationResult<T> {
+  const { searchParams } = new URL(req.url)
+  const raw: Record<string, string> = {}
+  searchParams.forEach((value, key) => {
+    raw[key] = value
+  })
+  const result = schema.safeParse(raw)
+  if (!result.success) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: "Paramètres invalides", details: result.error.issues.map((e) => e.message) },
+        { status: 400 }
+      ),
+    }
+  }
+  return { ok: true, data: result.data }
+}
+
 export function withValidation<T>(
   schema: z.ZodType<T>,
   handler: (req: NextRequest, auth: AuthUser, data: T, params: any) => Promise<NextResponse>
