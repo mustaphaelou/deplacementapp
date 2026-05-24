@@ -7,7 +7,8 @@ import {
   DemandeNotFoundError,
   InvalidTransitionError,
 } from "@/lib/demande-service"
-import type { Role, TypeTransport } from "@prisma/client"
+import { demandeSchema } from "@/lib/schemas"
+import { withValidation } from "@/lib/api-utils"
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuth()
@@ -55,26 +56,19 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ demandes, total })
 }
 
-export async function POST(req: NextRequest) {
-  const auth = await requireAuth()
-  if (!auth.ok) return auth.response
-  if (auth.user.role !== "EMPLOYEE") {
+export const POST = withValidation(demandeSchema, async (req, auth, data, _params) => {
+  if (auth.role !== "EMPLOYEE") {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
   }
 
-  const body = await req.json()
-  const { action, ...data } = body
-
+  const { action, ...serviceData } = data
   const serviceAction = action === "submit" ? "submit" as const : "create" as const
 
   try {
     const result = await demandeService.executeAction({
       action: serviceAction,
-      data: {
-        ...data,
-        typeTransport: data.typeTransport as TypeTransport,
-      },
-      actor: { id: auth.user.id, role: auth.user.role as Role },
+      data: serviceData,
+      actor: { id: auth.id, role: auth.role as any },
     })
     return NextResponse.json({ demande: result.demande })
   } catch (e) {
@@ -83,4 +77,4 @@ export async function POST(req: NextRequest) {
     if (e instanceof InvalidTransitionError) return NextResponse.json({ error: e.message }, { status: 422 })
     throw e
   }
-}
+})

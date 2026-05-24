@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth-utils"
 import { vehiculeService } from "@/lib/vehicule-service"
+import { vehiculeSchema, updateVehiculeSchema, deleteVehiculeSchema } from "@/lib/schemas"
+import { withValidation } from "@/lib/api-utils"
 
 export async function GET() {
   const auth = await requireAuth()
@@ -11,59 +13,33 @@ export async function GET() {
   return NextResponse.json(vehicules)
 }
 
-export async function POST(req: NextRequest) {
-  const auth = await requireAuth()
-  if (!auth.ok) return auth.response
-  if (auth.user.role !== "FINANCE_ADMIN") {
+export const POST = withValidation(vehiculeSchema, async (_req, auth, data) => {
+  if (auth.role !== "FINANCE_ADMIN") {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
   }
 
-  const body = await req.json()
-
-  const vehicule = await vehiculeService.create(
-    {
-      nom: body.nom,
-      immatriculation: body.immatriculation,
-      disponible: body.disponible ?? true,
-    },
-    auth.user.id
-  )
+  const vehicule = await vehiculeService.create(data, auth.id)
 
   return NextResponse.json({ vehicule })
-}
+})
 
-export async function PUT(req: NextRequest) {
-  const auth = await requireAuth()
-  if (!auth.ok) return auth.response
-  if (auth.user.role !== "FINANCE_ADMIN") {
+export const PUT = withValidation(updateVehiculeSchema, async (_req, auth, data) => {
+  if (auth.role !== "FINANCE_ADMIN") {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
   }
 
-  const body = await req.json()
-
-  const vehicule = await vehiculeService.update(
-    body.id,
-    {
-      nom: body.nom,
-      immatriculation: body.immatriculation,
-      disponible: body.disponible ?? true,
-    },
-    auth.user.id
-  )
+  const { id, ...updateData } = data
+  const vehicule = await vehiculeService.update(id, updateData, auth.id)
 
   return NextResponse.json({ vehicule })
-}
+})
 
-export async function DELETE(req: NextRequest) {
-  const auth = await requireAuth()
-  if (!auth.ok) return auth.response
-  if (auth.user.role !== "FINANCE_ADMIN") {
+export const DELETE = withValidation(deleteVehiculeSchema, async (_req, auth, data) => {
+  if (auth.role !== "FINANCE_ADMIN") {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
   }
 
-  const { id } = await req.json()
-
-  await vehiculeService.delete(id, auth.user.id)
+  await vehiculeService.delete(data.id, auth.id)
 
   return NextResponse.json({ success: true })
-}
+})

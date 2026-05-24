@@ -38,9 +38,10 @@ export const demandeSchema = z.object({
   fraisHebergement: z.string().optional(),
   fraisRepas: z.string().optional(),
   fraisDivers: z.string().optional(),
-  avanceRequise: z.boolean().default(false),
+  avanceRequise: z.boolean(),
   montantAvance: z.string().optional(),
   description: z.string().optional(),
+  action: z.enum(["submit", "save"]).optional(),
 }).refine(
   (data) => {
     if (!data.dateDepart || !data.dateRetour) return true
@@ -75,3 +76,35 @@ export const vehiculeSchema = z.object({
   immatriculation: z.string().min(1, "Immatriculation requise"),
   disponible: z.boolean().default(true),
 })
+
+export const profilUpdateSchema = z.object({
+  telephone: z.string().optional(),
+  poste: z.string().optional(),
+  email: z.string().email("Email invalide").optional(),
+  avatarData: z.string().optional(),
+  currentPassword: z.string().optional(),
+})
+
+export const updateUtilisateurSchema = utilisateurSchema.extend({
+  id: z.string().min(1, "ID requis"),
+})
+
+export const deleteVehiculeSchema = z.object({
+  id: z.string().min(1, "ID requis"),
+})
+
+export const updateVehiculeSchema = vehiculeSchema.extend({
+  id: z.string().min(1, "ID requis"),
+})
+
+export const passwordChangeSchema = z.object({
+  currentPassword: z.string().min(1, "Mot de passe actuel requis"),
+  newPassword: z.string().min(6, "Le nouveau mot de passe doit contenir au moins 6 caractères"),
+})
+
+export const actionBodySchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("approuver"), commentaire: z.string().optional() }),
+  z.object({ action: z.literal("rejeter"), commentaire: z.string().min(1, "Le commentaire est obligatoire pour le rejet") }),
+  z.object({ action: z.literal("retirer") }),
+])
+export type ActionBody = z.infer<typeof actionBodySchema>

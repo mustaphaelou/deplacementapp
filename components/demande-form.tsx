@@ -2,7 +2,6 @@
 
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -12,26 +11,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader2, Save, Send } from "lucide-react"
 import { PURPOSE_OPTIONS, TRANSPORT_LABELS } from "@/lib/constants"
 import { useDemandeForm } from "@/hooks/use-demande-form"
+import { demandeSchema } from "@/lib/schemas"
+import type { z } from "zod"
 
-const formSchema = z.object({
-  motif: z.array(z.string()).min(1),
-  motifAutre: z.string().optional(),
-  dateDepart: z.string().min(1),
-  dateRetour: z.string().min(1),
-  destination: z.string().min(2),
-  typeTransport: z.string().min(1),
-  autreTransport: z.string().optional(),
-  vehiculeId: z.string().optional(),
-  fraisTransport: z.string().optional(),
-  fraisHebergement: z.string().optional(),
-  fraisRepas: z.string().optional(),
-  fraisDivers: z.string().optional(),
-  avanceRequise: z.boolean(),
-  montantAvance: z.string().optional(),
-  description: z.string().optional(),
-})
-
-type FormValues = z.infer<typeof formSchema>
+type FormValues = z.infer<typeof demandeSchema>
 
 interface Vehicule {
   id: string
@@ -50,7 +33,7 @@ export function DemandeForm() {
     setValue,
     formState: { errors },
   } = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(demandeSchema),
     defaultValues: {
       motif: [],
       avanceRequise: false,
@@ -136,7 +119,7 @@ export function DemandeForm() {
                     type="radio"
                     value={value}
                     checked={typeTransport === value}
-                    onChange={(e) => setValue("typeTransport", e.target.value)}
+                    onChange={(e) => setValue("typeTransport", e.target.value as FormValues["typeTransport"])}
                     className="accent-primary"
                   />
                   {label}
