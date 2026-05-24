@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
+import { requireAuth } from "@/lib/auth-utils"
 import { prisma } from "@/lib/prisma"
 
 export async function GET() {
-  const session = await auth()
-  if (!session?.user || (session.user.role !== "FINANCE_ADMIN" && session.user.role !== "GENERAL_DIRECTION")) {
+  const auth = await requireAuth()
+  if (!auth.ok) return auth.response
+  if (auth.user.role !== "FINANCE_ADMIN" && auth.user.role !== "GENERAL_DIRECTION") {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
   }
 

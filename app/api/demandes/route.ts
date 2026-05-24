@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
+import { requireAuth } from "@/lib/auth-utils"
 import { prisma } from "@/lib/prisma"
 import { demandeService } from "@/lib/demande-service"
 import {
@@ -10,8 +10,8 @@ import {
 import type { Role, TypeTransport } from "@prisma/client"
 
 export async function GET(req: NextRequest) {
-  const session = await auth()
-  if (!session?.user) return NextResponse.json({ error: "Non autorise" }, { status: 401 })
+  const auth = await requireAuth()
+  if (!auth.ok) return auth.response
 
   const { searchParams } = new URL(req.url)
   const page = parseInt(searchParams.get("page") || "1")
@@ -19,8 +19,8 @@ export async function GET(req: NextRequest) {
   const statut = searchParams.get("statut") || undefined
   const recherche = searchParams.get("recherche") || undefined
 
-  const role = session.user.role
-  const userId = session.user.id
+  const role = auth.user.role
+  const userId = auth.user.id
 
   const where: any = { deletedAt: null }
 
@@ -56,9 +56,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await auth()
-  if (!session?.user || session.user.role !== "EMPLOYEE") {
-    return NextResponse.json({ error: "Non autorise" }, { status: 401 })
+  const auth = await requireAuth()
+  if (!auth.ok) return auth.response
+  if (auth.user.role !== "EMPLOYEE") {
+    return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
   }
 
   const body = await req.json()
@@ -73,7 +74,7 @@ export async function POST(req: NextRequest) {
         ...data,
         typeTransport: data.typeTransport as TypeTransport,
       },
-      actor: { id: session.user.id, role: session.user.role as Role },
+      actor: { id: auth.user.id, role: auth.user.role as Role },
     })
     return NextResponse.json({ demande: result.demande })
   } catch (e) {

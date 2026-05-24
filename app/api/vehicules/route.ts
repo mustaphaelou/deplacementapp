@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
+import { requireAuth } from "@/lib/auth-utils"
 import { vehiculeService } from "@/lib/vehicule-service"
 
 export async function GET() {
-  const session = await auth()
-  if (!session?.user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
+  const auth = await requireAuth()
+  if (!auth.ok) return auth.response
 
   const vehicules = await vehiculeService.list()
 
@@ -12,8 +12,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await auth()
-  if (!session?.user || session.user.role !== "FINANCE_ADMIN") {
+  const auth = await requireAuth()
+  if (!auth.ok) return auth.response
+  if (auth.user.role !== "FINANCE_ADMIN") {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
   }
 
@@ -25,15 +26,16 @@ export async function POST(req: NextRequest) {
       immatriculation: body.immatriculation,
       disponible: body.disponible ?? true,
     },
-    session.user.id
+    auth.user.id
   )
 
   return NextResponse.json({ vehicule })
 }
 
 export async function PUT(req: NextRequest) {
-  const session = await auth()
-  if (!session?.user || session.user.role !== "FINANCE_ADMIN") {
+  const auth = await requireAuth()
+  if (!auth.ok) return auth.response
+  if (auth.user.role !== "FINANCE_ADMIN") {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
   }
 
@@ -46,21 +48,22 @@ export async function PUT(req: NextRequest) {
       immatriculation: body.immatriculation,
       disponible: body.disponible ?? true,
     },
-    session.user.id
+    auth.user.id
   )
 
   return NextResponse.json({ vehicule })
 }
 
 export async function DELETE(req: NextRequest) {
-  const session = await auth()
-  if (!session?.user || session.user.role !== "FINANCE_ADMIN") {
+  const auth = await requireAuth()
+  if (!auth.ok) return auth.response
+  if (auth.user.role !== "FINANCE_ADMIN") {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
   }
 
   const { id } = await req.json()
 
-  await vehiculeService.delete(id, session.user.id)
+  await vehiculeService.delete(id, auth.user.id)
 
   return NextResponse.json({ success: true })
 }

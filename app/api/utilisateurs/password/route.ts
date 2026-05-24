@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
+import { requireAuth } from "@/lib/auth-utils"
 import { utilisateurService, UtilisateurNotFoundError, MotDePasseIncorrectError } from "@/lib/utilisateur-service"
 
 export async function PUT(req: NextRequest) {
-  const session = await auth()
-  if (!session?.user) {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
-  }
+  const auth = await requireAuth()
+  if (!auth.ok) return auth.response
 
   const body = await req.json()
   const { currentPassword, newPassword } = body
@@ -26,7 +24,7 @@ export async function PUT(req: NextRequest) {
   }
 
   try {
-    await utilisateurService.changePassword(session.user.id, currentPassword, newPassword)
+    await utilisateurService.changePassword(auth.user.id, currentPassword, newPassword)
   } catch (err) {
     if (err instanceof UtilisateurNotFoundError) {
       return NextResponse.json({ error: err.message }, { status: err.status })

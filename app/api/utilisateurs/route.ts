@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
+import { requireAuth } from "@/lib/auth-utils"
 import { utilisateurService } from "@/lib/utilisateur-service"
 
 export async function GET() {
-  const session = await auth()
-  if (!session?.user || (session.user.role !== "FINANCE_ADMIN" && session.user.role !== "GENERAL_DIRECTION")) {
+  const auth = await requireAuth()
+  if (!auth.ok) return auth.response
+  if (auth.user.role !== "FINANCE_ADMIN" && auth.user.role !== "GENERAL_DIRECTION") {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
   }
 
@@ -14,8 +15,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await auth()
-  if (!session?.user || (session.user.role !== "FINANCE_ADMIN" && session.user.role !== "GENERAL_DIRECTION")) {
+  const auth = await requireAuth()
+  if (!auth.ok) return auth.response
+  if (auth.user.role !== "FINANCE_ADMIN" && auth.user.role !== "GENERAL_DIRECTION") {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
   }
 
@@ -32,15 +34,16 @@ export async function POST(req: NextRequest) {
       departementId: body.departementId,
       telephone: body.telephone,
     },
-    session.user.id
+    auth.user.id
   )
 
   return NextResponse.json({ user })
 }
 
 export async function PUT(req: NextRequest) {
-  const session = await auth()
-  if (!session?.user || (session.user.role !== "FINANCE_ADMIN" && session.user.role !== "GENERAL_DIRECTION")) {
+  const auth = await requireAuth()
+  if (!auth.ok) return auth.response
+  if (auth.user.role !== "FINANCE_ADMIN" && auth.user.role !== "GENERAL_DIRECTION") {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
   }
 
@@ -58,7 +61,7 @@ export async function PUT(req: NextRequest) {
       telephone: body.telephone || null,
       motDePasse: body.motDePasse,
     },
-    session.user.id
+    auth.user.id
   )
 
   return NextResponse.json({ user })

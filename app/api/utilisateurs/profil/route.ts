@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
+import { requireAuth } from "@/lib/auth-utils"
 import { prisma } from "@/lib/prisma"
 import { compare } from "bcryptjs"
 import { utilisateurService } from "@/lib/utilisateur-service"
@@ -10,10 +10,8 @@ const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"]
 const MAX_SIZE = 2 * 1024 * 1024
 
 export async function PUT(req: NextRequest) {
-  const session = await auth()
-  if (!session?.user) {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
-  }
+  const auth = await requireAuth()
+  if (!auth.ok) return auth.response
 
   const body = await req.json()
   const { telephone, poste, email, avatarData, currentPassword } = body
@@ -35,7 +33,7 @@ export async function PUT(req: NextRequest) {
       )
     }
     const user = await prisma.utilisateur.findUnique({
-      where: { id: session.user.id },
+      where: { id: auth.user.id },
     })
     if (!user) {
       return NextResponse.json({ error: "Utilisateur introuvable" }, { status: 404 })
@@ -75,12 +73,12 @@ export async function PUT(req: NextRequest) {
         )
       }
       const ext = mime.split("/")[1]
-      const filename = `avatar-${session.user.id}-${Date.now()}.${ext}`
+      const filename = `avatar-${auth.user.id}-${Date.now()}.${ext}`
       const filepath = join(process.cwd(), "public", "uploads", "avatars", filename)
       await writeFile(filepath, buffer)
 
       const oldUser = await prisma.utilisateur.findUnique({
-        where: { id: session.user.id },
+        where: { id: auth.user.id },
         select: { avatarUrl: true },
       })
       if (oldUser?.avatarUrl) {
@@ -91,7 +89,7 @@ export async function PUT(req: NextRequest) {
       updateData.avatarUrl = `/uploads/avatars/${filename}`
     } else {
       const oldUser = await prisma.utilisateur.findUnique({
-        where: { id: session.user.id },
+        where: { id: auth.user.id },
         select: { avatarUrl: true },
       })
       if (oldUser?.avatarUrl) {
@@ -106,7 +104,7 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "Aucune donnée à modifier" }, { status: 400 })
   }
 
-  const updated = await utilisateurService.updateProfile(session.user.id, updateData)
+  const updated = await utilisateurService.updateProfile(auth.user.id, updateData)
 
   return NextResponse.json({ user: updated })
 }

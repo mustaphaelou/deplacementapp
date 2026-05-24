@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server"
 import { auth } from "./auth"
 
 export interface AuthUser {
@@ -35,4 +36,19 @@ export function getSessionUser(user: any): AuthUser {
     departement: user.departement ?? "",
     poste: user.poste ?? "",
   }
+}
+
+export type AuthResult =
+  | { ok: true; user: AuthUser }
+  | { ok: false; response: NextResponse }
+
+export async function requireAuth(): Promise<AuthResult> {
+  const session = await auth()
+  if (!session?.user) {
+    return {
+      ok: false,
+      response: NextResponse.json({ error: "Non autorisé" }, { status: 401 }),
+    }
+  }
+  return { ok: true, user: getSessionUser(session.user) }
 }

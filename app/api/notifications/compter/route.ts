@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
+import { requireAuth } from "@/lib/auth-utils"
 import { prisma } from "@/lib/prisma"
 
 export async function GET() {
-  const session = await auth()
-  if (!session?.user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
+  const auth = await requireAuth()
+  if (!auth.ok) return auth.response
 
   const count = await prisma.notification.count({
-    where: { utilisateurId: session.user.id, lu: false },
+    where: { utilisateurId: auth.user.id, lu: false },
   })
 
   return NextResponse.json({ count })

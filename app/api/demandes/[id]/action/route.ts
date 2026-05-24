@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
+import { requireAuth } from "@/lib/auth-utils"
 import { demandeService } from "@/lib/demande-service"
 import {
   UnauthorizedActionError,
@@ -15,8 +15,8 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const session = await auth()
-  if (!session?.user) return NextResponse.json({ error: "Non autorise" }, { status: 401 })
+  const auth = await requireAuth()
+  if (!auth.ok) return auth.response
 
   const body = await req.json().catch(() => ({}))
   const action = body.action as "approuver" | "rejeter" | "retirer"
@@ -38,7 +38,7 @@ export async function POST(
     const result = await demandeService.executeAction({
       action,
       demandeId: id,
-      actor: { id: session.user.id, role: session.user.role as Role },
+      actor: { id: auth.user.id, role: auth.user.role as Role },
       comment,
     })
     return NextResponse.json({ demande: result.demande })
