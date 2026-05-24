@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { ajouterAudit } from "@/lib/audit"
+import { auditBus } from "@/lib/audit-bus"
 
 export async function GET() {
   const session = await auth()
@@ -30,7 +30,13 @@ export async function POST(req: NextRequest) {
     },
   })
 
-  await ajouterAudit(prisma, session.user.id, "CREATION_VEHICULE", "VehiculeEntreprise", vehicule.id, { nom: vehicule.nom })
+  await auditBus.log({
+    utilisateurId: session.user.id,
+    action: "CREATION_VEHICULE",
+    entite: "VehiculeEntreprise",
+    entiteId: vehicule.id,
+    details: { nom: vehicule.nom },
+  })
 
   return NextResponse.json({ vehicule })
 }
@@ -52,7 +58,13 @@ export async function PUT(req: NextRequest) {
     },
   })
 
-  await ajouterAudit(prisma, session.user.id, "MODIFICATION_VEHICULE", "VehiculeEntreprise", vehicule.id, { nom: vehicule.nom })
+  await auditBus.log({
+    utilisateurId: session.user.id,
+    action: "MODIFICATION_VEHICULE",
+    entite: "VehiculeEntreprise",
+    entiteId: vehicule.id,
+    details: { nom: vehicule.nom },
+  })
 
   return NextResponse.json({ vehicule })
 }
@@ -66,7 +78,12 @@ export async function DELETE(req: NextRequest) {
   const { id } = await req.json()
 
   await prisma.vehiculeEntreprise.delete({ where: { id } })
-  await ajouterAudit(prisma, session.user.id, "SUPPRESSION_VEHICULE", "VehiculeEntreprise", id)
+  await auditBus.log({
+    utilisateurId: session.user.id,
+    action: "SUPPRESSION_VEHICULE",
+    entite: "VehiculeEntreprise",
+    entiteId: id,
+  })
 
   return NextResponse.json({ success: true })
 }

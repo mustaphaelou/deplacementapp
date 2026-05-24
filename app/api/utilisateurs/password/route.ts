@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { compare, hash } from "bcryptjs"
-import { ajouterAudit } from "@/lib/audit"
+import { auditBus } from "@/lib/audit-bus"
 
 export async function PUT(req: NextRequest) {
   const session = await auth()
@@ -49,7 +49,12 @@ export async function PUT(req: NextRequest) {
     data: { motDePasse: hashed },
   })
 
-  await ajouterAudit(prisma, session.user.id, "CHANGEMENT_MOT_DE_PASSE", "Utilisateur", user.id)
+  await auditBus.log({
+    utilisateurId: session.user.id,
+    action: "CHANGEMENT_MOT_DE_PASSE",
+    entite: "Utilisateur",
+    entiteId: user.id,
+  })
 
   return NextResponse.json({ success: true })
 }

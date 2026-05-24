@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { hash } from "bcryptjs"
-import { ajouterAudit } from "@/lib/audit"
+import { auditBus } from "@/lib/audit-bus"
 
 export async function GET() {
   const session = await auth()
@@ -40,7 +40,13 @@ export async function POST(req: NextRequest) {
     },
   })
 
-  await ajouterAudit(prisma, session.user.id, "CREATION_UTILISATEUR", "Utilisateur", user.id, { email: user.email })
+  await auditBus.log({
+    utilisateurId: session.user.id,
+    action: "CREATION_UTILISATEUR",
+    entite: "Utilisateur",
+    entiteId: user.id,
+    details: { email: user.email },
+  })
 
   return NextResponse.json({ user })
 }
@@ -71,7 +77,13 @@ export async function PUT(req: NextRequest) {
     data: updateData,
   })
 
-  await ajouterAudit(prisma, session.user.id, "MODIFICATION_UTILISATEUR", "Utilisateur", user.id, { email: user.email })
+  await auditBus.log({
+    utilisateurId: session.user.id,
+    action: "MODIFICATION_UTILISATEUR",
+    entite: "Utilisateur",
+    entiteId: user.id,
+    details: { email: user.email },
+  })
 
   return NextResponse.json({ user })
 }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { compare } from "bcryptjs"
-import { ajouterAudit } from "@/lib/audit"
+import { auditBus } from "@/lib/audit-bus"
 import { writeFile, unlink } from "fs/promises"
 import { join } from "path"
 
@@ -112,8 +112,12 @@ export async function PUT(req: NextRequest) {
     select: { id: true, email: true, telephone: true, poste: true, avatarUrl: true },
   })
 
-  await ajouterAudit(prisma, session.user.id, "MODIFICATION_PROFIL", "Utilisateur", updated.id, {
-    champs: Object.keys(updateData),
+  await auditBus.log({
+    utilisateurId: session.user.id,
+    action: "MODIFICATION_PROFIL",
+    entite: "Utilisateur",
+    entiteId: updated.id,
+    details: { champs: Object.keys(updateData) },
   })
 
   return NextResponse.json({ user: updated })
