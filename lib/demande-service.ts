@@ -3,8 +3,19 @@ import type { NotificationEventType } from "./notification-bus"
 import { prisma } from "./prisma"
 import { notificationBus } from "./notification-bus"
 import { auditBus } from "./audit-bus"
+import {
+  DemandeNotFoundError,
+  UnauthorizedActionError,
+  InvalidTransitionError,
+} from "./errors"
 import { canTransition, buildTransition, fromLegacyStatus } from "./workflow"
 import type { WorkflowAction } from "./workflow"
+
+export {
+  DemandeNotFoundError,
+  UnauthorizedActionError,
+  InvalidTransitionError,
+}
 
 // ─── Public types ──────────────────────────────────────────────────────────
 
@@ -37,32 +48,6 @@ export type ExecuteParams =
   | { action: "approuver"; demandeId: string; actor: Actor; comment?: string }
   | { action: "rejeter"; demandeId: string; actor: Actor; comment: string }
   | { action: "retirer"; demandeId: string; actor: Actor }
-
-// ─── Errors ────────────────────────────────────────────────────────────────
-
-export class DemandeNotFoundError extends Error {
-  status = 404
-  constructor() {
-    super("Demande introuvable")
-    this.name = "DemandeNotFoundError"
-  }
-}
-
-export class UnauthorizedActionError extends Error {
-  status = 403
-  constructor(message = "Action non autorisee") {
-    super(message)
-    this.name = "UnauthorizedActionError"
-  }
-}
-
-export class InvalidTransitionError extends Error {
-  status = 422
-  constructor(message = "Transition invalide") {
-    super(message)
-    this.name = "InvalidTransitionError"
-  }
-}
 
 // ─── Service ───────────────────────────────────────────────────────────────
 

@@ -2,13 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth-utils"
 import { prisma } from "@/lib/prisma"
 import { demandeService } from "@/lib/demande-service"
-import {
-  UnauthorizedActionError,
-  DemandeNotFoundError,
-  InvalidTransitionError,
-} from "@/lib/demande-service"
 import { demandeSchema } from "@/lib/schemas"
 import { withValidation } from "@/lib/api-utils"
+import { handleServiceError } from "@/lib/errors"
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuth()
@@ -72,9 +68,6 @@ export const POST = withValidation(demandeSchema, async (req, auth, data, _param
     })
     return NextResponse.json({ demande: result.demande })
   } catch (e) {
-    if (e instanceof DemandeNotFoundError) return NextResponse.json({ error: e.message }, { status: 404 })
-    if (e instanceof UnauthorizedActionError) return NextResponse.json({ error: e.message }, { status: 403 })
-    if (e instanceof InvalidTransitionError) return NextResponse.json({ error: e.message }, { status: 422 })
-    throw e
+    return handleServiceError(e)
   }
 })

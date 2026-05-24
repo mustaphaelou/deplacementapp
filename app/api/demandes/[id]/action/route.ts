@@ -1,12 +1,8 @@
 import { NextResponse } from "next/server"
 import { demandeService } from "@/lib/demande-service"
-import {
-  UnauthorizedActionError,
-  DemandeNotFoundError,
-  InvalidTransitionError,
-} from "@/lib/demande-service"
 import { actionBodySchema } from "@/lib/schemas"
 import { withValidation } from "@/lib/api-utils"
+import { handleServiceError } from "@/lib/errors"
 import type { Role } from "@prisma/client"
 
 export const POST = withValidation(actionBodySchema, async (req, auth, data, params) => {
@@ -42,9 +38,6 @@ export const POST = withValidation(actionBodySchema, async (req, auth, data, par
       }
     }
   } catch (e) {
-    if (e instanceof DemandeNotFoundError) return NextResponse.json({ error: e.message }, { status: 404 })
-    if (e instanceof UnauthorizedActionError) return NextResponse.json({ error: e.message }, { status: 403 })
-    if (e instanceof InvalidTransitionError) return NextResponse.json({ error: e.message }, { status: 422 })
-    throw e
+    return handleServiceError(e)
   }
 })

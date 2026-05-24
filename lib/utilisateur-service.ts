@@ -2,29 +2,14 @@ import type { PrismaClient, Utilisateur } from "@prisma/client"
 import { hash, compare } from "bcryptjs"
 import { prisma } from "./prisma"
 import { auditBus } from "./audit-bus"
+import {
+  UtilisateurNotFoundError,
+  MotDePasseIncorrectError,
+} from "./errors"
 
-export class UtilisateurNotFoundError extends Error {
-  status = 404
-  constructor() {
-    super("Utilisateur introuvable")
-    this.name = "UtilisateurNotFoundError"
-  }
-}
-
-export class UnauthorizedActionError extends Error {
-  status = 403
-  constructor(message = "Action non autorisee") {
-    super(message)
-    this.name = "UnauthorizedActionError"
-  }
-}
-
-export class MotDePasseIncorrectError extends Error {
-  status = 400
-  constructor() {
-    super("Mot de passe actuel incorrect")
-    this.name = "MotDePasseIncorrectError"
-  }
+export {
+  UtilisateurNotFoundError,
+  MotDePasseIncorrectError,
 }
 
 export class UtilisateurService {

@@ -1,14 +1,9 @@
 import type { PrismaClient, VehiculeEntreprise } from "@prisma/client"
 import { prisma } from "./prisma"
 import { auditBus } from "./audit-bus"
+import { VehiculeNotFoundError } from "./errors"
 
-export class VehiculeNotFoundError extends Error {
-  status = 404
-  constructor() {
-    super("Vehicule introuvable")
-    this.name = "VehiculeNotFoundError"
-  }
-}
+export { VehiculeNotFoundError }
 
 export class VehiculeService {
   constructor(
