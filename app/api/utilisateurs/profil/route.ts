@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { compare } from "bcryptjs"
-import { auditBus } from "@/lib/audit-bus"
+import { utilisateurService } from "@/lib/utilisateur-service"
 import { writeFile, unlink } from "fs/promises"
 import { join } from "path"
 
@@ -106,19 +106,7 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "Aucune donnée à modifier" }, { status: 400 })
   }
 
-  const updated = await prisma.utilisateur.update({
-    where: { id: session.user.id },
-    data: updateData,
-    select: { id: true, email: true, telephone: true, poste: true, avatarUrl: true },
-  })
-
-  await auditBus.log({
-    utilisateurId: session.user.id,
-    action: "MODIFICATION_PROFIL",
-    entite: "Utilisateur",
-    entiteId: updated.id,
-    details: { champs: Object.keys(updateData) },
-  })
+  const updated = await utilisateurService.updateProfile(session.user.id, updateData)
 
   return NextResponse.json({ user: updated })
 }

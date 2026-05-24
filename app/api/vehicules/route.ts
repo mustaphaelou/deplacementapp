@@ -1,15 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
-import { auditBus } from "@/lib/audit-bus"
+import { vehiculeService } from "@/lib/vehicule-service"
 
 export async function GET() {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
 
-  const vehicules = await prisma.vehiculeEntreprise.findMany({
-    orderBy: { nom: "asc" },
-  })
+  const vehicules = await vehiculeService.list()
 
   return NextResponse.json(vehicules)
 }
@@ -22,21 +19,14 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
 
-  const vehicule = await prisma.vehiculeEntreprise.create({
-    data: {
+  const vehicule = await vehiculeService.create(
+    {
       nom: body.nom,
       immatriculation: body.immatriculation,
       disponible: body.disponible ?? true,
     },
-  })
-
-  await auditBus.log({
-    utilisateurId: session.user.id,
-    action: "CREATION_VEHICULE",
-    entite: "VehiculeEntreprise",
-    entiteId: vehicule.id,
-    details: { nom: vehicule.nom },
-  })
+    session.user.id
+  )
 
   return NextResponse.json({ vehicule })
 }
@@ -49,22 +39,15 @@ export async function PUT(req: NextRequest) {
 
   const body = await req.json()
 
-  const vehicule = await prisma.vehiculeEntreprise.update({
-    where: { id: body.id },
-    data: {
+  const vehicule = await vehiculeService.update(
+    body.id,
+    {
       nom: body.nom,
       immatriculation: body.immatriculation,
       disponible: body.disponible ?? true,
     },
-  })
-
-  await auditBus.log({
-    utilisateurId: session.user.id,
-    action: "MODIFICATION_VEHICULE",
-    entite: "VehiculeEntreprise",
-    entiteId: vehicule.id,
-    details: { nom: vehicule.nom },
-  })
+    session.user.id
+  )
 
   return NextResponse.json({ vehicule })
 }
@@ -77,13 +60,7 @@ export async function DELETE(req: NextRequest) {
 
   const { id } = await req.json()
 
-  await prisma.vehiculeEntreprise.delete({ where: { id } })
-  await auditBus.log({
-    utilisateurId: session.user.id,
-    action: "SUPPRESSION_VEHICULE",
-    entite: "VehiculeEntreprise",
-    entiteId: id,
-  })
+  await vehiculeService.delete(id, session.user.id)
 
   return NextResponse.json({ success: true })
 }

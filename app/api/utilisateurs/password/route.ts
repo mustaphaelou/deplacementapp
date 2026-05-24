@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
-import { compare, hash } from "bcryptjs"
-import { auditBus } from "@/lib/audit-bus"
+import { utilisateurService, UtilisateurNotFoundError, MotDePasseIncorrectError } from "@/lib/utilisateur-service"
 
 export async function PUT(req: NextRequest) {
   const session = await auth()
@@ -27,34 +25,17 @@ export async function PUT(req: NextRequest) {
     )
   }
 
-  const user = await prisma.utilisateur.findUnique({
-    where: { id: session.user.id },
-  })
-  if (!user) {
-    return NextResponse.json({ error: "Utilisateur introuvable" }, { status: 404 })
+  try {
+    await utilisateurService.changePassword(session.user.id, currentPassword, newPassword)
+  } catch (err) {
+    if (err instanceof UtilisateurNotFoundError) {
+      return NextResponse.json({ error: err.message }, { status: err.status })
+    }
+    if (err instanceof MotDePasseIncorrectError) {
+      return NextResponse.json({ error: err.message }, { status: err.status })
+    }
+    throw err
   }
-
-  const isValid = await compare(currentPassword, user.motDePasse)
-  if (!isValid) {
-    return NextResponse.json(
-      { error: "Mot de passe actuel incorrect" },
-      { status: 400 }
-    )
-  }
-
-  const hashed = await hash(newPassword, 12)
-
-  await prisma.utilisateur.update({
-    where: { id: session.user.id },
-    data: { motDePasse: hashed },
-  })
-
-  await auditBus.log({
-    utilisateurId: session.user.id,
-    action: "CHANGEMENT_MOT_DE_PASSE",
-    entite: "Utilisateur",
-    entiteId: user.id,
-  })
 
   return NextResponse.json({ success: true })
 }

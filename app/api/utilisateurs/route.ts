@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
-import { hash } from "bcryptjs"
-import { auditBus } from "@/lib/audit-bus"
+import { utilisateurService } from "@/lib/utilisateur-service"
 
 export async function GET() {
   const session = await auth()
@@ -10,10 +8,7 @@ export async function GET() {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
   }
 
-  const users = await prisma.utilisateur.findMany({
-    include: { departement: { select: { id: true, nom: true } } },
-    orderBy: { nom: "asc" },
-  })
+  const users = await utilisateurService.list()
 
   return NextResponse.json({ users })
 }
@@ -25,28 +20,20 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const hashedPassword = await hash(body.motDePasse || "password123", 12)
 
-  const user = await prisma.utilisateur.create({
-    data: {
+  const user = await utilisateurService.create(
+    {
       email: body.email,
-      motDePasse: hashedPassword,
+      motDePasse: body.motDePasse || "password123",
       nom: body.nom,
       prenom: body.prenom,
       poste: body.poste,
       role: body.role,
       departementId: body.departementId,
-      telephone: body.telephone || null,
+      telephone: body.telephone,
     },
-  })
-
-  await auditBus.log({
-    utilisateurId: session.user.id,
-    action: "CREATION_UTILISATEUR",
-    entite: "Utilisateur",
-    entiteId: user.id,
-    details: { email: user.email },
-  })
+    session.user.id
+  )
 
   return NextResponse.json({ user })
 }
@@ -58,32 +45,21 @@ export async function PUT(req: NextRequest) {
   }
 
   const body = await req.json()
-  const updateData: any = {
-    email: body.email,
-    nom: body.nom,
-    prenom: body.prenom,
-    poste: body.poste,
-    role: body.role,
-    departementId: body.departementId,
-    telephone: body.telephone || null,
-  }
 
-  if (body.motDePasse) {
-    updateData.motDePasse = await hash(body.motDePasse, 12)
-  }
-
-  const user = await prisma.utilisateur.update({
-    where: { id: body.id },
-    data: updateData,
-  })
-
-  await auditBus.log({
-    utilisateurId: session.user.id,
-    action: "MODIFICATION_UTILISATEUR",
-    entite: "Utilisateur",
-    entiteId: user.id,
-    details: { email: user.email },
-  })
+  const user = await utilisateurService.update(
+    body.id,
+    {
+      email: body.email,
+      nom: body.nom,
+      prenom: body.prenom,
+      poste: body.poste,
+      role: body.role,
+      departementId: body.departementId,
+      telephone: body.telephone || null,
+      motDePasse: body.motDePasse,
+    },
+    session.user.id
+  )
 
   return NextResponse.json({ user })
 }
