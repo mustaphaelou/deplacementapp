@@ -1,7 +1,5 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -11,9 +9,9 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { toast } from "sonner"
-import { Loader2, Save, Send, Plus, X } from "lucide-react"
+import { Loader2, Save, Send } from "lucide-react"
 import { PURPOSE_OPTIONS, TRANSPORT_LABELS } from "@/lib/constants"
+import { useDemandeForm } from "@/hooks/use-demande-form"
 
 const formSchema = z.object({
   motif: z.array(z.string()).min(1),
@@ -43,10 +41,7 @@ interface Vehicule {
 }
 
 export function DemandeForm() {
-  const router = useRouter()
-  const [vehicules, setVehicules] = useState<Vehicule[]>([])
-  const [saving, setSaving] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
+  const { vehicules, saving, submitting, onSave, onSubmit } = useDemandeForm()
 
   const {
     register,
@@ -66,13 +61,6 @@ export function DemandeForm() {
   const typeTransport = watch("typeTransport")
   const avanceRequise = watch("avanceRequise")
 
-  useEffect(() => {
-    fetch("/api/vehicules")
-      .then((r) => r.json())
-      .then(setVehicules)
-      .catch(() => {})
-  }, [])
-
   function toggleMotif(value: string) {
     const current = selectedMotifs
     if (current.includes(value)) {
@@ -83,44 +71,6 @@ export function DemandeForm() {
   }
 
   const showVehicleField = typeTransport === "VOITURE_SOCIETE"
-
-  async function onSave(data: FormValues) {
-    setSaving(true)
-    try {
-      const res = await fetch("/api/demandes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, action: "save" }),
-      })
-      if (!res.ok) throw new Error()
-      toast.success("Brouillon sauvegardé")
-      router.push("/")
-      router.refresh()
-    } catch {
-      toast.error("Erreur lors de la sauvegarde")
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function onSubmit(data: FormValues) {
-    setSubmitting(true)
-    try {
-      const res = await fetch("/api/demandes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, action: "submit" }),
-      })
-      if (!res.ok) throw new Error()
-      toast.success("Demande soumise avec succès")
-      router.push("/")
-      router.refresh()
-    } catch {
-      toast.error("Erreur lors de la soumission")
-    } finally {
-      setSubmitting(false)
-    }
-  }
 
   const total =
     (parseFloat(watch("fraisTransport") || "0")) +

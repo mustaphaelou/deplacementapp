@@ -1,7 +1,5 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -11,7 +9,7 @@ import { DemandeStatusBadge } from "@/components/demande-status-badge"
 import { formatCurrency, formatDate, formatDateTime, TRANSPORT_LABELS, STATUT_LABELS, PURPOSE_OPTIONS } from "@/lib/constants"
 import { CheckCircle, XCircle, ArrowLeft, Download, Printer, Ban, ChevronRight, ChevronLeft, Loader2, Save } from "lucide-react"
 import Link from "next/link"
-import { toast } from "sonner"
+import { useDemandeActions } from "@/hooks/use-demande-actions"
 
 interface DemandeData {
   id: string
@@ -73,61 +71,17 @@ const stepOrder = ["BROUILLON", "SOUMISE", "APPROUVEE_MANAGER", "APPROUVEE_FINAN
 const rejectStatuses = ["REJETEE_MANAGER", "REJETEE_FINANCE", "REJETEE_DIRECTION"]
 
 export function DemandeDetail({ demande, canApprove, canReject, canWithdraw, isOwner, userRole }: DemandeDetailProps) {
-  const router = useRouter()
-  const [commentaire, setCommentaire] = useState("")
-  const [actionLoading, setActionLoading] = useState<string | null>(null)
-  const [showRejectForm, setShowRejectForm] = useState(false)
+  const {
+    commentaire,
+    setCommentaire,
+    actionLoading,
+    showRejectForm,
+    setShowRejectForm,
+    handleAction,
+    handleDownloadPdf,
+  } = useDemandeActions(demande.id, demande.numero)
 
   const motifs = parseMotif(demande.motif)
-
-  async function handleAction(action: string) {
-    if (action === "rejeter" && !commentaire.trim()) {
-      toast.error("Le commentaire est obligatoire pour le rejet")
-      return
-    }
-    setActionLoading(action)
-
-    try {
-      const res = await fetch(`/api/demandes/${demande.id}/action`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, commentaire }),
-      })
-
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || "Erreur")
-      }
-
-      const messages: Record<string, string> = {
-        approuver: "Demande approuvée",
-        rejeter: "Demande rejetée",
-        retirer: "Demande retirée",
-      }
-      toast.success(messages[action] ?? "Action effectuée")
-      router.refresh()
-    } catch (err: any) {
-      toast.error(err.message || "Erreur")
-    } finally {
-      setActionLoading(null)
-    }
-  }
-
-  async function handleDownloadPdf() {
-    try {
-      const res = await fetch(`/api/demandes/${demande.id}/pdf`)
-      if (!res.ok) throw new Error()
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = `demande-${demande.numero}.pdf`
-      a.click()
-      URL.revokeObjectURL(url)
-    } catch {
-      toast.error("Erreur de génération PDF")
-    }
-  }
 
   const currentStepIndex = stepOrder.indexOf(demande.statut)
   const isRejected = rejectStatuses.includes(demande.statut)
