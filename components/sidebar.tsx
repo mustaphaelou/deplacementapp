@@ -3,8 +3,19 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { X } from "lucide-react"
+import { X, BarChart3, FileText, FilePlus, Users, Clock, DollarSign, Car, CheckCircle, type LucideIcon } from "lucide-react"
 import type { NavItem } from "@/lib/roles"
+
+const iconMap: Record<string, LucideIcon> = {
+  "bar-chart-3": BarChart3,
+  "file-text": FileText,
+  "file-plus": FilePlus,
+  users: Users,
+  clock: Clock,
+  "dollar-sign": DollarSign,
+  car: Car,
+  "check-circle": CheckCircle,
+}
 
 interface SidebarProps {
   items: NavItem[]
@@ -33,7 +44,7 @@ export function Sidebar({ items, closeNav }: SidebarProps) {
       </div>
       <nav className="flex-1 space-y-1 p-3">
         {items.map((item) => {
-          const Icon = item.icon
+          const Icon = iconMap[item.icon]
           const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))
           return (
             <Link

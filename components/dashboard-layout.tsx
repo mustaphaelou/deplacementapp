@@ -1,9 +1,20 @@
 import Link from "next/link"
-import { ClipboardList } from "lucide-react"
+import { ClipboardList, BarChart3, FileText, FilePlus, Users, Clock, DollarSign, Car, CheckCircle, type LucideIcon } from "lucide-react"
 import { StatPill } from "@/components/ui/stat-pill"
 import { DemandeStatusBadge } from "@/components/demande-status-badge"
 import { formatCurrency, formatDate } from "@/lib/constants"
 import type { NavItem } from "@/lib/roles"
+
+const iconMap: Record<string, LucideIcon> = {
+  "bar-chart-3": BarChart3,
+  "file-text": FileText,
+  "file-plus": FilePlus,
+  users: Users,
+  clock: Clock,
+  "dollar-sign": DollarSign,
+  car: Car,
+  "check-circle": CheckCircle,
+}
 import type { DashboardConfig, TableColumnId } from "@/lib/dashboard-config"
 import type { DashboardDemandeSummary } from "@/lib/dashboard"
 
@@ -55,7 +66,7 @@ export function DashboardLayout({ config, navItems, demandes }: DashboardLayoutP
         </h2>
         <div className="grid gap-4 grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {navItems.filter((i) => i.href !== "/").map((item) => {
-            const Icon = item.icon
+            const Icon = iconMap[item.icon]
             return (
               <Link
                 key={item.href}

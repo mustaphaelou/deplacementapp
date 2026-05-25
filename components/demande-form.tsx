@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense } from "react"
+import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Button } from "@/components/ui/button"
@@ -10,9 +10,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { DateRangePicker } from "@/components/ui/date-range-picker"
-import { PrototypeCityField } from "@/components/prototype-city/prototype-city-field"
-import { PrototypeSwitcher } from "@/components/ui/prototype-switcher"
-import { Loader2, Save, Send } from "lucide-react"
+import { CityCombobox } from "@/components/ui/city-combobox"
+import { Loader2, Globe, Save, Send } from "lucide-react"
 import { PURPOSE_OPTIONS, TRANSPORT_LABELS } from "@/lib/constants"
 import { useDemandeForm } from "@/hooks/use-demande-form"
 import { demandeSchema } from "@/lib/schemas"
@@ -44,6 +43,7 @@ export function DemandeForm() {
     },
   })
 
+  const [horsMaroc, setHorsMaroc] = useState(false)
   const selectedMotifs = watch("motif")
   const typeTransport = watch("typeTransport")
   const avanceRequise = watch("avanceRequise")
@@ -66,8 +66,7 @@ export function DemandeForm() {
     (parseFloat(watch("fraisDivers") || "0"))
 
   return (
-    <>
-      <form className="space-y-6">
+    <form className="space-y-6">
         <Card>
           <CardHeader>
             <CardTitle>Nouvelle demande de déplacement</CardTitle>
@@ -108,12 +107,41 @@ export function DemandeForm() {
               />
             </div>
 
-            <PrototypeCityField
-              id="destination"
-              value={watch("destination")}
-              onValueChange={(v) => setValue("destination", v ?? "")}
-              error={errors.destination?.message}
-            />
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>Destination</Label>
+                <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+                  <Globe className="size-3" />
+                  <span>Hors Maroc</span>
+                  <input
+                    type="checkbox"
+                    checked={horsMaroc}
+                    onChange={(e) => {
+                      setHorsMaroc(e.target.checked)
+                      if (e.target.checked) setValue("destination", "")
+                    }}
+                    className="accent-primary size-3.5"
+                  />
+                </label>
+              </div>
+              {horsMaroc ? (
+                <Input
+                  id="destination"
+                  placeholder="Saisissez la destination..."
+                  {...register("destination")}
+                  className={errors.destination?.message ? "border-destructive" : ""}
+                />
+              ) : (
+                <CityCombobox
+                  id="destination"
+                  label=""
+                  value={watch("destination")}
+                  onValueChange={(v) => setValue("destination", v ?? "")}
+                  error={errors.destination?.message}
+                  placeholder="Rechercher une ville..."
+                />
+              )}
+            </div>
 
             <div className="space-y-2">
               <Label>Moyen de transport</Label>
@@ -221,10 +249,6 @@ export function DemandeForm() {
             Soumettre la demande
           </Button>
         </div>
-      </form>
-      <Suspense fallback={null}>
-        <PrototypeSwitcher />
-      </Suspense>
-    </>
+    </form>
   )
 }

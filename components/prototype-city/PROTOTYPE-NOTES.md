@@ -4,15 +4,15 @@
 
 What UX variations improve the destination city picker for DemandeDeplacement?
 
-## How to run
+## How to run (prototype only)
 
 ```bash
 npm run dev
 ```
 
-Navigate to `/demandes/nouvelle`. Use the floating bar at the bottom (or `←`/`→` arrow keys) to switch between 3 variants.
+Navigate to `/demandes/nouvelle`.
 
-## Variants
+## Variants tested
 
 | Key | Name | Description |
 |-----|------|-------------|
@@ -22,18 +22,25 @@ Navigate to `/demandes/nouvelle`. Use the floating bar at the bottom (or `←`/`
 
 ## Verdict
 
-<!-- Fill in after reviewing with the team -->
-
 ### Winner
 
-[Which variant or combination was chosen]
+**Variant A — Toggle fallback**
 
 ### Rationale
 
-[Why this variant won — concrete reasons tied to the original question]
+- Simple, minimal structural change to the existing form
+- The "Hors Maroc" toggle directly addresses the only real gap (non-Moroccan destinations)
+- No need to rework the combobox itself — the toggle wraps it cleanly
+- Region pills (B) add clutter for an edge case; quick-select grid (C) is too different from the rest of the form's UX patterns
 
-### Action items
+### Folded into production
 
-- [ ] Promote the winning variant to a real component
-- [ ] Delete the losing variants and the switcher
-- [ ] Remove PROTOTYPE-NOTES.md
+The toggle logic was integrated directly into `demande-form.tsx` wrapping the existing `<CityCombobox>`.
+
+### Deleted
+
+- `variant-b-filter.tsx`
+- `variant-c-quickselect.tsx`
+- `prototype-city-field.tsx`
+- `prototype-switcher.tsx`
+- `variant-a-toggle.tsx` (logic absorbed into `demande-form.tsx`)

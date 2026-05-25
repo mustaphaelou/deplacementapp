@@ -1,6 +1,3 @@
-import { BarChart3, FileText, FilePlus, Users, Clock, DollarSign, Car, CheckCircle } from "lucide-react"
-import type { LucideIcon } from "lucide-react"
-
 export type Role = "EMPLOYEE" | "MANAGER" | "FINANCE_ADMIN" | "GENERAL_DIRECTION"
 
 export const ROLE_HIERARCHY: Record<Role, number> = {
@@ -30,30 +27,30 @@ export const ROLE_LABELS: Record<string, string> = {
 export interface NavItem {
   label: string
   href: string
-  icon: LucideIcon
+  icon: string
   description: string
 }
 
 export const NAV_ITEMS: Record<string, NavItem[]> = {
   common: [
-    { label: "Tableau de bord", href: "/", icon: BarChart3, description: "Vue d'ensemble et statistiques" },
+    { label: "Tableau de bord", href: "/", icon: "bar-chart-3", description: "Vue d'ensemble et statistiques" },
   ],
   EMPLOYEE: [
-    { label: "Mes Demandes", href: "/demandes", icon: FileText, description: "Historique de vos demandes" },
-    { label: "Nouvelle Demande", href: "/demandes/nouvelle", icon: FilePlus, description: "Créer une demande de déplacement" },
+    { label: "Mes Demandes", href: "/demandes", icon: "file-text", description: "Historique de vos demandes" },
+    { label: "Nouvelle Demande", href: "/demandes/nouvelle", icon: "file-plus", description: "Créer une demande de déplacement" },
   ],
   MANAGER: [
-    { label: "Demandes Équipe", href: "/demandes", icon: Users, description: "Demandes de votre équipe" },
-    { label: "En Attente", href: "/demandes?statut=SOUMISE", icon: Clock, description: "Demandes en attente d'action" },
+    { label: "Demandes Équipe", href: "/demandes", icon: "users", description: "Demandes de votre équipe" },
+    { label: "En Attente", href: "/demandes?statut=SOUMISE", icon: "clock", description: "Demandes en attente d'action" },
   ],
   FINANCE_ADMIN: [
-    { label: "Approbations Budget", href: "/demandes", icon: DollarSign, description: "Validation budgétaire des demandes" },
-    { label: "Utilisateurs", href: "/administration/utilisateurs", icon: Users, description: "Gestion des comptes et rôles" },
-    { label: "Véhicules", href: "/administration/vehicules", icon: Car, description: "Gestion du parc automobile" },
-    { label: "Rapports", href: "/administration/rapports", icon: BarChart3, description: "Statistiques et exports" },
+    { label: "Approbations Budget", href: "/demandes", icon: "dollar-sign", description: "Validation budgétaire des demandes" },
+    { label: "Utilisateurs", href: "/administration/utilisateurs", icon: "users", description: "Gestion des comptes et rôles" },
+    { label: "Véhicules", href: "/administration/vehicules", icon: "car", description: "Gestion du parc automobile" },
+    { label: "Rapports", href: "/administration/rapports", icon: "bar-chart-3", description: "Statistiques et exports" },
   ],
   GENERAL_DIRECTION: [
-    { label: "Approbations Finales", href: "/demandes?statut=APPROUVEE_FINANCE", icon: CheckCircle, description: "Validation finale des demandes" },
-    { label: "Rapports", href: "/administration/rapports", icon: BarChart3, description: "Statistiques et exports" },
+    { label: "Approbations Finales", href: "/demandes?statut=APPROUVEE_FINANCE", icon: "check-circle", description: "Validation finale des demandes" },
+    { label: "Rapports", href: "/administration/rapports", icon: "bar-chart-3", description: "Statistiques et exports" },
   ],
 }
