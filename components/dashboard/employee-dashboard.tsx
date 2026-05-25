@@ -11,7 +11,6 @@ interface EmployeeDashboardProps {
 
 const iconL: Record<string, React.ElementType> = {
   "dashboard-square-01": BarChart3,
-  user: FileText,
   "notification-01": Bell,
   "file-01": FileText,
   "file-plus": FilePlus,
@@ -19,7 +18,6 @@ const iconL: Record<string, React.ElementType> = {
 
 const desc: Record<string, string> = {
   "Tableau de bord": "Vue d'ensemble et statistiques",
-  "Mon Profil": "Vos informations personnelles",
   "Notifications": "Alertes et mises à jour",
   "Mes Demandes": "Historique de vos demandes",
   "Nouvelle Demande": "Créer une demande de déplacement",

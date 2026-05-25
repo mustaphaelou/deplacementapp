@@ -11,7 +11,6 @@ interface DirectionDashboardProps {
 
 const iconL: Record<string, React.ElementType> = {
   "dashboard-square-01": BarChart3,
-  user: FileText,
   "notification-01": Bell,
   "checkmark-circle": CheckCircle,
   chart: BarChart3,
@@ -19,7 +18,6 @@ const iconL: Record<string, React.ElementType> = {
 
 const desc: Record<string, string> = {
   "Tableau de bord": "Vue d'ensemble et statistiques",
-  "Mon Profil": "Vos informations personnelles",
   "Notifications": "Alertes et mises à jour",
   "Approbations Finales": "Validation finale des demandes",
   "Rapports": "Statistiques et exports",

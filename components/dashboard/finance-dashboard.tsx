@@ -11,7 +11,6 @@ interface FinanceDashboardProps {
 
 const iconL: Record<string, React.ElementType> = {
   "dashboard-square-01": BarChart3,
-  user: FileText,
   "notification-01": Bell,
   "currency-dollar": DollarSign,
   "user-group": Users,
@@ -21,7 +20,6 @@ const iconL: Record<string, React.ElementType> = {
 
 const desc: Record<string, string> = {
   "Tableau de bord": "Vue d'ensemble et statistiques",
-  "Mon Profil": "Vos informations personnelles",
   "Notifications": "Alertes et mises à jour",
   "Approbations Budget": "Validation budgétaire des demandes",
   "Utilisateurs": "Gestion des comptes et rôles",

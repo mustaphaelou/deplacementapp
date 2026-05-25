@@ -21,7 +21,7 @@ describe("PdfRenderData contract", () => {
       motif: ["Réunion client"],
       dateDepart: new Date("2025-06-01"),
       dateRetour: new Date("2025-06-05"),
-      destination: "Paris",
+      destination: "Casablanca",
       typeTransport: "AVION",
       autreTransport: null,
       vehicule: null,
@@ -42,7 +42,7 @@ describe("PdfRenderData contract", () => {
     expect(data.motif).toEqual(["Réunion client"])
     expect(data.dateDepart).toEqual(new Date("2025-06-01"))
     expect(data.dateRetour).toEqual(new Date("2025-06-05"))
-    expect(data.destination).toBe("Paris")
+    expect(data.destination).toBe("Casablanca")
     expect(data.typeTransport).toBe("AVION")
     expect(data.autreTransport).toBeNull()
     expect(data.vehicule).toBeNull()
@@ -76,7 +76,7 @@ describe("PdfRenderData contract", () => {
       motif: ["Formation"],
       dateDepart: new Date("2025-07-01"),
       dateRetour: new Date("2025-07-03"),
-      destination: "Lyon",
+      destination: "Marrakech",
       typeTransport: "TRAIN",
       autreTransport: null,
       vehicule: null,
@@ -112,7 +112,7 @@ describe("PdfRenderData contract", () => {
       motif: ["Déplacement client"],
       dateDepart: new Date("2025-08-01"),
       dateRetour: new Date("2025-08-10"),
-      destination: "Marseille",
+      destination: "Fès",
       typeTransport: "VOITURE_SOCIETE",
       autreTransport: null,
       vehicule: { nom: "Peugeot 3008", immatriculation: "AB-123-CD" },

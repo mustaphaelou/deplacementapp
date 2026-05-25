@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { isValidCity } from "@/lib/cities-morocco"
 
 export const loginSchema = z.object({
   email: z.string().email("Email invalide"),
@@ -23,7 +24,7 @@ export const demandeSchema = z.object({
   motifAutre: z.string().optional(),
   dateDepart: z.string().min(1, "Date de départ requise"),
   dateRetour: z.string().min(1, "Date de retour requise"),
-  destination: z.string().min(2, "Destination requise"),
+  destination: z.string().min(2, "Destination requise").refine((v) => isValidCity(v), "Veuillez sélectionner une ville valide depuis la liste"),
   typeTransport: z.enum([
     "VOITURE_PERSONNELLE",
     "VOITURE_SOCIETE",

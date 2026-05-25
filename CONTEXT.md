@@ -26,6 +26,10 @@ _Avoid_: Position, title, permission level
 A company-owned vehicle that can be assigned to a DemandeDeplacement.
 _Avoid_: Company car, fleet vehicle
 
+**Ville**:
+A Moroccan city that can be selected as the destination of a DemandeDeplacement. Defined as a static list bundled with the app rather than a database table or external API. Each entry has a name and an optional region for grouping.
+_Avoid_: City, town, locality
+
 ### Workflow
 
 **Etape (Stage)**:

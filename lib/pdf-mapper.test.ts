@@ -16,7 +16,7 @@ function makeDemande(overrides?: Partial<DemandeDeplacement>): DemandeDeplacemen
     motif: '["Réunion client","Formation"]',
     dateDepart: new Date("2025-06-01"),
     dateRetour: new Date("2025-06-05"),
-    destination: "Paris",
+    destination: "Casablanca",
     typeTransport: "AVION" as any,
     autreTransport: null,
     vehiculeId: null,
@@ -114,7 +114,7 @@ describe("toPdfRenderData", () => {
     expect(result.motif).toEqual(["Réunion client", "Formation"])
     expect(result.dateDepart).toEqual(new Date("2025-06-01"))
     expect(result.dateRetour).toEqual(new Date("2025-06-05"))
-    expect(result.destination).toBe("Paris")
+    expect(result.destination).toBe("Casablanca")
     expect(result.typeTransport).toBe("AVION")
     expect(result.autreTransport).toBe("Taxi")
     expect(result.vehicule).toEqual({ nom: "Renault Clio", immatriculation: "XY-999-ZZ" })

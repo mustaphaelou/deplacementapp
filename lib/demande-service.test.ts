@@ -72,7 +72,7 @@ const createData = {
   motif: ["mission_client"],
   dateDepart: "2025-06-01",
   dateRetour: "2025-06-03",
-  destination: "Paris",
+  destination: "Casablanca",
   typeTransport: "AVION" as const,
 }
 

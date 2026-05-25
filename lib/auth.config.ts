@@ -18,6 +18,7 @@ export const authConfig = {
         token.departementId = user.departementId
         token.departement = user.departement
         token.poste = user.poste
+        token.avatarUrl = user.avatarUrl
       }
       return token
     },
@@ -28,6 +29,7 @@ export const authConfig = {
         session.user.departementId = token.departementId
         session.user.departement = token.departement
         session.user.poste = token.poste
+        session.user.avatarUrl = token.avatarUrl
       }
       return session
     },

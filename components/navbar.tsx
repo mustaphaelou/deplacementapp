@@ -1,13 +1,24 @@
 "use client"
 
 import { useSession, signOut } from "next-auth/react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { LogOut, Menu } from "lucide-react"
 import { ROLE_LABELS } from "@/lib/roles"
 import { NotificationBell } from "@/components/notification-bell"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 
 interface NavbarProps {
   onOpenMobileNav?: () => void
+}
+
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2)
 }
 
 export function Navbar({ onOpenMobileNav }: NavbarProps) {
@@ -36,6 +47,16 @@ export function Navbar({ onOpenMobileNav }: NavbarProps) {
         </span>
       </div>
       <div className="flex items-center gap-3">
+        <Link href="/profil" title="Mon Profil">
+          <Avatar className="size-8 cursor-pointer ring-1 ring-border hover:ring-primary transition-all">
+            {session?.user?.avatarUrl ? (
+              <AvatarImage src={session.user.avatarUrl} alt={session.user.name} />
+            ) : null}
+            <AvatarFallback className="text-xs font-medium">
+              {session?.user?.name ? getInitials(session.user.name) : "?"}
+            </AvatarFallback>
+          </Avatar>
+        </Link>
         <NotificationBell />
         <Button
           variant="ghost"

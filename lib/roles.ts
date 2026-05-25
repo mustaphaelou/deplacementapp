@@ -27,8 +27,6 @@ export const ROLE_LABELS: Record<string, string> = {
 export const NAV_ITEMS: Record<string, { label: string; href: string; icon: string }[]> = {
   common: [
     { label: "Tableau de bord", href: "/", icon: "dashboard-square-01" },
-    { label: "Mon Profil", href: "/profil", icon: "user" },
-    { label: "Notifications", href: "/notifications", icon: "notification-01" },
   ],
   EMPLOYEE: [
     { label: "Mes Demandes", href: "/demandes", icon: "file-01" },

@@ -11,7 +11,7 @@ describe("demandeSchema", () => {
       motif: ["mission"],
       dateDepart: "2026-06-01",
       dateRetour: "2026-06-05",
-      destination: "Paris",
+      destination: "Casablanca",
       typeTransport: "AVION",
       avanceRequise: false,
     })
@@ -25,7 +25,7 @@ describe("demandeSchema", () => {
       motif: ["mission"],
       dateDepart: "2026-06-10",
       dateRetour: "2026-06-05",
-      destination: "Paris",
+      destination: "Casablanca",
       typeTransport: "AVION",
     })
 
@@ -38,7 +38,7 @@ describe("demandeSchema", () => {
       motif: ["mission"],
       dateDepart: "2026-06-01",
       dateRetour: "2026-06-05",
-      destination: "Paris",
+      destination: "Casablanca",
       typeTransport: "AVION",
       avanceRequise: false,
       action: "submit",

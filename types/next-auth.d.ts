@@ -6,6 +6,7 @@ declare module "next-auth" {
     departementId?: string
     departement?: string
     poste?: string
+    avatarUrl?: string | null
   }
   interface Session {
     user: {
@@ -16,6 +17,7 @@ declare module "next-auth" {
       departementId: string
       departement: string
       poste: string
+      avatarUrl: string | null
     }
   }
 }

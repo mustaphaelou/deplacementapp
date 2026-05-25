@@ -11,7 +11,6 @@ interface ManagerDashboardProps {
 
 const iconL: Record<string, React.ElementType> = {
   "dashboard-square-01": BarChart3,
-  user: FileText,
   "notification-01": Bell,
   users: Users,
   clock: Clock,
@@ -19,7 +18,6 @@ const iconL: Record<string, React.ElementType> = {
 
 const desc: Record<string, string> = {
   "Tableau de bord": "Vue d'ensemble et statistiques",
-  "Mon Profil": "Vos informations personnelles",
   "Notifications": "Alertes et mises à jour",
   "Demandes Équipe": "Demandes de votre équipe",
   "En Attente": "Demandes en attente d'action",

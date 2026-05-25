@@ -13,7 +13,7 @@ function makePdfRenderData(overrides?: Partial<PdfRenderData>): PdfRenderData {
     motif: ["Réunion client"],
     dateDepart: new Date("2025-06-01"),
     dateRetour: new Date("2025-06-05"),
-    destination: "Paris",
+    destination: "Casablanca",
     typeTransport: "AVION",
     autreTransport: null,
     vehicule: null,

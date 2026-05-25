@@ -3,9 +3,8 @@ import { redirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import { formatDateTime } from "@/lib/constants"
 import Link from "next/link"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Bell } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 export default async function NotificationsPage() {
   const session = await auth()
@@ -22,47 +21,77 @@ export default async function NotificationsPage() {
     data: { lu: true },
   })
 
+  const unreadCount = notifications.filter((n) => !n.lu).length
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Notifications</h1>
-        <p className="text-sm text-muted-foreground">
-          {notifications.filter((n) => !n.lu).length} non lue(s)
-        </p>
+        <p className="text-sm text-muted-foreground">{unreadCount} non lue(s)</p>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          {notifications.length === 0 ? (
-            <div className="flex flex-col items-center justify-center p-8">
-              <Bell className="mb-2 size-8 text-muted-foreground/50" />
-              <p className="text-sm text-muted-foreground">Aucune notification</p>
-            </div>
-          ) : (
-            notifications.map((n) => (
+      {notifications.length === 0 ? (
+        <div className="flex flex-col items-center justify-center p-8">
+          <Bell className="mb-2 size-8 text-muted-foreground/50" />
+          <p className="text-sm text-muted-foreground">Aucune notification</p>
+        </div>
+      ) : (
+        <div className="divide-y rounded-lg border">
+          {notifications.map((n) => (
+            <div
+              key={n.id}
+              className={cn(
+                "flex items-start gap-3 p-4 transition-colors",
+                n.lu ? "bg-muted/40 text-muted-foreground/70" : "bg-background",
+              )}
+            >
               <div
-                key={n.id}
-                className={`flex items-start gap-3 border-b p-4 last:border-0 ${!n.lu ? "bg-muted/20" : ""}`}
-              >
-                <div className={`mt-1 size-2 shrink-0 rounded-full ${!n.lu ? "bg-primary" : "bg-transparent"}`} />
-                <div className="flex-1">
-                  <p className="text-sm font-medium">{n.titre}</p>
-                  <p className="text-sm text-muted-foreground">{n.message}</p>
-                  <p className="mt-1 text-xs text-muted-foreground/60">{formatDateTime(n.creeLe)}</p>
-                </div>
-                {n.demandeId && (
-                  <Link
-                    href={`/demandes/${n.demandeId}`}
-                    className="text-xs text-primary underline shrink-0"
-                  >
-                    Voir
-                  </Link>
+                className={cn(
+                  "mt-1.5 size-2 shrink-0 rounded-full",
+                  n.lu ? "bg-muted-foreground/30" : "bg-primary",
                 )}
+              />
+              <div className="flex-1">
+                <p
+                  className={cn(
+                    "text-sm",
+                    n.lu ? "font-normal" : "font-semibold text-foreground",
+                  )}
+                >
+                  {n.titre}
+                </p>
+                <p
+                  className={cn(
+                    "text-sm",
+                    n.lu ? "text-muted-foreground/50" : "text-muted-foreground",
+                  )}
+                >
+                  {n.message}
+                </p>
+                <p
+                  className={cn(
+                    "mt-1 text-xs",
+                    n.lu ? "text-muted-foreground/40" : "text-muted-foreground/60",
+                  )}
+                >
+                  {formatDateTime(n.creeLe)}
+                </p>
               </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
+              {n.demandeId && (
+                <Link
+                  href={`/demandes/${n.demandeId}`}
+                  className={cn(
+                    "shrink-0 text-xs underline",
+                    n.lu ? "text-muted-foreground/40" : "text-primary",
+                  )}
+                >
+                  Voir
+                </Link>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
