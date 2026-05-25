@@ -6,10 +6,9 @@ import {
   getFinanceDashboard,
   getDirectionDashboard,
 } from "@/lib/dashboard"
-import { EmployeeDashboard } from "@/components/dashboard/employee-dashboard"
-import { ManagerDashboard } from "@/components/dashboard/manager-dashboard"
-import { FinanceDashboard } from "@/components/dashboard/finance-dashboard"
-import { DirectionDashboard } from "@/components/dashboard/direction-dashboard"
+import { buildEmployeeConfig, buildManagerConfig, buildFinanceConfig, buildDirectionConfig } from "@/lib/dashboard-config"
+import { DashboardLayout } from "@/components/dashboard-layout"
+import { NAV_ITEMS } from "@/lib/roles"
 
 export default async function DashboardPage() {
   const session = await auth()
@@ -18,22 +17,28 @@ export default async function DashboardPage() {
   const role = session.user.role
   const userId = session.user.id
 
+  const navItems = [...NAV_ITEMS.common, ...(NAV_ITEMS[role as keyof typeof NAV_ITEMS] ?? [])]
+
   switch (role) {
     case "EMPLOYEE": {
       const data = await getEmployeeDashboard(userId)
-      return <EmployeeDashboard data={data} />
+      const config = buildEmployeeConfig(data.stats)
+      return <DashboardLayout config={config} navItems={navItems} demandes={data.demandes} />
     }
     case "MANAGER": {
       const data = await getManagerDashboard()
-      return <ManagerDashboard data={data} />
+      const config = buildManagerConfig(data.enAttente)
+      return <DashboardLayout config={config} navItems={navItems} demandes={data.demandes} />
     }
     case "FINANCE_ADMIN": {
       const data = await getFinanceDashboard()
-      return <FinanceDashboard data={data} />
+      const config = buildFinanceConfig(data.enAttente)
+      return <DashboardLayout config={config} navItems={navItems} demandes={data.demandes} />
     }
     case "GENERAL_DIRECTION": {
       const data = await getDirectionDashboard()
-      return <DirectionDashboard data={data} />
+      const config = buildDirectionConfig(data.enAttente, data.budgetTotal)
+      return <DashboardLayout config={config} navItems={navItems} demandes={data.demandes} />
     }
     default:
       redirect("/login")

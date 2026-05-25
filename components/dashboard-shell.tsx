@@ -4,9 +4,10 @@ import { useState } from "react"
 import { Sidebar } from "@/components/sidebar"
 import { Navbar } from "@/components/navbar"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
+import type { NavItem } from "@/lib/roles"
 
 interface DashboardShellProps {
-  navItems: { label: string; href: string; icon: string }[]
+  navItems: NavItem[]
   children: React.ReactNode
 }
 
