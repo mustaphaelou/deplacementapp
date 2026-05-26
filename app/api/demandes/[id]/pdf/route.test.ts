@@ -118,7 +118,7 @@ describe("PDF route integration", () => {
   it("mock Prisma can findUnique with expanded include", async () => {
     const prisma = makeMockPrisma()
 
-    const demande = await prisma.demandeDeplacement.findUnique({ where: { id: "d-1" }, include: { employe: true, vehicule: true, assigneA: true } } as any)
+    const demande = (await prisma.demandeDeplacement.findUnique({ where: { id: "d-1" }, include: { employe: true, vehicule: true, assigneA: true } } as any)) as any
 
     expect(demande).toBeDefined()
     expect(demande?.employe.nom).toBe("Dupont")

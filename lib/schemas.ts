@@ -24,7 +24,8 @@ export const demandeSchema = z.object({
   motifAutre: z.string().optional(),
   dateDepart: z.string().min(1, "Date de départ requise"),
   dateRetour: z.string().min(1, "Date de retour requise"),
-  destination: z.string().min(2, "Destination requise").refine((v) => isValidCity(v), "Veuillez sélectionner une ville valide depuis la liste"),
+  destination: z.string().min(2, "Destination requise"),
+  horsMaroc: z.boolean().optional(),
   typeTransport: z.enum([
     "VOITURE_PERSONNELLE",
     "VOITURE_SOCIETE",
@@ -49,6 +50,12 @@ export const demandeSchema = z.object({
     return new Date(data.dateRetour) >= new Date(data.dateDepart)
   },
   { message: "La date de retour doit être après la date de départ", path: ["dateRetour"] }
+).refine(
+  (data) => {
+    if (data.horsMaroc) return true
+    return isValidCity(data.destination)
+  },
+  { message: "Veuillez sélectionner une ville valide depuis la liste", path: ["destination"] }
 )
 
 export type DemandeFormValues = z.infer<typeof demandeSchema>
