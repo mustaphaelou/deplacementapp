@@ -1,9 +1,10 @@
 import Link from "next/link"
-import { ClipboardList, BarChart3, FileText, FilePlus, Users, Clock, DollarSign, Car, CheckCircle, type LucideIcon } from "lucide-react"
+import { ClipboardList, BarChart3, FileText, FilePlus, Users, Clock, DollarSign, Car, CheckCircle, AlertCircle, Plus, type LucideIcon } from "lucide-react"
 import { StatPill } from "@/components/ui/stat-pill"
 import { DemandeStatusBadge } from "@/components/demande-status-badge"
 import { formatCurrency, formatDate } from "@/lib/constants"
 import type { NavItem } from "@/lib/roles"
+import type { DashboardConfig, TableColumnId, DashboardDemandeSummary } from "@/lib/dashboard"
 
 const iconMap: Record<string, LucideIcon> = {
   "bar-chart-3": BarChart3,
@@ -14,9 +15,9 @@ const iconMap: Record<string, LucideIcon> = {
   "dollar-sign": DollarSign,
   car: Car,
   "check-circle": CheckCircle,
+  "alert-circle": AlertCircle,
+  plus: Plus,
 }
-import type { DashboardConfig, TableColumnId } from "@/lib/dashboard-config"
-import type { DashboardDemandeSummary } from "@/lib/dashboard"
 
 interface DashboardLayoutProps {
   config: DashboardConfig
@@ -55,9 +56,10 @@ export function DashboardLayout({ config, navItems, demandes }: DashboardLayoutP
       </div>
 
       <div className="flex flex-wrap gap-3">
-        {config.statPills.map((pill, i) => (
-          <StatPill key={i} {...pill} />
-        ))}
+        {config.statPills.map((pill, i) => {
+          const Icon = iconMap[pill.icon] || FileText
+          return <StatPill key={i} {...pill} icon={Icon} />
+        })}
       </div>
 
       <div>
@@ -149,7 +151,10 @@ export function DashboardLayout({ config, navItems, demandes }: DashboardLayoutP
           href={config.cta.href}
           className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90 transition"
         >
-          {(() => { const Icon = config.cta!.icon; return <Icon className="size-4" /> })()}
+          {(() => {
+            const Icon = iconMap[config.cta!.icon] || FilePlus
+            return <Icon className="size-4" />
+          })()}
           {config.cta.label}
         </Link>
       )}
