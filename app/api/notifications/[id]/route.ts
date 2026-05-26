@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth-utils"
 import { prisma } from "@/lib/prisma"
+import { notificationBus } from "@/lib/notification-bus"
 
 export async function PATCH(
   req: NextRequest,
@@ -23,10 +24,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Non autorisé" }, { status: 403 })
   }
 
-  await prisma.notification.update({
-    where: { id },
-    data: { lu: true },
-  })
+  await notificationBus.markAsRead(id)
 
   return NextResponse.json({ ok: true })
 }

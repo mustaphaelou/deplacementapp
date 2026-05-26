@@ -1,7 +1,6 @@
 import type { PrismaClient, Role } from "@prisma/client"
 import { prisma } from "./prisma"
-
-// ─── Types ───────────────────────────────────────────────────────────────────
+import { emailService } from "./email-service"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -12,6 +11,7 @@ export type NotificationEventType =
   | "DEMANDE_APPROBATION_FINALE"
   | "DEMANDE_REJETEE"
   | "DEMANDE_RETIREE"
+  | "DEMANDE_NOTIFICATION_LUE"
 
 export interface NotificationPayload {
   /** Demande identifier */
@@ -23,6 +23,8 @@ export interface NotificationPayload {
     id: string
     prenom: string
     nom: string
+    /** Department ID — required for read-receipt routing */
+    departementId?: string
   }
   /** Optional: the assigned approver (for withdraw notifications) */
   assigneAId?: string | null
@@ -54,6 +56,7 @@ class PrismaNotificationAdapter implements NotificationAdapter {
 
   async send(notification: NotificationMessage): Promise<AdapterResult> {
     try {
+      // 1. Persist in-app notification
       await this.db.notification.create({
         data: {
           utilisateurId: notification.utilisateurId,
@@ -62,6 +65,33 @@ class PrismaNotificationAdapter implements NotificationAdapter {
           demandeId: notification.demandeId,
         },
       })
+
+      // 2. Send email (best-effort — failures are logged but don't fail the notification)
+      const recipient = await this.db.utilisateur.findUnique({
+        where: { id: notification.utilisateurId },
+        select: { email: true, prenom: true, nom: true },
+      })
+
+      if (recipient?.email) {
+        await emailService.send({
+          to: recipient.email,
+          subject: notification.titre,
+          text: notification.message,
+          html: `
+            <div style="font-family: 'Segoe UI', Tahoma, sans-serif; max-width: 600px; margin: 0 auto;">
+              <div style="background: linear-gradient(135deg, #1e3a5f, #2d5a8e); padding: 24px; border-radius: 8px 8px 0 0;">
+                <h2 style="color: #ffffff; margin: 0; font-size: 18px;">${notification.titre}</h2>
+              </div>
+              <div style="background: #ffffff; padding: 24px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
+                <p style="color: #374151; font-size: 14px; line-height: 1.6; margin: 0 0 16px 0;">${notification.message}</p>
+                <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 16px 0;" />
+                <p style="color: #9ca3af; font-size: 12px; margin: 0;">Cet email a été envoyé automatiquement par le système de gestion des déplacements.</p>
+              </div>
+            </div>
+          `,
+        })
+      }
+
       return { success: true }
     } catch (error) {
       return { success: false, error: error as Error }
@@ -79,6 +109,7 @@ const EVENT_ROLE_MAP: Record<NotificationEventType, Role[]> = {
   DEMANDE_APPROBATION_FINALE: [],
   DEMANDE_REJETEE: [],
   DEMANDE_RETIREE: [],
+  DEMANDE_NOTIFICATION_LUE: [], // routed via custom logic below
 }
 
 // Events that go to the employee who owns the request.
@@ -89,6 +120,11 @@ const EMPLOYEE_EVENTS: NotificationEventType[] = [
 
 // Events that go to the assignee (for withdraw).
 const ASSIGNEE_EVENTS: NotificationEventType[] = ["DEMANDE_RETIREE"]
+
+// Events routed to the managers of the employee's department.
+const DEPARTMENT_MANAGER_EVENTS: NotificationEventType[] = [
+  "DEMANDE_NOTIFICATION_LUE",
+]
 
 async function resolveRecipients(
   event: NotificationEventType,
@@ -115,6 +151,19 @@ async function resolveRecipients(
   // 3. Assignee (for withdraw)
   if (ASSIGNEE_EVENTS.includes(event) && payload.assigneAId) {
     ids.add(payload.assigneAId)
+  }
+
+  // 4. Department managers (for read receipts)
+  if (DEPARTMENT_MANAGER_EVENTS.includes(event) && payload.employe.departementId) {
+    const managers = await db.utilisateur.findMany({
+      where: {
+        role: "MANAGER",
+        departementId: payload.employe.departementId,
+        actif: true,
+      },
+      select: { id: true },
+    })
+    managers.forEach((u) => ids.add(u.id))
   }
 
   return Array.from(ids)
@@ -160,6 +209,11 @@ function buildMessage(
       return {
         titre: "Demande retirée",
         message: `${fullName} a retiré la demande ${numero}.`,
+      }
+    case "DEMANDE_NOTIFICATION_LUE":
+      return {
+        titre: "Notification lue par l'employé",
+        message: `${fullName} a lu la notification concernant la demande ${numero}.`,
       }
     default:
       // exhaustive check
@@ -235,6 +289,51 @@ export class NotificationBus {
     }
 
     return { total: recipients.length, succeeded, failed, failures }
+  }
+
+  /**
+   * Mark a notification as read (lu) and, if the reader is an EMPLOYEE,
+   * dispatch a DEMANDE_NOTIFICATION_LUE event to the managers of the
+   * employee's department (AccuseLecture / read receipt).
+   */
+  async markAsRead(notificationId: string): Promise<void> {
+    const notification = await this.db.notification.findUnique({
+      where: { id: notificationId },
+      include: {
+        utilisateur: { select: { id: true, prenom: true, nom: true, role: true, departementId: true } },
+        demande: { select: { id: true, numero: true } },
+      },
+    })
+
+    if (!notification) {
+      throw new Error("Notification introuvable")
+    }
+
+    // Guard: already read — no-op
+    if (notification.lu) {
+      return
+    }
+
+    // Mark as read
+    await this.db.notification.update({
+      where: { id: notificationId },
+      data: { lu: true },
+    })
+
+    // Dispatch read receipt only when the reader is an EMPLOYEE
+    // and the notification is linked to a demande
+    if (notification.utilisateur.role === "EMPLOYEE" && notification.demande) {
+      await this.dispatch("DEMANDE_NOTIFICATION_LUE", {
+        demandeId: notification.demande.id,
+        numero: notification.demande.numero,
+        employe: {
+          id: notification.utilisateur.id,
+          prenom: notification.utilisateur.prenom,
+          nom: notification.utilisateur.nom,
+          departementId: notification.utilisateur.departementId,
+        },
+      })
+    }
   }
 }
 

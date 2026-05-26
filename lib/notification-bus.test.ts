@@ -3,18 +3,39 @@ import { NotificationBus } from "./notification-bus"
 import type { NotificationAdapter, NotificationMessage, NotificationPayload } from "./notification-bus"
 import type { PrismaClient, Role } from "@prisma/client"
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
 function mockAdapter(): NotificationAdapter & { send: ReturnType<typeof vi.fn> } {
   return { send: vi.fn().mockResolvedValue({ success: true }) }
 }
 
-function mockPrisma(usersByRole: Array<{ id: string; role: Role }>): PrismaClient {
+function mockPrisma(usersByRole: Array<{ id: string; role: Role; departementId?: string }>): PrismaClient {
   return {
     utilisateur: {
-      findMany: vi.fn().mockImplementation((args: { where: { role: { in: Role[] }; actif: boolean } }) => {
-        const roles = args.where.role.in as Role[]
-        const matches = usersByRole.filter((u) => roles.includes(u.role))
+      findMany: vi.fn().mockImplementation((args: { where: { role: { in?: Role[]; } | Role; actif: boolean; departementId?: string } }) => {
+        const where = args.where
+        let matches: typeof usersByRole
+
+        if (typeof where.role === "string") {
+          // Department-scoped manager lookup
+          matches = usersByRole.filter(
+            (u) => u.role === where.role && (!where.departementId || u.departementId === where.departementId)
+          )
+        } else if (where.role?.in) {
+          // Role-based lookup
+          const roles = where.role.in as Role[]
+          matches = usersByRole.filter((u) => roles.includes(u.role))
+        } else {
+          matches = []
+        }
+
         return Promise.resolve(matches.map((u) => ({ id: u.id })))
       }),
+      findUnique: vi.fn().mockResolvedValue(null),
+    },
+    notification: {
+      findUnique: vi.fn().mockResolvedValue(null),
+      update: vi.fn().mockResolvedValue({}),
     },
   } as unknown as PrismaClient
 }
@@ -25,6 +46,8 @@ const makePayload = (overrides?: Partial<NotificationPayload>): NotificationPayl
   employe: { id: "emp-1", prenom: "Jean", nom: "Dupont" },
   ...overrides,
 })
+
+// ─── dispatch() tests ────────────────────────────────────────────────────────
 
 describe("NotificationBus", () => {
   it("dispatch returns dispatch result when all deliveries succeed", async () => {
@@ -151,5 +174,148 @@ describe("NotificationBus", () => {
     const call = adapter.send.mock.calls[0]?.[0] as NotificationMessage
     expect(call.utilisateurId).toBe(payload.employe.id)
     expect(call.titre).toBe("Demande approuvée")
+  })
+
+  // ─── DEMANDE_NOTIFICATION_LUE (read receipt) dispatch tests ──────────────
+
+  it("dispatch routes DEMANDE_NOTIFICATION_LUE to department managers only", async () => {
+    const adapter = mockAdapter()
+    const prisma = mockPrisma([
+      { id: "mgr-hr", role: "MANAGER", departementId: "dept-hr" },
+      { id: "mgr-it", role: "MANAGER", departementId: "dept-it" },
+    ])
+    const bus = new NotificationBus(adapter, prisma)
+
+    const payload = makePayload({
+      employe: { id: "emp-1", prenom: "Jean", nom: "Dupont", departementId: "dept-hr" },
+    })
+    const result = await bus.dispatch("DEMANDE_NOTIFICATION_LUE", payload)
+
+    // Only the HR manager should receive — not the IT manager
+    expect(result.total).toBe(1)
+    expect(adapter.send).toHaveBeenCalledTimes(1)
+    const call = adapter.send.mock.calls[0][0] as NotificationMessage
+    expect(call.utilisateurId).toBe("mgr-hr")
+    expect(call.titre).toBe("Notification lue par l'employé")
+    expect(call.message).toContain("Jean Dupont")
+    expect(call.message).toContain("DD-2025-0001")
+  })
+
+  it("dispatch sends zero notifications for DEMANDE_NOTIFICATION_LUE when no departementId", async () => {
+    const adapter = mockAdapter()
+    const prisma = mockPrisma([{ id: "mgr-1", role: "MANAGER", departementId: "dept-hr" }])
+    const bus = new NotificationBus(adapter, prisma)
+
+    // No departementId on the employee — should skip department manager routing
+    const payload = makePayload()
+    const result = await bus.dispatch("DEMANDE_NOTIFICATION_LUE", payload)
+
+    expect(result.total).toBe(0)
+    expect(adapter.send).not.toHaveBeenCalled()
+  })
+
+  // ─── markAsRead() tests ───────────────────────────────────────────────────
+
+  it("markAsRead marks the notification as read and dispatches read receipt for employees", async () => {
+    const adapter = mockAdapter()
+    const prisma = mockPrisma([{ id: "mgr-hr", role: "MANAGER", departementId: "dept-hr" }])
+
+    // Mock notification.findUnique to return an unread notification from an employee
+    ;(prisma.notification.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      id: "notif-1",
+      lu: false,
+      utilisateur: { id: "emp-1", prenom: "Jean", nom: "Dupont", role: "EMPLOYEE", departementId: "dept-hr" },
+      demande: { id: "d-1", numero: "DD-2025-0001" },
+    })
+
+    const bus = new NotificationBus(adapter, prisma)
+    await bus.markAsRead("notif-1")
+
+    // Should have marked as read
+    expect(prisma.notification.update).toHaveBeenCalledWith({
+      where: { id: "notif-1" },
+      data: { lu: true },
+    })
+
+    // Should have dispatched read receipt to the manager
+    expect(adapter.send).toHaveBeenCalledTimes(1)
+    const call = adapter.send.mock.calls[0][0] as NotificationMessage
+    expect(call.titre).toBe("Notification lue par l'employé")
+    expect(call.utilisateurId).toBe("mgr-hr")
+  })
+
+  it("markAsRead is a no-op when notification is already read", async () => {
+    const adapter = mockAdapter()
+    const prisma = mockPrisma([])
+
+    ;(prisma.notification.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      id: "notif-1",
+      lu: true, // already read
+      utilisateur: { id: "emp-1", prenom: "Jean", nom: "Dupont", role: "EMPLOYEE", departementId: "dept-hr" },
+      demande: { id: "d-1", numero: "DD-2025-0001" },
+    })
+
+    const bus = new NotificationBus(adapter, prisma)
+    await bus.markAsRead("notif-1")
+
+    // Should NOT have updated or dispatched anything
+    expect(prisma.notification.update).not.toHaveBeenCalled()
+    expect(adapter.send).not.toHaveBeenCalled()
+  })
+
+  it("markAsRead does not dispatch read receipt for non-EMPLOYEE roles", async () => {
+    const adapter = mockAdapter()
+    const prisma = mockPrisma([])
+
+    ;(prisma.notification.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      id: "notif-1",
+      lu: false,
+      utilisateur: { id: "mgr-1", prenom: "Admin", nom: "User", role: "MANAGER", departementId: "dept-hr" },
+      demande: { id: "d-1", numero: "DD-2025-0001" },
+    })
+
+    const bus = new NotificationBus(adapter, prisma)
+    await bus.markAsRead("notif-1")
+
+    // Should mark as read
+    expect(prisma.notification.update).toHaveBeenCalledWith({
+      where: { id: "notif-1" },
+      data: { lu: true },
+    })
+
+    // Should NOT dispatch read receipt (reader is a MANAGER, not an EMPLOYEE)
+    expect(adapter.send).not.toHaveBeenCalled()
+  })
+
+  it("markAsRead throws when notification does not exist", async () => {
+    const adapter = mockAdapter()
+    const prisma = mockPrisma([])
+
+    ;(prisma.notification.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null)
+
+    const bus = new NotificationBus(adapter, prisma)
+
+    await expect(bus.markAsRead("notif-nonexistent")).rejects.toThrow("Notification introuvable")
+  })
+
+  it("markAsRead does not dispatch read receipt when notification has no demande", async () => {
+    const adapter = mockAdapter()
+    const prisma = mockPrisma([])
+
+    ;(prisma.notification.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      id: "notif-1",
+      lu: false,
+      utilisateur: { id: "emp-1", prenom: "Jean", nom: "Dupont", role: "EMPLOYEE", departementId: "dept-hr" },
+      demande: null, // no linked demande
+    })
+
+    const bus = new NotificationBus(adapter, prisma)
+    await bus.markAsRead("notif-1")
+
+    // Should mark as read
+    expect(prisma.notification.update).toHaveBeenCalled()
+
+    // Should NOT dispatch read receipt (no demande linked)
+    expect(adapter.send).not.toHaveBeenCalled()
   })
 })
