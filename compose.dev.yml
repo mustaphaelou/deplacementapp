@@ -1,0 +1,29 @@
+services:
+  db:
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=pass
+      - POSTGRES_DB=hay2010
+
+  app:
+    environment:
+      - DATABASE_URL=postgresql://user:pass@db:5432/hay2010
+      - NEXTAUTH_SECRET=dev-secret-not-for-production-use
+      - NEXTAUTH_URL=http://localhost:${PORT:-3000}
+      - AUTH_TRUST_HOST=true
+      - SMTP_HOST=mail
+      - SMTP_PORT=1025
+      - SMTP_USER=
+      - SMTP_PASS=
+      - SMTP_FROM=noreply@hay2010.ma
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=pass
+      - POSTGRES_DB=hay2010
+
+  mail:
+    image: axllent/mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"

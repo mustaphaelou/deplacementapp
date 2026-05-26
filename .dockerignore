@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+.env
+.env*.local
+*.md
+coverage
+.out-of-scope
+.antigravitycli
+error.log
+*.tsbuildinfo
+architecture-report-*.html

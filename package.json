@@ -30,7 +30,6 @@
     "@react-pdf/renderer": "^4.5.1",
     "@types/bcryptjs": "^2.4.6",
     "@types/pg": "^8.20.0",
-    "argon2": "^0.44.0",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
