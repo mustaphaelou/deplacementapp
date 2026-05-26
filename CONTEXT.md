@@ -48,7 +48,11 @@ The mode of transport for a DemandeDeplacement. One of: VOITURE_PERSONNELLE, VOI
 ### Supporting
 
 **Notification**:
-An in-app message sent to a Utilisateur about a DemandeDeplacement event.
+A message sent to a Utilisateur about a DemandeDeplacement event, delivered via both an in-app alert and an email.
+
+**AccuseLecture (Read Receipt)**:
+A Notification automatically sent to the Manager of an Employee's Departement when that Employee marks a Notification related to a DemandeDeplacement as read (lu).
+
 
 **JournalAudit**:
 A timestamped record of who performed what action on which entity.

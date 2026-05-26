@@ -1,25 +1,74 @@
-import { auth } from "@/lib/auth"
+"use client"
+
+import { useSession } from "next-auth/react"
 import { redirect } from "next/navigation"
-import { prisma } from "@/lib/prisma"
-import { formatDateTime } from "@/lib/constants"
+import { useEffect, useState, useCallback } from "react"
+import { Bell, Eye } from "lucide-react"
 import Link from "next/link"
-import { Bell } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { formatDateTime } from "@/lib/constants"
+import { Button } from "@/components/ui/button"
+import { useNotificationContext } from "@/components/notification-context"
 
-export default async function NotificationsPage() {
-  const session = await auth()
+type Notification = {
+  id: string
+  titre: string
+  message: string
+  lu: boolean
+  creeLe: string
+  demandeId: string | null
+}
+
+export default function NotificationsPage() {
+  const { data: session } = useSession()
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [loading, setLoading] = useState(true)
+  const [marking, setMarking] = useState<Set<string>>(new Set())
+  const { refreshBell } = useNotificationContext()
+
+  useEffect(() => {
+    if (!session?.user) return
+    ;(async () => {
+      try {
+        const res = await fetch("/api/notifications")
+        if (res.ok) {
+          const data = await res.json()
+          setNotifications(data.notifications)
+        }
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [session])
+
+  const markAsRead = useCallback(async (id: string) => {
+    setMarking((prev) => new Set(prev).add(id))
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, lu: true } : n)),
+    )
+    try {
+      const res = await fetch(`/api/notifications/${id}`, { method: "PATCH" })
+      if (!res.ok) {
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === id ? { ...n, lu: false } : n)),
+        )
+      } else {
+        refreshBell()
+      }
+    } catch {
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, lu: false } : n)),
+      )
+    } finally {
+      setMarking((prev) => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+    }
+  }, [refreshBell])
+
   if (!session?.user) redirect("/login")
-
-  const notifications = await prisma.notification.findMany({
-    where: { utilisateurId: session.user.id },
-    orderBy: { creeLe: "desc" },
-    take: 50,
-  })
-
-  await prisma.notification.updateMany({
-    where: { utilisateurId: session.user.id, lu: false },
-    data: { lu: true },
-  })
 
   const unreadCount = notifications.filter((n) => !n.lu).length
 
@@ -30,7 +79,11 @@ export default async function NotificationsPage() {
         <p className="text-sm text-muted-foreground">{unreadCount} non lue(s)</p>
       </div>
 
-      {notifications.length === 0 ? (
+      {loading ? (
+        <div className="flex items-center justify-center p-8">
+          <p className="text-sm text-muted-foreground">Chargement...</p>
+        </div>
+      ) : notifications.length === 0 ? (
         <div className="flex flex-col items-center justify-center p-8">
           <Bell className="mb-2 size-8 text-muted-foreground/50" />
           <p className="text-sm text-muted-foreground">Aucune notification</p>
@@ -77,17 +130,31 @@ export default async function NotificationsPage() {
                   {formatDateTime(n.creeLe)}
                 </p>
               </div>
-              {n.demandeId && (
-                <Link
-                  href={`/demandes/${n.demandeId}`}
-                  className={cn(
-                    "shrink-0 text-xs underline",
-                    n.lu ? "text-muted-foreground/40" : "text-primary",
-                  )}
-                >
-                  Voir
-                </Link>
-              )}
+              <div className="flex items-center gap-2">
+                {!n.lu && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => markAsRead(n.id)}
+                    disabled={marking.has(n.id)}
+                    className="size-7 shrink-0"
+                    title="Marquer comme lue"
+                  >
+                    <Eye className="size-3.5" />
+                  </Button>
+                )}
+                {n.demandeId && (
+                  <Link
+                    href={`/demandes/${n.demandeId}`}
+                    className={cn(
+                      "shrink-0 text-xs underline",
+                      n.lu ? "text-muted-foreground/40" : "text-primary",
+                    )}
+                  >
+                    Voir
+                  </Link>
+                )}
+              </div>
             </div>
           ))}
         </div>

@@ -4,29 +4,36 @@ import { useSession } from "next-auth/react"
 import Link from "next/link"
 import { Bell } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
+import { useNotificationContext } from "@/components/notification-context"
 
 export function NotificationBell() {
   const { data: session } = useSession()
   const [count, setCount] = useState(0)
+  const { onRefresh } = useNotificationContext()
+
+  const fetchCount = useCallback(async () => {
+    try {
+      const res = await fetch("/api/notifications/compter")
+      if (res.ok) {
+        const data = await res.json()
+        setCount(data.count)
+      }
+    } catch {}
+  }, [])
 
   useEffect(() => {
     if (!session?.user?.id) return
 
-    async function fetchCount() {
-      try {
-        const res = await fetch("/api/notifications/compter")
-        if (res.ok) {
-          const data = await res.json()
-          setCount(data.count)
-        }
-      } catch {}
-    }
+    const interval = setInterval(fetchCount, 120000)
+    const unsubscribe = onRefresh(fetchCount)
+    queueMicrotask(fetchCount)
 
-    fetchCount()
-    const interval = setInterval(fetchCount, 30000)
-    return () => clearInterval(interval)
-  }, [session])
+    return () => {
+      clearInterval(interval)
+      unsubscribe()
+    }
+  }, [session, fetchCount, onRefresh])
 
   if (count === 0) {
     return (

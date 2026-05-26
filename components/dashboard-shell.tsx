@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Sidebar } from "@/components/sidebar"
 import { Navbar } from "@/components/navbar"
+import { NotificationProvider } from "@/components/notification-context"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import type { NavItem } from "@/lib/roles"
 
@@ -19,6 +20,7 @@ export function DashboardShell({ navItems, children }: DashboardShellProps) {
   }
 
   return (
+    <NotificationProvider>
     <div className="flex h-screen overflow-hidden">
       {/* Desktop sidebar */}
       <div className="hidden md:flex md:shrink-0">
@@ -42,5 +44,6 @@ export function DashboardShell({ navItems, children }: DashboardShellProps) {
         </main>
       </div>
     </div>
+    </NotificationProvider>
   )
 }
