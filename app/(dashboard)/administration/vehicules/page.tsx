@@ -8,13 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import { Plus, Loader2, Pencil, Trash2, Search } from "lucide-react"
-
-interface Vehicule {
-  id: string
-  nom: string
-  immatriculation: string
-  disponible: boolean
-}
+import type { Vehicule } from "@/lib/demande-types"
 
 export default function VehiculesPage() {
   const [vehicules, setVehicules] = useState<Vehicule[]>([])

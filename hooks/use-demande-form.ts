@@ -3,13 +3,8 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-
-interface Vehicule {
-  id: string
-  nom: string
-  immatriculation: string
-  disponible: boolean
-}
+import type { Vehicule } from "@/lib/demande-types"
+import type { DemandeFormValues } from "@/lib/schemas"
 
 export function useDemandeForm() {
   const router = useRouter()
@@ -24,7 +19,7 @@ export function useDemandeForm() {
       .catch(() => {})
   }, [])
 
-  async function onSave(data: Record<string, unknown>) {
+  async function onSave(data: Partial<DemandeFormValues>) {
     setSaving(true)
     try {
       const res = await fetch("/api/demandes", {
@@ -43,7 +38,7 @@ export function useDemandeForm() {
     }
   }
 
-  async function onSubmit(data: Record<string, unknown>) {
+  async function onSubmit(data: Partial<DemandeFormValues>) {
     setSubmitting(true)
     try {
       const res = await fetch("/api/demandes", {

@@ -55,3 +55,5 @@ export interface DemandeDetail {
   creeLe: string
   modifieLe: string
 }
+
+export type Vehicule = Pick<VehiculeEntreprise, "id" | "nom" | "immatriculation" | "disponible">

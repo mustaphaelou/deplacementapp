@@ -14,17 +14,10 @@ import { CityCombobox } from "@/components/ui/city-combobox"
 import { Loader2, Globe, Save, Send, Calendar, MapPin, Truck, DollarSign, Wallet, ClipboardList, ArrowLeft, ArrowRight } from "lucide-react"
 import { PURPOSE_OPTIONS, TRANSPORT_LABELS } from "@/lib/constants"
 import { useDemandeForm } from "@/hooks/use-demande-form"
-import { demandeSchema } from "@/lib/schemas"
-import type { z } from "zod"
+import { demandeSchema, type DemandeFormValues } from "@/lib/schemas"
+import type { Vehicule } from "@/lib/demande-types"
 
-type FormValues = z.infer<typeof demandeSchema>
-
-interface Vehicule {
-  id: string
-  nom: string
-  immatriculation: string
-  disponible: boolean
-}
+type FormValues = DemandeFormValues
 
 const STEPS = [
   { label: "Motif", desc: "Raison du déplacement" },
