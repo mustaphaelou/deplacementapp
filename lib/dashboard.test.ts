@@ -1,23 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
+import { describe, it, expect, vi } from "vitest"
 import { getDashboardPayload } from "./dashboard"
-import { prisma } from "@/lib/prisma"
 import { formatCurrency } from "@/lib/constants"
 
-vi.mock("@/lib/prisma", () => ({
-  prisma: {
-    demandeDeplacement: {
-      findMany: vi.fn(),
-      groupBy: vi.fn(),
-      count: vi.fn(),
-      aggregate: vi.fn(),
-    },
-  },
-}))
-
 describe("Dashboard Module - getDashboardPayload", () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
 
   it("returns correct payload for EMPLOYEE role (injected fake service)", async () => {
     const mockDemandes = [
@@ -41,6 +26,7 @@ describe("Dashboard Module - getDashboardPayload", () => {
         if (statut === "SOUMISE") return Promise.resolve(2)
         return Promise.resolve(0)
       }),
+      aggregateBudget: vi.fn(),
     }
 
     const payload = await getDashboardPayload("user-emp", "EMPLOYEE", fakeService)
@@ -75,6 +61,7 @@ describe("Dashboard Module - getDashboardPayload", () => {
       getDemandesByUser: vi.fn(),
       getDemandesByStatuts: vi.fn().mockResolvedValue(mockDemandes as any),
       countByStatut: vi.fn().mockResolvedValue(1),
+      aggregateBudget: vi.fn(),
     }
 
     const payload = await getDashboardPayload("user-mgr", "MANAGER", fakeService)
@@ -110,6 +97,7 @@ describe("Dashboard Module - getDashboardPayload", () => {
       getDemandesByUser: vi.fn(),
       getDemandesByStatuts: vi.fn().mockResolvedValue(mockDemandes as any),
       countByStatut: vi.fn().mockResolvedValue(1),
+      aggregateBudget: vi.fn(),
     }
 
     const payload = await getDashboardPayload("user-fin", "FINANCE_ADMIN", fakeService)
@@ -125,7 +113,7 @@ describe("Dashboard Module - getDashboardPayload", () => {
     ])
   })
 
-  it("returns correct payload for GENERAL_DIRECTION role", async () => {
+  it("returns correct payload for GENERAL_DIRECTION role (injected fake service)", async () => {
     const mockDemandes = [
       {
         id: "d-4",
@@ -139,20 +127,23 @@ describe("Dashboard Module - getDashboardPayload", () => {
       },
     ]
 
-    vi.mocked(prisma.demandeDeplacement.findMany).mockResolvedValue(mockDemandes as any)
-    vi.mocked(prisma.demandeDeplacement.count).mockResolvedValue(1)
-    vi.mocked(prisma.demandeDeplacement.aggregate).mockResolvedValue({
-      _sum: { totalEstime: 15000 },
-    } as any)
+    const fakeService = {
+      getDemandesByUser: vi.fn(),
+      getDemandesByStatuts: vi.fn().mockResolvedValue(mockDemandes as any),
+      countByStatut: vi.fn().mockResolvedValue(1),
+      aggregateBudget: vi.fn().mockResolvedValue(15000),
+    }
 
-    const payload = await getDashboardPayload("user-dir", "GENERAL_DIRECTION")
+    const payload = await getDashboardPayload("user-dir", "GENERAL_DIRECTION", fakeService)
 
-    expect(prisma.demandeDeplacement.findMany).toHaveBeenCalledWith({
-      where: { statut: { in: ["APPROUVEE_FINANCE"] }, deletedAt: null },
-      orderBy: { approuveeFinanceLe: "desc" },
-      take: 10,
-      include: { employe: { select: { prenom: true, nom: true } } },
-    })
+    expect(fakeService.getDemandesByStatuts).toHaveBeenCalledWith(
+      ["APPROUVEE_FINANCE"],
+      { includeEmployee: true, limit: 10, orderBy: { approuveeFinanceLe: "desc" } }
+    )
+    expect(fakeService.countByStatut).toHaveBeenCalledWith("APPROUVEE_FINANCE")
+    expect(fakeService.aggregateBudget).toHaveBeenCalledWith(
+      ["APPROUVEE", "APPROUVEE_FINANCE", "APPROUVEE_MANAGER"]
+    )
 
     expect(payload.config.subtitle).toBe("Direction Générale")
     expect(payload.config.statPills).toEqual([

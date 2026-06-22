@@ -31,6 +31,7 @@ interface MockedDb {
     create: ReturnType<typeof vi.fn>
     update: ReturnType<typeof vi.fn>
     count: ReturnType<typeof vi.fn>
+    aggregate: ReturnType<typeof vi.fn>
   }
 }
 
@@ -42,6 +43,7 @@ function mockDb(): MockedDb {
       create: vi.fn(),
       update: vi.fn(),
       count: vi.fn().mockResolvedValue(5),
+      aggregate: vi.fn(),
     },
   }
 }
@@ -81,6 +83,39 @@ const actor = (overrides?: Partial<{ id: string; role: Role }>) => ({ id: "u-1",
 // ─── Tests ──────────────────────────────────────────────────────────────────
 
 describe("DemandeDeplacementService", () => {
+  // ── aggregateBudget ──────────────────────────────────────────────────
+
+  it("aggregateBudget sums totalEstime for given statuses", async () => {
+    const db = mockDb()
+    db.demandeDeplacement.aggregate.mockResolvedValue({
+      _sum: { totalEstime: 45000 },
+    })
+
+    const svc = new DemandeDeplacementService(db as unknown as PrismaClient, mockNotifications(), mockAudit())
+    const result = await svc.aggregateBudget(["APPROUVEE", "APPROUVEE_FINANCE"])
+
+    expect(db.demandeDeplacement.aggregate).toHaveBeenCalledWith({
+      _sum: { totalEstime: true },
+      where: {
+        statut: { in: ["APPROUVEE", "APPROUVEE_FINANCE"] },
+        deletedAt: null,
+      },
+    })
+    expect(result).toBe(45000)
+  })
+
+  it("aggregateBudget returns 0 when no matching demandes", async () => {
+    const db = mockDb()
+    db.demandeDeplacement.aggregate.mockResolvedValue({
+      _sum: { totalEstime: null },
+    })
+
+    const svc = new DemandeDeplacementService(db as unknown as PrismaClient, mockNotifications(), mockAudit())
+    const result = await svc.aggregateBudget(["BROUILLON"])
+
+    expect(result).toBe(0)
+  })
+
   // ── Create (draft) ────────────────────────────────────────────────────
 
   it("creates a draft demande with BROUILLON status", async () => {

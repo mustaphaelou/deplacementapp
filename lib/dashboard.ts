@@ -1,10 +1,6 @@
-import { prisma } from "@/lib/prisma"
 import type { StatutDemande, Role } from "@prisma/client"
 import { formatCurrency } from "@/lib/constants"
-import {
-  demandeService,
-  mapToDemandeSummary,
-} from "./demande-service"
+import { demandeService } from "./demande-service"
 import type { DashboardDemandeSummary } from "./demande-service"
 export type { DashboardDemandeSummary }
 
@@ -63,36 +59,6 @@ export function computeStats(counts: { statut: string; _count: number }[]): Dema
   }
 }
 
-// ─── Query module (internal, policy-agnostic) ───────────────────────────────
-
-async function fetchDemandesByStatuts(
-  statuts: StatutDemande[],
-  opts: { limit?: number; includeEmployee?: boolean; orderBy?: any } = {}
-): Promise<DashboardDemandeSummary[]> {
-  const { limit = 10, includeEmployee = false, orderBy = { creeLe: "desc" } } = opts
-
-  const demandes = await prisma.demandeDeplacement.findMany({
-    where: { statut: { in: statuts }, deletedAt: null },
-    orderBy,
-    take: limit,
-    include: includeEmployee ? { employe: { select: { prenom: true, nom: true } } } : undefined,
-  })
-
-  return demandes.map(mapToDemandeSummary)
-}
-
-async function countByStatut(statut: StatutDemande): Promise<number> {
-  return prisma.demandeDeplacement.count({ where: { statut, deletedAt: null } })
-}
-
-async function aggregateBudget(statuses: StatutDemande[]): Promise<number> {
-  const result = await prisma.demandeDeplacement.aggregate({
-    _sum: { totalEstime: true },
-    where: { statut: { in: statuses }, deletedAt: null },
-  })
-  return Number(result._sum?.totalEstime ?? 0)
-}
-
 // ─── Consolidated deep interface ───────────────────────────────────────────
 
 export async function getDashboardPayload(
@@ -102,6 +68,7 @@ export async function getDashboardPayload(
     getDemandesByUser: (userId: string, limit?: number) => Promise<DashboardDemandeSummary[]>
     getDemandesByStatuts: (statuts: StatutDemande[], opts?: { limit?: number; includeEmployee?: boolean; orderBy?: any }) => Promise<DashboardDemandeSummary[]>
     countByStatut: (statut: StatutDemande, userId?: string) => Promise<number>
+    aggregateBudget: (statuts: StatutDemande[]) => Promise<number>
   }
 ): Promise<DashboardPayload> {
   const service = svc ?? demandeService
@@ -199,9 +166,9 @@ export async function getDashboardPayload(
     }
     case "GENERAL_DIRECTION": {
       const [demandes, enAttente, budgetTotal] = await Promise.all([
-        fetchDemandesByStatuts(["APPROUVEE_FINANCE"], { includeEmployee: true, limit: 10, orderBy: { approuveeFinanceLe: "desc" } }),
-        countByStatut("APPROUVEE_FINANCE"),
-        aggregateBudget(["APPROUVEE", "APPROUVEE_FINANCE", "APPROUVEE_MANAGER"]),
+        service.getDemandesByStatuts(["APPROUVEE_FINANCE"], { includeEmployee: true, limit: 10, orderBy: { approuveeFinanceLe: "desc" } }),
+        service.countByStatut("APPROUVEE_FINANCE"),
+        service.aggregateBudget(["APPROUVEE", "APPROUVEE_FINANCE", "APPROUVEE_MANAGER"]),
       ])
 
       return {

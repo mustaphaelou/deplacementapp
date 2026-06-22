@@ -136,6 +136,14 @@ export class DemandeDeplacementService {
     return this.db.demandeDeplacement.count({ where })
   }
 
+  async aggregateBudget(statuts: StatutDemande[]): Promise<number> {
+    const result = await this.db.demandeDeplacement.aggregate({
+      _sum: { totalEstime: true },
+      where: { statut: { in: statuts }, deletedAt: null },
+    })
+    return Number(result._sum?.totalEstime ?? 0)
+  }
+
   // ── Create (draft or submit-and-transition) ──────────────────────────
 
   private async handleCreate(
