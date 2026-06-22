@@ -1,6 +1,5 @@
-import type { Prisma, PrismaClient, Role, StatutDemande } from "@prisma/client"
+import type { Prisma, PrismaClient, Role } from "@prisma/client"
 import type { NotificationEventType, NotificationPayload } from "./notification-bus"
-import type { DashboardDemandeSummary } from "./dashboard"
 import { prisma } from "./prisma"
 import { notificationBus } from "./notification-bus"
 import { auditBus } from "./audit-bus"
@@ -19,6 +18,8 @@ import {
   notifyAndAudit,
 } from "./demande-utils"
 import type { CreateDemandeData } from "./demande-utils"
+import { DemandeQueries } from "./demande-queries"
+import type { DemandeQueryParams } from "./demande-queries"
 
 export {
   DemandeNotFoundError,
@@ -27,19 +28,13 @@ export {
   mapToDemandeSummary,
 }
 export type { CreateDemandeData }
+export type { DemandeQueryParams }
 
 // ─── Public types ──────────────────────────────────────────────────────────
 
 export interface Actor {
   id: string
   role: Role
-}
-
-export interface DemandeQueryParams {
-  page: number
-  limit: number
-  statut?: string
-  recherche?: string
 }
 
 export type ExecuteParams =
@@ -52,11 +47,15 @@ export type ExecuteParams =
 // ─── Service ───────────────────────────────────────────────────────────────
 
 export class DemandeDeplacementService {
+  private queries: DemandeQueries
+
   constructor(
     private db: PrismaClient,
     private notifications = notificationBus,
     private audit = auditBus
-  ) {}
+  ) {
+    this.queries = new DemandeQueries(db)
+  }
 
   async executeAction(params: ExecuteParams) {
     switch (params.action) {
@@ -70,105 +69,34 @@ export class DemandeDeplacementService {
     }
   }
 
-  // ── Read queries ──────────────────────────────────────────────────
+  // ── Read queries (delegated) ──────────────────────────────────────
 
-  async findById(id: string) {
-    const demande = await this.db.demandeDeplacement.findUnique({
-      where: { id },
-      include: {
-        employe: { select: { id: true, prenom: true, nom: true, email: true, poste: true } },
-        assigneA: { select: { id: true, prenom: true, nom: true } },
-        vehicule: { select: { nom: true, immatriculation: true } },
-        documents: { select: { id: true, type: true, creeLe: true } },
-      },
-    })
-    if (!demande || demande.deletedAt) throw new DemandeNotFoundError()
-    return demande
+  findById(id: string) {
+    return this.queries.findById(id)
   }
 
-  async findMany(
+  findMany(
     role: string,
     userId: string,
     params: DemandeQueryParams
-  ): Promise<{ demandes: DashboardDemandeSummary[]; total: number }> {
-    const { page, limit, statut, recherche } = params
-    const where: any = { deletedAt: null }
-
-    if (role === "EMPLOYEE") {
-      where.employeId = userId
-    }
-
-    if (statut) {
-      where.statut = statut
-    }
-
-    if (recherche) {
-      where.OR = [
-        { destination: { contains: recherche, mode: "insensitive" } },
-        { numero: { contains: recherche, mode: "insensitive" } },
-      ]
-    }
-
-    const [demandes, total] = await Promise.all([
-      this.db.demandeDeplacement.findMany({
-        where,
-        orderBy: { creeLe: "desc" },
-        skip: (page - 1) * limit,
-        take: limit,
-        include: {
-          employe: { select: { id: true, prenom: true, nom: true } },
-        },
-      }),
-      this.db.demandeDeplacement.count({ where }),
-    ])
-
-    return { demandes: demandes.map(mapToDemandeSummary), total }
+  ) {
+    return this.queries.findMany(role, userId, params)
   }
 
-  async findByEmployeeId(
-    userId: string,
-    limit = 5
-  ): Promise<DashboardDemandeSummary[]> {
-    const demandes = await this.db.demandeDeplacement.findMany({
-      where: { employeId: userId, deletedAt: null },
-      orderBy: { creeLe: "desc" },
-      take: limit,
-    })
-    return demandes.map(mapToDemandeSummary)
+  findByEmployeeId(userId: string, limit?: number) {
+    return this.queries.findByEmployeeId(userId, limit)
   }
 
-  async findByStatuts(
-    statuts: StatutDemande[],
-    opts: { limit?: number; includeEmployee?: boolean; orderBy?: any } = {}
-  ): Promise<DashboardDemandeSummary[]> {
-    const { limit = 10, includeEmployee = false, orderBy = { creeLe: "desc" } } = opts
-    const demandes = await this.db.demandeDeplacement.findMany({
-      where: { statut: { in: statuts }, deletedAt: null },
-      orderBy,
-      take: limit,
-      include: includeEmployee ? { employe: { select: { prenom: true, nom: true } } } : undefined,
-    })
-    return demandes.map(mapToDemandeSummary)
+  findByStatuts(statuts: string[], opts?: { limit?: number; includeEmployee?: boolean; orderBy?: any }) {
+    return this.queries.findByStatuts(statuts as any, opts)
   }
 
-  async countByStatut(
-    statut: StatutDemande,
-    userId?: string
-  ): Promise<number> {
-    const where: Prisma.DemandeDeplacementCountArgs["where"] = {
-      statut,
-      deletedAt: null,
-    }
-    if (userId) where.employeId = userId
-    return this.db.demandeDeplacement.count({ where })
+  countByStatut(statut: string, userId?: string) {
+    return this.queries.countByStatut(statut as any, userId)
   }
 
-  async aggregateBudget(statuts: StatutDemande[]): Promise<number> {
-    const result = await this.db.demandeDeplacement.aggregate({
-      _sum: { totalEstime: true },
-      where: { statut: { in: statuts }, deletedAt: null },
-    })
-    return Number(result._sum?.totalEstime ?? 0)
+  aggregateBudget(statuts: string[]) {
+    return this.queries.aggregateBudget(statuts as any)
   }
 
   // ── Create (draft or submit-and-transition) ──────────────────────────
