@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient, TypeTransport, Role, StatutDemande } from "@prisma/client"
+import type { Prisma, PrismaClient, Role, StatutDemande } from "@prisma/client"
 import type { NotificationEventType, NotificationPayload } from "./notification-bus"
 import type { DashboardDemandeSummary } from "./dashboard"
 import { prisma } from "./prisma"
@@ -11,12 +11,22 @@ import {
 } from "./errors"
 import { canTransition, buildTransition, fromLegacyStatus } from "./workflow"
 import type { WorkflowAction } from "./workflow"
+import {
+  processMotif,
+  computeTotalEstime,
+  parseDecimal,
+  mapToDemandeSummary,
+  notifyAndAudit,
+} from "./demande-utils"
+import type { CreateDemandeData } from "./demande-utils"
 
 export {
   DemandeNotFoundError,
   UnauthorizedActionError,
   InvalidTransitionError,
+  mapToDemandeSummary,
 }
+export type { CreateDemandeData }
 
 // ─── Public types ──────────────────────────────────────────────────────────
 
@@ -30,39 +40,6 @@ export interface DemandeQueryParams {
   limit: number
   statut?: string
   recherche?: string
-}
-
-export function mapToDemandeSummary(demande: any): DashboardDemandeSummary {
-  return {
-    id: demande.id,
-    numero: demande.numero,
-    destination: demande.destination,
-    dateDepart: demande.dateDepart,
-    dateRetour: demande.dateRetour,
-    totalEstime: demande.totalEstime ? Number(demande.totalEstime) : null,
-    statut: demande.statut,
-    employe: demande.employe
-      ? { prenom: demande.employe.prenom, nom: demande.employe.nom }
-      : null,
-  }
-}
-
-export interface CreateDemandeData {
-  motif: string[]
-  motifAutre?: string
-  dateDepart: string
-  dateRetour: string
-  destination: string
-  typeTransport: TypeTransport
-  autreTransport?: string
-  vehiculeId?: string
-  fraisTransport?: string
-  fraisHebergement?: string
-  fraisRepas?: string
-  fraisDivers?: string
-  avanceRequise?: boolean
-  montantAvance?: string
-  description?: string
 }
 
 export type ExecuteParams =
@@ -210,8 +187,8 @@ export class DemandeDeplacementService {
     const nextNum = (await this.db.demandeDeplacement.count()) + 1
     const numero = `DD-${new Date().getFullYear()}-${String(nextNum).padStart(4, "0")}`
 
-    const motifArray = this.processMotif(data.motif, data.motifAutre)
-    const totalEstime = this.computeTotalEstime(data)
+    const motifArray = processMotif(data.motif, data.motifAutre)
+    const totalEstime = computeTotalEstime(data)
 
     const createData: Prisma.DemandeDeplacementUncheckedCreateInput = {
       numero,
@@ -228,13 +205,13 @@ export class DemandeDeplacementService {
       typeTransport: data.typeTransport,
       autreTransport: data.autreTransport || null,
       vehiculeId: data.vehiculeId || null,
-      fraisTransport: this.parseDecimal(data.fraisTransport),
-      fraisHebergement: this.parseDecimal(data.fraisHebergement),
-      fraisRepas: this.parseDecimal(data.fraisRepas),
-      fraisDivers: this.parseDecimal(data.fraisDivers),
+      fraisTransport: parseDecimal(data.fraisTransport),
+      fraisHebergement: parseDecimal(data.fraisHebergement),
+      fraisRepas: parseDecimal(data.fraisRepas),
+      fraisDivers: parseDecimal(data.fraisDivers),
       totalEstime,
       avanceRequise: data.avanceRequise || false,
-      montantAvance: data.avanceRequise ? this.parseDecimal(data.montantAvance) : null,
+      montantAvance: data.avanceRequise ? parseDecimal(data.montantAvance) : null,
       description: data.description || null,
       soumiseLe: null,
     }
@@ -258,7 +235,9 @@ export class DemandeDeplacementService {
       data: createData,
     })
 
-    await this.notifyAndAudit({
+    await notifyAndAudit({
+      audit: this.audit,
+      notifications: this.notifications,
       utilisateurId: user.id,
       action: auditAction,
       entiteId: demande.id,
@@ -327,7 +306,9 @@ export class DemandeDeplacementService {
       notificationPayload.assigneAId = demande.assigneAId
     }
 
-    await this.notifyAndAudit({
+    await notifyAndAudit({
+      audit: this.audit,
+      notifications: this.notifications,
       utilisateurId: actor.id,
       action: transition.auditAction,
       entiteId: demandeId,
@@ -339,56 +320,6 @@ export class DemandeDeplacementService {
     return { demande: updated }
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────
-
-  private processMotif(motif: string[], motifAutre?: string): string[] {
-    const arr = [...motif]
-    if (arr.includes("autre") && motifAutre) {
-      const idx = arr.indexOf("autre")
-      arr[idx] = `Autre: ${motifAutre}`
-    }
-    return arr
-  }
-
-  private computeTotalEstime(data: CreateDemandeData): number {
-    return (
-      this.parseDecimal(data.fraisTransport) +
-      this.parseDecimal(data.fraisHebergement) +
-      this.parseDecimal(data.fraisRepas) +
-      this.parseDecimal(data.fraisDivers)
-    )
-  }
-
-  private parseDecimal(value?: string): number {
-    return parseFloat(value || "0")
-  }
-
-  // ── Side-effects ──────────────────────────────────────────────────────
-
-  private async notifyAndAudit(params: {
-    utilisateurId: string
-    action: string
-    entiteId: string
-    numero: string
-    notificationEvent?: NotificationEventType | null
-    notificationPayload?: Omit<NotificationPayload, "demandeId" | "numero"> | null
-  }) {
-    await this.audit.log({
-      utilisateurId: params.utilisateurId,
-      action: params.action,
-      entite: "DemandeDeplacement",
-      entiteId: params.entiteId,
-      details: { numero: params.numero },
-    })
-
-    if (params.notificationEvent && params.notificationPayload) {
-      await this.notifications.dispatch(params.notificationEvent, {
-        demandeId: params.entiteId,
-        numero: params.numero,
-        ...params.notificationPayload,
-      })
-    }
-  }
 }
 
 // ─── Singleton ─────────────────────────────────────────────────────────────
