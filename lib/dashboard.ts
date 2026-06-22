@@ -1,8 +1,17 @@
 import type { StatutDemande, Role } from "@prisma/client"
 import { formatCurrency } from "@/lib/constants"
 import { demandeService } from "./demande-service"
-import type { DashboardDemandeSummary } from "./demande-service"
-export type { DashboardDemandeSummary }
+
+export interface DashboardDemandeSummary {
+  id: string
+  numero: string
+  destination: string
+  dateDepart: Date
+  dateRetour: Date
+  totalEstime: number | null
+  statut: string
+  employe: { prenom: string; nom: string } | null
+}
 
 // ─── Serializable configuration types ──────────────────────────────────────────
 
@@ -56,6 +65,21 @@ export function computeStats(counts: { statut: string; _count: number }[]): Dema
     brouillon: byStatut["BROUILLON"] ?? 0,
     soumises: byStatut["SOUMISE"] ?? 0,
     approuvees: byStatut["APPROUVEE"] ?? 0,
+  }
+}
+
+export function mapToSummary(demande: any): DashboardDemandeSummary {
+  return {
+    id: demande.id,
+    numero: demande.numero,
+    destination: demande.destination,
+    dateDepart: demande.dateDepart,
+    dateRetour: demande.dateRetour,
+    totalEstime: demande.totalEstime ? Number(demande.totalEstime) : null,
+    statut: demande.statut,
+    employe: demande.employe
+      ? { prenom: demande.employe.prenom, nom: demande.employe.nom }
+      : null,
   }
 }
 

@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient, TypeTransport, Role, StatutDemande } from "@prisma/client"
 import type { NotificationEventType, NotificationPayload } from "./notification-bus"
+import type { DashboardDemandeSummary } from "./dashboard"
 import { prisma } from "./prisma"
 import { notificationBus } from "./notification-bus"
 import { auditBus } from "./audit-bus"
@@ -22,17 +23,6 @@ export {
 export interface Actor {
   id: string
   role: Role
-}
-
-export interface DashboardDemandeSummary {
-  id: string
-  numero: string
-  destination: string
-  dateDepart: Date
-  dateRetour: Date
-  totalEstime: number | null
-  statut: string
-  employe: { prenom: string; nom: string } | null
 }
 
 export function mapToDemandeSummary(demande: any): DashboardDemandeSummary {
