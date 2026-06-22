@@ -1,6 +1,12 @@
 import { prisma } from "@/lib/prisma"
 import type { StatutDemande, Role } from "@prisma/client"
 import { formatCurrency } from "@/lib/constants"
+import {
+  demandeService,
+  mapToDemandeSummary,
+} from "./demande-service"
+import type { DashboardDemandeSummary } from "./demande-service"
+export type { DashboardDemandeSummary }
 
 // ─── Serializable configuration types ──────────────────────────────────────────
 
@@ -33,17 +39,6 @@ export interface DashboardConfig {
   cta?: { label: string; href: string; icon: string }
 }
 
-export interface DashboardDemandeSummary {
-  id: string
-  numero: string
-  destination: string
-  dateDepart: Date
-  dateRetour: Date
-  totalEstime: number | null
-  statut: string
-  employe: { prenom: string; nom: string } | null
-}
-
 export interface DashboardPayload {
   config: DashboardConfig
   demandes: DashboardDemandeSummary[]
@@ -68,19 +63,6 @@ export function computeStats(counts: { statut: string; _count: number }[]): Dema
   }
 }
 
-function mapToSummary(demande: any): DashboardDemandeSummary {
-  return {
-    id: demande.id,
-    numero: demande.numero,
-    destination: demande.destination,
-    dateDepart: demande.dateDepart,
-    dateRetour: demande.dateRetour,
-    totalEstime: demande.totalEstime ? Number(demande.totalEstime) : null,
-    statut: demande.statut,
-    employe: demande.employe ? { prenom: demande.employe.prenom, nom: demande.employe.nom } : null,
-  }
-}
-
 // ─── Query module (internal, policy-agnostic) ───────────────────────────────
 
 async function fetchDemandesByStatuts(
@@ -96,7 +78,7 @@ async function fetchDemandesByStatuts(
     include: includeEmployee ? { employe: { select: { prenom: true, nom: true } } } : undefined,
   })
 
-  return demandes.map(mapToSummary)
+  return demandes.map(mapToDemandeSummary)
 }
 
 async function countByStatut(statut: StatutDemande): Promise<number> {
@@ -115,32 +97,31 @@ async function aggregateBudget(statuses: StatutDemande[]): Promise<number> {
 
 export async function getDashboardPayload(
   userId: string,
-  role: Role
+  role: Role,
+  svc?: {
+    getDemandesByUser: (userId: string, limit?: number) => Promise<DashboardDemandeSummary[]>
+    countByStatut: (statut: StatutDemande, userId?: string) => Promise<number>
+  }
 ): Promise<DashboardPayload> {
+  const service = svc ?? demandeService
   switch (role) {
     case "EMPLOYEE": {
-      const [demandes, statutCounts] = await Promise.all([
-        prisma.demandeDeplacement.findMany({
-          where: { employeId: userId, deletedAt: null },
-          orderBy: { creeLe: "desc" },
-          take: 5,
-        }),
-        prisma.demandeDeplacement.groupBy({
-          by: ["statut"],
-          where: { employeId: userId, deletedAt: null },
-          _count: true,
-        }),
+      const [demandes, brouillon, soumises, approuvees] = await Promise.all([
+        service.getDemandesByUser(userId, 5),
+        service.countByStatut("BROUILLON", userId),
+        service.countByStatut("SOUMISE", userId),
+        service.countByStatut("APPROUVEE", userId),
       ])
+      const total = brouillon + soumises + approuvees
 
-      const stats = computeStats(statutCounts)
       return {
         config: {
           subtitle: "Bienvenue sur votre espace personnel",
           statPills: [
-            { icon: "file-text", label: "Total", value: stats.total, color: "blue" },
-            { icon: "clock", label: "Brouillons", value: stats.brouillon, color: "amber" },
-            { icon: "alert-circle", label: "Soumises", value: stats.soumises, color: "orange" },
-            { icon: "check-circle", label: "Approuvées", value: stats.approuvees, color: "green" },
+            { icon: "file-text", label: "Total", value: total, color: "blue" },
+            { icon: "clock", label: "Brouillons", value: brouillon, color: "amber" },
+            { icon: "alert-circle", label: "Soumises", value: soumises, color: "orange" },
+            { icon: "check-circle", label: "Approuvées", value: approuvees, color: "green" },
           ],
           table: {
             title: "Mes dernières demandes",
@@ -156,7 +137,7 @@ export async function getDashboardPayload(
           },
           cta: { label: "Nouvelle demande de déplacement", href: "/demandes/nouvelle", icon: "plus" },
         },
-        demandes: demandes.map(mapToSummary),
+        demandes,
       }
     }
     case "MANAGER": {

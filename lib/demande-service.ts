@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient, TypeTransport, Role } from "@prisma/client"
+import type { Prisma, PrismaClient, TypeTransport, Role, StatutDemande } from "@prisma/client"
 import type { NotificationEventType, NotificationPayload } from "./notification-bus"
 import { prisma } from "./prisma"
 import { notificationBus } from "./notification-bus"
@@ -22,6 +22,32 @@ export {
 export interface Actor {
   id: string
   role: Role
+}
+
+export interface DashboardDemandeSummary {
+  id: string
+  numero: string
+  destination: string
+  dateDepart: Date
+  dateRetour: Date
+  totalEstime: number | null
+  statut: string
+  employe: { prenom: string; nom: string } | null
+}
+
+export function mapToDemandeSummary(demande: any): DashboardDemandeSummary {
+  return {
+    id: demande.id,
+    numero: demande.numero,
+    destination: demande.destination,
+    dateDepart: demande.dateDepart,
+    dateRetour: demande.dateRetour,
+    totalEstime: demande.totalEstime ? Number(demande.totalEstime) : null,
+    statut: demande.statut,
+    employe: demande.employe
+      ? { prenom: demande.employe.prenom, nom: demande.employe.nom }
+      : null,
+  }
 }
 
 export interface CreateDemandeData {
@@ -68,6 +94,32 @@ export class DemandeDeplacementService {
       case "retirer":
         return this.handleTransition(params)
     }
+  }
+
+  // ── Read queries ──────────────────────────────────────────────────
+
+  async getDemandesByUser(
+    userId: string,
+    limit = 5
+  ): Promise<DashboardDemandeSummary[]> {
+    const demandes = await this.db.demandeDeplacement.findMany({
+      where: { employeId: userId, deletedAt: null },
+      orderBy: { creeLe: "desc" },
+      take: limit,
+    })
+    return demandes.map(mapToDemandeSummary)
+  }
+
+  async countByStatut(
+    statut: StatutDemande,
+    userId?: string
+  ): Promise<number> {
+    const where: Prisma.DemandeDeplacementCountArgs["where"] = {
+      statut,
+      deletedAt: null,
+    }
+    if (userId) where.employeId = userId
+    return this.db.demandeDeplacement.count({ where })
   }
 
   // ── Create (draft or submit-and-transition) ──────────────────────────

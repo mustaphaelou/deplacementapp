@@ -19,7 +19,7 @@ describe("Dashboard Module - getDashboardPayload", () => {
     vi.clearAllMocks()
   })
 
-  it("returns correct payload for EMPLOYEE role", async () => {
+  it("returns correct payload for EMPLOYEE role (injected fake service)", async () => {
     const mockDemandes = [
       {
         id: "d-1",
@@ -32,21 +32,17 @@ describe("Dashboard Module - getDashboardPayload", () => {
         employe: null,
       },
     ]
-    const mockCounts = [
-      { statut: "BROUILLON", _count: 1 },
-      { statut: "SOUMISE", _count: 2 },
-    ]
 
-    vi.mocked(prisma.demandeDeplacement.findMany).mockResolvedValue(mockDemandes as any)
-    vi.mocked(prisma.demandeDeplacement.groupBy).mockResolvedValue(mockCounts as any)
+    const fakeService = {
+      getDemandesByUser: vi.fn().mockResolvedValue(mockDemandes as any),
+      countByStatut: vi.fn().mockImplementation((statut: string) => {
+        if (statut === "BROUILLON") return Promise.resolve(1)
+        if (statut === "SOUMISE") return Promise.resolve(2)
+        return Promise.resolve(0)
+      }),
+    }
 
-    const payload = await getDashboardPayload("user-emp", "EMPLOYEE")
-
-    expect(prisma.demandeDeplacement.findMany).toHaveBeenCalledWith({
-      where: { employeId: "user-emp", deletedAt: null },
-      orderBy: { creeLe: "desc" },
-      take: 5,
-    })
+    const payload = await getDashboardPayload("user-emp", "EMPLOYEE", fakeService)
 
     expect(payload.config.subtitle).toBe("Bienvenue sur votre espace personnel")
     expect(payload.config.statPills).toEqual([
