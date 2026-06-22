@@ -1,7 +1,7 @@
-import type { Prisma, PrismaClient, Role } from "@prisma/client"
-import type { NotificationEventType, NotificationPayload } from "./notification-bus"
+import type { Prisma, PrismaClient } from "@prisma/client"
 import { prisma } from "./prisma"
 import { notificationBus } from "./notification-bus"
+import type { NotificationPayload } from "./notification-bus"
 import { auditBus } from "./audit-bus"
 import {
   DemandeNotFoundError,
@@ -11,15 +11,14 @@ import {
 import { canTransition, buildTransition, fromLegacyStatus } from "./workflow"
 import type { WorkflowAction } from "./workflow"
 import {
-  processMotif,
-  computeTotalEstime,
-  parseDecimal,
   mapToDemandeSummary,
   notifyAndAudit,
 } from "./demande-utils"
 import type { CreateDemandeData } from "./demande-utils"
 import { DemandeQueries } from "./demande-queries"
 import type { DemandeQueryParams } from "./demande-queries"
+import { DemandeFactory } from "./demande-factory"
+import type { Actor } from "./demande-factory"
 
 export {
   DemandeNotFoundError,
@@ -27,15 +26,7 @@ export {
   InvalidTransitionError,
   mapToDemandeSummary,
 }
-export type { CreateDemandeData }
-export type { DemandeQueryParams }
-
-// ─── Public types ──────────────────────────────────────────────────────────
-
-export interface Actor {
-  id: string
-  role: Role
-}
+export type { Actor, CreateDemandeData, DemandeQueryParams }
 
 export type ExecuteParams =
   | { action: "create"; data: CreateDemandeData; actor: Actor }
@@ -48,13 +39,16 @@ export type ExecuteParams =
 
 export class DemandeDeplacementService {
   private queries: DemandeQueries
+  private factory: DemandeFactory
 
   constructor(
     private db: PrismaClient,
     private notifications = notificationBus,
-    private audit = auditBus
+    private audit = auditBus,
+    factory?: DemandeFactory
   ) {
     this.queries = new DemandeQueries(db)
+    this.factory = factory ?? new DemandeFactory(db, this.notifications, this.audit)
   }
 
   async executeAction(params: ExecuteParams) {
@@ -106,75 +100,10 @@ export class DemandeDeplacementService {
   ) {
     const { action, data, actor } = params
 
-    const user = await this.db.utilisateur.findUnique({
-      where: { id: actor.id },
-      include: { departement: true },
-    })
-    if (!user) throw new UnauthorizedActionError("Utilisateur introuvable")
-
-    const nextNum = (await this.db.demandeDeplacement.count()) + 1
-    const numero = `DD-${new Date().getFullYear()}-${String(nextNum).padStart(4, "0")}`
-
-    const motifArray = processMotif(data.motif, data.motifAutre)
-    const totalEstime = computeTotalEstime(data)
-
-    const createData: Prisma.DemandeDeplacementUncheckedCreateInput = {
-      numero,
-      employeId: user.id,
-      statut: "BROUILLON",
-      employeNom: user.nom,
-      employePrenom: user.prenom,
-      employePoste: user.poste,
-      employeDepartement: user.departement.nom,
-      motif: JSON.stringify(motifArray),
-      dateDepart: new Date(data.dateDepart),
-      dateRetour: new Date(data.dateRetour),
-      destination: data.destination,
-      typeTransport: data.typeTransport,
-      autreTransport: data.autreTransport || null,
-      vehiculeId: data.vehiculeId || null,
-      fraisTransport: parseDecimal(data.fraisTransport),
-      fraisHebergement: parseDecimal(data.fraisHebergement),
-      fraisRepas: parseDecimal(data.fraisRepas),
-      fraisDivers: parseDecimal(data.fraisDivers),
-      totalEstime,
-      avanceRequise: data.avanceRequise || false,
-      montantAvance: data.avanceRequise ? parseDecimal(data.montantAvance) : null,
-      description: data.description || null,
-      soumiseLe: null,
-    }
-
-    let auditAction = "CREATION"
-    let notificationEvent: NotificationEventType | null = null
-    let notificationPayload: Omit<NotificationPayload, "demandeId" | "numero"> | null = null
-
     if (action === "submit") {
-      const transition = buildTransition("EMPLOYEE", "DRAFT", "submit")
-      if (!transition) throw new InvalidTransitionError("Soumission impossible")
-      Object.assign(createData, transition.transition.fields)
-      auditAction = transition.auditAction
-      notificationEvent = transition.notificationEvent
-      notificationPayload = {
-        employe: { id: user.id, prenom: user.prenom, nom: user.nom },
-      }
+      return this.factory.createAndSubmit(data, actor)
     }
-
-    const demande = await this.db.demandeDeplacement.create({
-      data: createData,
-    })
-
-    await notifyAndAudit({
-      audit: this.audit,
-      notifications: this.notifications,
-      utilisateurId: user.id,
-      action: auditAction,
-      entiteId: demande.id,
-      numero,
-      notificationEvent,
-      notificationPayload,
-    })
-
-    return { demande }
+    return this.factory.createDraft(data, actor)
   }
 
   // ── Transition (approve / reject / withdraw) ──────────────────────────
