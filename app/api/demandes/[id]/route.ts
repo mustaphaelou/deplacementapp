@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth-utils"
-import { prisma } from "@/lib/prisma"
+import { demandeService } from "@/lib/demande-service"
+import { handleServiceError } from "@/lib/errors"
 
 export async function GET(
   req: NextRequest,
@@ -10,19 +11,10 @@ export async function GET(
   const auth = await requireAuth()
   if (!auth.ok) return auth.response
 
-  const demande = await prisma.demandeDeplacement.findUnique({
-    where: { id },
-    include: {
-      employe: { select: { id: true, prenom: true, nom: true, email: true, poste: true } },
-      assigneA: { select: { id: true, prenom: true, nom: true } },
-      vehicule: { select: { nom: true, immatriculation: true } },
-      documents: { select: { id: true, type: true, creeLe: true } },
-    },
-  })
-
-  if (!demande || demande.deletedAt) {
-    return NextResponse.json({ error: "Introuvable" }, { status: 404 })
+  try {
+    const demande = await demandeService.findById(id)
+    return NextResponse.json({ demande })
+  } catch (e) {
+    return handleServiceError(e)
   }
-
-  return NextResponse.json({ demande })
 }

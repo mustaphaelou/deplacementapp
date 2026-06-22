@@ -19,8 +19,8 @@ describe("Dashboard Module - getDashboardPayload", () => {
     ]
 
     const fakeService = {
-      getDemandesByUser: vi.fn().mockResolvedValue(mockDemandes as any),
-      getDemandesByStatuts: vi.fn(),
+      findByEmployeeId: vi.fn().mockResolvedValue(mockDemandes as any),
+      findByStatuts: vi.fn(),
       countByStatut: vi.fn().mockImplementation((statut: string) => {
         if (statut === "BROUILLON") return Promise.resolve(1)
         if (statut === "SOUMISE") return Promise.resolve(2)
@@ -58,15 +58,15 @@ describe("Dashboard Module - getDashboardPayload", () => {
     ]
 
     const fakeService = {
-      getDemandesByUser: vi.fn(),
-      getDemandesByStatuts: vi.fn().mockResolvedValue(mockDemandes as any),
+      findByEmployeeId: vi.fn(),
+      findByStatuts: vi.fn().mockResolvedValue(mockDemandes as any),
       countByStatut: vi.fn().mockResolvedValue(1),
       aggregateBudget: vi.fn(),
     }
 
     const payload = await getDashboardPayload("user-mgr", "MANAGER", fakeService)
 
-    expect(fakeService.getDemandesByStatuts).toHaveBeenCalledWith(
+    expect(fakeService.findByStatuts).toHaveBeenCalledWith(
       ["SOUMISE"],
       { includeEmployee: true, limit: 10, orderBy: { soumiseLe: "desc" } }
     )
@@ -94,15 +94,15 @@ describe("Dashboard Module - getDashboardPayload", () => {
     ]
 
     const fakeService = {
-      getDemandesByUser: vi.fn(),
-      getDemandesByStatuts: vi.fn().mockResolvedValue(mockDemandes as any),
+      findByEmployeeId: vi.fn(),
+      findByStatuts: vi.fn().mockResolvedValue(mockDemandes as any),
       countByStatut: vi.fn().mockResolvedValue(1),
       aggregateBudget: vi.fn(),
     }
 
     const payload = await getDashboardPayload("user-fin", "FINANCE_ADMIN", fakeService)
 
-    expect(fakeService.getDemandesByStatuts).toHaveBeenCalledWith(
+    expect(fakeService.findByStatuts).toHaveBeenCalledWith(
       ["APPROUVEE_MANAGER"],
       { includeEmployee: true, limit: 10, orderBy: { approuveeManagerLe: "desc" } }
     )
@@ -128,15 +128,15 @@ describe("Dashboard Module - getDashboardPayload", () => {
     ]
 
     const fakeService = {
-      getDemandesByUser: vi.fn(),
-      getDemandesByStatuts: vi.fn().mockResolvedValue(mockDemandes as any),
+      findByEmployeeId: vi.fn(),
+      findByStatuts: vi.fn().mockResolvedValue(mockDemandes as any),
       countByStatut: vi.fn().mockResolvedValue(1),
       aggregateBudget: vi.fn().mockResolvedValue(15000),
     }
 
     const payload = await getDashboardPayload("user-dir", "GENERAL_DIRECTION", fakeService)
 
-    expect(fakeService.getDemandesByStatuts).toHaveBeenCalledWith(
+    expect(fakeService.findByStatuts).toHaveBeenCalledWith(
       ["APPROUVEE_FINANCE"],
       { includeEmployee: true, limit: 10, orderBy: { approuveeFinanceLe: "desc" } }
     )

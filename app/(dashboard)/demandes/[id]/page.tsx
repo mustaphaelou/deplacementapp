@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
-import { prisma } from "@/lib/prisma"
+import { demandeService, DemandeNotFoundError } from "@/lib/demande-service"
 import { DemandeDetail } from "@/components/demande-detail"
 import { notFound } from "next/navigation"
 import { getAllowedActions } from "@/lib/workflow"
@@ -14,17 +14,13 @@ export default async function DemandeDetailPage({
   const session = await auth()
   if (!session?.user) redirect("/login")
 
-  const demande = await prisma.demandeDeplacement.findUnique({
-    where: { id },
-    include: {
-      employe: { select: { id: true, prenom: true, nom: true, email: true, poste: true } },
-      assigneA: { select: { id: true, prenom: true, nom: true } },
-      vehicule: { select: { nom: true, immatriculation: true } },
-      documents: { select: { id: true, type: true, creeLe: true } },
-    },
-  })
-
-  if (!demande || demande.deletedAt) notFound()
+  let demande: any
+  try {
+    demande = await demandeService.findById(id)
+  } catch (e) {
+    if (e instanceof DemandeNotFoundError) notFound()
+    throw e
+  }
 
   const userRole = session.user.role
   const userId = session.user.id

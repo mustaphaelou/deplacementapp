@@ -68,29 +68,14 @@ export function computeStats(counts: { statut: string; _count: number }[]): Dema
   }
 }
 
-export function mapToSummary(demande: any): DashboardDemandeSummary {
-  return {
-    id: demande.id,
-    numero: demande.numero,
-    destination: demande.destination,
-    dateDepart: demande.dateDepart,
-    dateRetour: demande.dateRetour,
-    totalEstime: demande.totalEstime ? Number(demande.totalEstime) : null,
-    statut: demande.statut,
-    employe: demande.employe
-      ? { prenom: demande.employe.prenom, nom: demande.employe.nom }
-      : null,
-  }
-}
-
 // ─── Consolidated deep interface ───────────────────────────────────────────
 
 export async function getDashboardPayload(
   userId: string,
   role: Role,
   svc?: {
-    getDemandesByUser: (userId: string, limit?: number) => Promise<DashboardDemandeSummary[]>
-    getDemandesByStatuts: (statuts: StatutDemande[], opts?: { limit?: number; includeEmployee?: boolean; orderBy?: any }) => Promise<DashboardDemandeSummary[]>
+    findByEmployeeId: (userId: string, limit?: number) => Promise<DashboardDemandeSummary[]>
+    findByStatuts: (statuts: StatutDemande[], opts?: { limit?: number; includeEmployee?: boolean; orderBy?: any }) => Promise<DashboardDemandeSummary[]>
     countByStatut: (statut: StatutDemande, userId?: string) => Promise<number>
     aggregateBudget: (statuts: StatutDemande[]) => Promise<number>
   }
@@ -99,7 +84,7 @@ export async function getDashboardPayload(
   switch (role) {
     case "EMPLOYEE": {
       const [demandes, brouillon, soumises, approuvees] = await Promise.all([
-        service.getDemandesByUser(userId, 5),
+        service.findByEmployeeId(userId, 5),
         service.countByStatut("BROUILLON", userId),
         service.countByStatut("SOUMISE", userId),
         service.countByStatut("APPROUVEE", userId),
@@ -134,7 +119,7 @@ export async function getDashboardPayload(
     }
     case "MANAGER": {
       const [demandes, enAttente] = await Promise.all([
-        service.getDemandesByStatuts(["SOUMISE"], { includeEmployee: true, limit: 10, orderBy: { soumiseLe: "desc" } }),
+        service.findByStatuts(["SOUMISE"], { includeEmployee: true, limit: 10, orderBy: { soumiseLe: "desc" } }),
         service.countByStatut("SOUMISE"),
       ])
 
@@ -162,7 +147,7 @@ export async function getDashboardPayload(
     }
     case "FINANCE_ADMIN": {
       const [demandes, enAttente] = await Promise.all([
-        service.getDemandesByStatuts(["APPROUVEE_MANAGER"], { includeEmployee: true, limit: 10, orderBy: { approuveeManagerLe: "desc" } }),
+        service.findByStatuts(["APPROUVEE_MANAGER"], { includeEmployee: true, limit: 10, orderBy: { approuveeManagerLe: "desc" } }),
         service.countByStatut("APPROUVEE_MANAGER"),
       ])
 
@@ -190,7 +175,7 @@ export async function getDashboardPayload(
     }
     case "GENERAL_DIRECTION": {
       const [demandes, enAttente, budgetTotal] = await Promise.all([
-        service.getDemandesByStatuts(["APPROUVEE_FINANCE"], { includeEmployee: true, limit: 10, orderBy: { approuveeFinanceLe: "desc" } }),
+        service.findByStatuts(["APPROUVEE_FINANCE"], { includeEmployee: true, limit: 10, orderBy: { approuveeFinanceLe: "desc" } }),
         service.countByStatut("APPROUVEE_FINANCE"),
         service.aggregateBudget(["APPROUVEE", "APPROUVEE_FINANCE", "APPROUVEE_MANAGER"]),
       ])

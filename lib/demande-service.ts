@@ -25,6 +25,13 @@ export interface Actor {
   role: Role
 }
 
+export interface DemandeQueryParams {
+  page: number
+  limit: number
+  statut?: string
+  recherche?: string
+}
+
 export function mapToDemandeSummary(demande: any): DashboardDemandeSummary {
   return {
     id: demande.id,
@@ -88,7 +95,60 @@ export class DemandeDeplacementService {
 
   // ── Read queries ──────────────────────────────────────────────────
 
-  async getDemandesByUser(
+  async findById(id: string) {
+    const demande = await this.db.demandeDeplacement.findUnique({
+      where: { id },
+      include: {
+        employe: { select: { id: true, prenom: true, nom: true, email: true, poste: true } },
+        assigneA: { select: { id: true, prenom: true, nom: true } },
+        vehicule: { select: { nom: true, immatriculation: true } },
+        documents: { select: { id: true, type: true, creeLe: true } },
+      },
+    })
+    if (!demande || demande.deletedAt) throw new DemandeNotFoundError()
+    return demande
+  }
+
+  async findMany(
+    role: string,
+    userId: string,
+    params: DemandeQueryParams
+  ): Promise<{ demandes: DashboardDemandeSummary[]; total: number }> {
+    const { page, limit, statut, recherche } = params
+    const where: any = { deletedAt: null }
+
+    if (role === "EMPLOYEE") {
+      where.employeId = userId
+    }
+
+    if (statut) {
+      where.statut = statut
+    }
+
+    if (recherche) {
+      where.OR = [
+        { destination: { contains: recherche, mode: "insensitive" } },
+        { numero: { contains: recherche, mode: "insensitive" } },
+      ]
+    }
+
+    const [demandes, total] = await Promise.all([
+      this.db.demandeDeplacement.findMany({
+        where,
+        orderBy: { creeLe: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          employe: { select: { id: true, prenom: true, nom: true } },
+        },
+      }),
+      this.db.demandeDeplacement.count({ where }),
+    ])
+
+    return { demandes: demandes.map(mapToDemandeSummary), total }
+  }
+
+  async findByEmployeeId(
     userId: string,
     limit = 5
   ): Promise<DashboardDemandeSummary[]> {
@@ -100,7 +160,7 @@ export class DemandeDeplacementService {
     return demandes.map(mapToDemandeSummary)
   }
 
-  async getDemandesByStatuts(
+  async findByStatuts(
     statuts: StatutDemande[],
     opts: { limit?: number; includeEmployee?: boolean; orderBy?: any } = {}
   ): Promise<DashboardDemandeSummary[]> {

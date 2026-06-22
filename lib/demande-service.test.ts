@@ -28,6 +28,7 @@ interface MockedDb {
   utilisateur: { findUnique: ReturnType<typeof vi.fn> }
   demandeDeplacement: {
     findUnique: ReturnType<typeof vi.fn>
+    findMany: ReturnType<typeof vi.fn>
     create: ReturnType<typeof vi.fn>
     update: ReturnType<typeof vi.fn>
     count: ReturnType<typeof vi.fn>
@@ -40,6 +41,7 @@ function mockDb(): MockedDb {
     utilisateur: { findUnique: vi.fn() },
     demandeDeplacement: {
       findUnique: vi.fn(),
+      findMany: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       count: vi.fn().mockResolvedValue(5),
@@ -114,6 +116,103 @@ describe("DemandeDeplacementService", () => {
     const result = await svc.aggregateBudget(["BROUILLON"])
 
     expect(result).toBe(0)
+  })
+
+  // ── findById ───────────────────────────────────────────────────────────
+
+  it("findById returns demande with all relations included", async () => {
+    const db = mockDb()
+    const mockDemande = {
+      id: "dd-1",
+      statut: "SOUMISE",
+      employeId: "u-1",
+      employe: { id: "u-1", prenom: "Jean", nom: "Dupont", email: "jean@test.com", poste: "Dev" },
+      assigneA: null,
+      vehicule: null,
+      documents: [],
+      deletedAt: null,
+      creeLe: new Date(),
+    }
+    db.demandeDeplacement.findUnique.mockResolvedValue(mockDemande)
+
+    const svc = new DemandeDeplacementService(db as unknown as PrismaClient, mockNotifications(), mockAudit())
+    const result = await svc.findById("dd-1")
+
+    expect(result.id).toBe("dd-1")
+    expect(result.employe.prenom).toBe("Jean")
+    expect(db.demandeDeplacement.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "dd-1" },
+        include: expect.objectContaining({
+          employe: expect.any(Object),
+          assigneA: expect.any(Object),
+          vehicule: expect.any(Object),
+          documents: expect.any(Object),
+        }),
+      })
+    )
+  })
+
+  it("findById throws DemandeNotFoundError when demande is null", async () => {
+    const db = mockDb()
+    db.demandeDeplacement.findUnique.mockResolvedValue(null)
+
+    const svc = new DemandeDeplacementService(db as unknown as PrismaClient, mockNotifications(), mockAudit())
+    await expect(svc.findById("dd-missing")).rejects.toThrow(DemandeNotFoundError)
+  })
+
+  it("findById throws DemandeNotFoundError when demande is soft-deleted", async () => {
+    const db = mockDb()
+    db.demandeDeplacement.findUnique.mockResolvedValue({
+      id: "dd-1",
+      deletedAt: new Date(),
+    })
+
+    const svc = new DemandeDeplacementService(db as unknown as PrismaClient, mockNotifications(), mockAudit())
+    await expect(svc.findById("dd-1")).rejects.toThrow(DemandeNotFoundError)
+  })
+
+  // ── findMany ───────────────────────────────────────────────────────────
+
+  it("findMany returns paginated demandes with total count", async () => {
+    const db = mockDb()
+    const mockDemandes = [
+      { id: "dd-1", statut: "SOUMISE", employeId: "u-1", employe: { prenom: "Jean", nom: "Dupont" } },
+      { id: "dd-2", statut: "SOUMISE", employeId: "u-1", employe: { prenom: "Jean", nom: "Dupont" } },
+    ]
+    db.demandeDeplacement.findMany.mockResolvedValue(mockDemandes)
+    db.demandeDeplacement.count.mockResolvedValue(2)
+
+    const svc = new DemandeDeplacementService(db as unknown as PrismaClient, mockNotifications(), mockAudit())
+    const result = await svc.findMany("MANAGER", "u-1", { page: 1, limit: 10 })
+
+    expect(result.demandes).toHaveLength(2)
+    expect(result.total).toBe(2)
+  })
+
+  it("findMany restricts results for EMPLOYEE role", async () => {
+    const db = mockDb()
+    db.demandeDeplacement.findMany.mockResolvedValue([])
+    db.demandeDeplacement.count.mockResolvedValue(0)
+
+    const svc = new DemandeDeplacementService(db as unknown as PrismaClient, mockNotifications(), mockAudit())
+    await svc.findMany("EMPLOYEE", "u-42", { page: 1, limit: 10 })
+
+    const findManyCall = db.demandeDeplacement.findMany.mock.calls[0]?.[0] as any
+    expect(findManyCall.where.employeId).toBe("u-42")
+  })
+
+  it("findMany applies statut and recherche filters when provided", async () => {
+    const db = mockDb()
+    db.demandeDeplacement.findMany.mockResolvedValue([])
+    db.demandeDeplacement.count.mockResolvedValue(0)
+
+    const svc = new DemandeDeplacementService(db as unknown as PrismaClient, mockNotifications(), mockAudit())
+    await svc.findMany("MANAGER", "u-1", { page: 1, limit: 10, statut: "SOUMISE", recherche: "Casablanca" })
+
+    const findManyCall = db.demandeDeplacement.findMany.mock.calls[0]?.[0] as any
+    expect(findManyCall.where.statut).toBe("SOUMISE")
+    expect(findManyCall.where.OR).toBeDefined()
   })
 
   // ── Create (draft) ────────────────────────────────────────────────────
