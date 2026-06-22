@@ -100,6 +100,7 @@ export async function getDashboardPayload(
   role: Role,
   svc?: {
     getDemandesByUser: (userId: string, limit?: number) => Promise<DashboardDemandeSummary[]>
+    getDemandesByStatuts: (statuts: StatutDemande[], opts?: { limit?: number; includeEmployee?: boolean; orderBy?: any }) => Promise<DashboardDemandeSummary[]>
     countByStatut: (statut: StatutDemande, userId?: string) => Promise<number>
   }
 ): Promise<DashboardPayload> {
@@ -142,8 +143,8 @@ export async function getDashboardPayload(
     }
     case "MANAGER": {
       const [demandes, enAttente] = await Promise.all([
-        fetchDemandesByStatuts(["SOUMISE"], { includeEmployee: true, limit: 10, orderBy: { soumiseLe: "desc" } }),
-        countByStatut("SOUMISE"),
+        service.getDemandesByStatuts(["SOUMISE"], { includeEmployee: true, limit: 10, orderBy: { soumiseLe: "desc" } }),
+        service.countByStatut("SOUMISE"),
       ])
 
       return {
@@ -170,8 +171,8 @@ export async function getDashboardPayload(
     }
     case "FINANCE_ADMIN": {
       const [demandes, enAttente] = await Promise.all([
-        fetchDemandesByStatuts(["APPROUVEE_MANAGER"], { includeEmployee: true, limit: 10, orderBy: { approuveeManagerLe: "desc" } }),
-        countByStatut("APPROUVEE_MANAGER"),
+        service.getDemandesByStatuts(["APPROUVEE_MANAGER"], { includeEmployee: true, limit: 10, orderBy: { approuveeManagerLe: "desc" } }),
+        service.countByStatut("APPROUVEE_MANAGER"),
       ])
 
       return {

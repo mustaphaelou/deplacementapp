@@ -35,6 +35,7 @@ describe("Dashboard Module - getDashboardPayload", () => {
 
     const fakeService = {
       getDemandesByUser: vi.fn().mockResolvedValue(mockDemandes as any),
+      getDemandesByStatuts: vi.fn(),
       countByStatut: vi.fn().mockImplementation((statut: string) => {
         if (statut === "BROUILLON") return Promise.resolve(1)
         if (statut === "SOUMISE") return Promise.resolve(2)
@@ -56,7 +57,7 @@ describe("Dashboard Module - getDashboardPayload", () => {
     expect(payload.demandes[0].numero).toBe("DD-2026-0001")
   })
 
-  it("returns correct payload for MANAGER role", async () => {
+  it("returns correct payload for MANAGER role (injected fake service)", async () => {
     const mockDemandes = [
       {
         id: "d-2",
@@ -70,17 +71,18 @@ describe("Dashboard Module - getDashboardPayload", () => {
       },
     ]
 
-    vi.mocked(prisma.demandeDeplacement.findMany).mockResolvedValue(mockDemandes as any)
-    vi.mocked(prisma.demandeDeplacement.count).mockResolvedValue(1)
+    const fakeService = {
+      getDemandesByUser: vi.fn(),
+      getDemandesByStatuts: vi.fn().mockResolvedValue(mockDemandes as any),
+      countByStatut: vi.fn().mockResolvedValue(1),
+    }
 
-    const payload = await getDashboardPayload("user-mgr", "MANAGER")
+    const payload = await getDashboardPayload("user-mgr", "MANAGER", fakeService)
 
-    expect(prisma.demandeDeplacement.findMany).toHaveBeenCalledWith({
-      where: { statut: { in: ["SOUMISE"] }, deletedAt: null },
-      orderBy: { soumiseLe: "desc" },
-      take: 10,
-      include: { employe: { select: { prenom: true, nom: true } } },
-    })
+    expect(fakeService.getDemandesByStatuts).toHaveBeenCalledWith(
+      ["SOUMISE"],
+      { includeEmployee: true, limit: 10, orderBy: { soumiseLe: "desc" } }
+    )
 
     expect(payload.config.subtitle).toBe("Gérez les demandes de votre équipe")
     expect(payload.config.statPills).toEqual([
@@ -90,7 +92,7 @@ describe("Dashboard Module - getDashboardPayload", () => {
     expect(payload.demandes[0].employe).toEqual({ prenom: "Ali", nom: "Kader" })
   })
 
-  it("returns correct payload for FINANCE_ADMIN role", async () => {
+  it("returns correct payload for FINANCE_ADMIN role (injected fake service)", async () => {
     const mockDemandes = [
       {
         id: "d-3",
@@ -104,17 +106,18 @@ describe("Dashboard Module - getDashboardPayload", () => {
       },
     ]
 
-    vi.mocked(prisma.demandeDeplacement.findMany).mockResolvedValue(mockDemandes as any)
-    vi.mocked(prisma.demandeDeplacement.count).mockResolvedValue(1)
+    const fakeService = {
+      getDemandesByUser: vi.fn(),
+      getDemandesByStatuts: vi.fn().mockResolvedValue(mockDemandes as any),
+      countByStatut: vi.fn().mockResolvedValue(1),
+    }
 
-    const payload = await getDashboardPayload("user-fin", "FINANCE_ADMIN")
+    const payload = await getDashboardPayload("user-fin", "FINANCE_ADMIN", fakeService)
 
-    expect(prisma.demandeDeplacement.findMany).toHaveBeenCalledWith({
-      where: { statut: { in: ["APPROUVEE_MANAGER"] }, deletedAt: null },
-      orderBy: { approuveeManagerLe: "desc" },
-      take: 10,
-      include: { employe: { select: { prenom: true, nom: true } } },
-    })
+    expect(fakeService.getDemandesByStatuts).toHaveBeenCalledWith(
+      ["APPROUVEE_MANAGER"],
+      { includeEmployee: true, limit: 10, orderBy: { approuveeManagerLe: "desc" } }
+    )
 
     expect(payload.config.subtitle).toBe("Administration & Finances")
     expect(payload.config.statPills).toEqual([

@@ -110,6 +110,20 @@ export class DemandeDeplacementService {
     return demandes.map(mapToDemandeSummary)
   }
 
+  async getDemandesByStatuts(
+    statuts: StatutDemande[],
+    opts: { limit?: number; includeEmployee?: boolean; orderBy?: any } = {}
+  ): Promise<DashboardDemandeSummary[]> {
+    const { limit = 10, includeEmployee = false, orderBy = { creeLe: "desc" } } = opts
+    const demandes = await this.db.demandeDeplacement.findMany({
+      where: { statut: { in: statuts }, deletedAt: null },
+      orderBy,
+      take: limit,
+      include: includeEmployee ? { employe: { select: { prenom: true, nom: true } } } : undefined,
+    })
+    return demandes.map(mapToDemandeSummary)
+  }
+
   async countByStatut(
     statut: StatutDemande,
     userId?: string
