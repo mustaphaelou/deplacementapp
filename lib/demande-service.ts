@@ -241,7 +241,7 @@ export class DemandeDeplacementService {
 
     let auditAction = "CREATION"
     let notificationEvent: NotificationEventType | null = null
-    let notificationPayload: { employe: { id: string; prenom: string; nom: string } } | null = null
+    let notificationPayload: Omit<NotificationPayload, "demandeId" | "numero"> | null = null
 
     if (action === "submit") {
       const transition = buildTransition("EMPLOYEE", "DRAFT", "submit")
@@ -258,21 +258,14 @@ export class DemandeDeplacementService {
       data: createData,
     })
 
-    await this.audit.log({
+    await this.notifyAndAudit({
       utilisateurId: user.id,
       action: auditAction,
-      entite: "DemandeDeplacement",
       entiteId: demande.id,
-      details: { numero },
+      numero,
+      notificationEvent,
+      notificationPayload,
     })
-
-    if (notificationEvent && notificationPayload) {
-      await this.notifications.dispatch(notificationEvent, {
-        demandeId: demande.id,
-        numero: demande.numero,
-        ...notificationPayload,
-      })
-    }
 
     return { demande }
   }
@@ -322,17 +315,7 @@ export class DemandeDeplacementService {
       data: transition.transition.fields as Prisma.DemandeDeplacementUncheckedUpdateInput,
     })
 
-    await this.audit.log({
-      utilisateurId: actor.id,
-      action: transition.auditAction,
-      entite: "DemandeDeplacement",
-      entiteId: demandeId,
-      details: { numero: demande.numero },
-    })
-
-    const notificationPayload: NotificationPayload = {
-      demandeId: demande.id,
-      numero: demande.numero,
+    const notificationPayload: Omit<NotificationPayload, "demandeId" | "numero"> = {
       employe: {
         id: demande.employe.id,
         prenom: demande.employe.prenom,
@@ -344,10 +327,14 @@ export class DemandeDeplacementService {
       notificationPayload.assigneAId = demande.assigneAId
     }
 
-    await this.notifications.dispatch(
-      transition.notificationEvent,
-      notificationPayload
-    )
+    await this.notifyAndAudit({
+      utilisateurId: actor.id,
+      action: transition.auditAction,
+      entiteId: demandeId,
+      numero: demande.numero,
+      notificationEvent: transition.notificationEvent,
+      notificationPayload,
+    })
 
     return { demande: updated }
   }
@@ -374,6 +361,33 @@ export class DemandeDeplacementService {
 
   private parseDecimal(value?: string): number {
     return parseFloat(value || "0")
+  }
+
+  // ── Side-effects ──────────────────────────────────────────────────────
+
+  private async notifyAndAudit(params: {
+    utilisateurId: string
+    action: string
+    entiteId: string
+    numero: string
+    notificationEvent?: NotificationEventType | null
+    notificationPayload?: Omit<NotificationPayload, "demandeId" | "numero"> | null
+  }) {
+    await this.audit.log({
+      utilisateurId: params.utilisateurId,
+      action: params.action,
+      entite: "DemandeDeplacement",
+      entiteId: params.entiteId,
+      details: { numero: params.numero },
+    })
+
+    if (params.notificationEvent && params.notificationPayload) {
+      await this.notifications.dispatch(params.notificationEvent, {
+        demandeId: params.entiteId,
+        numero: params.numero,
+        ...params.notificationPayload,
+      })
+    }
   }
 }
 
