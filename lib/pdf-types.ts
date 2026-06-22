@@ -6,6 +6,10 @@ export interface CoutEstime {
   total: number
 }
 
+export interface PdfRendererAdapter {
+  render(data: PdfRenderData): Promise<Buffer>
+}
+
 export interface PdfRenderData {
   numero: string
   statut: string

@@ -1,8 +1,7 @@
 import { renderToBuffer } from "@react-pdf/renderer"
 import React from "react"
 import { TravelRequestPdf } from "./travel-request-pdf"
-import type { PdfRenderData } from "@/lib/pdf-types"
-import type { PdfRendererAdapter } from "@/lib/pdf-renderer"
+import type { PdfRenderData, PdfRendererAdapter } from "@/lib/pdf-types"
 
 export class TravelRequestPdfAdapter implements PdfRendererAdapter {
   async render(data: PdfRenderData): Promise<Buffer> {
@@ -10,3 +9,5 @@ export class TravelRequestPdfAdapter implements PdfRendererAdapter {
     return renderToBuffer(element as any)
   }
 }
+
+export const pdfAdapter = new TravelRequestPdfAdapter()

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import type { DemandeDeplacement, Utilisateur, VehiculeEntreprise, PrismaClient } from "@prisma/client"
 import type { PdfRenderData } from "@/lib/pdf-types"
-import { PdfRenderer } from "@/lib/pdf-renderer"
+import { TravelRequestPdfAdapter } from "@/components/pdf/travel-request-pdf-adapter"
 
 const mockDemande: DemandeDeplacement & { employe: Utilisateur; vehicule: VehiculeEntreprise | null; assigneA: Utilisateur | null } = {
   id: "d-1",
@@ -93,7 +93,7 @@ function makeMockPrisma() {
 }
 
 describe("PDF route integration", () => {
-  it("toPdfRenderData produces valid PdfRenderData for pdfRenderer", async () => {
+  it("toPdfRenderData produces valid PdfRenderData for TravelRequestPdfAdapter", async () => {
     const { toPdfRenderData } = await import("@/lib/pdf-mapper")
     const data = toPdfRenderData(mockDemande)
 
@@ -103,13 +103,12 @@ describe("PDF route integration", () => {
     expect(data.vehicule).toEqual({ nom: "Peugeot 3008", immatriculation: "AB-123-CD" })
   })
 
-  it("pdfRenderer renders a non-empty buffer from mapped data", async () => {
+  it("TravelRequestPdfAdapter renders a non-empty buffer from mapped data", async () => {
     const { toPdfRenderData } = await import("@/lib/pdf-mapper")
-    const { ReactPdfAdapter } = await import("@/lib/pdf-renderer")
 
     const data = toPdfRenderData(mockDemande)
-    const renderer = new PdfRenderer(new ReactPdfAdapter())
-    const buffer = await renderer.render(data)
+    const adapter = new TravelRequestPdfAdapter()
+    const buffer = await adapter.render(data)
 
     expect(Buffer.isBuffer(buffer)).toBe(true)
     expect(buffer.length).toBeGreaterThan(0)

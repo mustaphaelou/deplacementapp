@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth-utils"
 import { prisma } from "@/lib/prisma"
 import { toPdfRenderData } from "@/lib/pdf-mapper"
-import { pdfRenderer } from "@/lib/pdf-renderer"
+import { pdfAdapter } from "@/components/pdf/travel-request-pdf-adapter"
 
 export async function GET(
   req: NextRequest,
@@ -25,7 +25,7 @@ export async function GET(
 
   try {
     const data = toPdfRenderData(demande)
-    const buffer = await pdfRenderer.render(data)
+    const buffer = await pdfAdapter.render(data)
 
     await prisma.document.create({
       data: {
