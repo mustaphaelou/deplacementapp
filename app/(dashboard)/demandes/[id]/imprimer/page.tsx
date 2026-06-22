@@ -2,12 +2,7 @@ import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import { formatCurrency, formatDate, TRANSPORT_LABELS, STATUT_LABELS } from "@/lib/constants"
-import type { DemandeDeplacement, Utilisateur, VehiculeEntreprise } from "@prisma/client"
-
-type DemandeWithRelations = DemandeDeplacement & {
-  employe: Utilisateur
-  vehicule: VehiculeEntreprise | null
-}
+import { parseMotif, type DemandeWithRelations } from "@/lib/demande-types"
 
 export default async function ImprimerPage({
   params,
@@ -23,18 +18,11 @@ export default async function ImprimerPage({
     include: {
       employe: true,
       vehicule: true,
+      assigneA: true,
     },
-  })
+  }) as DemandeWithRelations | null
 
   if (!demande) redirect("/demandes")
-
-  function parseMotif(motif: string): string[] {
-    try {
-      return JSON.parse(motif)
-    } catch {
-      return [motif]
-    }
-  }
 
   const motifs = parseMotif(demande.motif)
 

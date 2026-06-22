@@ -7,64 +7,19 @@ import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { DemandeStatusBadge } from "@/components/demande-status-badge"
 import { formatCurrency, formatDate, formatDateTime, TRANSPORT_LABELS, STATUT_LABELS, PURPOSE_OPTIONS } from "@/lib/constants"
+import { parseMotif } from "@/lib/demande-types"
+import type { DemandeDetail } from "@/lib/demande-types"
 import { CheckCircle, XCircle, ArrowLeft, Download, Printer, Ban, ChevronRight, ChevronLeft, Loader2, Save } from "lucide-react"
 import Link from "next/link"
 import { useDemandeActions } from "@/hooks/use-demande-actions"
 
-interface DemandeData {
-  id: string
-  numero: string
-  statut: string
-  employePrenom: string
-  employeNom: string
-  employePoste: string
-  employeDepartement: string
-  motif: string
-  dateDepart: string
-  dateRetour: string
-  destination: string
-  typeTransport: string
-  autreTransport: string | null
-  vehicule: { nom: string; immatriculation: string } | null
-  fraisTransport: number | null
-  fraisHebergement: number | null
-  fraisRepas: number | null
-  fraisDivers: number | null
-  totalEstime: number | null
-  avanceRequise: boolean
-  montantAvance: number | null
-  description: string | null
-  commentaireManager: string | null
-  commentaireFinance: string | null
-  commentaireDirection: string | null
-  soumiseLe: string | null
-  approuveeManagerLe: string | null
-  approuveeFinanceLe: string | null
-  approuveeDirectionLe: string | null
-  rejeteeLe: string | null
-  retireeLe: string | null
-  employe: { id: string; prenom: string; nom: string; email: string; poste: string }
-  assigneA: { id: string; prenom: string; nom: string } | null
-  documents: { id: string; type: string; creeLe: string }[]
-  creeLe: string
-  modifieLe: string
-}
-
 interface DemandeDetailProps {
-  demande: DemandeData
+  demande: DemandeDetail
   canApprove: boolean
   canReject: boolean
   canWithdraw: boolean
   isOwner: boolean
   userRole: string
-}
-
-function parseMotif(motif: string): string[] {
-  try {
-    return JSON.parse(motif)
-  } catch {
-    return [motif]
-  }
 }
 
 const stepOrder = ["BROUILLON", "SOUMISE", "APPROUVEE_MANAGER", "APPROUVEE_FINANCE", "APPROUVEE"]

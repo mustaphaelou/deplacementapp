@@ -1,6 +1,7 @@
 import { expect, describe, it } from "vitest"
 import type { DemandeDeplacement, Utilisateur, VehiculeEntreprise } from "@prisma/client"
-import { toPdfRenderData, type DemandeWithRelations } from "./pdf-mapper"
+import { type DemandeWithRelations } from "./demande-types"
+import { toPdfRenderData } from "./pdf-mapper"
 
 function makeDemande(overrides?: Partial<DemandeDeplacement>): DemandeDeplacement {
   return {

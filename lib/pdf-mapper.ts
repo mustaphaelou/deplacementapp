@@ -1,21 +1,5 @@
-import type { DemandeDeplacement, Utilisateur, VehiculeEntreprise } from "@prisma/client"
 import type { PdfRenderData } from "./pdf-types"
-
-export type DemandeWithRelations = DemandeDeplacement & {
-  employe: Utilisateur
-  vehicule: VehiculeEntreprise | null
-  assigneA: Utilisateur | null
-}
-
-function parseMotif(motif: string): string[] {
-  try {
-    const parsed = JSON.parse(motif)
-    if (Array.isArray(parsed)) return parsed
-    return [motif]
-  } catch {
-    return [motif]
-  }
-}
+import { parseMotif, type DemandeWithRelations } from "./demande-types"
 
 function toNumber(value: unknown): number {
   if (typeof value === "number") return value
