@@ -1,25 +1,17 @@
-import type { Prisma, PrismaClient } from "@prisma/client"
+import type { PrismaClient } from "@prisma/client"
 import { prisma } from "./prisma"
 import { notificationBus } from "./notification-bus"
-import type { NotificationPayload } from "./notification-bus"
 import { auditBus } from "./audit-bus"
-import {
-  DemandeNotFoundError,
-  UnauthorizedActionError,
-  InvalidTransitionError,
-} from "./errors"
-import { canTransition, buildTransition, fromLegacyStatus } from "./workflow"
-import type { WorkflowAction } from "./workflow"
-import {
-  mapToDemandeSummary,
-  notifyAndAudit,
-} from "./demande-utils"
+import { DemandeNotFoundError, UnauthorizedActionError, InvalidTransitionError } from "./errors"
+import { mapToDemandeSummary } from "./demande-utils"
 import type { CreateDemandeData } from "./demande-utils"
 import { DemandeQueries } from "./demande-queries"
 import type { DemandeQueryParams } from "./demande-queries"
 import { DemandeFactory } from "./demande-factory"
 import type { Actor } from "./demande-factory"
+import { DemandeWorkflow } from "./demande-workflow"
 
+export { DemandeWorkflow } from "./demande-workflow"
 export {
   DemandeNotFoundError,
   UnauthorizedActionError,
@@ -40,15 +32,18 @@ export type ExecuteParams =
 export class DemandeDeplacementService {
   private queries: DemandeQueries
   private factory: DemandeFactory
+  private workflow: DemandeWorkflow
 
   constructor(
     private db: PrismaClient,
     private notifications = notificationBus,
     private audit = auditBus,
-    factory?: DemandeFactory
+    factory?: DemandeFactory,
+    workflow?: DemandeWorkflow
   ) {
     this.queries = new DemandeQueries(db)
     this.factory = factory ?? new DemandeFactory(db, this.notifications, this.audit)
+    this.workflow = workflow ?? new DemandeWorkflow(db, this.notifications, this.audit)
   }
 
   async executeAction(params: ExecuteParams) {
@@ -108,73 +103,10 @@ export class DemandeDeplacementService {
 
   // ── Transition (approve / reject / withdraw) ──────────────────────────
 
-  private async handleTransition(
+  private handleTransition(
     params: Extract<ExecuteParams, { action: "approuver" | "rejeter" | "retirer" }>
   ) {
-    const { action, demandeId, actor } = params
-
-    const demande = await this.db.demandeDeplacement.findUnique({
-      where: { id: demandeId },
-      include: { employe: { select: { id: true, prenom: true, nom: true } } },
-    })
-    if (!demande || demande.deletedAt) throw new DemandeNotFoundError()
-
-    const { etape } = fromLegacyStatus(demande.statut)
-
-    if (action === "retirer" && demande.employeId !== actor.id) {
-      throw new UnauthorizedActionError("Seul le proprietaire peut retirer la demande")
-    }
-
-    if (!canTransition(actor.role, etape, action as WorkflowAction)) {
-      throw new UnauthorizedActionError()
-    }
-
-    const transitionParams: { comment?: string; assigneAId?: string } = {}
-    if (action === "approuver") {
-      transitionParams.assigneAId = actor.id
-      if (params.comment) transitionParams.comment = params.comment
-    }
-    if (action === "rejeter") {
-      transitionParams.comment = params.comment
-    }
-
-    const transition = buildTransition(
-      actor.role,
-      etape,
-      action as WorkflowAction,
-      transitionParams
-    )
-    if (!transition) throw new InvalidTransitionError()
-
-    const updated = await this.db.demandeDeplacement.update({
-      where: { id: demandeId },
-      data: transition.transition.fields as Prisma.DemandeDeplacementUncheckedUpdateInput,
-    })
-
-    const notificationPayload: Omit<NotificationPayload, "demandeId" | "numero"> = {
-      employe: {
-        id: demande.employe.id,
-        prenom: demande.employe.prenom,
-        nom: demande.employe.nom,
-      },
-    }
-
-    if (action === "retirer") {
-      notificationPayload.assigneAId = demande.assigneAId
-    }
-
-    await notifyAndAudit({
-      audit: this.audit,
-      notifications: this.notifications,
-      utilisateurId: actor.id,
-      action: transition.auditAction,
-      entiteId: demandeId,
-      numero: demande.numero,
-      notificationEvent: transition.notificationEvent,
-      notificationPayload,
-    })
-
-    return { demande: updated }
+    return this.workflow.executeTransition(params)
   }
 
 }
