@@ -1,6 +1,5 @@
 import type { Prisma, PrismaClient } from "@prisma/client"
-import type { NotificationBus, NotificationPayload } from "./notification-bus"
-import { auditBus } from "./audit-bus"
+import type { NotificationEventType, NotificationBus, NotificationPayload } from "./notification-bus"
 import type { AuditBus } from "./audit-bus"
 import {
   DemandeNotFoundError,
@@ -9,7 +8,6 @@ import {
 } from "./errors"
 import { canTransition, buildTransition, fromLegacyStatus } from "./workflow"
 import type { WorkflowAction } from "./workflow"
-import { notifyAndAudit } from "./demande-utils"
 import type { Actor } from "./demande-factory"
 
 export class DemandeWorkflow {
@@ -18,6 +16,31 @@ export class DemandeWorkflow {
     private notifications: NotificationBus,
     private audit: AuditBus
   ) {}
+
+  private async notifyAndAudit(params: {
+    utilisateurId: string
+    action: string
+    entiteId: string
+    numero: string
+    notificationEvent?: NotificationEventType | null
+    notificationPayload?: Omit<NotificationPayload, "demandeId" | "numero"> | null
+  }) {
+    await this.audit.log({
+      utilisateurId: params.utilisateurId,
+      action: params.action,
+      entite: "DemandeDeplacement",
+      entiteId: params.entiteId,
+      details: { numero: params.numero },
+    })
+
+    if (params.notificationEvent && params.notificationPayload) {
+      await this.notifications.dispatch(params.notificationEvent, {
+        demandeId: params.entiteId,
+        numero: params.numero,
+        ...params.notificationPayload,
+      })
+    }
+  }
 
   async executeTransition(params: {
     demandeId: string
@@ -77,9 +100,7 @@ export class DemandeWorkflow {
       notificationPayload.assigneAId = demande.assigneAId
     }
 
-    await notifyAndAudit({
-      audit: this.audit,
-      notifications: this.notifications,
+    await this.notifyAndAudit({
       utilisateurId: actor.id,
       action: transition.auditAction,
       entiteId: demandeId,

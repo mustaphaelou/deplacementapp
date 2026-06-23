@@ -5,12 +5,6 @@ import type { AuditBus } from "./audit-bus"
 import type { CreateDemandeData } from "./demande-utils"
 import { UnauthorizedActionError, InvalidTransitionError } from "./errors"
 import { buildTransition } from "./workflow"
-import {
-  processMotif,
-  computeTotalEstime,
-  parseDecimal,
-  notifyAndAudit,
-} from "./demande-utils"
 
 export interface Actor {
   id: string
@@ -23,6 +17,53 @@ export class DemandeFactory {
     private notifications: NotificationBus,
     private audit: AuditBus
   ) {}
+
+  private parseDecimal(value?: string): number {
+    return parseFloat(value || "0")
+  }
+
+  private processMotif(motif: string[], motifAutre?: string): string[] {
+    const arr = [...motif]
+    if (arr.includes("autre") && motifAutre) {
+      const idx = arr.indexOf("autre")
+      arr[idx] = `Autre: ${motifAutre}`
+    }
+    return arr
+  }
+
+  private computeTotalEstime(data: CreateDemandeData): number {
+    return (
+      this.parseDecimal(data.fraisTransport) +
+      this.parseDecimal(data.fraisHebergement) +
+      this.parseDecimal(data.fraisRepas) +
+      this.parseDecimal(data.fraisDivers)
+    )
+  }
+
+  private async notifyAndAudit(params: {
+    utilisateurId: string
+    action: string
+    entiteId: string
+    numero: string
+    notificationEvent?: NotificationEventType | null
+    notificationPayload?: Omit<NotificationPayload, "demandeId" | "numero"> | null
+  }) {
+    await this.audit.log({
+      utilisateurId: params.utilisateurId,
+      action: params.action,
+      entite: "DemandeDeplacement",
+      entiteId: params.entiteId,
+      details: { numero: params.numero },
+    })
+
+    if (params.notificationEvent && params.notificationPayload) {
+      await this.notifications.dispatch(params.notificationEvent, {
+        demandeId: params.entiteId,
+        numero: params.numero,
+        ...params.notificationPayload,
+      })
+    }
+  }
 
   async createDraft(data: CreateDemandeData, actor: Actor) {
     return this.createDemande(data, actor, false)
@@ -46,8 +87,8 @@ export class DemandeFactory {
     const nextNum = (await this.db.demandeDeplacement.count()) + 1
     const numero = `DD-${new Date().getFullYear()}-${String(nextNum).padStart(4, "0")}`
 
-    const motifArray = processMotif(data.motif, data.motifAutre)
-    const totalEstime = computeTotalEstime(data)
+    const motifArray = this.processMotif(data.motif, data.motifAutre)
+    const totalEstime = this.computeTotalEstime(data)
 
     const createData: Prisma.DemandeDeplacementUncheckedCreateInput = {
       numero,
@@ -64,13 +105,13 @@ export class DemandeFactory {
       typeTransport: data.typeTransport,
       autreTransport: data.autreTransport || null,
       vehiculeId: data.vehiculeId || null,
-      fraisTransport: parseDecimal(data.fraisTransport),
-      fraisHebergement: parseDecimal(data.fraisHebergement),
-      fraisRepas: parseDecimal(data.fraisRepas),
-      fraisDivers: parseDecimal(data.fraisDivers),
+      fraisTransport: this.parseDecimal(data.fraisTransport),
+      fraisHebergement: this.parseDecimal(data.fraisHebergement),
+      fraisRepas: this.parseDecimal(data.fraisRepas),
+      fraisDivers: this.parseDecimal(data.fraisDivers),
       totalEstime,
       avanceRequise: data.avanceRequise || false,
-      montantAvance: data.avanceRequise ? parseDecimal(data.montantAvance) : null,
+      montantAvance: data.avanceRequise ? this.parseDecimal(data.montantAvance) : null,
       description: data.description || null,
       soumiseLe: null,
     }
@@ -94,9 +135,7 @@ export class DemandeFactory {
       data: createData,
     })
 
-    await notifyAndAudit({
-      audit: this.audit,
-      notifications: this.notifications,
+    await this.notifyAndAudit({
       utilisateurId: user.id,
       action: auditAction,
       entiteId: demande.id,

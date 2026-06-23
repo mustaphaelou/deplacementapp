@@ -1,7 +1,6 @@
 import type { Prisma, PrismaClient, StatutDemande } from "@prisma/client"
 import type { DashboardDemandeSummary } from "./dashboard"
 import { DemandeNotFoundError } from "./errors"
-import { mapToDemandeSummary } from "./demande-utils"
 
 export interface DemandeQueryParams {
   page: number
@@ -12,6 +11,21 @@ export interface DemandeQueryParams {
 
 export class DemandeQueries {
   constructor(private db: PrismaClient) {}
+
+  private mapToDemandeSummary(demande: any): DashboardDemandeSummary {
+    return {
+      id: demande.id,
+      numero: demande.numero,
+      destination: demande.destination,
+      dateDepart: demande.dateDepart,
+      dateRetour: demande.dateRetour,
+      totalEstime: demande.totalEstime ? Number(demande.totalEstime) : null,
+      statut: demande.statut,
+      employe: demande.employe
+        ? { prenom: demande.employe.prenom, nom: demande.employe.nom }
+        : null,
+    }
+  }
 
   async findById(id: string) {
     const demande = await this.db.demandeDeplacement.findUnique({
@@ -63,7 +77,7 @@ export class DemandeQueries {
       this.db.demandeDeplacement.count({ where }),
     ])
 
-    return { demandes: demandes.map(mapToDemandeSummary), total }
+    return { demandes: demandes.map((d) => this.mapToDemandeSummary(d)), total }
   }
 
   async findByEmployeeId(
@@ -75,7 +89,7 @@ export class DemandeQueries {
       orderBy: { creeLe: "desc" },
       take: limit,
     })
-    return demandes.map(mapToDemandeSummary)
+    return demandes.map((d) => this.mapToDemandeSummary(d))
   }
 
   async findByStatuts(
@@ -89,7 +103,7 @@ export class DemandeQueries {
       take: limit,
       include: includeEmployee ? { employe: { select: { prenom: true, nom: true } } } : undefined,
     })
-    return demandes.map(mapToDemandeSummary)
+    return demandes.map((d) => this.mapToDemandeSummary(d))
   }
 
   async countByStatut(
