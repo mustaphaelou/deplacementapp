@@ -4,20 +4,13 @@ import {
   DemandeNotFoundError,
   UnauthorizedActionError,
 } from "./errors"
-import type { NotificationBus } from "./notification-bus"
-import type { AuditBus } from "./audit-bus"
+import type { DemandeEventBus } from "./demande-event-bus"
 import type { PrismaClient, Role, StatutDemande } from "@prisma/client"
 
-function mockNotifications(): NotificationBus & { dispatch: ReturnType<typeof vi.fn> } {
+function mockEventBus(): DemandeEventBus & { dispatch: ReturnType<typeof vi.fn> } {
   return {
-    dispatch: vi.fn().mockResolvedValue({ total: 0, succeeded: 0, failed: 0, failures: [] }),
-  } as unknown as NotificationBus & { dispatch: ReturnType<typeof vi.fn> }
-}
-
-function mockAudit(): AuditBus & { log: ReturnType<typeof vi.fn> } {
-  return {
-    log: vi.fn().mockResolvedValue(undefined),
-  } as unknown as AuditBus & { log: ReturnType<typeof vi.fn> }
+    dispatch: vi.fn().mockResolvedValue(undefined),
+  } as unknown as DemandeEventBus & { dispatch: ReturnType<typeof vi.fn> }
 }
 
 interface MockedDb {
@@ -62,13 +55,12 @@ describe("DemandeWorkflow", () => {
 
   it("allows MANAGER to approve a SOUMISE demande", async () => {
     const db = mockDb()
-    const notifications = mockNotifications()
-    const audit = mockAudit()
+    const events = mockEventBus()
 
     db.demandeDeplacement.findUnique.mockResolvedValue(makeDemande())
     db.demandeDeplacement.update.mockResolvedValue(makeDemande({ statut: "APPROUVEE_MANAGER" }))
 
-    const workflow = new DemandeWorkflow(db as unknown as PrismaClient, notifications, audit)
+    const workflow = new DemandeWorkflow(db as unknown as PrismaClient, events)
     const result = await workflow.executeTransition({
       action: "approuver",
       demandeId: "dd-1",
@@ -76,11 +68,7 @@ describe("DemandeWorkflow", () => {
     })
 
     expect(result.demande.statut).toBe("APPROUVEE_MANAGER")
-    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: "APPROBATION_MANAGER" }))
-    expect(notifications.dispatch).toHaveBeenCalledWith(
-      "DEMANDE_APPROBATION_MANAGER",
-      expect.any(Object)
-    )
+    expect(events.dispatch).toHaveBeenCalledWith(expect.objectContaining({ action: "APPROBATION_MANAGER", notificationEvent: "DEMANDE_APPROBATION_MANAGER" }))
   })
 
   it("allows FINANCE_ADMIN to approve an APPROUVEE_MANAGER demande", async () => {
@@ -88,7 +76,7 @@ describe("DemandeWorkflow", () => {
     db.demandeDeplacement.findUnique.mockResolvedValue(makeDemande({ statut: "APPROUVEE_MANAGER" }))
     db.demandeDeplacement.update.mockResolvedValue(makeDemande({ statut: "APPROUVEE_FINANCE" }))
 
-    const workflow = new DemandeWorkflow(db as unknown as PrismaClient, mockNotifications(), mockAudit())
+    const workflow = new DemandeWorkflow(db as unknown as PrismaClient, mockEventBus())
     const result = await workflow.executeTransition({
       action: "approuver",
       demandeId: "dd-1",
@@ -103,7 +91,7 @@ describe("DemandeWorkflow", () => {
     db.demandeDeplacement.findUnique.mockResolvedValue(makeDemande({ statut: "APPROUVEE_FINANCE" }))
     db.demandeDeplacement.update.mockResolvedValue(makeDemande({ statut: "APPROUVEE" }))
 
-    const workflow = new DemandeWorkflow(db as unknown as PrismaClient, mockNotifications(), mockAudit())
+    const workflow = new DemandeWorkflow(db as unknown as PrismaClient, mockEventBus())
     const result = await workflow.executeTransition({
       action: "approuver",
       demandeId: "dd-1",
@@ -117,7 +105,7 @@ describe("DemandeWorkflow", () => {
     const db = mockDb()
     db.demandeDeplacement.findUnique.mockResolvedValue(makeDemande())
 
-    const workflow = new DemandeWorkflow(db as unknown as PrismaClient, mockNotifications(), mockAudit())
+    const workflow = new DemandeWorkflow(db as unknown as PrismaClient, mockEventBus())
     await expect(
       workflow.executeTransition({
         action: "approuver",
@@ -131,7 +119,7 @@ describe("DemandeWorkflow", () => {
     const db = mockDb()
     db.demandeDeplacement.findUnique.mockResolvedValue(null)
 
-    const workflow = new DemandeWorkflow(db as unknown as PrismaClient, mockNotifications(), mockAudit())
+    const workflow = new DemandeWorkflow(db as unknown as PrismaClient, mockEventBus())
     await expect(
       workflow.executeTransition({
         action: "approuver",
@@ -148,7 +136,7 @@ describe("DemandeWorkflow", () => {
     db.demandeDeplacement.findUnique.mockResolvedValue(makeDemande())
     db.demandeDeplacement.update.mockResolvedValue(makeDemande({ statut: "REJETEE_MANAGER" }))
 
-    const workflow = new DemandeWorkflow(db as unknown as PrismaClient, mockNotifications(), mockAudit())
+    const workflow = new DemandeWorkflow(db as unknown as PrismaClient, mockEventBus())
     const result = await workflow.executeTransition({
       action: "rejeter",
       demandeId: "dd-1",
@@ -163,7 +151,7 @@ describe("DemandeWorkflow", () => {
     const db = mockDb()
     db.demandeDeplacement.findUnique.mockResolvedValue(makeDemande({ statut: "APPROUVEE" }))
 
-    const workflow = new DemandeWorkflow(db as unknown as PrismaClient, mockNotifications(), mockAudit())
+    const workflow = new DemandeWorkflow(db as unknown as PrismaClient, mockEventBus())
     await expect(
       workflow.executeTransition({
         action: "approuver",
@@ -182,8 +170,8 @@ describe("DemandeWorkflow", () => {
     )
     db.demandeDeplacement.update.mockResolvedValue(makeDemande({ statut: "RETIREE" }))
 
-    const notifications = mockNotifications()
-    const workflow = new DemandeWorkflow(db as unknown as PrismaClient, notifications, mockAudit())
+    const events = mockEventBus()
+    const workflow = new DemandeWorkflow(db as unknown as PrismaClient, events)
     const result = await workflow.executeTransition({
       action: "retirer",
       demandeId: "dd-1",
@@ -191,9 +179,11 @@ describe("DemandeWorkflow", () => {
     })
 
     expect(result.demande.statut).toBe("RETIREE")
-    expect(notifications.dispatch).toHaveBeenCalledWith(
-      "DEMANDE_RETIREE",
-      expect.objectContaining({ assigneAId: "mgr-1" })
+    expect(events.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        notificationEvent: "DEMANDE_RETIREE",
+        notificationPayload: expect.objectContaining({ assigneAId: "mgr-1" }),
+      })
     )
   })
 
@@ -203,7 +193,7 @@ describe("DemandeWorkflow", () => {
       makeDemande({ statut: "BROUILLON", employeId: "u-2" })
     )
 
-    const workflow = new DemandeWorkflow(db as unknown as PrismaClient, mockNotifications(), mockAudit())
+    const workflow = new DemandeWorkflow(db as unknown as PrismaClient, mockEventBus())
     await expect(
       workflow.executeTransition({
         action: "retirer",
@@ -219,7 +209,7 @@ describe("DemandeWorkflow", () => {
       makeDemande({ statut: "SOUMISE", employeId: "u-1" })
     )
 
-    const workflow = new DemandeWorkflow(db as unknown as PrismaClient, mockNotifications(), mockAudit())
+    const workflow = new DemandeWorkflow(db as unknown as PrismaClient, mockEventBus())
     await expect(
       workflow.executeTransition({
         action: "retirer",

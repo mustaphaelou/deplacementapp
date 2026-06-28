@@ -1,7 +1,6 @@
 import type { Prisma, PrismaClient, Role } from "@prisma/client"
 import type { NotificationEventType, NotificationPayload } from "./notification-bus"
-import type { NotificationBus } from "./notification-bus"
-import type { AuditBus } from "./audit-bus"
+import type { DemandeEventBus } from "./demande-event-bus"
 import type { CreateDemandeData } from "./demande-utils"
 import { UnauthorizedActionError, InvalidTransitionError } from "./errors"
 import { buildTransition } from "./workflow"
@@ -14,8 +13,7 @@ export interface Actor {
 export class DemandeFactory {
   constructor(
     private db: PrismaClient,
-    private notifications: NotificationBus,
-    private audit: AuditBus
+    private events: DemandeEventBus
   ) {}
 
   private parseDecimal(value?: string): number {
@@ -38,31 +36,6 @@ export class DemandeFactory {
       this.parseDecimal(data.fraisRepas) +
       this.parseDecimal(data.fraisDivers)
     )
-  }
-
-  private async notifyAndAudit(params: {
-    utilisateurId: string
-    action: string
-    entiteId: string
-    numero: string
-    notificationEvent?: NotificationEventType | null
-    notificationPayload?: Omit<NotificationPayload, "demandeId" | "numero"> | null
-  }) {
-    await this.audit.log({
-      utilisateurId: params.utilisateurId,
-      action: params.action,
-      entite: "DemandeDeplacement",
-      entiteId: params.entiteId,
-      details: { numero: params.numero },
-    })
-
-    if (params.notificationEvent && params.notificationPayload) {
-      await this.notifications.dispatch(params.notificationEvent, {
-        demandeId: params.entiteId,
-        numero: params.numero,
-        ...params.notificationPayload,
-      })
-    }
   }
 
   async createDraft(data: CreateDemandeData, actor: Actor) {
@@ -135,7 +108,7 @@ export class DemandeFactory {
       data: createData,
     })
 
-    await this.notifyAndAudit({
+    await this.events.dispatch({
       utilisateurId: user.id,
       action: auditAction,
       entiteId: demande.id,

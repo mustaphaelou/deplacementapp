@@ -1,20 +1,13 @@
 import { describe, it, expect, vi } from "vitest"
 import { DemandeFactory } from "./demande-factory"
 import { UnauthorizedActionError } from "./errors"
-import type { NotificationBus } from "./notification-bus"
-import type { AuditBus } from "./audit-bus"
+import type { DemandeEventBus } from "./demande-event-bus"
 import type { PrismaClient, Role } from "@prisma/client"
 
-function mockNotifications(): NotificationBus & { dispatch: ReturnType<typeof vi.fn> } {
+function mockEventBus(): DemandeEventBus & { dispatch: ReturnType<typeof vi.fn> } {
   return {
-    dispatch: vi.fn().mockResolvedValue({ total: 0, succeeded: 0, failed: 0, failures: [] }),
-  } as unknown as NotificationBus & { dispatch: ReturnType<typeof vi.fn> }
-}
-
-function mockAudit(): AuditBus & { log: ReturnType<typeof vi.fn> } {
-  return {
-    log: vi.fn().mockResolvedValue(undefined),
-  } as unknown as AuditBus & { log: ReturnType<typeof vi.fn> }
+    dispatch: vi.fn().mockResolvedValue(undefined),
+  } as unknown as DemandeEventBus & { dispatch: ReturnType<typeof vi.fn> }
 }
 
 interface MockedDb {
@@ -73,39 +66,36 @@ const actor = (overrides?: Partial<{ id: string; role: Role }>) => ({
 describe("DemandeFactory", () => {
   it("createAndSubmit creates a demande with SOUMISE status and dispatches notification", async () => {
     const db = mockDb()
-    const notifications = mockNotifications()
-    const audit = mockAudit()
+    const events = mockEventBus()
 
     db.utilisateur.findUnique.mockResolvedValue(makeUser())
     db.demandeDeplacement.create.mockResolvedValue(makeDemande({ statut: "SOUMISE" }))
 
-    const factory = new DemandeFactory(db as unknown as PrismaClient, notifications, audit)
+    const factory = new DemandeFactory(db as unknown as PrismaClient, events)
     const result = await factory.createAndSubmit(createData, actor())
 
     expect(result.demande.statut).toBe("SOUMISE")
-    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: "SOUMISSION" }))
-    expect(notifications.dispatch).toHaveBeenCalledWith("DEMANDE_SOUMISE", expect.any(Object))
+    expect(events.dispatch).toHaveBeenCalledWith(expect.objectContaining({ action: "SOUMISSION", notificationEvent: "DEMANDE_SOUMISE" }))
   })
 
   it("throws UnauthorizedActionError when user not found", async () => {
     const db = mockDb()
     db.utilisateur.findUnique.mockResolvedValue(null)
 
-    const factory = new DemandeFactory(db as unknown as PrismaClient, mockNotifications(), mockAudit())
+    const factory = new DemandeFactory(db as unknown as PrismaClient, mockEventBus())
     await expect(factory.createDraft(createData, actor())).rejects.toThrow(UnauthorizedActionError)
   })
 
   it("computes totalEstime from cost fields", async () => {
     const db = mockDb()
-    const notifications = mockNotifications()
-    const audit = mockAudit()
+    const events = mockEventBus()
 
     db.utilisateur.findUnique.mockResolvedValue(makeUser())
     db.demandeDeplacement.create.mockImplementation((args: any) =>
       Promise.resolve(makeDemande({ statut: "BROUILLON", ...args.data }))
     )
 
-    const factory = new DemandeFactory(db as unknown as PrismaClient, notifications, audit)
+    const factory = new DemandeFactory(db as unknown as PrismaClient, events)
     const result = await factory.createDraft({
       ...createData,
       fraisTransport: "100",
@@ -125,7 +115,7 @@ describe("DemandeFactory", () => {
       Promise.resolve(makeDemande({ statut: "BROUILLON" }))
     )
 
-    const factory = new DemandeFactory(db as unknown as PrismaClient, mockNotifications(), mockAudit())
+    const factory = new DemandeFactory(db as unknown as PrismaClient, mockEventBus())
     await factory.createDraft({
       ...createData,
       motif: ["mission_client", "autre"],
@@ -137,19 +127,17 @@ describe("DemandeFactory", () => {
     expect(motif).toContain("Autre: Conference")
   })
 
-  it("createDraft creates a demande with BROUILLON status", async () => {
+  it("createDraft creates a demande with BROUILLON status without notification", async () => {
     const db = mockDb()
-    const notifications = mockNotifications()
-    const audit = mockAudit()
+    const events = mockEventBus()
 
     db.utilisateur.findUnique.mockResolvedValue(makeUser())
     db.demandeDeplacement.create.mockResolvedValue(makeDemande({ statut: "BROUILLON" }))
 
-    const factory = new DemandeFactory(db as unknown as PrismaClient, notifications, audit)
+    const factory = new DemandeFactory(db as unknown as PrismaClient, events)
     const result = await factory.createDraft(createData, actor())
 
     expect(result.demande.statut).toBe("BROUILLON")
-    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: "CREATION" }))
-    expect(notifications.dispatch).not.toHaveBeenCalled()
+    expect(events.dispatch).toHaveBeenCalledWith(expect.objectContaining({ action: "CREATION", notificationEvent: null }))
   })
 })

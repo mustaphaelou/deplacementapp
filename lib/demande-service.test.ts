@@ -1,28 +1,21 @@
 import { describe, it, expect, vi } from "vitest"
 import { DemandeDeplacementService } from "./demande-service"
 import type { PrismaClient, Role } from "@prisma/client"
-import type { NotificationBus } from "./notification-bus"
-import type { AuditBus } from "./audit-bus"
+import type { DemandeEventBus } from "./demande-event-bus"
 
 function mockDb(): any {
   return {} as unknown as PrismaClient
 }
 
-function mockNotifications(): NotificationBus & { dispatch: ReturnType<typeof vi.fn> } {
+function mockEventBus(): DemandeEventBus & { dispatch: ReturnType<typeof vi.fn> } {
   return {
-    dispatch: vi.fn().mockResolvedValue({ total: 0, succeeded: 0, failed: 0, failures: [] }),
-  } as unknown as NotificationBus & { dispatch: ReturnType<typeof vi.fn> }
-}
-
-function mockAudit(): AuditBus & { log: ReturnType<typeof vi.fn> } {
-  return {
-    log: vi.fn().mockResolvedValue(undefined),
-  } as unknown as AuditBus & { log: ReturnType<typeof vi.fn> }
+    dispatch: vi.fn().mockResolvedValue(undefined),
+  } as unknown as DemandeEventBus & { dispatch: ReturnType<typeof vi.fn> }
 }
 
 describe("DemandeDeplacementService (facade smoke)", () => {
   it("exposes queries, factory, and workflow as public properties", () => {
-    const svc = new DemandeDeplacementService(mockDb(), mockNotifications(), mockAudit())
+    const svc = new DemandeDeplacementService(mockDb(), mockEventBus())
     expect(svc.queries).toBeDefined()
     expect(svc.factory).toBeDefined()
     expect(svc.workflow).toBeDefined()
@@ -30,10 +23,9 @@ describe("DemandeDeplacementService (facade smoke)", () => {
 
   it("executeAction with 'create' delegates to factory.createDraft", async () => {
     const db = mockDb()
-    const notif = mockNotifications()
-    const audit = mockAudit()
+    const events = mockEventBus()
 
-    const svc = new DemandeDeplacementService(db, notif, audit)
+    const svc = new DemandeDeplacementService(db, events)
 
     svc.factory.createDraft = vi.fn().mockResolvedValue({ demande: { id: "dd-1" } })
 
@@ -55,10 +47,9 @@ describe("DemandeDeplacementService (facade smoke)", () => {
 
   it("executeAction with 'submit' delegates to factory.createAndSubmit", async () => {
     const db = mockDb()
-    const notif = mockNotifications()
-    const audit = mockAudit()
+    const events = mockEventBus()
 
-    const svc = new DemandeDeplacementService(db, notif, audit)
+    const svc = new DemandeDeplacementService(db, events)
 
     svc.factory.createAndSubmit = vi.fn().mockResolvedValue({ demande: { id: "dd-2" } })
 
@@ -80,10 +71,9 @@ describe("DemandeDeplacementService (facade smoke)", () => {
 
   it("executeAction with 'approuver' delegates to workflow.executeTransition", async () => {
     const db = mockDb()
-    const notif = mockNotifications()
-    const audit = mockAudit()
+    const events = mockEventBus()
 
-    const svc = new DemandeDeplacementService(db, notif, audit)
+    const svc = new DemandeDeplacementService(db, events)
 
     svc.workflow.executeTransition = vi.fn().mockResolvedValue({ demande: { id: "dd-1", statut: "APPROUVEE_MANAGER" } })
 
@@ -104,10 +94,9 @@ describe("DemandeDeplacementService (facade smoke)", () => {
 
   it("executeAction with 'rejeter' delegates to workflow.executeTransition", async () => {
     const db = mockDb()
-    const notif = mockNotifications()
-    const audit = mockAudit()
+    const events = mockEventBus()
 
-    const svc = new DemandeDeplacementService(db, notif, audit)
+    const svc = new DemandeDeplacementService(db, events)
 
     svc.workflow.executeTransition = vi.fn().mockResolvedValue({ demande: { id: "dd-1", statut: "REJETEE_MANAGER" } })
 
@@ -129,10 +118,9 @@ describe("DemandeDeplacementService (facade smoke)", () => {
 
   it("executeAction with 'retirer' delegates to workflow.executeTransition", async () => {
     const db = mockDb()
-    const notif = mockNotifications()
-    const audit = mockAudit()
+    const events = mockEventBus()
 
-    const svc = new DemandeDeplacementService(db, notif, audit)
+    const svc = new DemandeDeplacementService(db, events)
 
     svc.workflow.executeTransition = vi.fn().mockResolvedValue({ demande: { id: "dd-1", statut: "RETIREE" } })
 
@@ -153,10 +141,9 @@ describe("DemandeDeplacementService (facade smoke)", () => {
 
   it("delegates query methods to queries property", async () => {
     const db = mockDb()
-    const notif = mockNotifications()
-    const audit = mockAudit()
+    const events = mockEventBus()
 
-    const svc = new DemandeDeplacementService(db, notif, audit)
+    const svc = new DemandeDeplacementService(db, events)
 
     svc.queries.findById = vi.fn().mockResolvedValue({ id: "dd-1" })
     svc.queries.findMany = vi.fn().mockResolvedValue({ demandes: [], total: 0 })

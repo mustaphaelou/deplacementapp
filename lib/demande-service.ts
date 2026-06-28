@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@prisma/client"
 import { prisma } from "./prisma"
-import { notificationBus } from "./notification-bus"
-import { auditBus } from "./audit-bus"
+import { demandeEventBus } from "./demande-event-bus"
+import type { DemandeEventBus } from "./demande-event-bus"
 import type { CreateDemandeData } from "./demande-utils"
 import { DemandeQueries } from "./demande-queries"
 import type { DemandeQueryParams } from "./demande-queries"
@@ -27,12 +27,11 @@ export class DemandeDeplacementService {
 
   constructor(
     db: PrismaClient,
-    notifications = notificationBus,
-    audit = auditBus
+    events: DemandeEventBus = demandeEventBus
   ) {
     this.queries = new DemandeQueries(db)
-    this.factory = new DemandeFactory(db, notifications, audit)
-    this.workflow = new DemandeWorkflow(db, notifications, audit)
+    this.factory = new DemandeFactory(db, events)
+    this.workflow = new DemandeWorkflow(db, events)
   }
 
   async executeAction(params: ExecuteParams) {
