@@ -6,19 +6,12 @@ import type { CreateDemandeData } from "./demande-utils"
 import { DemandeQueries } from "./demande-queries"
 import type { DemandeQueryParams } from "./demande-queries"
 import { DemandeFactory } from "./demande-factory"
-import type { Actor } from "./demande-factory"
 import { DemandeWorkflow } from "./demande-workflow"
 
+import type { Actor, ExecuteParams } from "./demande-types"
 export { DemandeWorkflow } from "./demande-workflow"
 export { DemandeNotFoundError, UnauthorizedActionError, InvalidTransitionError } from "./errors"
-export type { Actor, CreateDemandeData, DemandeQueryParams }
-
-export type ExecuteParams =
-  | { action: "create"; data: CreateDemandeData; actor: Actor }
-  | { action: "submit"; data: CreateDemandeData; actor: Actor }
-  | { action: "approuver"; demandeId: string; actor: Actor; comment?: string }
-  | { action: "rejeter"; demandeId: string; actor: Actor; comment: string }
-  | { action: "retirer"; demandeId: string; actor: Actor }
+export type { Actor, ExecuteParams, CreateDemandeData, DemandeQueryParams }
 
 export class DemandeDeplacementService {
   queries: DemandeQueries

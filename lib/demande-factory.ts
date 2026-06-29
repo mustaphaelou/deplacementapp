@@ -2,13 +2,9 @@ import type { Prisma, PrismaClient, Role } from "@prisma/client"
 import type { NotificationEventType, NotificationPayload } from "./notification-bus"
 import type { DemandeEventBus } from "./demande-event-bus"
 import type { CreateDemandeData } from "./demande-utils"
+import type { Actor } from "./demande-types"
 import { UnauthorizedActionError, InvalidTransitionError } from "./errors"
 import { buildTransition } from "./workflow"
-
-export interface Actor {
-  id: string
-  role: Role
-}
 
 export class DemandeFactory {
   constructor(

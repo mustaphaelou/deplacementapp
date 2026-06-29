@@ -1,4 +1,5 @@
-import type { DemandeDeplacement, Utilisateur, VehiculeEntreprise } from "@prisma/client"
+import type { DemandeDeplacement, Utilisateur, VehiculeEntreprise, Role } from "@prisma/client"
+import type { CreateDemandeData } from "./demande-utils"
 
 export function parseMotif(motif: string): string[] {
   try {
@@ -57,3 +58,15 @@ export interface DemandeDetail {
 }
 
 export type Vehicule = Pick<VehiculeEntreprise, "id" | "nom" | "immatriculation" | "disponible">
+
+export interface Actor {
+  id: string
+  role: Role
+}
+
+export type ExecuteParams =
+  | { action: "create"; data: CreateDemandeData; actor: Actor }
+  | { action: "submit"; data: CreateDemandeData; actor: Actor }
+  | { action: "approuver"; demandeId: string; actor: Actor; comment?: string }
+  | { action: "rejeter"; demandeId: string; actor: Actor; comment: string }
+  | { action: "retirer"; demandeId: string; actor: Actor }

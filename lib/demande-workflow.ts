@@ -8,7 +8,7 @@ import {
 } from "./errors"
 import { canTransition, buildTransition, fromLegacyStatus } from "./workflow"
 import type { WorkflowAction } from "./workflow"
-import type { Actor } from "./demande-factory"
+import type { Actor } from "./demande-types"
 
 export class DemandeWorkflow {
   constructor(
