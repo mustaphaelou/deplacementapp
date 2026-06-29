@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client"
+import type { PrismaClient, StatutDemande } from "@prisma/client"
 import { prisma } from "./prisma"
 import { demandeEventBus } from "./demande-event-bus"
 import type { DemandeEventBus } from "./demande-event-bus"
@@ -57,16 +57,16 @@ export class DemandeDeplacementService {
     return this.queries.findByEmployeeId(userId, limit)
   }
 
-  findByStatuts(statuts: string[], opts?: { limit?: number; includeEmployee?: boolean; orderBy?: any }) {
-    return this.queries.findByStatuts(statuts as any, opts)
+  findByStatuts(statuts: StatutDemande[], opts?: { limit?: number; includeEmployee?: boolean; orderBy?: any }) {
+    return this.queries.findByStatuts(statuts, opts)
   }
 
-  countByStatut(statut: string, userId?: string) {
-    return this.queries.countByStatut(statut as any, userId)
+  countByStatut(statut: StatutDemande, userId?: string) {
+    return this.queries.countByStatut(statut, userId)
   }
 
-  aggregateBudget(statuts: string[]) {
-    return this.queries.aggregateBudget(statuts as any)
+  aggregateBudget(statuts: StatutDemande[]) {
+    return this.queries.aggregateBudget(statuts)
   }
 }
 

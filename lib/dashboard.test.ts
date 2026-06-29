@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest"
 import { getDashboardPayload } from "./dashboard"
+import type { DemandeQueriesPort } from "./demande-queries"
 import { formatCurrency } from "@/lib/constants"
 
 describe("Dashboard Module - getDashboardPayload", () => {
@@ -18,7 +19,7 @@ describe("Dashboard Module - getDashboardPayload", () => {
       },
     ]
 
-    const fakeService = {
+    const fakeService: DemandeQueriesPort = {
       findByEmployeeId: vi.fn().mockResolvedValue(mockDemandes as any),
       findByStatuts: vi.fn(),
       countByStatut: vi.fn().mockImplementation((statut: string) => {
@@ -57,7 +58,7 @@ describe("Dashboard Module - getDashboardPayload", () => {
       },
     ]
 
-    const fakeService = {
+    const fakeService: DemandeQueriesPort = {
       findByEmployeeId: vi.fn(),
       findByStatuts: vi.fn().mockResolvedValue(mockDemandes as any),
       countByStatut: vi.fn().mockResolvedValue(1),
@@ -93,7 +94,7 @@ describe("Dashboard Module - getDashboardPayload", () => {
       },
     ]
 
-    const fakeService = {
+    const fakeService: DemandeQueriesPort = {
       findByEmployeeId: vi.fn(),
       findByStatuts: vi.fn().mockResolvedValue(mockDemandes as any),
       countByStatut: vi.fn().mockResolvedValue(1),
@@ -127,7 +128,7 @@ describe("Dashboard Module - getDashboardPayload", () => {
       },
     ]
 
-    const fakeService = {
+    const fakeService: DemandeQueriesPort = {
       findByEmployeeId: vi.fn(),
       findByStatuts: vi.fn().mockResolvedValue(mockDemandes as any),
       countByStatut: vi.fn().mockResolvedValue(1),

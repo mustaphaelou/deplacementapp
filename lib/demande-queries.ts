@@ -2,6 +2,13 @@ import type { Prisma, PrismaClient, StatutDemande } from "@prisma/client"
 import type { DashboardDemandeSummary } from "./dashboard"
 import { DemandeNotFoundError } from "./errors"
 
+export interface DemandeQueriesPort {
+  findByEmployeeId(userId: string, limit?: number): Promise<DashboardDemandeSummary[]>
+  findByStatuts(statuts: StatutDemande[], opts?: { limit?: number; includeEmployee?: boolean; orderBy?: any }): Promise<DashboardDemandeSummary[]>
+  countByStatut(statut: StatutDemande, userId?: string): Promise<number>
+  aggregateBudget(statuts: StatutDemande[]): Promise<number>
+}
+
 export interface DemandeQueryParams {
   page: number
   limit: number

@@ -1,6 +1,7 @@
 import type { StatutDemande, Role } from "@prisma/client"
 import { formatCurrency } from "@/lib/constants"
 import { demandeService } from "./demande-service"
+import type { DemandeQueriesPort } from "./demande-queries"
 
 export interface DashboardDemandeSummary {
   id: string
@@ -73,12 +74,7 @@ export function computeStats(counts: { statut: string; _count: number }[]): Dema
 export async function getDashboardPayload(
   userId: string,
   role: Role,
-  svc?: {
-    findByEmployeeId: (userId: string, limit?: number) => Promise<DashboardDemandeSummary[]>
-    findByStatuts: (statuts: StatutDemande[], opts?: { limit?: number; includeEmployee?: boolean; orderBy?: any }) => Promise<DashboardDemandeSummary[]>
-    countByStatut: (statut: StatutDemande, userId?: string) => Promise<number>
-    aggregateBudget: (statuts: StatutDemande[]) => Promise<number>
-  }
+  svc?: DemandeQueriesPort
 ): Promise<DashboardPayload> {
   const service = svc ?? demandeService
   switch (role) {
