@@ -1,6 +1,9 @@
 import type { PrismaClient, Role } from "@prisma/client"
 import { prisma } from "./prisma"
 import { emailService } from "./email-service"
+import { NotificationNotFoundError, UnauthorizedActionError } from "./errors"
+
+export { NotificationNotFoundError } from "./errors"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -295,8 +298,13 @@ export class NotificationBus {
    * Mark a notification as read (lu) and, if the reader is an EMPLOYEE,
    * dispatch a DEMANDE_NOTIFICATION_LUE event to the managers of the
    * employee's department (AccuseLecture / read receipt).
+   *
+   * The bus owns the ownership check: the notifier must exist and must belong
+   * to the requesting Utilisateur. Throws `NotificationNotFoundError` (404)
+   * when the notification is missing and `UnauthorizedActionError("Non autorisé")`
+   * (403) when the requester is not the owner.
    */
-  async markAsRead(notificationId: string): Promise<void> {
+  async markAsRead(notificationId: string, userId: string): Promise<void> {
     const notification = await this.db.notification.findUnique({
       where: { id: notificationId },
       include: {
@@ -306,7 +314,12 @@ export class NotificationBus {
     })
 
     if (!notification) {
-      throw new Error("Notification introuvable")
+      throw new NotificationNotFoundError()
+    }
+
+    // Ownership check: the requester must be the notification's recipient.
+    if (notification.utilisateurId !== userId) {
+      throw new UnauthorizedActionError("Non autorisé")
     }
 
     // Guard: already read — no-op

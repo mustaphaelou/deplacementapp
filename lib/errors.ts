@@ -8,6 +8,14 @@ export class DemandeNotFoundError extends Error {
   }
 }
 
+export class NotificationNotFoundError extends Error {
+  status = 404
+  constructor() {
+    super("Notification introuvable")
+    this.name = "NotificationNotFoundError"
+  }
+}
+
 export class UnauthorizedActionError extends Error {
   status = 403
   constructor(message = "Action non autorisee") {

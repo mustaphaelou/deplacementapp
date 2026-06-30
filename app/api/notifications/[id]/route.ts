@@ -1,30 +1,21 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth-utils"
-import { prisma } from "@/lib/prisma"
 import { notificationBus } from "@/lib/notification-bus"
+import { handleServiceError } from "@/lib/errors"
 
 export async function PATCH(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
   const auth = await requireAuth()
   if (!auth.ok) return auth.response
 
-  const notification = await prisma.notification.findUnique({
-    where: { id },
-    select: { utilisateurId: true },
-  })
-
-  if (!notification) {
-    return NextResponse.json({ error: "Notification introuvable" }, { status: 404 })
+  try {
+    await notificationBus.markAsRead(id, auth.user.id)
+  } catch (e) {
+    return handleServiceError(e)
   }
-
-  if (notification.utilisateurId !== auth.user.id) {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 403 })
-  }
-
-  await notificationBus.markAsRead(id)
 
   return NextResponse.json({ ok: true })
 }

@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest"
 import { NotificationBus } from "./notification-bus"
 import type { NotificationAdapter, NotificationMessage, NotificationPayload } from "./notification-bus"
 import type { PrismaClient, Role } from "@prisma/client"
+import { NotificationNotFoundError, UnauthorizedActionError } from "./errors"
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -216,20 +217,21 @@ describe("NotificationBus", () => {
 
   // ─── markAsRead() tests ───────────────────────────────────────────────────
 
-  it("markAsRead marks the notification as read and dispatches read receipt for employees", async () => {
+  it("markAsRead marks the notification as read and dispatches read receipt for the owner employee", async () => {
     const adapter = mockAdapter()
     const prisma = mockPrisma([{ id: "mgr-hr", role: "MANAGER", departementId: "dept-hr" }])
 
     // Mock notification.findUnique to return an unread notification from an employee
     ;(prisma.notification.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       id: "notif-1",
+      utilisateurId: "emp-1",
       lu: false,
       utilisateur: { id: "emp-1", prenom: "Jean", nom: "Dupont", role: "EMPLOYEE", departementId: "dept-hr" },
       demande: { id: "d-1", numero: "DD-2025-0001" },
     })
 
     const bus = new NotificationBus(adapter, prisma)
-    await bus.markAsRead("notif-1")
+    await bus.markAsRead("notif-1", "emp-1")
 
     // Should have marked as read
     expect(prisma.notification.update).toHaveBeenCalledWith({
@@ -250,13 +252,14 @@ describe("NotificationBus", () => {
 
     ;(prisma.notification.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       id: "notif-1",
+      utilisateurId: "emp-1",
       lu: true, // already read
       utilisateur: { id: "emp-1", prenom: "Jean", nom: "Dupont", role: "EMPLOYEE", departementId: "dept-hr" },
       demande: { id: "d-1", numero: "DD-2025-0001" },
     })
 
     const bus = new NotificationBus(adapter, prisma)
-    await bus.markAsRead("notif-1")
+    await bus.markAsRead("notif-1", "emp-1")
 
     // Should NOT have updated or dispatched anything
     expect(prisma.notification.update).not.toHaveBeenCalled()
@@ -269,13 +272,14 @@ describe("NotificationBus", () => {
 
     ;(prisma.notification.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       id: "notif-1",
+      utilisateurId: "mgr-1",
       lu: false,
       utilisateur: { id: "mgr-1", prenom: "Admin", nom: "User", role: "MANAGER", departementId: "dept-hr" },
       demande: { id: "d-1", numero: "DD-2025-0001" },
     })
 
     const bus = new NotificationBus(adapter, prisma)
-    await bus.markAsRead("notif-1")
+    await bus.markAsRead("notif-1", "mgr-1")
 
     // Should mark as read
     expect(prisma.notification.update).toHaveBeenCalledWith({
@@ -287,7 +291,7 @@ describe("NotificationBus", () => {
     expect(adapter.send).not.toHaveBeenCalled()
   })
 
-  it("markAsRead throws when notification does not exist", async () => {
+  it("markAsRead throws NotificationNotFoundError when the notification does not exist", async () => {
     const adapter = mockAdapter()
     const prisma = mockPrisma([])
 
@@ -295,7 +299,53 @@ describe("NotificationBus", () => {
 
     const bus = new NotificationBus(adapter, prisma)
 
-    await expect(bus.markAsRead("notif-nonexistent")).rejects.toThrow("Notification introuvable")
+    await expect(bus.markAsRead("notif-nonexistent", "emp-1")).rejects.toBeInstanceOf(
+      NotificationNotFoundError
+    )
+  })
+
+  it("markAsRead throws UnauthorizedActionError when the reader does not own the notification", async () => {
+    const adapter = mockAdapter()
+    const prisma = mockPrisma([])
+
+    ;(prisma.notification.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      id: "notif-1",
+      utilisateurId: "emp-1",
+      lu: false,
+      utilisateur: { id: "emp-1", prenom: "Jean", nom: "Dupont", role: "EMPLOYEE", departementId: "dept-hr" },
+      demande: { id: "d-1", numero: "DD-2025-0001" },
+    })
+
+    const bus = new NotificationBus(adapter, prisma)
+
+    // Tried by a different user
+    const promise = bus.markAsRead("notif-1", "emp-2")
+    await expect(promise).rejects.toBeInstanceOf(UnauthorizedActionError)
+    await expect(promise).rejects.toMatchObject({ status: 403, message: "Non autorisé" })
+
+    // Should NOT have updated or dispatched anything
+    expect(prisma.notification.update).not.toHaveBeenCalled()
+    expect(adapter.send).not.toHaveBeenCalled()
+  })
+
+  it("markAsRead enforces ownership even when the owner is not an EMPLOYEE", async () => {
+    const adapter = mockAdapter()
+    const prisma = mockPrisma([])
+
+    ;(prisma.notification.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      id: "notif-1",
+      utilisateurId: "mgr-1",
+      lu: false,
+      utilisateur: { id: "mgr-1", prenom: "Admin", nom: "User", role: "MANAGER", departementId: "dept-hr" },
+      demande: { id: "d-1", numero: "DD-2025-0001" },
+    })
+
+    const bus = new NotificationBus(adapter, prisma)
+    // Owner is mgr-1, requester is mgr-2 → should throw UnauthorizedActionError
+    await expect(bus.markAsRead("notif-1", "mgr-2")).rejects.toBeInstanceOf(
+      UnauthorizedActionError
+    )
+    expect(prisma.notification.update).not.toHaveBeenCalled()
   })
 
   it("markAsRead does not dispatch read receipt when notification has no demande", async () => {
@@ -304,13 +354,14 @@ describe("NotificationBus", () => {
 
     ;(prisma.notification.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       id: "notif-1",
+      utilisateurId: "emp-1",
       lu: false,
       utilisateur: { id: "emp-1", prenom: "Jean", nom: "Dupont", role: "EMPLOYEE", departementId: "dept-hr" },
       demande: null, // no linked demande
     })
 
     const bus = new NotificationBus(adapter, prisma)
-    await bus.markAsRead("notif-1")
+    await bus.markAsRead("notif-1", "emp-1")
 
     // Should mark as read
     expect(prisma.notification.update).toHaveBeenCalled()
