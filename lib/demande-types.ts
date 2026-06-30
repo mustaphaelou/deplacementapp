@@ -12,9 +12,9 @@ export function parseMotif(motif: string): string[] {
 }
 
 export type DemandeWithRelations = DemandeDeplacement & {
-  employe: Utilisateur
-  vehicule: VehiculeEntreprise | null
-  assigneA: Utilisateur | null
+  employe: Pick<Utilisateur, "id" | "prenom" | "nom" | "email" | "poste">
+  vehicule: Pick<VehiculeEntreprise, "nom" | "immatriculation"> | null
+  assigneA: Pick<Utilisateur, "id" | "prenom" | "nom"> | null
 }
 
 export interface DemandeDetail {

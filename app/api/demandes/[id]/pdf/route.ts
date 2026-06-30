@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth-utils"
 import { prisma } from "@/lib/prisma"
+import { demandeService } from "@/lib/demande-service"
 import { toPdfRenderData } from "@/lib/pdf-mapper"
 import { pdfAdapter } from "@/components/pdf/travel-request-pdf-adapter"
+import { handleServiceError } from "@/lib/errors"
 
 export async function GET(
   req: NextRequest,
@@ -12,16 +14,12 @@ export async function GET(
   const auth = await requireAuth()
   if (!auth.ok) return auth.response
 
-  const demande = await prisma.demandeDeplacement.findUnique({
-    where: { id },
-    include: {
-      employe: true,
-      vehicule: true,
-      assigneA: true,
-    },
-  })
-
-  if (!demande) return NextResponse.json({ error: "Introuvable" }, { status: 404 })
+  let demande
+  try {
+    demande = await demandeService.queries.findById(id)
+  } catch (e) {
+    return handleServiceError(e)
+  }
 
   try {
     const data = toPdfRenderData(demande)
@@ -41,7 +39,7 @@ export async function GET(
         "Content-Disposition": `attachment; filename="demande-${demande.numero}.pdf"`,
       },
     })
-  } catch (err) {
+  } catch {
     return NextResponse.json({ error: "Erreur de génération PDF" }, { status: 500 })
   }
 }

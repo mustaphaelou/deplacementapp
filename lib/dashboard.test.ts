@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest"
 import { getDashboardPayload } from "./dashboard"
 import type { DemandeQueriesPort } from "./demande-queries"
+import type { DashboardDemandeSummary } from "./dashboard"
 import { formatCurrency } from "@/lib/constants"
 
 describe("Dashboard Module - getDashboardPayload", () => {
@@ -20,7 +21,9 @@ describe("Dashboard Module - getDashboardPayload", () => {
     ]
 
     const fakeService: DemandeQueriesPort = {
-      findByEmployeeId: vi.fn().mockResolvedValue(mockDemandes as any),
+      findById: vi.fn(),
+      findMany: vi.fn(),
+      findByEmployeeId: vi.fn().mockResolvedValue(mockDemandes as DashboardDemandeSummary[]),
       findByStatuts: vi.fn(),
       countByStatut: vi.fn().mockImplementation((statut: string) => {
         if (statut === "BROUILLON") return Promise.resolve(1)
@@ -59,8 +62,10 @@ describe("Dashboard Module - getDashboardPayload", () => {
     ]
 
     const fakeService: DemandeQueriesPort = {
+      findById: vi.fn(),
+      findMany: vi.fn(),
       findByEmployeeId: vi.fn(),
-      findByStatuts: vi.fn().mockResolvedValue(mockDemandes as any),
+      findByStatuts: vi.fn().mockResolvedValue(mockDemandes as DashboardDemandeSummary[]),
       countByStatut: vi.fn().mockResolvedValue(1),
       aggregateBudget: vi.fn(),
     }
@@ -95,8 +100,10 @@ describe("Dashboard Module - getDashboardPayload", () => {
     ]
 
     const fakeService: DemandeQueriesPort = {
+      findById: vi.fn(),
+      findMany: vi.fn(),
       findByEmployeeId: vi.fn(),
-      findByStatuts: vi.fn().mockResolvedValue(mockDemandes as any),
+      findByStatuts: vi.fn().mockResolvedValue(mockDemandes as DashboardDemandeSummary[]),
       countByStatut: vi.fn().mockResolvedValue(1),
       aggregateBudget: vi.fn(),
     }
@@ -129,8 +136,10 @@ describe("Dashboard Module - getDashboardPayload", () => {
     ]
 
     const fakeService: DemandeQueriesPort = {
+      findById: vi.fn(),
+      findMany: vi.fn(),
       findByEmployeeId: vi.fn(),
-      findByStatuts: vi.fn().mockResolvedValue(mockDemandes as any),
+      findByStatuts: vi.fn().mockResolvedValue(mockDemandes as DashboardDemandeSummary[]),
       countByStatut: vi.fn().mockResolvedValue(1),
       aggregateBudget: vi.fn().mockResolvedValue(15000),
     }

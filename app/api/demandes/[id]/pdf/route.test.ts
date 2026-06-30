@@ -1,14 +1,49 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import type { DemandeDeplacement, Utilisateur, VehiculeEntreprise, PrismaClient } from "@prisma/client"
-import type { PdfRenderData } from "@/lib/pdf-types"
+import { NextRequest } from "next/server"
+import type { DemandeDeplacement, Utilisateur, VehiculeEntreprise, Role, StatutDemande, TypeTransport } from "@prisma/client"
 import { TravelRequestPdfAdapter } from "@/components/pdf/travel-request-pdf-adapter"
+import { DemandeNotFoundError } from "@/lib/demande-service"
+
+vi.mock("@/lib/auth-utils", () => ({
+  requireAuth: vi.fn(),
+}))
+
+vi.mock("@/lib/demande-service", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/demande-service")>()
+  return {
+    ...actual,
+    demandeService: {
+      queries: {
+        findById: vi.fn(),
+      },
+    },
+  }
+})
+
+vi.mock("@/components/pdf/travel-request-pdf-adapter", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/components/pdf/travel-request-pdf-adapter")>()
+  return {
+    ...actual,
+    pdfAdapter: {
+      render: vi.fn().mockResolvedValue(Buffer.from("%PDF-1.4")),
+    },
+  }
+})
+
+vi.mock("@/lib/prisma", () => ({
+  prisma: {
+    document: {
+      create: vi.fn().mockResolvedValue({ id: "doc-1" }),
+    },
+  },
+}))
 
 const mockDemande: DemandeDeplacement & { employe: Utilisateur; vehicule: VehiculeEntreprise | null; assigneA: Utilisateur | null } = {
   id: "d-1",
   numero: "DD-2025-0001",
   employeId: "u-1",
   assigneAId: "u-2",
-  statut: "APPROUVEE_MANAGER" as any,
+  statut: "APPROUVEE_MANAGER" as StatutDemande,
   employeNom: "Dupont",
   employePrenom: "Jean",
   employePoste: "Développeur",
@@ -17,14 +52,14 @@ const mockDemande: DemandeDeplacement & { employe: Utilisateur; vehicule: Vehicu
   dateDepart: new Date("2025-06-01"),
   dateRetour: new Date("2025-06-05"),
   destination: "Casablanca",
-  typeTransport: "AVION" as any,
+  typeTransport: "AVION" as TypeTransport,
   autreTransport: null,
   vehiculeId: "v-1",
-  fraisTransport: { toNumber: () => 100 } as any,
-  fraisHebergement: { toNumber: () => 200 } as any,
-  fraisRepas: { toNumber: () => 50 } as any,
-  fraisDivers: { toNumber: () => 30 } as any,
-  totalEstime: { toNumber: () => 380 } as any,
+  fraisTransport: { toNumber: () => 100 } as unknown as DemandeDeplacement["fraisTransport"],
+  fraisHebergement: { toNumber: () => 200 } as unknown as DemandeDeplacement["fraisHebergement"],
+  fraisRepas: { toNumber: () => 50 } as unknown as DemandeDeplacement["fraisRepas"],
+  fraisDivers: { toNumber: () => 30 } as unknown as DemandeDeplacement["fraisDivers"],
+  totalEstime: { toNumber: () => 380 } as unknown as DemandeDeplacement["totalEstime"],
   avanceRequise: false,
   montantAvance: null,
   description: null,
@@ -47,7 +82,7 @@ const mockDemande: DemandeDeplacement & { employe: Utilisateur; vehicule: Vehicu
     nom: "Dupont",
     prenom: "Jean",
     poste: "Développeur",
-    role: "EMPLOYEE" as any,
+    role: "EMPLOYEE" as Role,
     departementId: "dep-1",
     avatarUrl: null,
     telephone: null,
@@ -70,7 +105,7 @@ const mockDemande: DemandeDeplacement & { employe: Utilisateur; vehicule: Vehicu
     nom: "Bernard",
     prenom: "Pierre",
     poste: "Manager",
-    role: "MANAGER" as any,
+    role: "MANAGER" as Role,
     departementId: "dep-2",
     avatarUrl: null,
     telephone: null,
@@ -81,18 +116,30 @@ const mockDemande: DemandeDeplacement & { employe: Utilisateur; vehicule: Vehicu
   },
 }
 
-function makeMockPrisma() {
+function mockAuth() {
   return {
-    demandeDeplacement: {
-      findUnique: vi.fn().mockResolvedValue(mockDemande),
+    ok: true,
+    user: {
+      id: "u-1",
+      email: "user@example.com",
+      name: "User",
+      role: "EMPLOYEE",
+      departementId: "d-1",
+      departement: "IT",
+      poste: "Dev",
     },
-    document: {
-      create: vi.fn().mockResolvedValue({ id: "doc-1" }),
-    },
-  } as unknown as PrismaClient
+  }
+}
+
+function mockRequest(id: string): NextRequest {
+  return new NextRequest(`http://localhost/api/demandes/${id}/pdf`)
 }
 
 describe("PDF route integration", () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
   it("toPdfRenderData produces valid PdfRenderData for TravelRequestPdfAdapter", async () => {
     const { toPdfRenderData } = await import("@/lib/pdf-mapper")
     const data = toPdfRenderData(mockDemande)
@@ -114,29 +161,56 @@ describe("PDF route integration", () => {
     expect(buffer.length).toBeGreaterThan(0)
   })
 
-  it("mock Prisma can findUnique with expanded include", async () => {
-    const prisma = makeMockPrisma()
+  it("GET returns a PDF buffer when demande is found", async () => {
+    const { requireAuth } = await import("@/lib/auth-utils")
+    const { demandeService } = await import("@/lib/demande-service")
+    const { pdfAdapter } = await import("@/components/pdf/travel-request-pdf-adapter")
+    const { prisma } = await import("@/lib/prisma")
 
-    const demande = (await prisma.demandeDeplacement.findUnique({ where: { id: "d-1" }, include: { employe: true, vehicule: true, assigneA: true } } as any)) as any
+    ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
+    ;(demandeService.queries.findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockDemande)
 
-    expect(demande).toBeDefined()
-    expect(demande?.employe.nom).toBe("Dupont")
-    expect(demande?.vehicule?.nom).toBe("Peugeot 3008")
-    expect(demande?.assigneA?.nom).toBe("Bernard")
-  })
+    const { GET } = await import("./route")
+    const response = await GET(mockRequest("d-1"), { params: Promise.resolve({ id: "d-1" }) })
 
-  it("mock Prisma document.create stores the PDF record", async () => {
-    const prisma = makeMockPrisma()
-
-    const doc = await prisma.document.create({
+    expect(response.status).toBe(200)
+    expect(response.headers.get("Content-Type")).toBe("application/pdf")
+    expect(demandeService.queries.findById).toHaveBeenCalledWith("d-1")
+    expect(prisma.document.create).toHaveBeenCalledWith({
       data: {
         demandeId: "d-1",
         type: "PDF",
         chemin: "demande-DD-2025-0001.pdf",
       },
     })
+    expect(pdfAdapter.render).toHaveBeenCalledOnce()
+  })
 
-    expect(doc).toBeDefined()
-    expect(prisma.document.create).toHaveBeenCalledTimes(1)
+  it("GET returns 401 when auth fails", async () => {
+    const { requireAuth } = await import("@/lib/auth-utils")
+    ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: false,
+      response: new Response(JSON.stringify({ error: "Non autorisé" }), { status: 401 }),
+    })
+
+    const { GET } = await import("./route")
+    const response = await GET(mockRequest("d-1"), { params: Promise.resolve({ id: "d-1" }) })
+
+    expect(response.status).toBe(401)
+  })
+
+  it("GET returns 404 when demande is soft-deleted or missing", async () => {
+    const { requireAuth } = await import("@/lib/auth-utils")
+    const { demandeService } = await import("@/lib/demande-service")
+
+    ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
+    ;(demandeService.queries.findById as ReturnType<typeof vi.fn>).mockRejectedValue(new DemandeNotFoundError())
+
+    const { GET } = await import("./route")
+    const response = await GET(mockRequest("d-1"), { params: Promise.resolve({ id: "d-1" }) })
+
+    expect(response.status).toBe(404)
+    const body = await response.json()
+    expect(body.error).toBe("Demande introuvable")
   })
 })

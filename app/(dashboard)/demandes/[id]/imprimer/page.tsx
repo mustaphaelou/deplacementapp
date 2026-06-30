@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
-import { prisma } from "@/lib/prisma"
+import { demandeService, DemandeNotFoundError } from "@/lib/demande-service"
 import { formatCurrency, formatDate, TRANSPORT_LABELS, STATUT_LABELS } from "@/lib/constants"
 import { parseMotif, type DemandeWithRelations } from "@/lib/demande-types"
 
@@ -13,16 +13,13 @@ export default async function ImprimerPage({
   const session = await auth()
   if (!session?.user) redirect("/login")
 
-  const demande = await prisma.demandeDeplacement.findUnique({
-    where: { id },
-    include: {
-      employe: true,
-      vehicule: true,
-      assigneA: true,
-    },
-  }) as DemandeWithRelations | null
-
-  if (!demande) redirect("/demandes")
+  let demande: DemandeWithRelations
+  try {
+    demande = await demandeService.queries.findById(id)
+  } catch (e) {
+    if (e instanceof DemandeNotFoundError) redirect("/demandes")
+    throw e
+  }
 
   const motifs = parseMotif(demande.motif)
 

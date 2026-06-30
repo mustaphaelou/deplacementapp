@@ -81,12 +81,11 @@ describe("DemandeQueries", () => {
     expect(result.employe.prenom).toBe("Jean")
     expect(db.demandeDeplacement.findUnique).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: "dd-1" },
+        where: { id: "dd-1", deletedAt: null },
         include: expect.objectContaining({
           employe: expect.any(Object),
           assigneA: expect.any(Object),
           vehicule: expect.any(Object),
-          documents: expect.any(Object),
         }),
       })
     )

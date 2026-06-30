@@ -1,8 +1,11 @@
 import type { Prisma, PrismaClient, StatutDemande } from "@prisma/client"
 import type { DashboardDemandeSummary } from "./dashboard"
+import type { DemandeWithRelations } from "./demande-types"
 import { DemandeNotFoundError } from "./errors"
 
 export interface DemandeQueriesPort {
+  findById(id: string): Promise<DemandeWithRelations>
+  findMany(role: string, userId: string, params: DemandeQueryParams): Promise<{ demandes: DashboardDemandeSummary[]; total: number }>
   findByEmployeeId(userId: string, limit?: number): Promise<DashboardDemandeSummary[]>
   findByStatuts(statuts: StatutDemande[], opts?: { limit?: number; includeEmployee?: boolean; orderBy?: any }): Promise<DashboardDemandeSummary[]>
   countByStatut(statut: StatutDemande, userId?: string): Promise<number>
@@ -36,12 +39,11 @@ export class DemandeQueries {
 
   async findById(id: string) {
     const demande = await this.db.demandeDeplacement.findUnique({
-      where: { id },
+      where: { id, deletedAt: null },
       include: {
         employe: { select: { id: true, prenom: true, nom: true, email: true, poste: true } },
         assigneA: { select: { id: true, prenom: true, nom: true } },
         vehicule: { select: { nom: true, immatriculation: true } },
-        documents: { select: { id: true, type: true, creeLe: true } },
       },
     })
     if (!demande || demande.deletedAt) throw new DemandeNotFoundError()
