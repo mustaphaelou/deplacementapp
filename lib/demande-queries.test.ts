@@ -110,6 +110,81 @@ describe("DemandeQueries", () => {
     await expect(queries.findById("dd-1")).rejects.toThrow(DemandeNotFoundError)
   })
 
+  it("findById omits documents from the fetched data when no include is provided", async () => {
+    const db = mockDb()
+    db.demandeDeplacement.findUnique.mockResolvedValue({
+      id: "dd-1",
+      statut: "SOUMISE",
+      employeId: "u-1",
+      employe: { id: "u-1", prenom: "Jean", nom: "Dupont", email: "jean@test.com", poste: "Dev" },
+      assigneA: null,
+      vehicule: null,
+      deletedAt: null,
+      creeLe: new Date(),
+    })
+
+    const queries = new DemandeQueries(db as unknown as PrismaClient)
+    await queries.findById("dd-1")
+
+    const call = db.demandeDeplacement.findUnique.mock.calls[0]?.[0] as any
+    expect(call.include.documents).toBeUndefined()
+  })
+
+  it("findById returns documents when include.documents is true", async () => {
+    const db = mockDb()
+    const docs = [
+      { id: "doc-1", demandeId: "dd-1", type: "PDF", chemin: "doc-1.pdf", creeLe: new Date("2025-05-01") },
+      { id: "doc-2", demandeId: "dd-1", type: "INVOICE", chemin: "doc-2.pdf", creeLe: new Date("2025-05-02") },
+    ]
+    db.demandeDeplacement.findUnique.mockResolvedValue({
+      id: "dd-1",
+      statut: "SOUMISE",
+      employeId: "u-1",
+      employe: { id: "u-1", prenom: "Jean", nom: "Dupont", email: "jean@test.com", poste: "Dev" },
+      assigneA: null,
+      vehicule: null,
+      documents: docs,
+      deletedAt: null,
+      creeLe: new Date(),
+    })
+
+    const queries = new DemandeQueries(db as unknown as PrismaClient)
+    const result = await queries.findById("dd-1", { include: { documents: true } })
+
+    expect(result.documents).toEqual(docs)
+    expect(db.demandeDeplacement.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "dd-1", deletedAt: null },
+        include: expect.objectContaining({
+          employe: expect.any(Object),
+          assigneA: expect.any(Object),
+          vehicule: expect.any(Object),
+          documents: true,
+        }),
+      })
+    )
+  })
+
+  it("findById omits documents when include.documents is false", async () => {
+    const db = mockDb()
+    db.demandeDeplacement.findUnique.mockResolvedValue({
+      id: "dd-1",
+      statut: "SOUMISE",
+      employeId: "u-1",
+      employe: { id: "u-1", prenom: "Jean", nom: "Dupont", email: "jean@test.com", poste: "Dev" },
+      assigneA: null,
+      vehicule: null,
+      deletedAt: null,
+      creeLe: new Date(),
+    })
+
+    const queries = new DemandeQueries(db as unknown as PrismaClient)
+    await queries.findById("dd-1", { include: { documents: false } })
+
+    const call = db.demandeDeplacement.findUnique.mock.calls[0]?.[0] as any
+    expect(call.include.documents).toBeUndefined()
+  })
+
   // ── findMany ───────────────────────────────────────────────────────────
 
   it("findMany returns paginated demandes with total count", async () => {

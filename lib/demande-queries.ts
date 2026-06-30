@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient, StatutDemande } from "@prisma/client"
+import type { Document, Prisma, PrismaClient, StatutDemande } from "@prisma/client"
 import type { DashboardDemandeSummary } from "./dashboard"
 import type { DemandeWithRelations } from "./demande-types"
 import { DemandeNotFoundError } from "./errors"
@@ -15,8 +15,24 @@ export interface DemandeExportRow {
   employe: { prenom: string; nom: string } | null
 }
 
+type DemandeFindByIdIncludableRelations = {
+  documents: Document
+}
+
+export type DemandeFindByIdInclude = {
+  [K in keyof DemandeFindByIdIncludableRelations]?: boolean
+}
+
+export type DemandeFindByIdExtra<I extends DemandeFindByIdInclude> = {
+  [K in keyof I & keyof DemandeFindByIdIncludableRelations as I[K] extends true ? K : never]: DemandeFindByIdIncludableRelations[K][]
+}
+
 export interface DemandeQueriesPort {
   findById(id: string): Promise<DemandeWithRelations>
+  findById<I extends DemandeFindByIdInclude>(
+    id: string,
+    options: { include: I }
+  ): Promise<DemandeWithRelations & DemandeFindByIdExtra<I>>
   findMany(role: string, userId: string, params: DemandeQueryParams): Promise<{ demandes: DashboardDemandeSummary[]; total: number }>
   findByEmployeeId(userId: string, limit?: number): Promise<DashboardDemandeSummary[]>
   findByStatuts(statuts: StatutDemande[], opts?: { limit?: number; includeEmployee?: boolean; orderBy?: any }): Promise<DashboardDemandeSummary[]>
@@ -50,13 +66,22 @@ export class DemandeQueries {
     }
   }
 
-  async findById(id: string) {
+  findById(id: string): Promise<DemandeWithRelations>
+  findById<I extends DemandeFindByIdInclude>(
+    id: string,
+    options: { include: I }
+  ): Promise<DemandeWithRelations & DemandeFindByIdExtra<I>>
+  async findById(
+    id: string,
+    options?: { include?: DemandeFindByIdInclude }
+  ): Promise<DemandeWithRelations> {
     const demande = await this.db.demandeDeplacement.findUnique({
       where: { id, deletedAt: null },
       include: {
         employe: { select: { id: true, prenom: true, nom: true, email: true, poste: true } },
         assigneA: { select: { id: true, prenom: true, nom: true } },
         vehicule: { select: { nom: true, immatriculation: true } },
+        ...(options?.include?.documents ? { documents: true } : {}),
       },
     })
     if (!demande || demande.deletedAt) throw new DemandeNotFoundError()
