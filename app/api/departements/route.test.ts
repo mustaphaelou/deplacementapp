@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { DepartementNotFoundError } from "@/lib/errors"
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
@@ -14,7 +13,7 @@ describe("departements route", () => {
     vi.resetAllMocks()
   })
 
-  it("GET returns the list of departements", async () => {
+  it("GET returns the list of Departement", async () => {
     const { prisma } = await import("@/lib/prisma")
     ;(prisma.departement.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
       { id: "d-1", nom: "IT" },
@@ -28,17 +27,17 @@ describe("departements route", () => {
     expect(body).toEqual([{ id: "d-1", nom: "IT" }])
   })
 
-  it("GET returns 404 when the Prisma query throws DepartementNotFoundError", async () => {
+  it("GET returns 500 when the Prisma query throws an unknown error", async () => {
     const { prisma } = await import("@/lib/prisma")
     ;(prisma.departement.findMany as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new DepartementNotFoundError()
+      new Error("DB down")
     )
 
     const { GET } = await import("./route")
     const response = await GET()
 
-    expect(response.status).toBe(404)
+    expect(response.status).toBe(500)
     const body = await response.json()
-    expect(body.error).toBe("Departement introuvable")
+    expect(body.error).toBe("Erreur interne")
   })
 })

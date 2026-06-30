@@ -73,14 +73,6 @@ export class VehiculeNotFoundError extends Error {
   }
 }
 
-export class DepartementNotFoundError extends Error {
-  status = 404
-  constructor() {
-    super("Departement introuvable")
-    this.name = "DepartementNotFoundError"
-  }
-}
-
 export function handleServiceError(e: unknown): NextResponse {
   if (e && typeof (e as Record<string, unknown>).status === "number") {
     const err = e as Error & { status: number }
