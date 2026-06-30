@@ -12,7 +12,7 @@ export async function GET(
   if (!auth.ok) return auth.response
 
   try {
-    const demande = await demandeService.findById(id)
+    const demande = await demandeService.queries.findById(id)
     return NextResponse.json({ demande })
   } catch (e) {
     return handleServiceError(e)

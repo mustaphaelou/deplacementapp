@@ -16,7 +16,7 @@ export default async function DemandeDetailPage({
 
   let demande: any
   try {
-    demande = await demandeService.findById(id)
+    demande = await demandeService.queries.findById(id)
   } catch (e) {
     if (e instanceof DemandeNotFoundError) notFound()
     throw e

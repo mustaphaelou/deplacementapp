@@ -138,32 +138,4 @@ describe("DemandeDeplacementService (facade smoke)", () => {
       comment: undefined,
     })
   })
-
-  it("delegates query methods to queries property", async () => {
-    const db = mockDb()
-    const events = mockEventBus()
-
-    const svc = new DemandeDeplacementService(db, events)
-
-    svc.queries.findById = vi.fn().mockResolvedValue({ id: "dd-1" })
-    svc.queries.findMany = vi.fn().mockResolvedValue({ demandes: [], total: 0 })
-    svc.queries.findByEmployeeId = vi.fn().mockResolvedValue([])
-    svc.queries.findByStatuts = vi.fn().mockResolvedValue([])
-    svc.queries.countByStatut = vi.fn().mockResolvedValue(3)
-    svc.queries.aggregateBudget = vi.fn().mockResolvedValue(1000)
-
-    await expect(svc.findById("dd-1")).resolves.toEqual({ id: "dd-1" })
-    await expect(svc.findMany("MANAGER", "u-1", { page: 1, limit: 10 })).resolves.toEqual({ demandes: [], total: 0 })
-    await expect(svc.findByEmployeeId("u-1")).resolves.toEqual([])
-    await expect(svc.findByStatuts(["SOUMISE"])).resolves.toEqual([])
-    await expect(svc.countByStatut("SOUMISE")).resolves.toBe(3)
-    await expect(svc.aggregateBudget(["APPROUVEE"])).resolves.toBe(1000)
-
-    expect(svc.queries.findById).toHaveBeenCalledWith("dd-1")
-    expect(svc.queries.findMany).toHaveBeenCalledWith("MANAGER", "u-1", { page: 1, limit: 10 })
-    expect(svc.queries.findByEmployeeId).toHaveBeenCalledWith("u-1", undefined)
-    expect(svc.queries.findByStatuts).toHaveBeenCalledWith(["SOUMISE"], undefined)
-    expect(svc.queries.countByStatut).toHaveBeenCalledWith("SOUMISE", undefined)
-    expect(svc.queries.aggregateBudget).toHaveBeenCalledWith(["APPROUVEE"])
-  })
 })

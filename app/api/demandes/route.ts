@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   if (!query.ok) return query.response
 
   try {
-    const result = await demandeService.findMany(auth.user.role, auth.user.id, query.data)
+    const result = await demandeService.queries.findMany(auth.user.role, auth.user.id, query.data)
     return NextResponse.json(result)
   } catch (e) {
     return handleServiceError(e)

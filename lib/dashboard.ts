@@ -76,14 +76,14 @@ export async function getDashboardPayload(
   role: Role,
   svc?: DemandeQueriesPort
 ): Promise<DashboardPayload> {
-  const service = svc ?? demandeService
+  const queries = svc ?? demandeService.queries
   switch (role) {
     case "EMPLOYEE": {
       const [demandes, brouillon, soumises, approuvees] = await Promise.all([
-        service.findByEmployeeId(userId, 5),
-        service.countByStatut("BROUILLON", userId),
-        service.countByStatut("SOUMISE", userId),
-        service.countByStatut("APPROUVEE", userId),
+        queries.findByEmployeeId(userId, 5),
+        queries.countByStatut("BROUILLON", userId),
+        queries.countByStatut("SOUMISE", userId),
+        queries.countByStatut("APPROUVEE", userId),
       ])
       const total = brouillon + soumises + approuvees
 
@@ -115,8 +115,8 @@ export async function getDashboardPayload(
     }
     case "MANAGER": {
       const [demandes, enAttente] = await Promise.all([
-        service.findByStatuts(["SOUMISE"], { includeEmployee: true, limit: 10, orderBy: { soumiseLe: "desc" } }),
-        service.countByStatut("SOUMISE"),
+        queries.findByStatuts(["SOUMISE"], { includeEmployee: true, limit: 10, orderBy: { soumiseLe: "desc" } }),
+        queries.countByStatut("SOUMISE"),
       ])
 
       return {
@@ -143,8 +143,8 @@ export async function getDashboardPayload(
     }
     case "FINANCE_ADMIN": {
       const [demandes, enAttente] = await Promise.all([
-        service.findByStatuts(["APPROUVEE_MANAGER"], { includeEmployee: true, limit: 10, orderBy: { approuveeManagerLe: "desc" } }),
-        service.countByStatut("APPROUVEE_MANAGER"),
+        queries.findByStatuts(["APPROUVEE_MANAGER"], { includeEmployee: true, limit: 10, orderBy: { approuveeManagerLe: "desc" } }),
+        queries.countByStatut("APPROUVEE_MANAGER"),
       ])
 
       return {
@@ -171,9 +171,9 @@ export async function getDashboardPayload(
     }
     case "GENERAL_DIRECTION": {
       const [demandes, enAttente, budgetTotal] = await Promise.all([
-        service.findByStatuts(["APPROUVEE_FINANCE"], { includeEmployee: true, limit: 10, orderBy: { approuveeFinanceLe: "desc" } }),
-        service.countByStatut("APPROUVEE_FINANCE"),
-        service.aggregateBudget(["APPROUVEE", "APPROUVEE_FINANCE", "APPROUVEE_MANAGER"]),
+        queries.findByStatuts(["APPROUVEE_FINANCE"], { includeEmployee: true, limit: 10, orderBy: { approuveeFinanceLe: "desc" } }),
+        queries.countByStatut("APPROUVEE_FINANCE"),
+        queries.aggregateBudget(["APPROUVEE", "APPROUVEE_FINANCE", "APPROUVEE_MANAGER"]),
       ])
 
       return {

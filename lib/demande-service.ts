@@ -1,10 +1,10 @@
-import type { PrismaClient, StatutDemande } from "@prisma/client"
+import type { PrismaClient } from "@prisma/client"
 import { prisma } from "./prisma"
 import { demandeEventBus } from "./demande-event-bus"
 import type { DemandeEventBus } from "./demande-event-bus"
-import type { CreateDemandeData } from "./demande-utils"
 import { DemandeQueries } from "./demande-queries"
 import type { DemandeQueryParams } from "./demande-queries"
+import type { CreateDemandeData } from "./demande-utils"
 import { DemandeFactory } from "./demande-factory"
 import { DemandeWorkflow } from "./demande-workflow"
 
@@ -43,30 +43,6 @@ export class DemandeDeplacementService {
           comment: "comment" in params ? params.comment : undefined,
         })
     }
-  }
-
-  findById(id: string) {
-    return this.queries.findById(id)
-  }
-
-  findMany(role: string, userId: string, params: DemandeQueryParams) {
-    return this.queries.findMany(role, userId, params)
-  }
-
-  findByEmployeeId(userId: string, limit?: number) {
-    return this.queries.findByEmployeeId(userId, limit)
-  }
-
-  findByStatuts(statuts: StatutDemande[], opts?: { limit?: number; includeEmployee?: boolean; orderBy?: any }) {
-    return this.queries.findByStatuts(statuts, opts)
-  }
-
-  countByStatut(statut: StatutDemande, userId?: string) {
-    return this.queries.countByStatut(statut, userId)
-  }
-
-  aggregateBudget(statuts: StatutDemande[]) {
-    return this.queries.aggregateBudget(statuts)
   }
 }
 
