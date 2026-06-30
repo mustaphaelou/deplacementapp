@@ -33,6 +33,18 @@ describe("requireRole", () => {
       expect(body.error).toBe("Accès refusé")
     }
   })
+
+  it("returns ok:false with 403 when the role casing differs", async () => {
+    const result = requireRole(makeUser("finance_admin"), "FINANCE_ADMIN")
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.response).toBeInstanceOf(NextResponse)
+      expect(result.response.status).toBe(403)
+      const body = await result.response.json()
+      expect(body.error).toBe("Accès refusé")
+    }
+  })
 })
 
 describe("requireAnyRole", () => {
@@ -40,6 +52,36 @@ describe("requireAnyRole", () => {
     const result = requireAnyRole(makeUser("GENERAL_DIRECTION"), ["FINANCE_ADMIN", "GENERAL_DIRECTION"])
 
     expect(result.ok).toBe(true)
+  })
+
+  it("returns ok:true when the user matches a single required role", () => {
+    const result = requireAnyRole(makeUser("FINANCE_ADMIN"), ["FINANCE_ADMIN"])
+
+    expect(result.ok).toBe(true)
+  })
+
+  it("returns ok:false with 403 when the user does not match a single required role", async () => {
+    const result = requireAnyRole(makeUser("EMPLOYEE"), ["FINANCE_ADMIN"])
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.response).toBeInstanceOf(NextResponse)
+      expect(result.response.status).toBe(403)
+      const body = await result.response.json()
+      expect(body.error).toBe("Accès refusé")
+    }
+  })
+
+  it("returns ok:false with 403 when the required roles list is empty", async () => {
+    const result = requireAnyRole(makeUser("FINANCE_ADMIN"), [])
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.response).toBeInstanceOf(NextResponse)
+      expect(result.response.status).toBe(403)
+      const body = await result.response.json()
+      expect(body.error).toBe("Accès refusé")
+    }
   })
 
   it("returns ok:false with 403 when the user has none of the required roles", async () => {
