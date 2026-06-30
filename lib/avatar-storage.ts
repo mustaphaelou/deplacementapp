@@ -1,17 +1,11 @@
 import { writeFile, unlink } from "fs/promises"
 import { join } from "path"
+import { AvatarError } from "./errors"
+
+export { AvatarError } from "./errors"
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"]
 const MAX_SIZE = 2 * 1024 * 1024
-
-export class AvatarError extends Error {
-  status: number
-  constructor(message: string, status: number) {
-    super(message)
-    this.name = "AvatarError"
-    this.status = status
-  }
-}
 
 export interface AvatarStorage {
   save(dataUri: string, userId: string): Promise<string>

@@ -40,6 +40,31 @@ export class MotDePasseIncorrectError extends Error {
   }
 }
 
+export class EmailChangeRequiresPasswordError extends Error {
+  status = 400
+  constructor() {
+    super("Mot de passe requis pour modifier l'email")
+    this.name = "EmailChangeRequiresPasswordError"
+  }
+}
+
+export class NoProfileUpdateDataError extends Error {
+  status = 400
+  constructor() {
+    super("Aucune donnée à modifier")
+    this.name = "NoProfileUpdateDataError"
+  }
+}
+
+export class AvatarError extends Error {
+  status: number
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = "AvatarError"
+    this.status = status
+  }
+}
+
 export class VehiculeNotFoundError extends Error {
   status = 404
   constructor() {

@@ -3,9 +3,12 @@ import {
   UtilisateurService,
   UtilisateurNotFoundError,
   MotDePasseIncorrectError,
+  EmailChangeRequiresPasswordError,
+  NoProfileUpdateDataError,
 } from "./utilisateur-service"
 import type { AuditBus } from "./audit-bus"
-import type { PrismaClient, Utilisateur } from "@prisma/client"
+import type { Prisma, PrismaClient, Utilisateur } from "@prisma/client"
+import type { AvatarStorage } from "./avatar-storage"
 
 vi.mock("bcryptjs", () => ({
   hash: vi.fn().mockResolvedValue("$hashed$"),
@@ -37,6 +40,19 @@ function mockDb(): MockedDb {
       create: vi.fn(),
       update: vi.fn(),
     },
+  }
+}
+
+function mockAvatarStorage(): AvatarStorage & {
+  save: ReturnType<typeof vi.fn>
+  delete: ReturnType<typeof vi.fn>
+} {
+  return {
+    save: vi.fn().mockResolvedValue("/uploads/avatars/new.png"),
+    delete: vi.fn().mockResolvedValue(undefined),
+  } as unknown as AvatarStorage & {
+    save: ReturnType<typeof vi.fn>
+    delete: ReturnType<typeof vi.fn>
   }
 }
 
@@ -231,16 +247,15 @@ describe("UtilisateurService", () => {
     it("updates profile fields and audits", async () => {
       const db = mockDb()
       const audit = mockAudit()
+      db.utilisateur.findUnique.mockResolvedValue(makeUser())
       db.utilisateur.update.mockResolvedValue(
-        makeUser({ telephone: "0612345678", poste: "Lead", avatarUrl: "/uploads/avatars/avatar.png" })
+        makeUser({ telephone: "0612345678", poste: "Lead" })
       )
 
       const svc = new UtilisateurService(db as unknown as PrismaClient, audit)
       const result = await svc.updateProfile("u-1", {
         telephone: "0612345678",
         poste: "Lead",
-        email: "new@test.com",
-        avatarUrl: "/uploads/avatars/avatar.png",
       })
 
       expect(result.telephone).toBe("0612345678")
@@ -256,8 +271,9 @@ describe("UtilisateurService", () => {
 
     it("allows setting telephone to null", async () => {
       const db = mockDb()
-      db.utilisateur.update.mockImplementation((args: any) =>
-        Promise.resolve(makeUser(args.data))
+      db.utilisateur.findUnique.mockResolvedValue(makeUser())
+      db.utilisateur.update.mockImplementation((args: { data: Prisma.UtilisateurUpdateInput }) =>
+        Promise.resolve(makeUser(args.data as Partial<Utilisateur>))
       )
 
       const svc = new UtilisateurService(db as unknown as PrismaClient, mockAudit())
@@ -266,14 +282,103 @@ describe("UtilisateurService", () => {
       expect(result.telephone).toBeNull()
     })
 
-    it("throws UtilisateurNotFoundError on missing user", async () => {
+    it("throws UtilisateurNotFoundError when user is missing", async () => {
       const db = mockDb()
-      db.utilisateur.update.mockRejectedValue(new Error("Record to update not found"))
+      db.utilisateur.findUnique.mockResolvedValue(null)
 
       const svc = new UtilisateurService(db as unknown as PrismaClient, mockAudit())
       await expect(
         svc.updateProfile("u-missing", { poste: "Ghost" })
       ).rejects.toThrow(UtilisateurNotFoundError)
+    })
+
+    it("verifies current password and updates email when correct", async () => {
+      const db = mockDb()
+      const audit = mockAudit()
+      db.utilisateur.findUnique.mockResolvedValue(makeUser({ motDePasse: "$oldhash$" }))
+      ;(compare as ReturnType<typeof vi.fn>).mockResolvedValue(true)
+      db.utilisateur.update.mockResolvedValue(makeUser({ email: "new@test.com" }))
+
+      const svc = new UtilisateurService(db as unknown as PrismaClient, audit)
+      const result = await svc.updateProfile("u-1", {
+        email: "new@test.com",
+        currentPassword: "oldpass",
+      })
+
+      expect(compare).toHaveBeenCalledWith("oldpass", "$oldhash$")
+      expect(result.email).toBe("new@test.com")
+    })
+
+    it("throws MotDePasseIncorrectError when current password is wrong", async () => {
+      const db = mockDb()
+      db.utilisateur.findUnique.mockResolvedValue(makeUser({ motDePasse: "$oldhash$" }))
+      ;(compare as ReturnType<typeof vi.fn>).mockResolvedValue(false)
+
+      const svc = new UtilisateurService(db as unknown as PrismaClient, mockAudit())
+      await expect(
+        svc.updateProfile("u-1", { email: "new@test.com", currentPassword: "wrongpass" })
+      ).rejects.toThrow(MotDePasseIncorrectError)
+    })
+
+    it("throws EmailChangeRequiresPasswordError when email is provided without password", async () => {
+      const db = mockDb()
+      db.utilisateur.findUnique.mockResolvedValue(makeUser())
+
+      const svc = new UtilisateurService(db as unknown as PrismaClient, mockAudit())
+      await expect(
+        svc.updateProfile("u-1", { email: "new@test.com" })
+      ).rejects.toThrow(EmailChangeRequiresPasswordError)
+    })
+
+    it("deletes old avatar and saves new avatar when avatarData is provided", async () => {
+      const db = mockDb()
+      const audit = mockAudit()
+      const avatarStorage = mockAvatarStorage()
+      db.utilisateur.findUnique.mockResolvedValue(
+        makeUser({ avatarUrl: "/uploads/avatars/old.png" })
+      )
+      db.utilisateur.update.mockResolvedValue(makeUser({ avatarUrl: "/uploads/avatars/new.png" }))
+
+      const svc = new UtilisateurService(
+        db as unknown as PrismaClient,
+        audit,
+        avatarStorage
+      )
+      const result = await svc.updateProfile("u-1", { avatarData: "data:image/png;base64,abc" })
+
+      expect(avatarStorage.delete).toHaveBeenCalledWith("/uploads/avatars/old.png")
+      expect(avatarStorage.save).toHaveBeenCalledWith("data:image/png;base64,abc", "u-1")
+      expect(result.avatarUrl).toBe("/uploads/avatars/new.png")
+    })
+
+    it("removes avatar when avatarData is empty", async () => {
+      const db = mockDb()
+      const avatarStorage = mockAvatarStorage()
+      db.utilisateur.findUnique.mockResolvedValue(
+        makeUser({ avatarUrl: "/uploads/avatars/old.png" })
+      )
+      db.utilisateur.update.mockImplementation((args: { data: Prisma.UtilisateurUpdateInput }) =>
+        Promise.resolve(makeUser(args.data as Partial<Utilisateur>))
+      )
+
+      const svc = new UtilisateurService(
+        db as unknown as PrismaClient,
+        mockAudit(),
+        avatarStorage
+      )
+      const result = await svc.updateProfile("u-1", { avatarData: "" })
+
+      expect(avatarStorage.delete).toHaveBeenCalledWith("/uploads/avatars/old.png")
+      expect(avatarStorage.save).not.toHaveBeenCalled()
+      expect(result.avatarUrl).toBeNull()
+    })
+
+    it("throws NoProfileUpdateDataError when no fields are provided", async () => {
+      const db = mockDb()
+      db.utilisateur.findUnique.mockResolvedValue(makeUser())
+
+      const svc = new UtilisateurService(db as unknown as PrismaClient, mockAudit())
+      await expect(svc.updateProfile("u-1", {})).rejects.toThrow(NoProfileUpdateDataError)
     })
   })
 })

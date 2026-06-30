@@ -1,21 +1,32 @@
-import type { Prisma, PrismaClient, Utilisateur, Role } from "@prisma/client"
+import { Prisma, type PrismaClient, type Utilisateur, type Role } from "@prisma/client"
 import { hash, compare } from "bcryptjs"
 import { prisma } from "./prisma"
 import { auditBus } from "./audit-bus"
 import {
+  avatarStorage as defaultAvatarStorage,
+  type AvatarStorage,
+} from "./avatar-storage"
+import {
   UtilisateurNotFoundError,
   MotDePasseIncorrectError,
+  EmailChangeRequiresPasswordError,
+  NoProfileUpdateDataError,
+  AvatarError,
 } from "./errors"
 
 export {
   UtilisateurNotFoundError,
   MotDePasseIncorrectError,
+  EmailChangeRequiresPasswordError,
+  NoProfileUpdateDataError,
+  AvatarError,
 }
 
 export class UtilisateurService {
   constructor(
     private db: PrismaClient,
-    private audit = auditBus
+    private audit = auditBus,
+    private avatarStorage: AvatarStorage = defaultAvatarStorage
   ) {}
 
   async list(): Promise<Utilisateur[]> {
@@ -134,12 +145,55 @@ export class UtilisateurService {
 
   async updateProfile(
     userId: string,
-    data: Prisma.UtilisateurUpdateInput
-  ): Promise<Utilisateur> {
+    data: {
+      telephone?: string | null
+      poste?: string
+      email?: string
+      currentPassword?: string
+      avatarData?: string
+    }
+  ): Promise<Pick<Utilisateur, "id" | "email" | "telephone" | "poste" | "avatarUrl">> {
+    const user = await this.db.utilisateur.findUnique({
+      where: { id: userId },
+    })
+    if (!user) throw new UtilisateurNotFoundError()
+
+    const updateData: Prisma.UtilisateurUpdateInput = {}
+
+    if (data.telephone !== undefined) {
+      updateData.telephone = data.telephone || null
+    }
+
+    if (data.poste !== undefined) {
+      updateData.poste = data.poste
+    }
+
+    if (data.email !== undefined) {
+      if (!data.currentPassword) {
+        throw new EmailChangeRequiresPasswordError()
+      }
+      const isValid = await compare(data.currentPassword, user.motDePasse)
+      if (!isValid) throw new MotDePasseIncorrectError()
+      updateData.email = data.email
+    }
+
+    if (data.avatarData !== undefined) {
+      if (user.avatarUrl) {
+        await this.avatarStorage.delete(user.avatarUrl)
+      }
+      updateData.avatarUrl = data.avatarData
+        ? await this.avatarStorage.save(data.avatarData, userId)
+        : null
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      throw new NoProfileUpdateDataError()
+    }
+
     try {
       const updated = await this.db.utilisateur.update({
         where: { id: userId },
-        data,
+        data: updateData,
         select: { id: true, email: true, telephone: true, poste: true, avatarUrl: true },
       })
 
@@ -148,12 +202,15 @@ export class UtilisateurService {
         action: "MODIFICATION_PROFIL",
         entite: "Utilisateur",
         entiteId: updated.id,
-        details: { champs: Object.keys(data) },
+        details: { champs: Object.keys(updateData) },
       })
 
-      return updated as Utilisateur
-    } catch {
-      throw new UtilisateurNotFoundError()
+      return updated
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025") {
+        throw new UtilisateurNotFoundError()
+      }
+      throw e
     }
   }
 }
