@@ -73,6 +73,15 @@ export class VehiculeNotFoundError extends Error {
   }
 }
 
+export class PdfRenderError extends Error {
+  status: number
+  constructor(message = "Erreur de génération PDF", status = 500) {
+    super(message)
+    this.name = "PdfRenderError"
+    this.status = status
+  }
+}
+
 export function handleServiceError(e: unknown): NextResponse {
   if (e && typeof (e as Record<string, unknown>).status === "number") {
     const err = e as Error & { status: number }

@@ -14,14 +14,8 @@ export async function GET(
   const auth = await requireAuth()
   if (!auth.ok) return auth.response
 
-  let demande
   try {
-    demande = await demandeService.queries.findById(id)
-  } catch (e) {
-    return handleServiceError(e)
-  }
-
-  try {
+    const demande = await demandeService.queries.findById(id)
     const data = toPdfRenderData(demande)
     const buffer = await pdfAdapter.render(data)
 
@@ -39,7 +33,7 @@ export async function GET(
         "Content-Disposition": `attachment; filename="demande-${demande.numero}.pdf"`,
       },
     })
-  } catch {
-    return NextResponse.json({ error: "Erreur de génération PDF" }, { status: 500 })
+  } catch (e) {
+    return handleServiceError(e)
   }
 }

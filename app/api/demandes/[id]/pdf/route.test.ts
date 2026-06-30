@@ -3,6 +3,7 @@ import { NextRequest } from "next/server"
 import type { DemandeDeplacement, Utilisateur, VehiculeEntreprise, Role, StatutDemande, TypeTransport } from "@prisma/client"
 import { TravelRequestPdfAdapter } from "@/components/pdf/travel-request-pdf-adapter"
 import { DemandeNotFoundError } from "@/lib/demande-service"
+import { PdfRenderError } from "@/lib/errors"
 
 vi.mock("@/lib/auth-utils", () => ({
   requireAuth: vi.fn(),
@@ -212,5 +213,24 @@ describe("PDF route integration", () => {
     expect(response.status).toBe(404)
     const body = await response.json()
     expect(body.error).toBe("Demande introuvable")
+  })
+
+  it("GET returns 500 when PDF render fails and does not create a document", async () => {
+    const { requireAuth } = await import("@/lib/auth-utils")
+    const { demandeService } = await import("@/lib/demande-service")
+    const { pdfAdapter } = await import("@/components/pdf/travel-request-pdf-adapter")
+    const { prisma } = await import("@/lib/prisma")
+
+    ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
+    ;(demandeService.queries.findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockDemande)
+    ;(pdfAdapter.render as ReturnType<typeof vi.fn>).mockRejectedValue(new PdfRenderError())
+
+    const { GET } = await import("./route")
+    const response = await GET(mockRequest("d-1"), { params: Promise.resolve({ id: "d-1" }) })
+
+    expect(response.status).toBe(500)
+    const body = await response.json()
+    expect(body.error).toBe("Erreur de génération PDF")
+    expect(prisma.document.create).not.toHaveBeenCalled()
   })
 })
