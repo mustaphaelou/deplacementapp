@@ -31,6 +31,7 @@ describe("Dashboard Module - getDashboardPayload", () => {
         return Promise.resolve(0)
       }),
       aggregateBudget: vi.fn(),
+      findAllForExport: vi.fn(),
     }
 
     const payload = await getDashboardPayload("user-emp", "EMPLOYEE", fakeService)
@@ -68,6 +69,7 @@ describe("Dashboard Module - getDashboardPayload", () => {
       findByStatuts: vi.fn().mockResolvedValue(mockDemandes as DashboardDemandeSummary[]),
       countByStatut: vi.fn().mockResolvedValue(1),
       aggregateBudget: vi.fn(),
+      findAllForExport: vi.fn(),
     }
 
     const payload = await getDashboardPayload("user-mgr", "MANAGER", fakeService)
@@ -106,6 +108,7 @@ describe("Dashboard Module - getDashboardPayload", () => {
       findByStatuts: vi.fn().mockResolvedValue(mockDemandes as DashboardDemandeSummary[]),
       countByStatut: vi.fn().mockResolvedValue(1),
       aggregateBudget: vi.fn(),
+      findAllForExport: vi.fn(),
     }
 
     const payload = await getDashboardPayload("user-fin", "FINANCE_ADMIN", fakeService)
@@ -142,6 +145,7 @@ describe("Dashboard Module - getDashboardPayload", () => {
       findByStatuts: vi.fn().mockResolvedValue(mockDemandes as DashboardDemandeSummary[]),
       countByStatut: vi.fn().mockResolvedValue(1),
       aggregateBudget: vi.fn().mockResolvedValue(15000),
+      findAllForExport: vi.fn(),
     }
 
     const payload = await getDashboardPayload("user-dir", "GENERAL_DIRECTION", fakeService)

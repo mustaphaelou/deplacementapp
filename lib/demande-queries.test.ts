@@ -216,6 +216,62 @@ describe("DemandeQueries", () => {
     expect(call.include).toEqual({ employe: { select: { prenom: true, nom: true } } })
   })
 
+  // ── findAllForExport ─────────────────────────────────────────────────
+
+  it("findAllForExport returns all non-deleted demandes with CSV fields", async () => {
+    const db = mockDb()
+    const mockDemandes = [
+      {
+        numero: "DD-2025-0001",
+        destination: "Casablanca",
+        dateDepart: new Date("2025-06-01"),
+        dateRetour: new Date("2025-06-05"),
+        typeTransport: "AVION",
+        totalEstime: 380,
+        statut: "APPROUVEE",
+        creeLe: new Date("2025-05-24"),
+        employe: { prenom: "Jean", nom: "Dupont" },
+      },
+    ]
+    db.demandeDeplacement.findMany.mockResolvedValue(mockDemandes)
+
+    const queries = new DemandeQueries(db as unknown as PrismaClient)
+    const result = await queries.findAllForExport()
+
+    expect(result).toHaveLength(1)
+    expect(result[0]).toEqual({
+      numero: "DD-2025-0001",
+      destination: "Casablanca",
+      dateDepart: new Date("2025-06-01"),
+      dateRetour: new Date("2025-06-05"),
+      typeTransport: "AVION",
+      totalEstime: 380,
+      statut: "APPROUVEE",
+      creeLe: new Date("2025-05-24"),
+      employe: { prenom: "Jean", nom: "Dupont" },
+    })
+
+    const call = db.demandeDeplacement.findMany.mock.calls[0]?.[0] as any
+    expect(call.where).toEqual({ deletedAt: null })
+    expect(call.orderBy).toEqual({ creeLe: "desc" })
+    expect(call.include).toEqual({ employe: { select: { prenom: true, nom: true } } })
+  })
+
+  it("findAllForExport converts totalEstime to number and nulls when absent", async () => {
+    const db = mockDb()
+    db.demandeDeplacement.findMany.mockResolvedValue([
+      { numero: "DD-1", totalEstime: 450, typeTransport: "BUS", statut: "SOUMISE", creeLe: new Date(), employe: { prenom: "A", nom: "B" } },
+      { numero: "DD-2", totalEstime: null, typeTransport: "TRAIN", statut: "BROUILLON", creeLe: new Date(), employe: null },
+    ])
+
+    const queries = new DemandeQueries(db as unknown as PrismaClient)
+    const result = await queries.findAllForExport()
+
+    expect(result[0].totalEstime).toBe(450)
+    expect(result[1].totalEstime).toBeNull()
+    expect(result[1].employe).toBeNull()
+  })
+
   // ── countByStatut ────────────────────────────────────────────────────
 
   it("countByStatut counts demandes by status", async () => {

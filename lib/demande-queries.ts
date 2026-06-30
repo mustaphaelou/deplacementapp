@@ -3,6 +3,18 @@ import type { DashboardDemandeSummary } from "./dashboard"
 import type { DemandeWithRelations } from "./demande-types"
 import { DemandeNotFoundError } from "./errors"
 
+export interface DemandeExportRow {
+  numero: string
+  destination: string
+  dateDepart: Date
+  dateRetour: Date
+  typeTransport: string
+  totalEstime: number | null
+  statut: string
+  creeLe: Date
+  employe: { prenom: string; nom: string } | null
+}
+
 export interface DemandeQueriesPort {
   findById(id: string): Promise<DemandeWithRelations>
   findMany(role: string, userId: string, params: DemandeQueryParams): Promise<{ demandes: DashboardDemandeSummary[]; total: number }>
@@ -10,6 +22,7 @@ export interface DemandeQueriesPort {
   findByStatuts(statuts: StatutDemande[], opts?: { limit?: number; includeEmployee?: boolean; orderBy?: any }): Promise<DashboardDemandeSummary[]>
   countByStatut(statut: StatutDemande, userId?: string): Promise<number>
   aggregateBudget(statuts: StatutDemande[]): Promise<number>
+  findAllForExport(): Promise<DemandeExportRow[]>
 }
 
 export interface DemandeQueryParams {
@@ -133,5 +146,26 @@ export class DemandeQueries {
       where: { statut: { in: statuts }, deletedAt: null },
     })
     return Number(result._sum?.totalEstime ?? 0)
+  }
+
+  async findAllForExport(): Promise<DemandeExportRow[]> {
+    const demandes = await this.db.demandeDeplacement.findMany({
+      where: { deletedAt: null },
+      orderBy: { creeLe: "desc" },
+      include: {
+        employe: { select: { prenom: true, nom: true } },
+      },
+    })
+    return demandes.map((d) => ({
+      numero: d.numero,
+      destination: d.destination,
+      dateDepart: d.dateDepart,
+      dateRetour: d.dateRetour,
+      typeTransport: d.typeTransport,
+      totalEstime: d.totalEstime != null ? Number(d.totalEstime) : null,
+      statut: d.statut,
+      creeLe: d.creeLe,
+      employe: d.employe ? { prenom: d.employe.prenom, nom: d.employe.nom } : null,
+    }))
   }
 }

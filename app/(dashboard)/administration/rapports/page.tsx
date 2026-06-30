@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
-import { prisma } from "@/lib/prisma"
+import { demandeService } from "@/lib/demande-service"
+import type { StatutDemande } from "@prisma/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { formatCurrency, STATUT_LABELS } from "@/lib/constants"
 import Link from "next/link"
@@ -12,24 +13,26 @@ export default async function RapportsPage() {
     redirect("/")
   }
 
-  const totalDemandes = await prisma.demandeDeplacement.count({ where: { deletedAt: null } })
-  const totalApprouvees = await prisma.demandeDeplacement.count({ where: { statut: "APPROUVEE", deletedAt: null } })
-  const totalRejetees = await prisma.demandeDeplacement.count({
-    where: { statut: { in: ["REJETEE_MANAGER", "REJETEE_FINANCE", "REJETEE_DIRECTION"] }, deletedAt: null },
-  })
-
-  const totalBudget = await prisma.demandeDeplacement.aggregate({
-    _sum: { totalEstime: true },
-    where: { statut: { in: ["APPROUVEE", "APPROUVEE_FINANCE", "APPROUVEE_MANAGER"] }, deletedAt: null },
-  })
-
   const statutCounts = await Promise.all(
     Object.keys(STATUT_LABELS).map(async (statut) => ({
       statut,
       label: STATUT_LABELS[statut],
-      count: await prisma.demandeDeplacement.count({ where: { statut: statut as any, deletedAt: null } }),
+      count: await demandeService.queries.countByStatut(statut as StatutDemande),
     }))
   )
+
+  const totalDemandes = statutCounts.reduce((sum, s) => sum + s.count, 0)
+  const totalApprouvees = statutCounts.find((s) => s.statut === "APPROUVEE")?.count ?? 0
+  const totalRejetees = (["REJETEE_MANAGER", "REJETEE_FINANCE", "REJETEE_DIRECTION"] as const).reduce(
+    (sum, statut) => sum + (statutCounts.find((s) => s.statut === statut)?.count ?? 0),
+    0
+  )
+
+  const totalBudget = await demandeService.queries.aggregateBudget([
+    "APPROUVEE",
+    "APPROUVEE_FINANCE",
+    "APPROUVEE_MANAGER",
+  ])
 
   return (
     <div className="space-y-6">
@@ -42,7 +45,7 @@ export default async function RapportsPage() {
         <StatCard icon={FileText} label="Total demandes" value={totalDemandes} />
         <StatCard icon={CheckCircle} label="Approuvées" value={totalApprouvees} />
         <StatCard icon={XCircle} label="Rejetées" value={totalRejetees} />
-        <StatCard icon={TrendingUp} label="Budget total" value={formatCurrency(Number(totalBudget._sum.totalEstime ?? 0))} />
+        <StatCard icon={TrendingUp} label="Budget total" value={formatCurrency(totalBudget)} />
       </div>
 
       <Card>
