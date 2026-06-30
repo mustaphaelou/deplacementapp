@@ -1,23 +1,18 @@
 import { NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth-utils"
+import { requireAnyRole } from "@/lib/authorization"
 import { utilisateurService } from "@/lib/utilisateur-service"
 import { utilisateurSchema, updateUtilisateurSchema } from "@/lib/schemas"
 import { withValidation } from "@/lib/api-utils"
+import type { Role } from "@/lib/roles"
 
-const ADMIN_ROLES = ["FINANCE_ADMIN", "GENERAL_DIRECTION"]
-
-function checkAdminRole(role: string): NextResponse | null {
-  if (!ADMIN_ROLES.includes(role)) {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
-  }
-  return null
-}
+const ADMIN_ROLES: Role[] = ["FINANCE_ADMIN", "GENERAL_DIRECTION"]
 
 export async function GET() {
   const auth = await requireAuth()
   if (!auth.ok) return auth.response
-  const forbidden = checkAdminRole(auth.user.role)
-  if (forbidden) return forbidden
+  const authorized = requireAnyRole(auth.user, ADMIN_ROLES)
+  if (!authorized.ok) return authorized.response
 
   const users = await utilisateurService.list()
 
@@ -25,8 +20,8 @@ export async function GET() {
 }
 
 export const POST = withValidation(utilisateurSchema, async (_req, auth, data) => {
-  const forbidden = checkAdminRole(auth.role)
-  if (forbidden) return forbidden
+  const authorized = requireAnyRole(auth, ADMIN_ROLES)
+  if (!authorized.ok) return authorized.response
 
   const user = await utilisateurService.create(
     { ...data, motDePasse: data.motDePasse || "password123" },
@@ -37,8 +32,8 @@ export const POST = withValidation(utilisateurSchema, async (_req, auth, data) =
 })
 
 export const PUT = withValidation(updateUtilisateurSchema, async (_req, auth, data) => {
-  const forbidden = checkAdminRole(auth.role)
-  if (forbidden) return forbidden
+  const authorized = requireAnyRole(auth, ADMIN_ROLES)
+  if (!authorized.ok) return authorized.response
 
   const { id, ...updateData } = data
   const user = await utilisateurService.update(

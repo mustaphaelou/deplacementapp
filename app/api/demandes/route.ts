@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth-utils"
+import { requireRole } from "@/lib/authorization"
 import { demandeService } from "@/lib/demande-service"
 import { demandeSchema, demandeQuerySchema } from "@/lib/schemas"
 import { withValidation, validateQueryParams } from "@/lib/api-utils"
@@ -21,9 +22,8 @@ export async function GET(req: NextRequest) {
 }
 
 export const POST = withValidation(demandeSchema, async (req, auth, data, _params) => {
-  if (auth.role !== "EMPLOYEE") {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
-  }
+  const authorized = requireRole(auth, "EMPLOYEE")
+  if (!authorized.ok) return authorized.response
 
   const { action, ...serviceData } = data
   const serviceAction = action === "submit" ? "submit" as const : "create" as const

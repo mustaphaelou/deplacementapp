@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth-utils"
+import { requireAnyRole } from "@/lib/authorization"
 import { prisma } from "@/lib/prisma"
+import type { Role } from "@/lib/roles"
+
+const EXPORT_ROLES: Role[] = ["FINANCE_ADMIN", "GENERAL_DIRECTION"]
 
 export async function GET() {
   const auth = await requireAuth()
   if (!auth.ok) return auth.response
-  if (auth.user.role !== "FINANCE_ADMIN" && auth.user.role !== "GENERAL_DIRECTION") {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
-  }
+  const authorized = requireAnyRole(auth.user, EXPORT_ROLES)
+  if (!authorized.ok) return authorized.response
 
   const demandes = await prisma.demandeDeplacement.findMany({
     where: { deletedAt: null },

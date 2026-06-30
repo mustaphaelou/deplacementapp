@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth-utils"
+import { requireRole } from "@/lib/authorization"
 import { vehiculeService } from "@/lib/vehicule-service"
 import { vehiculeSchema, updateVehiculeSchema, deleteVehiculeSchema } from "@/lib/schemas"
 import { withValidation } from "@/lib/api-utils"
@@ -14,9 +15,8 @@ export async function GET() {
 }
 
 export const POST = withValidation(vehiculeSchema, async (_req, auth, data) => {
-  if (auth.role !== "FINANCE_ADMIN") {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
-  }
+  const authorized = requireRole(auth, "FINANCE_ADMIN")
+  if (!authorized.ok) return authorized.response
 
   const vehicule = await vehiculeService.create(data, auth.id)
 
@@ -24,9 +24,8 @@ export const POST = withValidation(vehiculeSchema, async (_req, auth, data) => {
 })
 
 export const PUT = withValidation(updateVehiculeSchema, async (_req, auth, data) => {
-  if (auth.role !== "FINANCE_ADMIN") {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
-  }
+  const authorized = requireRole(auth, "FINANCE_ADMIN")
+  if (!authorized.ok) return authorized.response
 
   const { id, ...updateData } = data
   const vehicule = await vehiculeService.update(id, updateData, auth.id)
@@ -35,9 +34,8 @@ export const PUT = withValidation(updateVehiculeSchema, async (_req, auth, data)
 })
 
 export const DELETE = withValidation(deleteVehiculeSchema, async (_req, auth, data) => {
-  if (auth.role !== "FINANCE_ADMIN") {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
-  }
+  const authorized = requireRole(auth, "FINANCE_ADMIN")
+  if (!authorized.ok) return authorized.response
 
   await vehiculeService.delete(data.id, auth.id)
 

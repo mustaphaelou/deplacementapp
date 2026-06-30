@@ -1,22 +1,5 @@
 export type Role = "EMPLOYEE" | "MANAGER" | "FINANCE_ADMIN" | "GENERAL_DIRECTION"
 
-export const ROLE_HIERARCHY: Record<Role, number> = {
-  EMPLOYEE: 0,
-  MANAGER: 1,
-  FINANCE_ADMIN: 2,
-  GENERAL_DIRECTION: 3,
-}
-
-export function hasRole(userRole: string, requiredRole: Role): boolean {
-  const userLevel = ROLE_HIERARCHY[userRole as Role] ?? -1
-  const requiredLevel = ROLE_HIERARCHY[requiredRole]
-  return userLevel >= requiredLevel
-}
-
-export function isRole(userRole: string, role: Role): boolean {
-  return userRole === role
-}
-
 export const ROLE_LABELS: Record<string, string> = {
   EMPLOYEE: "Employé",
   MANAGER: "Responsable",
