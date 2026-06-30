@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth-utils"
-import { prisma } from "@/lib/prisma"
+import { notificationQueries } from "@/lib/notification-queries"
+import { handleServiceError } from "@/lib/errors"
 
 export async function GET() {
   const auth = await requireAuth()
   if (!auth.ok) return auth.response
 
-  const notifications = await prisma.notification.findMany({
-    where: { utilisateurId: auth.user.id },
-    orderBy: { creeLe: "desc" },
-    take: 50,
-  })
-
-  return NextResponse.json({ notifications })
+  try {
+    const notifications = await notificationQueries.listForUser(auth.user.id)
+    return NextResponse.json({ notifications })
+  } catch (e) {
+    return handleServiceError(e)
+  }
 }
