@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
 import { NextResponse } from "next/server"
-import { requireRole, requireAnyRole } from "./authorization"
+import { requireRole, requireAnyRole, hasAnyRole } from "./authorization"
 import type { AuthUser } from "./auth-utils"
 
 function makeUser(role: string): AuthUser {
@@ -94,5 +94,27 @@ describe("requireAnyRole", () => {
       const body = await result.response.json()
       expect(body.error).toBe("Accès refusé")
     }
+  })
+})
+
+describe("hasAnyRole", () => {
+  it("returns true when the role matches a single allowed role", () => {
+    expect(hasAnyRole("FINANCE_ADMIN", ["FINANCE_ADMIN"])).toBe(true)
+  })
+
+  it("returns true when the role matches one of multiple allowed roles", () => {
+    expect(hasAnyRole("GENERAL_DIRECTION", ["FINANCE_ADMIN", "GENERAL_DIRECTION"])).toBe(true)
+  })
+
+  it("returns false when the role does not match any allowed role", () => {
+    expect(hasAnyRole("EMPLOYEE", ["FINANCE_ADMIN", "GENERAL_DIRECTION"])).toBe(false)
+  })
+
+  it("returns false when the allowed list is empty", () => {
+    expect(hasAnyRole("FINANCE_ADMIN", [])).toBe(false)
+  })
+
+  it("returns false when the role casing differs from the allowed roles", () => {
+    expect(hasAnyRole("finance_admin", ["FINANCE_ADMIN", "GENERAL_DIRECTION"])).toBe(false)
   })
 })

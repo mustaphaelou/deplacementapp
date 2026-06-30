@@ -4,12 +4,14 @@ import { demandeService } from "@/lib/demande-service"
 import type { StatutDemande } from "@prisma/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { formatCurrency, STATUT_LABELS } from "@/lib/constants"
+import { hasAnyRole } from "@/lib/authorization"
 import Link from "next/link"
 import { FileText, Users, TrendingUp, CheckCircle, XCircle, Clock } from "lucide-react"
 
 export default async function RapportsPage() {
   const session = await auth()
-  if (!session?.user || (session.user.role !== "FINANCE_ADMIN" && session.user.role !== "GENERAL_DIRECTION")) {
+  const userRole = session?.user?.role
+  if (!hasAnyRole(userRole ?? "", ["FINANCE_ADMIN", "GENERAL_DIRECTION"])) {
     redirect("/")
   }
 

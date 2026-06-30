@@ -6,8 +6,12 @@ export type AuthorizationResult =
   | { ok: true }
   | { ok: false; response: NextResponse }
 
+export function hasAnyRole(role: string, allowed: readonly Role[]): boolean {
+  return allowed.includes(role as Role)
+}
+
 export function requireRole(user: AuthUser, requiredRole: Role): AuthorizationResult {
-  if (user.role !== requiredRole) {
+  if (!hasAnyRole(user.role, [requiredRole])) {
     return {
       ok: false,
       response: NextResponse.json({ error: "Accès refusé" }, { status: 403 }),
@@ -17,7 +21,7 @@ export function requireRole(user: AuthUser, requiredRole: Role): AuthorizationRe
 }
 
 export function requireAnyRole(user: AuthUser, requiredRoles: readonly Role[]): AuthorizationResult {
-  if (!requiredRoles.includes(user.role as Role)) {
+  if (!hasAnyRole(user.role, requiredRoles)) {
     return {
       ok: false,
       response: NextResponse.json({ error: "Accès refusé" }, { status: 403 }),
