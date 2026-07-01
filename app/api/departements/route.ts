@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
+import { departementQueries } from "@/lib/departement-queries"
 import { handleServiceError } from "@/lib/errors"
 
 export async function GET() {
   try {
-    const departements = await prisma.departement.findMany({
-      orderBy: { nom: "asc" },
-    })
+    const departements = await departementQueries.findAll()
     return NextResponse.json(departements)
   } catch (e) {
     return handleServiceError(e)

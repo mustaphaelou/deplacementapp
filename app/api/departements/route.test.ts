@@ -1,10 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
-vi.mock("@/lib/prisma", () => ({
-  prisma: {
-    departement: {
-      findMany: vi.fn(),
-    },
+vi.mock("@/lib/departement-queries", () => ({
+  departementQueries: {
+    findAll: vi.fn(),
   },
 }))
 
@@ -14,8 +12,8 @@ describe("departements route", () => {
   })
 
   it("GET returns the list of Departement", async () => {
-    const { prisma } = await import("@/lib/prisma")
-    ;(prisma.departement.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
+    const { departementQueries } = await import("@/lib/departement-queries")
+    ;(departementQueries.findAll as ReturnType<typeof vi.fn>).mockResolvedValue([
       { id: "d-1", nom: "IT" },
     ])
 
@@ -27,9 +25,9 @@ describe("departements route", () => {
     expect(body).toEqual([{ id: "d-1", nom: "IT" }])
   })
 
-  it("GET returns 500 when the Prisma query throws an unknown error", async () => {
-    const { prisma } = await import("@/lib/prisma")
-    ;(prisma.departement.findMany as ReturnType<typeof vi.fn>).mockRejectedValue(
+  it("GET returns 500 when the queries throw an unknown error", async () => {
+    const { departementQueries } = await import("@/lib/departement-queries")
+    ;(departementQueries.findAll as ReturnType<typeof vi.fn>).mockRejectedValue(
       new Error("DB down")
     )
 
