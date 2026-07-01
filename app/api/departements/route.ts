@@ -4,7 +4,7 @@ import { handleServiceError } from "@/lib/errors"
 
 export async function GET() {
   try {
-    const departements = await departementQueries.findAll()
+    const departements = await departementQueries.listAll()
     return NextResponse.json(departements)
   } catch (e) {
     return handleServiceError(e)

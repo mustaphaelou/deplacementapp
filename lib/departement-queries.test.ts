@@ -23,14 +23,14 @@ const fakeDepartements = [
 ]
 
 describe("DepartementQueries", () => {
-  // ── findAll ──────────────────────────────────────────────────────────
+  // ── listAll ──────────────────────────────────────────────────────────
 
-  it("findAll returns all departements ordered by nom asc", async () => {
+  it("listAll returns all departements ordered by nom asc", async () => {
     const db = mockDb()
     db.departement.findMany.mockResolvedValue(fakeDepartements)
 
     const queries = new DepartementQueries(db as unknown as PrismaClient)
-    const result = await queries.findAll()
+    const result = await queries.listAll()
 
     expect(result).toEqual(fakeDepartements)
     expect(db.departement.findMany).toHaveBeenCalledWith({
@@ -38,12 +38,12 @@ describe("DepartementQueries", () => {
     })
   })
 
-  it("findAll returns an empty array when no departements exist", async () => {
+  it("listAll returns an empty array when no departements exist", async () => {
     const db = mockDb()
     db.departement.findMany.mockResolvedValue([])
 
     const queries = new DepartementQueries(db as unknown as PrismaClient)
-    const result = await queries.findAll()
+    const result = await queries.listAll()
 
     expect(result).toEqual([])
   })

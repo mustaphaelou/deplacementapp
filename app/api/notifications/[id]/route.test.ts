@@ -16,14 +16,6 @@ vi.mock("@/lib/notification-bus", async (importOriginal) => {
   }
 })
 
-vi.mock("@/lib/prisma", () => ({
-  prisma: {
-    notification: {
-      findUnique: vi.fn(),
-    },
-  },
-}))
-
 function mockAuth(userId = "u-1") {
   return {
     ok: true,

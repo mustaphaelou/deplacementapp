@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 
 vi.mock("@/lib/departement-queries", () => ({
   departementQueries: {
-    findAll: vi.fn(),
+    listAll: vi.fn(),
   },
 }))
 
@@ -13,7 +13,7 @@ describe("departements route", () => {
 
   it("GET returns the list of Departement", async () => {
     const { departementQueries } = await import("@/lib/departement-queries")
-    ;(departementQueries.findAll as ReturnType<typeof vi.fn>).mockResolvedValue([
+    ;(departementQueries.listAll as ReturnType<typeof vi.fn>).mockResolvedValue([
       { id: "d-1", nom: "IT" },
     ])
 
@@ -27,7 +27,7 @@ describe("departements route", () => {
 
   it("GET returns 500 when the queries throw an unknown error", async () => {
     const { departementQueries } = await import("@/lib/departement-queries")
-    ;(departementQueries.findAll as ReturnType<typeof vi.fn>).mockRejectedValue(
+    ;(departementQueries.listAll as ReturnType<typeof vi.fn>).mockRejectedValue(
       new Error("DB down")
     )
 
