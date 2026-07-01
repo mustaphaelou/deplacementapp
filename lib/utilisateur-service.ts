@@ -14,6 +14,21 @@ import {
   AvatarError,
 } from "./errors"
 
+export interface ProfileResult {
+  id: string
+  email: string
+  nom: string
+  prenom: string
+  poste: string
+  telephone: string | null
+  avatarUrl: string | null
+  role: Role
+  departement: { nom: string }
+  dateEmbauche: Date | null
+  creeLe: Date
+  _count: { demandes: number }
+}
+
 export {
   UtilisateurNotFoundError,
   MotDePasseIncorrectError,
@@ -34,6 +49,18 @@ export class UtilisateurService {
       include: { departement: { select: { id: true, nom: true } } },
       orderBy: { nom: "asc" },
     })
+  }
+
+  async findProfile(userId: string): Promise<ProfileResult> {
+    const user = await this.db.utilisateur.findUnique({
+      where: { id: userId },
+      include: {
+        departement: { select: { nom: true } },
+        _count: { select: { demandes: true } },
+      },
+    })
+    if (!user) throw new UtilisateurNotFoundError()
+    return user as unknown as ProfileResult
   }
 
   async create(

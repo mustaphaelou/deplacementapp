@@ -243,6 +243,48 @@ describe("UtilisateurService", () => {
     })
   })
 
+  describe("findProfile", () => {
+    it("returns the user profile with departement and demande count", async () => {
+      const db = mockDb()
+      db.utilisateur.findUnique.mockResolvedValue({
+        ...makeUser(),
+        departement: { nom: "IT" },
+        _count: { demandes: 5 },
+      })
+
+      const svc = new UtilisateurService(db as unknown as PrismaClient, mockAudit())
+      const result = await svc.findProfile("u-1")
+
+      expect(result.id).toBe("u-1")
+      expect(result.email).toBe("jean@example.com")
+      expect(result.nom).toBe("Dupont")
+      expect(result.prenom).toBe("Jean")
+      expect(result.poste).toBe("Dev")
+      expect(result.telephone).toBeNull()
+      expect(result.avatarUrl).toBeNull()
+      expect(result.role).toBe("EMPLOYEE")
+      expect(result.departement).toEqual({ nom: "IT" })
+      expect(result.dateEmbauche).toBeNull()
+      expect(result.creeLe).toEqual(new Date("2025-01-01"))
+      expect(result._count).toEqual({ demandes: 5 })
+      expect(db.utilisateur.findUnique).toHaveBeenCalledWith({
+        where: { id: "u-1" },
+        include: {
+          departement: { select: { nom: true } },
+          _count: { select: { demandes: true } },
+        },
+      })
+    })
+
+    it("throws UtilisateurNotFoundError when user is not found", async () => {
+      const db = mockDb()
+      db.utilisateur.findUnique.mockResolvedValue(null)
+
+      const svc = new UtilisateurService(db as unknown as PrismaClient, mockAudit())
+      await expect(svc.findProfile("u-missing")).rejects.toThrow(UtilisateurNotFoundError)
+    })
+  })
+
   describe("updateProfile", () => {
     it("updates profile fields and audits", async () => {
       const db = mockDb()
