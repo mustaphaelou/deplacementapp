@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth-utils"
-import { prisma } from "@/lib/prisma"
 import { demandeService } from "@/lib/demande-service"
 import { toPdfRenderData } from "@/lib/pdf-mapper"
 import { pdfAdapter } from "@/components/pdf/travel-request-pdf-adapter"
@@ -19,12 +18,9 @@ export async function GET(
     const data = toPdfRenderData(demande)
     const buffer = await pdfAdapter.render(data)
 
-    await prisma.document.create({
-      data: {
-        demandeId: id,
-        type: "PDF",
-        chemin: `demande-${demande.numero}.pdf`,
-      },
+    await demandeService.recordDocument(id, {
+      type: "PDF",
+      chemin: `demande-${demande.numero}.pdf`,
     })
 
     return new NextResponse(new Uint8Array(buffer), {

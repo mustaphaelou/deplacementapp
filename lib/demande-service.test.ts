@@ -138,4 +138,20 @@ describe("DemandeDeplacementService (facade smoke)", () => {
       comment: undefined,
     })
   })
+
+  it("recordDocument creates a Document row via the db seam", async () => {
+    const db = { document: { create: vi.fn().mockResolvedValue({ id: "doc-1" }) } } as unknown as PrismaClient
+    const events = mockEventBus()
+    const svc = new DemandeDeplacementService(db, events)
+
+    await svc.recordDocument("dd-1", { type: "PDF", chemin: "demande-DD-2025-0001.pdf" })
+
+    expect(db.document.create).toHaveBeenCalledWith({
+      data: {
+        demandeId: "dd-1",
+        type: "PDF",
+        chemin: "demande-DD-2025-0001.pdf",
+      },
+    })
+  })
 })

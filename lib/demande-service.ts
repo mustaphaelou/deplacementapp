@@ -17,11 +17,13 @@ export class DemandeDeplacementService {
   queries: DemandeQueries
   factory: DemandeFactory
   workflow: DemandeWorkflow
+  private db: PrismaClient
 
   constructor(
     db: PrismaClient,
     events: DemandeEventBus = demandeEventBus
   ) {
+    this.db = db
     this.queries = new DemandeQueries(db)
     this.factory = new DemandeFactory(db, events)
     this.workflow = new DemandeWorkflow(db, events)
@@ -43,6 +45,19 @@ export class DemandeDeplacementService {
           comment: "comment" in params ? params.comment : undefined,
         })
     }
+  }
+
+  async recordDocument(
+    demandeId: string,
+    params: { type: string; chemin: string }
+  ) {
+    await this.db.document.create({
+      data: {
+        demandeId,
+        type: params.type,
+        chemin: params.chemin,
+      },
+    })
   }
 }
 

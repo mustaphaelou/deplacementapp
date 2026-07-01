@@ -17,6 +17,7 @@ vi.mock("@/lib/demande-service", async (importOriginal) => {
       queries: {
         findById: vi.fn(),
       },
+      recordDocument: vi.fn().mockResolvedValue(undefined),
     },
   }
 })
@@ -30,14 +31,6 @@ vi.mock("@/components/pdf/travel-request-pdf-adapter", async (importOriginal) =>
     },
   }
 })
-
-vi.mock("@/lib/prisma", () => ({
-  prisma: {
-    document: {
-      create: vi.fn().mockResolvedValue({ id: "doc-1" }),
-    },
-  },
-}))
 
 const mockDemande: DemandeDeplacement & { employe: Utilisateur; vehicule: VehiculeEntreprise | null; assigneA: Utilisateur | null } = {
   id: "d-1",
@@ -166,7 +159,6 @@ describe("PDF route integration", () => {
     const { requireAuth } = await import("@/lib/auth-utils")
     const { demandeService } = await import("@/lib/demande-service")
     const { pdfAdapter } = await import("@/components/pdf/travel-request-pdf-adapter")
-    const { prisma } = await import("@/lib/prisma")
 
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
     ;(demandeService.queries.findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockDemande)
@@ -177,12 +169,9 @@ describe("PDF route integration", () => {
     expect(response.status).toBe(200)
     expect(response.headers.get("Content-Type")).toBe("application/pdf")
     expect(demandeService.queries.findById).toHaveBeenCalledWith("d-1")
-    expect(prisma.document.create).toHaveBeenCalledWith({
-      data: {
-        demandeId: "d-1",
-        type: "PDF",
-        chemin: "demande-DD-2025-0001.pdf",
-      },
+    expect(demandeService.recordDocument).toHaveBeenCalledWith("d-1", {
+      type: "PDF",
+      chemin: "demande-DD-2025-0001.pdf",
     })
     expect(pdfAdapter.render).toHaveBeenCalledOnce()
   })
@@ -219,7 +208,6 @@ describe("PDF route integration", () => {
     const { requireAuth } = await import("@/lib/auth-utils")
     const { demandeService } = await import("@/lib/demande-service")
     const { pdfAdapter } = await import("@/components/pdf/travel-request-pdf-adapter")
-    const { prisma } = await import("@/lib/prisma")
 
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
     ;(demandeService.queries.findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockDemande)
@@ -231,6 +219,6 @@ describe("PDF route integration", () => {
     expect(response.status).toBe(500)
     const body = await response.json()
     expect(body.error).toBe("Erreur de génération PDF")
-    expect(prisma.document.create).not.toHaveBeenCalled()
+    expect(demandeService.recordDocument).not.toHaveBeenCalled()
   })
 })
