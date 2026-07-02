@@ -33,7 +33,8 @@ _Avoid_: City, town, locality
 ### Workflow
 
 **Etape (Stage)**:
-The current position of a DemandeDeplacement in the approval pipeline. One of: DRAFT, MANAGER_REVIEW, FINANCE_REVIEW, DIRECTION_REVIEW, FINAL.
+The current position of a DemandeDeplacement in the approval pipeline. One of: DRAFT, MANAGER_REVIEW, FINANCE_REVIEW, DIRECTION_REVIEW, FINAL. When a demande is rejected or withdrawn, the Etape stays where it was — the outcome is recorded in the Decision, not by moving to a new stage.
+_Avoid_: Step, phase, status
 
 **Decision**:
 The outcome recorded at a given Etape. One of: PENDING, APPROVED, REJECTED, WITHDRAWN.
@@ -44,6 +45,18 @@ _Avoid_: Using in new code; prefer Etape + Decision.
 
 **TypeTransport**:
 The mode of transport for a DemandeDeplacement. One of: VOITURE_PERSONNELLE, VOITURE_SOCIETE, BUS, AVION, TRAIN, AUTRE.
+
+**Motif**:
+The business reason for a DemandeDeplacement. Selected from a fixed list: mission client, formation, réunion, livraison, maintenance, démarche administrative, autre.
+_Avoid_: Purpose, reason, objet
+
+**EstimationFrais**:
+The projected cost breakdown of a DemandeDeplacement: transport, hébergement, repas, divers, and a computed total. Part of the DemandeDeplacement, not a separate entity.
+_Avoid_: Budget, cost estimate, expenses
+
+**Avance**:
+An optional cash advance the employee requests before the trip. Comprises a flag (`avanceRequise`) and an amount (`montantAvance`).
+_Avoid_: Prepayment, advance payment, deposit
 
 ### Supporting
 
@@ -62,7 +75,7 @@ An optional profile image uploaded by a Utilisateur. Stored as a file on the loc
 _Avoid_: Profile picture, profile photo, user image
 
 **Document**:
-A file attached to a DemandeDeplacement (e.g., invoice, receipt, PDF).
+A file attached to a DemandeDeplacement (e.g., invoice, receipt, PDF). The `type` field is free-text (typically a MIME type or descriptive label), not a fixed enum.
 
 ## Relationships
 
@@ -88,3 +101,4 @@ A file attached to a DemandeDeplacement (e.g., invoice, receipt, PDF).
 - "approved" was used to mean both a stage-level outcome (manager said yes) and a terminal outcome (whole pipeline complete). Resolved by splitting into **Etape** (where we are) and **Decision** (what happened there). Terminal approval is `Etape: FINAL, Decision: APPROVED`.
 - "status" / "statut" was used for both the single-field legacy representation and the conceptual state machine. Resolved: **StatutDemande** is the legacy computed field; **Etape** + **Decision** are the canonical model.
 - "retirée" (withdrawn) was treated as a separate StatutDemande value. Resolved: withdrawal is a **Decision** (`WITHDRAWN`) and a terminal outcome, not a stage.
+- `workflow.ts` includes `REJECTED` and `WITHDRAWN` as members of the `Etape` type and as terminal stages in the `PIPELINE` array. This contradicts the glossary: REJECTED and WITHDRAWN are **Decisions**, not stages. The Etape should stay at the stage where the decision happened. Code needs to be aligned.
