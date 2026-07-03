@@ -7,7 +7,7 @@ A travel request system where employees submit trip requests that flow through a
 ### Core domain
 
 **DemandeDeplacement**:
-A request submitted by an employee to travel for business purposes. Has a lifecycle through a multi-stage approval pipeline.
+A request submitted by an employee to travel for business purposes. Has a lifecycle through a multi-stage approval pipeline. Contains an intentional point-in-time snapshot of the employee's data (name, department, position) so historical requests are unaffected by future employee transfers or title changes.
 _Avoid_: Trip, request, travel form
 
 **Utilisateur**:
@@ -61,7 +61,7 @@ _Avoid_: Prepayment, advance payment, deposit
 ### Supporting
 
 **Notification**:
-A message sent to a Utilisateur about a DemandeDeplacement event, delivered via both an in-app alert and an email.
+A message sent to a Utilisateur about a DemandeDeplacement event, delivered via both an in-app alert and an email. MANAGER notifications are scoped to the employee's Departement; FINANCE_ADMIN and GENERAL_DIRECTION notifications are org-wide.
 
 **AccuseLecture (Read Receipt)**:
 A Notification automatically sent to the Manager of an Employee's Departement when that Employee marks a Notification related to a DemandeDeplacement as read (lu).
@@ -101,4 +101,3 @@ A file attached to a DemandeDeplacement (e.g., invoice, receipt, PDF). The `type
 - "approved" was used to mean both a stage-level outcome (manager said yes) and a terminal outcome (whole pipeline complete). Resolved by splitting into **Etape** (where we are) and **Decision** (what happened there). Terminal approval is `Etape: FINAL, Decision: APPROVED`.
 - "status" / "statut" was used for both the single-field legacy representation and the conceptual state machine. Resolved: **StatutDemande** is the legacy computed field; **Etape** + **Decision** are the canonical model.
 - "retirée" (withdrawn) was treated as a separate StatutDemande value. Resolved: withdrawal is a **Decision** (`WITHDRAWN`) and a terminal outcome, not a stage.
-- `workflow.ts` includes `REJECTED` and `WITHDRAWN` as members of the `Etape` type and as terminal stages in the `PIPELINE` array. This contradicts the glossary: REJECTED and WITHDRAWN are **Decisions**, not stages. The Etape should stay at the stage where the decision happened. Code needs to be aligned.

@@ -36,7 +36,7 @@ const makeDemande = (overrides?: Partial<{
   numero: string
   deletedAt: Date | null
   assigneAId: string | null
-  employe: { id: string; prenom: string; nom: string }
+  employe: { id: string; prenom: string; nom: string; departementId: string }
 }>) => ({
   id: "dd-1",
   statut: "SOUMISE" as StatutDemande,
@@ -44,7 +44,7 @@ const makeDemande = (overrides?: Partial<{
   numero: "DD-2025-0001",
   deletedAt: null,
   assigneAId: null,
-  employe: { id: "u-1", prenom: "Jean", nom: "Dupont" },
+  employe: { id: "u-1", prenom: "Jean", nom: "Dupont", departementId: "dept-hr" },
   ...overrides,
 })
 

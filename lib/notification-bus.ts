@@ -105,14 +105,20 @@ class PrismaNotificationAdapter implements NotificationAdapter {
 // ─── Recipient resolver: who should receive which event ──────────────────────
 
 // Map each event to the roles that should be notified.
-const EVENT_ROLE_MAP: Record<NotificationEventType, Role[]> = {
-  DEMANDE_SOUMISE: ["MANAGER"],
-  DEMANDE_APPROBATION_MANAGER: ["FINANCE_ADMIN"],
-  DEMANDE_APPROBATION_FINANCE: ["GENERAL_DIRECTION"],
+// `departmentScoped: true` restricts to the employee's department.
+interface RoleTarget {
+  role: Role
+  departmentScoped: boolean
+}
+
+const EVENT_ROLE_MAP: Record<NotificationEventType, RoleTarget[]> = {
+  DEMANDE_SOUMISE: [{ role: "MANAGER", departmentScoped: true }],
+  DEMANDE_APPROBATION_MANAGER: [{ role: "FINANCE_ADMIN", departmentScoped: false }],
+  DEMANDE_APPROBATION_FINANCE: [{ role: "GENERAL_DIRECTION", departmentScoped: false }],
   DEMANDE_APPROBATION_FINALE: [],
   DEMANDE_REJETEE: [],
   DEMANDE_RETIREE: [],
-  DEMANDE_NOTIFICATION_LUE: [], // routed via custom logic below
+  DEMANDE_NOTIFICATION_LUE: [{ role: "MANAGER", departmentScoped: true }],
 }
 
 // Events that go to the employee who owns the request.
@@ -124,11 +130,6 @@ const EMPLOYEE_EVENTS: NotificationEventType[] = [
 // Events that go to the assignee (for withdraw).
 const ASSIGNEE_EVENTS: NotificationEventType[] = ["DEMANDE_RETIREE"]
 
-// Events routed to the managers of the employee's department.
-const DEPARTMENT_MANAGER_EVENTS: NotificationEventType[] = [
-  "DEMANDE_NOTIFICATION_LUE",
-]
-
 async function resolveRecipients(
   event: NotificationEventType,
   payload: NotificationPayload,
@@ -136,11 +137,21 @@ async function resolveRecipients(
 ): Promise<string[]> {
   const ids = new Set<string>()
 
-  // 1. Role-based recipients
-  const roles = EVENT_ROLE_MAP[event]
-  if (roles && roles.length > 0) {
+  // 1. Role-based recipients (department-scoped or org-wide)
+  const roleTargets = EVENT_ROLE_MAP[event]
+  for (const target of roleTargets) {
+    const where: { role: Role; actif: boolean; departementId?: string } = {
+      role: target.role,
+      actif: true,
+    }
+    if (target.departmentScoped && payload.employe.departementId) {
+      where.departementId = payload.employe.departementId
+    }
+    // Skip department-scoped lookups when no departementId is available
+    if (target.departmentScoped && !payload.employe.departementId) continue
+
     const users = await db.utilisateur.findMany({
-      where: { role: { in: roles }, actif: true },
+      where,
       select: { id: true },
     })
     users.forEach((u) => ids.add(u.id))
@@ -154,19 +165,6 @@ async function resolveRecipients(
   // 3. Assignee (for withdraw)
   if (ASSIGNEE_EVENTS.includes(event) && payload.assigneAId) {
     ids.add(payload.assigneAId)
-  }
-
-  // 4. Department managers (for read receipts)
-  if (DEPARTMENT_MANAGER_EVENTS.includes(event) && payload.employe.departementId) {
-    const managers = await db.utilisateur.findMany({
-      where: {
-        role: "MANAGER",
-        departementId: payload.employe.departementId,
-        actif: true,
-      },
-      select: { id: true },
-    })
-    managers.forEach((u) => ids.add(u.id))
   }
 
   return Array.from(ids)

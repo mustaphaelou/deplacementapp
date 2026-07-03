@@ -56,12 +56,8 @@ describe("toLegacyStatus", () => {
     expect(toLegacyStatus("FINAL", "APPROVED")).toBe("APPROUVEE")
   })
 
-  it("maps WITHDRAWN with WITHDRAWN to RETIREE", () => {
-    expect(toLegacyStatus("WITHDRAWN", "WITHDRAWN")).toBe("RETIREE")
-  })
-
-  it("maps REJECTED with any decision to REJETEE_DIRECTION (fallback)", () => {
-    expect(toLegacyStatus("REJECTED", "REJECTED")).toBe("REJETEE_DIRECTION")
+  it("maps DRAFT with WITHDRAWN to RETIREE", () => {
+    expect(toLegacyStatus("DRAFT", "WITHDRAWN")).toBe("RETIREE")
   })
 })
 
@@ -86,20 +82,20 @@ describe("fromLegacyStatus", () => {
     expect(fromLegacyStatus("APPROUVEE")).toEqual({ etape: "FINAL", decision: "APPROVED" })
   })
 
-  it("maps REJETEE_MANAGER to REJECTED+REJECTED", () => {
-    expect(fromLegacyStatus("REJETEE_MANAGER")).toEqual({ etape: "REJECTED", decision: "REJECTED" })
+  it("maps REJETEE_MANAGER to MANAGER_REVIEW+REJECTED", () => {
+    expect(fromLegacyStatus("REJETEE_MANAGER")).toEqual({ etape: "MANAGER_REVIEW", decision: "REJECTED" })
   })
 
-  it("maps REJETEE_FINANCE to REJECTED+REJECTED", () => {
-    expect(fromLegacyStatus("REJETEE_FINANCE")).toEqual({ etape: "REJECTED", decision: "REJECTED" })
+  it("maps REJETEE_FINANCE to FINANCE_REVIEW+REJECTED", () => {
+    expect(fromLegacyStatus("REJETEE_FINANCE")).toEqual({ etape: "FINANCE_REVIEW", decision: "REJECTED" })
   })
 
-  it("maps REJETEE_DIRECTION to REJECTED+REJECTED", () => {
-    expect(fromLegacyStatus("REJETEE_DIRECTION")).toEqual({ etape: "REJECTED", decision: "REJECTED" })
+  it("maps REJETEE_DIRECTION to DIRECTION_REVIEW+REJECTED", () => {
+    expect(fromLegacyStatus("REJETEE_DIRECTION")).toEqual({ etape: "DIRECTION_REVIEW", decision: "REJECTED" })
   })
 
-  it("maps RETIREE to WITHDRAWN+WITHDRAWN", () => {
-    expect(fromLegacyStatus("RETIREE")).toEqual({ etape: "WITHDRAWN", decision: "WITHDRAWN" })
+  it("maps RETIREE to DRAFT+WITHDRAWN", () => {
+    expect(fromLegacyStatus("RETIREE")).toEqual({ etape: "DRAFT", decision: "WITHDRAWN" })
   })
 })
 
@@ -150,12 +146,12 @@ describe("canTransition", () => {
     expect(canTransition("GENERAL_DIRECTION", "FINAL", "approuver")).toBe(false)
   })
 
-  it("denies action on terminal REJECTED stage", () => {
-    expect(canTransition("MANAGER", "REJECTED", "rejeter")).toBe(false)
+  it("denies action on a stage with REJECTED decision", () => {
+    expect(canTransition("MANAGER", "MANAGER_REVIEW", "rejeter", "REJECTED")).toBe(false)
   })
 
-  it("denies action on terminal WITHDRAWN stage", () => {
-    expect(canTransition("EMPLOYEE", "WITHDRAWN", "submit")).toBe(false)
+  it("denies action on a stage with WITHDRAWN decision", () => {
+    expect(canTransition("EMPLOYEE", "DRAFT", "submit", "WITHDRAWN")).toBe(false)
   })
 })
 

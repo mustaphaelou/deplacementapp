@@ -67,6 +67,7 @@ export interface Actor {
 export type ExecuteParams =
   | { action: "create"; data: CreateDemandeData; actor: Actor }
   | { action: "submit"; data: CreateDemandeData; actor: Actor }
+  | { action: "submit_draft"; demandeId: string; actor: Actor }
   | { action: "approuver"; demandeId: string; actor: Actor; comment?: string }
   | { action: "rejeter"; demandeId: string; actor: Actor; comment: string }
   | { action: "retirer"; demandeId: string; actor: Actor }

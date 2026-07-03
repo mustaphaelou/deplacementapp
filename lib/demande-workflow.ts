@@ -18,7 +18,7 @@ export class DemandeWorkflow {
 
   async executeTransition(params: {
     demandeId: string
-    action: "approuver" | "rejeter" | "retirer"
+    action: "submit" | "approuver" | "rejeter" | "retirer"
     actor: Actor
     comment?: string
   }) {
@@ -26,21 +26,21 @@ export class DemandeWorkflow {
 
     const demande = await this.db.demandeDeplacement.findUnique({
       where: { id: demandeId },
-      include: { employe: { select: { id: true, prenom: true, nom: true } } },
+      include: { employe: { select: { id: true, prenom: true, nom: true, departementId: true } } },
     })
     if (!demande || demande.deletedAt) throw new DemandeNotFoundError()
 
-    const { etape } = fromLegacyStatus(demande.statut)
+    const { etape, decision } = fromLegacyStatus(demande.statut)
 
-    if (action === "retirer" && demande.employeId !== actor.id) {
-      throw new UnauthorizedActionError("Seul le proprietaire peut retirer la demande")
+    if ((action === "retirer" || action === "submit") && demande.employeId !== actor.id) {
+      throw new UnauthorizedActionError("Seul le proprietaire peut " + (action === "submit" ? "soumettre" : "retirer") + " la demande")
     }
 
-    if (!canTransition(actor.role, etape, action as WorkflowAction)) {
+    if (!canTransition(actor.role, etape, action as WorkflowAction, decision)) {
       throw new UnauthorizedActionError()
     }
 
-    const transitionParams: { comment?: string; assigneAId?: string } = {}
+    const transitionParams: { comment?: string; assigneAId?: string; decision?: string } = { decision }
     if (action === "approuver") {
       transitionParams.assigneAId = actor.id
       if (params.comment) transitionParams.comment = params.comment
@@ -67,6 +67,7 @@ export class DemandeWorkflow {
         id: demande.employe.id,
         prenom: demande.employe.prenom,
         nom: demande.employe.nom,
+        departementId: demande.employe.departementId,
       },
     }
 

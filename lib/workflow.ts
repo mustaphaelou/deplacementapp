@@ -9,26 +9,21 @@ export type Etape =
   | "FINANCE_REVIEW"
   | "DIRECTION_REVIEW"
   | "FINAL"
-  | "REJECTED"
-  | "WITHDRAWN"
 
 export type Decision = "PENDING" | "APPROVED" | "REJECTED" | "WITHDRAWN"
 
 export const PIPELINE: readonly StageDefinition[] = [
   { id: "DRAFT", roleCanAct: "EMPLOYEE", onApprove: "MANAGER_REVIEW" },
-  { id: "MANAGER_REVIEW", roleCanAct: "MANAGER", onApprove: "FINANCE_REVIEW", onReject: "REJECTED" },
-  { id: "FINANCE_REVIEW", roleCanAct: "FINANCE_ADMIN", onApprove: "DIRECTION_REVIEW", onReject: "REJECTED" },
-  { id: "DIRECTION_REVIEW", roleCanAct: "GENERAL_DIRECTION", onApprove: "FINAL", onReject: "REJECTED" },
+  { id: "MANAGER_REVIEW", roleCanAct: "MANAGER", onApprove: "FINANCE_REVIEW" },
+  { id: "FINANCE_REVIEW", roleCanAct: "FINANCE_ADMIN", onApprove: "DIRECTION_REVIEW" },
+  { id: "DIRECTION_REVIEW", roleCanAct: "GENERAL_DIRECTION", onApprove: "FINAL" },
   { id: "FINAL" },
-  { id: "REJECTED" },
-  { id: "WITHDRAWN" },
 ] as const
 
 export interface StageDefinition {
   id: Etape
   roleCanAct?: Role
   onApprove?: Etape
-  onReject?: Etape
 }
 
 // ─── Legacy compatibility ─────────────────────────────────────────────────────
@@ -53,10 +48,6 @@ export function toLegacyStatus(etape: Etape, decision: Decision): StatutDemande 
       return "APPROUVEE"
     case "FINAL":
       return "APPROUVEE"
-    case "REJECTED":
-      return "REJETEE_DIRECTION"
-    case "WITHDRAWN":
-      return "RETIREE"
     default:
       return "BROUILLON"
   }
@@ -75,13 +66,13 @@ export function fromLegacyStatus(statut: StatutDemande): { etape: Etape; decisio
     case "APPROUVEE":
       return { etape: "FINAL", decision: "APPROVED" }
     case "REJETEE_MANAGER":
-      return { etape: "REJECTED", decision: "REJECTED" }
+      return { etape: "MANAGER_REVIEW", decision: "REJECTED" }
     case "REJETEE_FINANCE":
-      return { etape: "REJECTED", decision: "REJECTED" }
+      return { etape: "FINANCE_REVIEW", decision: "REJECTED" }
     case "REJETEE_DIRECTION":
-      return { etape: "REJECTED", decision: "REJECTED" }
+      return { etape: "DIRECTION_REVIEW", decision: "REJECTED" }
     case "RETIREE":
-      return { etape: "WITHDRAWN", decision: "WITHDRAWN" }
+      return { etape: "DRAFT", decision: "WITHDRAWN" }
     default:
       return { etape: "DRAFT", decision: "PENDING" }
   }
@@ -114,30 +105,30 @@ export const TRANSITION_EFFECTS: readonly TransitionEffect[] = [
   {
     from: "FINANCE_REVIEW", action: "approuver", to: "DIRECTION_REVIEW",
     auditAction: "APPROBATION_FINANCE", notificationEvent: "DEMANDE_APPROBATION_FINANCE",
-    timestamps: ["approuveeFinanceLe"], commentField: "commentaireFinance",
+    timestamps: ["approuveeFinanceLe"], commentField: "commentaireFinance", setAssignee: true,
   },
   {
     from: "DIRECTION_REVIEW", action: "approuver", to: "FINAL",
     auditAction: "APPROBATION_DIRECTION", notificationEvent: "DEMANDE_APPROBATION_FINALE",
-    timestamps: ["approuveeDirectionLe"], commentField: "commentaireDirection",
+    timestamps: ["approuveeDirectionLe"], commentField: "commentaireDirection", setAssignee: true,
   },
   {
-    from: "MANAGER_REVIEW", action: "rejeter", to: "REJECTED",
+    from: "MANAGER_REVIEW", action: "rejeter", to: "MANAGER_REVIEW",
     auditAction: "REJET", notificationEvent: "DEMANDE_REJETEE",
     timestamps: ["rejeteeLe"], commentField: "commentaireManager",
   },
   {
-    from: "FINANCE_REVIEW", action: "rejeter", to: "REJECTED",
+    from: "FINANCE_REVIEW", action: "rejeter", to: "FINANCE_REVIEW",
     auditAction: "REJET", notificationEvent: "DEMANDE_REJETEE",
     timestamps: ["rejeteeLe"], commentField: "commentaireFinance",
   },
   {
-    from: "DIRECTION_REVIEW", action: "rejeter", to: "REJECTED",
+    from: "DIRECTION_REVIEW", action: "rejeter", to: "DIRECTION_REVIEW",
     auditAction: "REJET", notificationEvent: "DEMANDE_REJETEE",
     timestamps: ["rejeteeLe"], commentField: "commentaireDirection",
   },
   {
-    from: "DRAFT", action: "retirer", to: "WITHDRAWN",
+    from: "DRAFT", action: "retirer", to: "DRAFT",
     auditAction: "RETRAIT", notificationEvent: "DEMANDE_RETIREE",
     timestamps: ["retireeLe"],
   },
@@ -167,9 +158,12 @@ function findEffect(action: WorkflowAction, etape: Etape): TransitionEffect | un
   return TRANSITION_EFFECTS.find((e) => e.from === etape && e.action === action)
 }
 
-export function canTransition(role: Role, etape: Etape, action: WorkflowAction): boolean {
+export function canTransition(role: Role, etape: Etape, action: WorkflowAction, decision?: Decision): boolean {
   const stage = PIPELINE.find((s) => s.id === etape)
   if (!stage || !stage.roleCanAct) return false
+
+  // Terminal decisions block all further transitions
+  if (decision === "REJECTED" || decision === "WITHDRAWN" || decision === "APPROVED") return false
 
   // retirer is only allowed from DRAFT by EMPLOYEE
   if (action === "retirer") {
@@ -191,10 +185,13 @@ export function buildTransition(
   role: Role,
   etape: Etape,
   action: WorkflowAction,
-  params?: { comment?: string; assigneAId?: string }
+  params?: { comment?: string; assigneAId?: string; decision?: Decision }
 ): WorkflowResult | null {
   const stage = PIPELINE.find((s) => s.id === etape)
   if (!stage || !stage.roleCanAct) return null
+
+  // Terminal decisions block all further transitions
+  if (params?.decision === "REJECTED" || params?.decision === "WITHDRAWN" || params?.decision === "APPROVED") return null
 
   // Guard: retirer only from DRAFT by EMPLOYEE
   if (action === "retirer" && (role !== "EMPLOYEE" || etape !== "DRAFT")) return null
@@ -208,20 +205,18 @@ export function buildTransition(
   // Guard: role must match stage actor
   if (stage.roleCanAct !== role) return null
 
-  let decision: Decision
+  let newDecision: Decision
   if (action === "retirer") {
-    decision = "WITHDRAWN"
+    newDecision = "WITHDRAWN"
   } else if (action === "rejeter") {
-    decision = "REJECTED"
+    newDecision = "REJECTED"
   } else if (effect.to === "FINAL") {
-    decision = "APPROVED"
+    newDecision = "APPROVED"
   } else {
-    decision = "PENDING"
+    newDecision = "PENDING"
   }
 
-  // For reject, the legacy status is derived from the stage that rejected
-  const statusEtape = action === "rejeter" ? effect.from : effect.to
-  const newStatus = toLegacyStatus(statusEtape, decision)
+  const newStatus = toLegacyStatus(effect.to, newDecision)
 
   const fields: Record<string, unknown> = { statut: newStatus }
 
@@ -251,13 +246,13 @@ export function getAllowedActions(
 ): AllowedActions {
   const isOwner = demande.employeId === userId
   const r = role as Role
-  const { etape } = fromLegacyStatus(demande.statut as StatutDemande)
+  const { etape, decision } = fromLegacyStatus(demande.statut as StatutDemande)
 
   return {
-    canSubmit: canTransition(r, etape, "submit") && isOwner,
-    canApprove: canTransition(r, etape, "approuver"),
-    canReject: canTransition(r, etape, "rejeter"),
-    canWithdraw: canTransition(r, etape, "retirer") && isOwner,
+    canSubmit: canTransition(r, etape, "submit", decision) && isOwner,
+    canApprove: canTransition(r, etape, "approuver", decision),
+    canReject: canTransition(r, etape, "rejeter", decision),
+    canWithdraw: canTransition(r, etape, "retirer", decision) && isOwner,
   }
 }
 
@@ -268,8 +263,8 @@ export function canTransitionFromLegacy(
   statut: StatutDemande,
   action: WorkflowAction
 ): boolean {
-  const { etape } = fromLegacyStatus(statut)
-  return canTransition(role, etape, action)
+  const { etape, decision } = fromLegacyStatus(statut)
+  return canTransition(role, etape, action, decision)
 }
 
 export function buildTransitionFromLegacy(
@@ -278,6 +273,6 @@ export function buildTransitionFromLegacy(
   action: WorkflowAction,
   params?: { comment?: string; assigneAId?: string }
 ): WorkflowResult | null {
-  const { etape } = fromLegacyStatus(statut)
-  return buildTransition(role, etape, action, params)
+  const { etape, decision } = fromLegacyStatus(statut)
+  return buildTransition(role, etape, action, { ...params, decision })
 }

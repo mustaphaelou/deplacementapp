@@ -13,23 +13,12 @@ function mockAdapter(): NotificationAdapter & { send: ReturnType<typeof vi.fn> }
 function mockPrisma(usersByRole: Array<{ id: string; role: Role; departementId?: string }>): PrismaClient {
   return {
     utilisateur: {
-      findMany: vi.fn().mockImplementation((args: { where: { role: { in?: Role[]; } | Role; actif: boolean; departementId?: string } }) => {
+      findMany: vi.fn().mockImplementation((args: { where: { role: Role; actif: boolean; departementId?: string } }) => {
         const where = args.where
-        let matches: typeof usersByRole
-
-        if (typeof where.role === "string") {
-          // Department-scoped manager lookup
-          matches = usersByRole.filter(
-            (u) => u.role === where.role && (!where.departementId || u.departementId === where.departementId)
-          )
-        } else if (where.role?.in) {
-          // Role-based lookup
-          const roles = where.role.in as Role[]
-          matches = usersByRole.filter((u) => roles.includes(u.role))
-        } else {
-          matches = []
+        let matches = usersByRole.filter((u) => u.role === where.role)
+        if (where.departementId) {
+          matches = matches.filter((u) => u.departementId === where.departementId)
         }
-
         return Promise.resolve(matches.map((u) => ({ id: u.id })))
       }),
       findUnique: vi.fn().mockResolvedValue(null),
@@ -44,16 +33,19 @@ function mockPrisma(usersByRole: Array<{ id: string; role: Role; departementId?:
 const makePayload = (overrides?: Partial<NotificationPayload>): NotificationPayload => ({
   demandeId: "d-1",
   numero: "DD-2025-0001",
-  employe: { id: "emp-1", prenom: "Jean", nom: "Dupont" },
+  employe: { id: "emp-1", prenom: "Jean", nom: "Dupont", departementId: "dept-hr" },
   ...overrides,
 })
 
 // ─── dispatch() tests ────────────────────────────────────────────────────────
 
 describe("NotificationBus", () => {
-  it("dispatch returns dispatch result when all deliveries succeed", async () => {
+  it("dispatch sends DEMANDE_SOUMISE only to managers in the employee's department", async () => {
     const adapter = mockAdapter()
-    const prisma = mockPrisma([{ id: "mgr-1", role: "MANAGER" }])
+    const prisma = mockPrisma([
+      { id: "mgr-hr", role: "MANAGER", departementId: "dept-hr" },
+      { id: "mgr-it", role: "MANAGER", departementId: "dept-it" },
+    ])
     const bus = new NotificationBus(adapter, prisma)
 
     const result = await bus.dispatch("DEMANDE_SOUMISE", makePayload())
@@ -62,12 +54,14 @@ describe("NotificationBus", () => {
     expect(result.succeeded).toBe(1)
     expect(result.failed).toBe(0)
     expect(result.failures).toEqual([])
+    const call = adapter.send.mock.calls[0][0] as NotificationMessage
+    expect(call.utilisateurId).toBe("mgr-hr")
   })
 
   it("dispatch reports per-recipient failures when adapter fails", async () => {
     const adapter = mockAdapter()
     adapter.send.mockResolvedValueOnce({ success: false, error: new Error("DB write error") })
-    const prisma = mockPrisma([{ id: "mgr-1", role: "MANAGER" }])
+    const prisma = mockPrisma([{ id: "mgr-hr", role: "MANAGER", departementId: "dept-hr" }])
     const bus = new NotificationBus(adapter, prisma)
 
     const result = await bus.dispatch("DEMANDE_SOUMISE", makePayload())
@@ -75,18 +69,18 @@ describe("NotificationBus", () => {
     expect(result.total).toBe(1)
     expect(result.succeeded).toBe(0)
     expect(result.failed).toBe(1)
-    expect(result.failures[0]).toMatchObject({ utilisateurId: "mgr-1", error: "DB write error" })
+    expect(result.failures[0]).toMatchObject({ utilisateurId: "mgr-hr", error: "DB write error" })
   })
 
-  it("dispatch aggregates mixed success/failure across multiple recipients", async () => {
+  it("dispatch aggregates mixed success/failure across multiple department recipients", async () => {
     const adapter = mockAdapter()
     adapter.send
       .mockResolvedValueOnce({ success: true })
       .mockResolvedValueOnce({ success: false, error: new Error("Network timeout") })
 
     const prisma = mockPrisma([
-      { id: "mgr-1", role: "MANAGER" },
-      { id: "mgr-2", role: "MANAGER" },
+      { id: "mgr-hr-1", role: "MANAGER", departementId: "dept-hr" },
+      { id: "mgr-hr-2", role: "MANAGER", departementId: "dept-hr" },
     ])
     const bus = new NotificationBus(adapter, prisma)
 
@@ -96,7 +90,7 @@ describe("NotificationBus", () => {
     expect(result.succeeded).toBe(1)
     expect(result.failed).toBe(1)
     expect(result.failures).toHaveLength(1)
-    expect(result.failures[0].utilisateurId).toBe("mgr-2")
+    expect(result.failures[0].utilisateurId).toBe("mgr-hr-2")
   })
 
   it("dispatch succeeds with zero notifications when no roles match and no employee/assignee", async () => {
@@ -208,7 +202,9 @@ describe("NotificationBus", () => {
     const bus = new NotificationBus(adapter, prisma)
 
     // No departementId on the employee — should skip department manager routing
-    const payload = makePayload()
+    const payload = makePayload({
+      employe: { id: "emp-1", prenom: "Jean", nom: "Dupont" },
+    })
     const result = await bus.dispatch("DEMANDE_NOTIFICATION_LUE", payload)
 
     expect(result.total).toBe(0)

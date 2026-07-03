@@ -35,6 +35,12 @@ export class DemandeDeplacementService {
         return this.factory.createDraft(params.data, params.actor)
       case "submit":
         return this.factory.createAndSubmit(params.data, params.actor)
+      case "submit_draft":
+        return this.workflow.executeTransition({
+          demandeId: params.demandeId,
+          action: "submit",
+          actor: params.actor,
+        })
       case "approuver":
       case "rejeter":
       case "retirer":

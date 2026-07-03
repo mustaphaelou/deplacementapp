@@ -96,7 +96,7 @@ export class DemandeFactory {
       auditAction = transition.auditAction
       notificationEvent = transition.notificationEvent
       notificationPayload = {
-        employe: { id: user.id, prenom: user.prenom, nom: user.nom },
+        employe: { id: user.id, prenom: user.prenom, nom: user.nom, departementId: user.departementId },
       }
     }
 
