@@ -33,15 +33,27 @@ _Avoid_: City, town, locality
 ### Workflow
 
 **Etape (Stage)**:
-The current position of a DemandeDeplacement in the approval pipeline. One of: DRAFT, MANAGER_REVIEW, FINANCE_REVIEW, DIRECTION_REVIEW, FINAL. When a demande is rejected or withdrawn, the Etape stays where it was — the outcome is recorded in the Decision, not by moving to a new stage.
+The current position of a DemandeDeplacement in the approval pipeline. One of: DRAFT, MANAGER_REVIEW, FINANCE_REVIEW, DIRECTION_REVIEW, FINAL. When a demande is rejected or withdrawn, the Etape stays where it was — the outcome is recorded in the Decision, not by moving to a new stage. Withdrawal (`retirer`) is only permitted while the demande is still at DRAFT (i.e. before the first `submit`); once submitted, the Employee can no longer recall it — to abandon the trip they must ask the current approver to reject it.
 _Avoid_: Step, phase, status
 
 **Decision**:
-The outcome recorded at a given Etape. One of: PENDING, APPROVED, REJECTED, WITHDRAWN.
+The outcome recorded at a given Etape. One of: PENDING, APPROVED, REJECTED, WITHDRAWN. APPROVED, REJECTED, and WITHDRAWN are **terminal** — once recorded, the DemandeDeplacement cannot transition any further and cannot be edited or resubmitted. To pursue the trip after a REJECTED or WITHDRAWN outcome, the Employee creates a *new* DemandeDeplacement; the rejected/withdrawn record is retained unchanged for history.
 
-**StatutDemande (Legacy)**:
-The single-field representation of a DemandeDeplacement's state. Retained for backward compatibility and computed from Etape + Decision. Examples: BROUILLON, SOUMISE, APPROUVEE_MANAGER, REJETEE_FINANCE, APPROUVEE, RETIREE.
-_Avoid_: Using in new code; prefer Etape + Decision.
+### Pipeline actors
+
+At each Etape exactly one Role is permitted to act. The pairing is fixed:
+
+- **DRAFT** → EMPLOYEE (the owner). EMPLOYEE may `submit` (advances to MANAGER_REVIEW) or `retirer` (records Decision WITHDRAWN, terminates). `retirer` is only permitted here — once submitted, the demande leaves the Employee's hands.
+- **MANAGER_REVIEW** → MANAGER. MANAGER may `approuver` (advances to FINANCE_REVIEW) or `rejeter` (records Decision REJECTED, terminates).
+- **FINANCE_REVIEW** → FINANCE_ADMIN. FINANCE_ADMIN may `approuver` (advances to DIRECTION_REVIEW) or `rejeter` (terminates).
+- **DIRECTION_REVIEW** → GENERAL_DIRECTION. GENERAL_DIRECTION may `approuver` (advances to FINAL) or `rejeter` (terminates).
+- **FINAL** → no Role may act. Terminal state.
+
+Once a Decision of APPROVED, REJECTED, or WITHDRAWN is recorded at any Etape, no further transitions are permitted from that Etape.
+
+**StatutDemande (persisted state)**:
+The single persisted column on a DemandeDeplacement row that records its current state. One of: BROUILLON, SOUMISE, APPROUVEE_MANAGER, APPROUVEE_FINANCE, APPROUVEE, REJETEE_MANAGER, REJETEE_FINANCE, REJETEE_DIRECTION, RETIREE. **Etape + Decision are a derived in-memory read-model computed from StatutDemande** via `fromLegacyStatus`, not the other way around. New code is encouraged to reason in terms of Etape + Decision (clearer) but must persist via StatutDemande; the `toLegacyStatus` function maps the other direction for writes.
+_Avoid_: Treating Etape + Decision as the source of truth; the enum is.
 
 **TypeTransport**:
 The mode of transport for a DemandeDeplacement. One of: VOITURE_PERSONNELLE, VOITURE_SOCIETE, BUS, AVION, TRAIN, AUTRE.
@@ -60,15 +72,19 @@ _Avoid_: Prepayment, advance payment, deposit
 
 ### Supporting
 
+**Assignataire**:
+The Utilisateur who last recorded an approve or reject Decision on a DemandeDeplacement. Persisted on `assigneAId`. NULL while the demande is still in DRAFT (no approver has acted yet); set when the first approver acts and updated on each subsequent approval. On a terminal REJECTED demande the Assignataire is the rejecter; on a terminal APPROVED demande it is the GENERAL_DIRECTION member who gave the final approval. The Assignataire is distinct from the Employe who created the demande.
+_Avoid_: Approver, assigné, assignee, last-actor
+
 **Notification**:
 A message sent to a Utilisateur about a DemandeDeplacement event, delivered via both an in-app alert and an email. MANAGER notifications are scoped to the employee's Departement; FINANCE_ADMIN and GENERAL_DIRECTION notifications are org-wide.
 
 **AccuseLecture (Read Receipt)**:
-A Notification automatically sent to the Manager of an Employee's Departement when that Employee marks a Notification related to a DemandeDeplacement as read (lu).
+A Notification automatically sent to the MANAGER of an Employee's Departement when that Employee marks a Notification related to a DemandeDeplacement as read (lu). Dispatched only when the reader's Role is EMPLOYEE and the Notification is linked to a DemandeDeplacement — reads by MANAGER, FINANCE_ADMIN, or GENERAL_DIRECTION (or reads of demande-less notifications) produce no AccuseLecture.
 
 
 **JournalAudit**:
-A timestamped record of who performed what action on which entity.
+A timestamped record of a *committed* state change: who performed what action on which entity. Only successful transitions are recorded — attempts that fail authorization or transition guards (wrong role, invalid action, missing record) throw before the audit dispatch and produce no JournalAudit entry.
 
 **AvatarProfil**:
 An optional profile image uploaded by a Utilisateur. Stored as a file on the local filesystem under `/uploads/avatars/` with the URL path saved in `Utilisateur.avatarUrl`.
@@ -80,7 +96,7 @@ A file attached to a DemandeDeplacement (e.g., invoice, receipt, PDF). The `type
 ## Relationships
 
 - A **DemandeDeplacement** is created by exactly one **Utilisateur** (the employee).
-- A **DemandeDeplacement** can be assigned to at most one **Utilisateur** (the approver who last acted on it).
+- A **DemandeDeplacement** can be assigned to at most one **Utilisateur** (the **Assignataire** — the approver who last acted on it).
 - A **DemandeDeplacement** may be associated with zero or one **VehiculeEntreprise**.
 - A **DemandeDeplacement** has exactly one **Etape** and exactly one current **Decision**.
 - A **Utilisateur** belongs to exactly one **Departement**.
@@ -92,12 +108,12 @@ A file attached to a DemandeDeplacement (e.g., invoice, receipt, PDF). The `type
 ## Example dialogue
 
 > **Dev:** "When a manager rejects a demande, does the sequence start over?"
-> **Domain expert:** "No — the demande stops. The employee must create a new one."
+> **Domain expert:** "No — REJECTED is terminal. The employee must create a new DemandeDeplacement if they want to pursue the trip. The original stays at MANAGER_REVIEW with Decision=REJECTED."
 > **Dev:** "Can we show 'pending at manager' and 'pending at finance' using the same word?"
 > **Domain expert:** "Not really. 'Pending' is too generic. One is waiting for the manager, the other for finance. Those are different places in the pipeline."
 
 ## Flagged ambiguities
 
 - "approved" was used to mean both a stage-level outcome (manager said yes) and a terminal outcome (whole pipeline complete). Resolved by splitting into **Etape** (where we are) and **Decision** (what happened there). Terminal approval is `Etape: FINAL, Decision: APPROVED`.
-- "status" / "statut" was used for both the single-field legacy representation and the conceptual state machine. Resolved: **StatutDemande** is the legacy computed field; **Etape** + **Decision** are the canonical model.
+- "status" / "statut" was used for both the single-field legacy representation and the conceptual state machine. Resolved: **StatutDemande** is the *persisted* source of truth (the actual stored column); **Etape** + **Decision** are the *conceptual* read-model computed from it. New code reasons in Etape + Decision but persists via StatutDemande.
 - "retirée" (withdrawn) was treated as a separate StatutDemande value. Resolved: withdrawal is a **Decision** (`WITHDRAWN`) and a terminal outcome, not a stage.
