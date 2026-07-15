@@ -1,0 +1,285 @@
+/* Shared stylesheet for deplacementapp deployment lessons.
+   Every lesson links this so the course looks like one coherent thing,
+   not a pile of one-offs. Think Tufte: quiet typography, generous margins,
+   readable on screen and on paper. */
+
+:root {
+  --ink: #1a1a1a;
+  --ink-mute: #555;
+  --rule: #d8d4cc;
+  --paper: #fdfcf8;
+  --accent: #8a1538;
+  --accent-soft: #f4e9ec;
+  --ok: #2e6f40;
+  --warn: #9a6a00;
+  --mono: "SFMono-Regular", ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
+  --serif: "Iowan Old Style", "Hoefler Text", "Charter", "Source Serif Pro", Georgia, serif;
+  --sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html { font-size: 18px; }
+
+body {
+  margin: 0 auto;
+  max-width: 38rem;
+  padding: 2.5rem 1.5rem 5rem;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--serif);
+  line-height: 1.55;
+  font-feature-settings: "kern", "liga", "onum";
+  -webkit-font-smoothing: antialiased;
+}
+
+header.lesson-head {
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 1.25rem;
+  margin-bottom: 2rem;
+}
+.lesson-head .kicker {
+  font-family: var(--sans);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 600;
+  margin: 0 0 0.4rem;
+}
+.lesson-head h1 {
+  font-size: 1.9rem;
+  line-height: 1.2;
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}
+.lesson-head .meta {
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  color: var(--ink-mute);
+  margin: 0;
+}
+
+main h2 {
+  font-family: var(--sans);
+  font-size: 1.05rem;
+  letter-spacing: 0.02em;
+  margin-top: 2.2rem;
+  margin-bottom: 0.6rem;
+  font-weight: 600;
+}
+
+main h3 {
+  font-family: var(--sans);
+  font-size: 0.9rem;
+  margin-top: 1.6rem;
+  margin-bottom: 0.4rem;
+  font-weight: 600;
+}
+
+p { margin: 0 0 1rem; }
+
+.lead { font-size: 1.08rem; color: var(--ink); }
+
+code, pre, .mono {
+  font-family: var(--mono);
+  font-size: 0.86em;
+}
+
+:not(pre) > code {
+  background: #f0ece2;
+  padding: 0.1em 0.36em;
+  border-radius: 3px;
+  color: var(--ink);
+}
+
+pre {
+  background: #2b2622;
+  color: #ece6db;
+  padding: 1rem 1.1rem;
+  border-radius: 6px;
+  overflow-x: auto;
+  line-height: 1.5;
+  font-size: 0.82rem;
+}
+pre code { background: none; padding: 0; color: inherit; }
+
+blockquote {
+  margin: 1.4rem 0;
+  padding: 0.2rem 0 0.2rem 1rem;
+  border-left: 3px solid var(--accent);
+  color: var(--ink);
+  font-style: italic;
+}
+
+.repo-snippet {
+  border: 1px solid var(--rule);
+  background: #f7f4ec;
+  border-radius: 6px;
+  padding: 0.9rem 1rem;
+  margin: 1.2rem 0;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  line-height: 1.55;
+  overflow-x: auto;
+}
+.repo-snippet .file-tag {
+  font-family: var(--sans);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  margin-bottom: 0.4rem;
+  display: block;
+}
+.repo-snippet .ln {
+  display: block;
+  white-space: pre;
+}
+.repo-snippet .focus {
+  background: var(--accent-soft);
+  border-left: 3px solid var(--accent);
+  padding-left: 0.4rem;
+  margin-left: -0.55rem;
+}
+
+.vocab {
+  background: #f3efe5;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 0.9rem 1.1rem;
+  margin: 1.2rem 0;
+}
+.vocab dt {
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: var(--accent);
+  margin-bottom: 0.15rem;
+}
+.vocab dd {
+  margin-left: 0;
+  margin-bottom: 0.7rem;
+  font-size: 0.95rem;
+}
+.vocab dd:last-child { margin-bottom: 0; }
+
+.callout {
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--accent);
+  background: #fbf8f1;
+  padding: 0.9rem 1.1rem;
+  border-radius: 4px;
+  margin: 1.4rem 0;
+}
+.callout .h {
+  font-family: var(--sans);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 600;
+  margin: 0 0 0.4rem;
+}
+
+.win {
+  background: #eef5ef;
+  border: 1px solid #cfe3d2;
+  border-radius: 6px;
+  padding: 1rem 1.1rem;
+  margin: 1.6rem 0 0.4rem;
+}
+.win .h {
+  font-family: var(--sans);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ok);
+  font-weight: 600;
+  margin: 0 0 0.3rem;
+}
+
+.win, .callout p:last-child { margin-bottom: 0; }
+
+ul.step {
+  list-style: none;
+  padding-left: 0;
+  counter-reset: step;
+  margin: 1.2rem 0;
+}
+ul.step > li {
+  position: relative;
+  padding-left: 2.4rem;
+  margin-bottom: 0.85rem;
+  counter-increment: step;
+}
+ul.step > li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1.7rem;
+  height: 1.7rem;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-family: var(--sans);
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+nav.lesson-nav {
+  margin-top: 3rem;
+  padding-top: 1.4rem;
+  border-top: 1px solid var(--rule);
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--sans);
+  font-size: 0.84rem;
+}
+nav.lesson-nav a {
+  color: var(--accent);
+  text-decoration: none;
+}
+nav.lesson-nav a:hover { text-decoration: underline; }
+
+footer.lesson-foot {
+  margin-top: 3rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--rule);
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  color: var(--ink-mute);
+}
+footer.lesson-foot a { color: var(--accent); }
+
+.ask {
+  background: #fdf6e3;
+  border: 1px solid #ecd9a8;
+  border-radius: 6px;
+  padding: 0.95rem 1.1rem;
+  margin: 1.6rem 0 0.4rem;
+  font-size: 0.93rem;
+}
+.ask .h {
+  font-family: var(--sans);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--warn);
+  font-weight: 600;
+  margin: 0 0 0.3rem;
+}
+
+a { color: var(--accent); }
+a:hover { text-decoration: underline; }
+
+@media print {
+  html { font-size: 11pt; }
+  body { max-width: none; padding: 1rem; }
+  nav.lesson-nav, footer.lesson-foot, .ask { display: none; }
+  pre, .repo-snippet { page-break-inside: avoid; }
+}

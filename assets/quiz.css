@@ -1,0 +1,89 @@
+/* Reusable multiple-choice quiz widget for lessons.
+   Markup contract:
+     <figure class="quiz" data-correct="B" data-explain="...">
+       <p class="quiz-q">…question…</p>
+       <ul class="quiz-opts">
+         <li><button data-k="A">…</button></li>
+         <li><button data-k="B">…</button></li>
+         <li><button data-k="C">…</button></li>
+         <li><button data-k="D">…</button></li>
+       </ul>
+       <p class="quiz-feedback" hidden></p>
+     </figure>
+
+   Best practice (per teach skill): every option string should be the same
+   word count and ideally the same character count, so formatting gives no clue. */
+
+.quiz {
+  border: 1px solid var(--rule);
+  background: #f9f6ee;
+  border-radius: 6px;
+  padding: 1rem 1.15rem 1.15rem;
+  margin: 1.6rem 0;
+}
+.quiz .quiz-q {
+  font-family: var(--sans);
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-top: 0;
+  margin-bottom: 0.9rem;
+  color: var(--ink);
+}
+.quiz-opts {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+.quiz-opts button {
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  text-align: left;
+  background: #fffcf3;
+  border: 1px solid #d8d4cc;
+  border-radius: 4px;
+  padding: 0.55rem 0.7rem;
+  color: var(--ink);
+  cursor: pointer;
+  display: flex;
+  gap: 0.6rem;
+  align-items: baseline;
+  line-height: 1.4;
+}
+.quiz-opts button::before {
+  content: attr(data-k) ".";
+  font-weight: 600;
+  color: var(--accent);
+  min-width: 1.4rem;
+}
+.quiz-opts button:hover { border-color: var(--accent); background: #fff8e9; }
+.quiz-opts button[disabled] { cursor: default; opacity: 0.9; }
+
+.quiz-opts button.chosen-correct {
+  background: #e8f3e9;
+  border-color: #8fc497;
+}
+.quiz-opts button.chosen-wrong {
+  background: #f6e6e6;
+  border-color: #d6a3a3;
+  text-decoration: line-through;
+}
+.quiz-opts button.reveal-correct {
+  background: #e8f3e9;
+  border-color: #8fc497;
+  font-weight: 600;
+}
+
+.quiz-feedback {
+  margin: 0.85rem 0 0;
+  font-family: var(--sans);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  padding-top: 0.7rem;
+  border-top: 1px dashed var(--rule);
+}
+.quiz-feedback.ok { color: var(--ok); }
+.quiz-feedback.no { color: #a13a3a; }
+.quiz-feedback b { font-family: var(--mono); font-weight: 600; }

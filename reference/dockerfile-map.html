@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>deplacementapp — Docker mental model & Dockerfile map</title>
+<link rel="stylesheet" href="../assets/lesson.css">
+<style>
+  body { max-width: 48rem; }
+  .cheat h2 {
+    margin-top: 2.2rem;
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 0.3rem;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-family: var(--sans);
+    font-size: 0.85rem;
+  }
+  th, td {
+    text-align: left;
+    padding: 0.55rem 0.6rem;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  th { font-weight: 600; color: var(--ink); background: #f3efe5; }
+  td:first-child { font-family: var(--mono); color: var(--accent); white-space: nowrap; }
+  .pipeline {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+    margin: 1.2rem 0;
+    font-family: var(--sans);
+    font-size: 0.78rem;
+  }
+  .pipeline .stage {
+    border: 1px solid var(--rule);
+    border-radius: 5px;
+    padding: 0.6rem 0.6rem 0.5rem;
+    background: #fbf8f1;
+  }
+  .pipeline .stage .tag {
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 0.25rem;
+  }
+  .pipeline .stage .name { font-weight: 600; display: block; margin-bottom: 0.3rem; }
+  .pipeline .stage ul { margin: 0; padding-left: 1rem; line-height: 1.4; }
+  .pipeline .stage.runner { background: #eef5ef; border-color: #cfe3d2; }
+</style>
+</head>
+<body>
+<header class="lesson-head">
+  <p class="kicker">Reference · cheat sheet</p>
+  <h1>Docker mental model & the <code class="mono">deplacementapp</code> Dockerfile</h1>
+  <p class="meta">Companion to <a href="../lessons/0001-image-vs-container.html">Lesson 0001 — Image vs Container</a>.</p>
+</header>
+
+<main class="cheat">
+
+<h2>The four nouns</h2>
+<table>
+  <thead><tr><th>Term</th><th>What it IS</th><th>What it is NOT</th></tr></thead>
+  <tbody>
+    <tr><td>Image</td>
+      <td>Read-only, layered filesystem snapshot + metadata (env, workdir, entrypoint). Built from a <code>Dockerfile</code>. Stopped.</td>
+      <td>A running thing. A virtual machine. A package manager output.</td></tr>
+    <tr><td>Container</td>
+      <td>A running instance of an image: isolated process tree, a writable layer stacked on the image, own network + env. Same image → many containers.</td>
+      <td>The image itself. Always long-lived (containers can be one-shot).</td></tr>
+    <tr><td>Layer</td>
+      <td>One instruction's worth of filesystem delta inside an image (one <code>RUN</code> or <code>COPY</code>). Stacked + cached independently.</td>
+      <td>A build stage. A commit.</td></tr>
+    <tr><td>Stage</td>
+      <td>One <code>FROM</code> block in a multi-stage <code>Dockerfile</code>. Produces an intermediate image; later stages <code>COPY --from=</code> out of it.</td>
+      <td>A layer. A separate container.</td></tr>
+  </tbody>
+</table>
+
+<h2>The mental move</h2>
+<blockquote>
+You don't <em>run an image</em>. You <strong>start</strong> an image; that act creates a container. The image is the recipe; the container is the cake. Two cakes from one recipe — identical. You can't change a recipe by tasting a cake: <strong>editing a running container does not change its image.</strong>
+</blockquote>
+
+<h2>This repo's <code>Dockerfile</code> — the 4-stage pipeline</h2>
+<div class="pipeline">
+  <div class="stage">
+    <span class="tag">Stage 1</span>
+    <span class="name">deps</span>
+    <ul>
+      <li>full <code>node_modules</code></li>
+      <li><code>npm ci --ignore-scripts</code></li>
+      <li><em>build-time only</em></li>
+    </ul>
+  </div>
+  <div class="stage">
+    <span class="tag">Stage 2</span>
+    <span class="name">prod-deps</span>
+    <ul>
+      <li><code>node_modules</code> w/o devDeps</li>
+      <li><code>npm ci --omit=dev</code></li>
+      <li>for runtime scripts</li>
+    </ul>
+  </div>
+  <div class="stage">
+    <span class="tag">Stage 3</span>
+    <span class="name">builder</span>
+    <ul>
+      <li>copies <em>deps</em> ndm</li>
+      <li><code>prisma generate</code></li>
+      <li><code>npm run build</code> → <code>.next/standalone</code></li>
+    </ul>
+  </div>
+  <div class="stage runner">
+    <span class="tag">Stage 4 · runner</span>
+    <span class="name">runner (final)</span>
+    <ul>
+      <li>non-root <code>nextjs</code> user</li>
+      <li><code>standalone</code> + <code>static</code> + <code>public</code></li>
+      <li>prisma client + prisma CLI</li>
+      <li><code>HEALTHCHECK</code> on <code>/api/health</code></li>
+    </ul>
+  </div>
+</div>
+<p><strong>Only <code>FROM … AS runner</code> becomes the image you ship.</strong> Stages 1–3 are scaffolding to build it; they never reach the registry.</p>
+
+<h2>Why split stages?</h2>
+<table>
+  <thead><tr><th>Concern</th><th>How the split handles it</th></tr></thead>
+  <tbody>
+    <tr><td>Build tools in prod image</td><td><code>builder</code> holds devDeps & source; <code>runner</code> takes only what the running app needs.</td></tr>
+    <tr><td>Image size</td><td><code>runner</code> doesn't include <code>.next</code> source — just the <code>standalone</code> server + <code>static</code> assets + a few prisma dirs.</td></tr>
+    <tr><td>Cache reuse</td><td>Changing app code rebuilds <code>builder</code> + <code>runner</code> but reuses the cached <code>deps</code> & <code>prod-deps</code> stages (only triggered by <code>package*.json</code> change).</td></tr>
+    <tr><td>Runtime CLI access</td><td><code>prod-deps</code> keeps <code>prisma</code> CLI available in <code>runner</code> for <code>migrate deploy</code> in the entrypoint.</td></tr>
+  </tbody>
+</table>
+
+<h2>Common gotchas (preview)</h2>
+<ul>
+  <li><strong>Editing <code>package.json</code></strong> invalidates the <code>deps</code>+<code>prod-deps</code>+<code>builder</code> caches — expect a full reinstall next build.</li>
+  <li><strong><code>npm ci --ignore-scripts</code></strong> skips <code>postinstall</code> prisma generate on purpose; the Dockerfile runs <code>npx prisma generate</code> explicitly in <code>builder</code>.</li>
+  <li><strong>The <code>runner</code> user is 1001.</strong> Volumes mounted into <code>public/uploads</code> & <code>pdfs</code> must be writable by <code>uid 1001</code>, or the app silently fails at write time.</li>
+</ul>
+
+</main>
+
+<footer class="lesson-foot">
+  This is a reference doc — the compressed essence of <a href="../lessons/0001-image-vs-container.html">Lesson 0001</a>.
+  Keep it open while you read the <code>Dockerfile</code>. Glossary lives at <a href="GLOSSARY.html">GLOSSARY.html</a>.
+</footer>
+</body>
+</html>

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 0001b — Image vs Container, again, with a chainsaw</title>
+<link rel="stylesheet" href="../assets/lesson.css">
+<link rel="stylesheet" href="../assets/quiz.css">
+<style>
+  .timeline { display: grid; grid-template-columns: auto 1fr; gap: 0.5rem 1rem; font-family: var(--sans); font-size: 0.86rem; margin: 1.2rem 0; }
+  .timeline .t { color: var(--accent); font-weight: 600; text-align: right; white-space: nowrap; }
+  .timeline .e { color: var(--ink); }
+  .timeline .gone { color: var(--ink-mute); text-decoration: line-through; }
+  .pairs { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; margin: 1.2rem 0; }
+  .pairs .card { border: 1px solid var(--rule); border-radius: 6px; padding: 0.7rem 0.9rem; font-family: var(--sans); font-size: 0.84rem; }
+  .pairs .card .t { font-family: var(--serif); font-style: italic; color: var(--ink-mute); font-size: 0.78rem; margin-bottom: 0.25rem; }
+  .pairs .card .name { font-weight: 600; color: var(--accent); margin-bottom: 0.2rem; }
+  .pairs .card ol { margin: 0; padding-left: 1.2rem; line-height: 1.45; }
+</style>
+<script src="../assets/quiz.js" defer></script>
+</head>
+<body>
+
+<header class="lesson-head">
+  <p class="kicker">Lesson 0001b · re-teach</p>
+  <h1>Image vs container — with a chainsaw</h1>
+  <p class="meta">You're here because the first pass didn't land. That's fine; retrieval is hard on purpose. 5 min.</p>
+</header>
+
+<main>
+
+<p class="lead">
+Last lesson you got the four nouns and a quiz. The quiz didn't go well — so forget the nouns for a minute. Let's make the distinction <em>physically obvious</em> by doing something bad to a running container and watching it not stick.
+</p>
+
+<h2>A recipe, then a cake</h2>
+
+<p>An <strong>image</strong> is a recipe. You build it once. It sits on a shelf, immutable. A <strong>container</strong> is a cake you baked from that recipe — it exists in time, you can poke it, and if you throw it away you can bake an identical one from the same recipe.</p>
+
+<div class="pairs">
+  <div class="card">
+    <div class="t">on the shelf</div>
+    <div class="name">Image (recipe)</div>
+    <ol>
+      <li>built by <code>docker build</code></li>
+      <li>read-only, never changes</li>
+      <li>identified by a hash (<code>abc123…</code>)</li>
+      <li>does <em>not</em> answer a port</li>
+    </ol>
+  </div>
+  <div class="card">
+    <div class="t">on the counter</div>
+    <div class="name">Container (cake)</div>
+    <ol>
+      <li>created by <code>docker run <image></code></li>
+      <li>running, has a writable layer</li>
+      <li>has a name like <code>app-1</code></li>
+      <li>the thing answering port 3000</li>
+    </ol>
+  </div>
+</div>
+
+<p>The thing answering <code>localhost:3000</code> after <code>docker compose up</code> is <strong>a container</strong>. The image is sitting on the shelf the whole time. Compose just happens to do <code>build</code> → <code>run</code> for you, so the two blur into one command.</p>
+
+<h2>Watch a container edit vanish</h2>
+
+<p>Here's the demo that makes the distinction concrete. Imagine you do this:</p>
+
+<div class="repo-snippet">
+<span class="file-tag">shell — inside a running container named app-1</span>
+<span class="ln focus">docker exec app-1 sh -c 'echo "hello" > /tmp/marker'</span>
+<span class="ln">docker exec app-1 cat /tmp/marker   # → hello</span>
+<span class="ln focus">docker stop app-1 && docker rm app-1</span>
+<span class="ln">docker run ... <same image>            # brand new container</span>
+<span class="ln focus">docker exec <new> cat /tmp/marker     # → No such file</span>
+</div>
+
+<div class="timeline">
+  <div class="t">t0</div><div class="e">You edit a file inside the <em>container</em> — its writable layer.</div>
+  <div class="t">t1</div><div class="e">The edit is visible <em>inside that container</em>.</div>
+  <div class="t">t2</div><div class="e">You destroy the container (<code>stop</code> + <code>rm</code>).</div>
+  <div class="t">t3</div><div class="e gone">The edit is gone. The <em>image</em> is untouched — it was on the shelf this whole time.</div>
+  <div class="t">t4</div><div class="e">You start a new container from the same image: fresh, no marker.</div>
+</div>
+
+<blockquote>
+Container edits do <strong>not</strong> reach the image. Ever. To change what the image contains, you change the recipe (the <code>Dockerfile</code>) and re-<code>build</code>. That is why, on a server, "I'll just tweak it live" is a trap — your tweak dies on the next deploy.
+</blockquote>
+
+<h2>Re-take the questions</h2>
+
+<p>Same three questions as before — but now answer with the chainsaw demo in mind.</p>
+
+<figure class="quiz" data-correct="C" data-explain="Right — the live port-3000 thing is a CONTAINER. The image is on the shelf; Compose built it then ran a container from it. Compose obscured the two steps by doing both at once.">
+  <p class="quiz-q">After `docker compose up`, port 3000 is served by…?</p>
+  <ul class="quiz-opts">
+    <li><button data-k="A">the image, running</button></li>
+    <li><button data-k="B">the recipe alone</button></li>
+    <li><button data-k="C">a container it started</button></li>
+    <li><button data-k="D">the Dockerfile itself</button></li>
+  </ul>
+  <p class="quiz-feedback" hidden></p>
+</figure>
+
+<figure class="quiz" data-correct="C" data-explain="Right. A container edit doesn't survive <code>stop</code> + <code>rm</code>, and Coolify will recreate your container on every deploy. To make the env var permanent, amend the recipe (Dockerfile or Compose env) and rebuild — then every future container born from that image has it.">
+  <p class="quiz-q">You want a new env var to persist across future deploys. You…</p>
+  <ul class="quiz-opts">
+    <li><button data-k="A">edit the running container</button></li>
+    <li><button data-k="B">stop and restart it</button></li>
+    <li><button data-k="C">edit the image's recipe</button></li>
+    <li><button data-k="D">mount a new layer in</button></li>
+  </ul>
+  <p class="quiz-feedback" hidden></p>
+</figure>
+
+<figure class="quiz" data-correct="D" data-explain="Right. Stages deps/prod-deps/builder are SCAFFOLDING — they compile things the final image needs, but only the bits <code>runner</code> copies off them ship. The final image is just the last stage.">
+  <p class="quiz-q">In deplacementapp's Dockerfile, what ships to Coolify?</p>
+  <ul class="quiz-opts">
+    <li><button data-k="A">all five FROM blocks</button></li>
+    <li><button data-k="B">the first stage only</button></li>
+    <li><button data-k="C">everything except base</button></li>
+    <li><button data-k="D">just the runner stage</button></li>
+  </ul>
+  <p class="quiz-feedback" hidden></p>
+</figure>
+
+<div class="win">
+  <p class="h">Your win this lesson</p>
+  <p>If you got all three this time: the recipe/cake distinction is now yours. That's the hinge — building it, starting it, and shipping it on Coolify all become follow-on facts.</p>
+</div>
+
+<h2>Do this next</h2>
+<ul class="step">
+  <li>Tell me — in one sentence — which of the three quizzes you're <em>least</em> sure about. That tells me what to anchor next time.</li>
+  <li>If you have Docker locally: run the chainsaw demo yourself on any image (<code>alpine</code> works). Watching the marker vanish once is worth reading it ten times.</li>
+  <li>Primary source — short, official: <a href="https://docs.docker.com/get-started/docker-overview/" target="_blank" rel="noopener">Docker overview</a>. Read the "What is a container?" + "What is an image?" sections only.</li>
+</ul>
+
+<div class="ask">
+  <p class="h">Still shaky?</p>
+  <p>Reply with the one sentence that still feels wrong, or the demo step that didn't make sense. I'd rather re-anchor now than carry a half-right model into Coolify.</p>
+</div>
+
+</main>
+
+<nav class="lesson-nav">
+  <a href="0001-image-vs-container.html">← Back to Lesson 0001 (first pass)</a>
+  <span>Gated on you nailing the three quizzes</span>
+</nav>
+
+<footer class="lesson-foot">
+  Lesson 0001b — re-teach of the four-noun distinction. Companion cheat sheet: <a href="../reference/dockerfile-map.html">Dockerfile map</a>.
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 0001 — Image vs Container (and layer, and stage)</title>
+<link rel="stylesheet" href="../assets/lesson.css">
+<link rel="stylesheet" href="../assets/quiz.css">
+<script src="../assets/quiz.js" defer></script>
+</head>
+<body>
+
+<header class="lesson-head">
+  <p class="kicker">Lesson 0001 · Docker mental model</p>
+  <h1>Image vs container — and the two quieter nouns</h1>
+  <p class="meta">Mission: deploy <code class="mono">deplacementapp</code> on Coolify · 5–7 min</p>
+</header>
+
+<main>
+
+<p class="lead">
+You've run <code>docker compose up</code> and it "just worked" — until it didn't. The reason it stopped making sense is that <em>four different nouns</em> were all being called "Docker thing" in your head. Separate them now and the rest of the deployment, including what Coolify does on your behalf, will snap into place.
+</p>
+
+<h2>The four nouns, in one breath</h2>
+
+<dl class="vocab">
+  <dt>Image</dt>
+  <dd>A read-only, layered filesystem snapshot plus some metadata (env vars, working directory, the command to run). Built from a <code>Dockerfile</code>. Stopped. Static. Boring.</dd>
+
+  <dt>Container</dt>
+  <dd>A <em>running</em> instance of an image. A container adds a writable layer on top of the read-only image, its own process tree, its own network, its own copy of the env. The same image can launch dozens of containers.</dd>
+
+  <dt>Layer</dt>
+  <dd>One instruction's worth of filesystem delta <em>inside one image</em>. Each <code>RUN</code> or <code>COPY</code> in a Dockerfile produces a layer. Layers stack and cache independently — so order matters.</dd>
+
+  <dt>Stage</dt>
+  <dd>One <code>FROM</code> block inside a multi-stage Dockerfile. Each stage builds its own intermediate image; later stages can <code>COPY --from=</code> bits out of earlier ones. Stages are the trick that keeps prod images small.</dd>
+</dl>
+
+<blockquote>
+You don't <em>run an image</em>. You <strong>start</strong> an image — that act creates a container. The image is the recipe; the container is the cake. You can bake two cakes from one recipe. Tweaking a running container does <strong>not</strong> change the recipe.
+</blockquote>
+
+<h2>See it in this repo</h2>
+
+<p>Open the repo's <code>Dockerfile</code> and count the <code>FROM</code> lines:</p>
+
+<div class="repo-snippet">
+<span class="file-tag">Dockerfile</span>
+<span class="ln focus">FROM node:20-alpine AS base</span>
+<span class="ln">FROM base AS deps</span>
+<span class="ln">FROM base AS prod-deps</span>
+<span class="ln">FROM base AS builder</span>
+<span class="ln focus">FROM base AS runner</span>
+</div>
+
+<p>That's <strong>five <code>FROM</code> lines = five stages</strong> (<code>base</code> is a shared parent; the other four are real build stages). Only the very last one — <code>runner</code> — becomes the image you ship. The first four are scaffolding: <code>deps</code> installs everything (for building), <code>prod-deps</code> installs only runtime deps, <code>builder</code> builds Next.js. Then <code>runner</code> <code>COPY --from=</code>es just the bits it needs from each.</p>
+
+<div class="callout">
+  <p class="h">Why this matters for you</p>
+  <p>When the deploy breaks, the symptom lives in <em>the container</em> (a process exiting, a port not answering, a healthcheck failing). But the fix almost always lives in <em>the Dockerfile</em>, which is the image recipe. If you can't tell image from container, you can't tell "I need to edit the Dockerfile" from "I need to restart the container" — and you'll waste hours trying the wrong one.</p>
+</div>
+
+<h2>One quick self-check</h2>
+
+<figure class="quiz" data-correct="C" data-explain="Image = recipe (read-only, built from Dockerfile). Layer = one instruction's delta inside an image. The 'deployment running on your server' is the container — the live, running instance of that image.">
+  <p class="quiz-q">A "deployment running on your server" maps to which noun?</p>
+  <ul class="quiz-opts">
+    <li><button data-k="A">a Dockerfile</button></li>
+    <li><button data-k="B">an image you built</button></li>
+    <li><button data-k="C">a running container</button></li>
+    <li><button data-k="D">a layer in it</button></li>
+  </ul>
+  <p class="quiz-feedback" hidden></p>
+</figure>
+
+<p>All four phrases are the same length and structure — no clue from formatting. Pick before you peek at the answer. (This is retrieval practice; the slight discomfort is what builds storage strength.)</p>
+
+<div class="win">
+  <p class="h">Your win for this lesson</p>
+  <p>You can now read the repo's <code>Dockerfile</code> and see <em>five stages</em> instead of five mysterious lines, and you know which one ends up actually running. That's the foundation everything else stands on.</p>
+</div>
+
+<h2>Do this next</h2>
+<ul class="step">
+  <li>Open <code>Dockerfile</code> and label each <code>FROM</code> in your own words: what does <em>this</em> stage produce? (One sentence each — you'll need them for Lesson 0002.)</li>
+  <li>Keep the <a href="../reference/dockerfile-map.html">Dockerfile map cheat sheet</a> open in another tab; it's the compressed version of this lesson.</li>
+  <li><strong>Primary source to read before next lesson:</strong> Docker's own overview — <a href="https://docs.docker.com/get-started/docker-overview/" target="_blank" rel="noopener">"Docker overview"</a> — for the engine/daemon split we'll touch on next.</li>
+</ul>
+
+<div class="ask">
+  <p class="h">Stuck? Ask me.</p>
+  <p>I'm your teacher for this — ask follow-up questions about anything in this lesson: a word that didn't land, an instruction in the Dockerfile that still looks weird, or "but on Coolify, what's the image and what's the container?". The next lesson depends on this one being solid.</p>
+</div>
+
+</main>
+
+<nav class="lesson-nav">
+  <span>Start of the course</span>
+  <a href="0002-reading-the-dockerfile.html">Next: reading the Dockerfile stage by stage →</a>
+</nav>
+
+<footer class="lesson-foot">
+  Lesson 0001 of the <em>Deploy deplacementapp on Coolify</em> course.
+  See <a href="../MISSION.md">MISSION.md</a> for why this exists, and <a href="../reference/GLOSSARY.md">GLOSSARY.md</a> for canonical terms.
+</footer>
+
+</body>
+</html>
