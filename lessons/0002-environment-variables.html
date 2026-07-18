@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 0002 — Environment variables: where they live, where they go</title>
+<link rel="stylesheet" href="../assets/lesson.css">
+<link rel="stylesheet" href="../assets/quiz.css">
+<script src="../assets/quiz.js" defer></script>
+</head>
+<body>
+
+<header class="lesson-head">
+  <p class="kicker">Lesson 0002 · Env vars in deplacementapp</p>
+  <h1>Environment variables: where they live, where they go</h1>
+  <p class="meta">Mission: deploy on Coolify · 6–8 min</p>
+</header>
+
+<main>
+
+<p class="lead">
+You've already seen that a container gets <em>its own copy</em> of environment variables — inherited from the image, then overridden by Compose, then overridden by Coolify. But <strong>which env vars does deplacementapp actually need</strong>, and why does the wrong one crash it?
+</p>
+
+<h2>Three groups, one app</h2>
+
+<p>Open your repo's <code>compose.yml</code> and look at the <code>app</code> service's <code>environment:</code> block (lines 7–16). Every env var your app reads is listed there. They split into three groups:</p>
+
+<table>
+  <thead>
+    <tr><th>Group</th><th>Variables</th><th>Required?</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Database</strong></td>
+      <td><code>DATABASE_URL</code></td>
+      <td>Yes — no DB, no app</td>
+    </tr>
+    <tr>
+      <td><strong>Auth</strong></td>
+      <td><code>NEXTAUTH_SECRET</code>, <code>NEXTAUTH_URL</code>, <code>AUTH_TRUST_HOST</code></td>
+      <td>Yes — no auth, no login</td>
+    </tr>
+    <tr>
+      <td><strong>Email</strong></td>
+      <td><code>SMTP_HOST</code>, <code>SMTP_PORT</code>, <code>SMTP_USER</code>, <code>SMTP_PASS</code>, <code>SMTP_FROM</code></td>
+      <td>No — app runs, but notifications don't send</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Where does the app read them?</h2>
+
+<p>Each env var is read by <code>process.env.&lt;NAME&gt;</code> somewhere in the code:</p>
+
+<div class="repo-snippet">
+<span class="file-tag">lib/prisma.ts</span>
+<span class="ln"><span class="m">const pool = new Pool({ connectionString: process.env.DATABASE_URL })</span></span>
+</div>
+
+<div class="repo-snippet">
+<span class="file-tag">lib/email-service.ts</span>
+<span class="ln">const host = <span class="m">process.env.SMTP_HOST</span></span>
+<span class="ln">const port = <span class="m">process.env.SMTP_PORT</span></span>
+<span class="ln">const user = <span class="m">process.env.SMTP_USER</span></span>
+<span class="ln">const pass = <span class="m">process.env.SMTP_PASS</span></span>
+<span class="ln">const from = <span class="m">process.env.SMTP_FROM</span></span>
+</div>
+
+<div class="repo-snippet">
+<span class="file-tag">prisma.config.js</span>
+<span class="ln">url: <span class="m">process.env.DATABASE_URL</span></span>
+</div>
+
+<p>NextAuth.js reads <code>NEXTAUTH_SECRET</code>, <code>NEXTAUTH_URL</code>, and <code>AUTH_TRUST_HOST</code> from env automatically — you don't see them in your own code, but the library pulls them on startup.</p>
+
+<h2>The production puzzle: <code>localhost</code> kills the container</h2>
+
+<p>Compare your three files:</p>
+
+<table>
+  <thead>
+    <tr><th>File</th><th><code>DATABASE_URL</code> host</th><th>Works where</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>.env</code> (local dev)</td>
+      <td><code>localhost</code></td>
+      <td>On your machine, because Postgres runs on <em>your</em> localhost</td>
+    </tr>
+    <tr>
+      <td><code>.env.example</code></td>
+      <td><code>db</code></td>
+      <td>Inside Docker Compose, because the Postgres container is named <code>db</code></td>
+    </tr>
+    <tr>
+      <td><code>compose.yml</code></td>
+      <td><code>db</code></td>
+      <td>Inside Docker Compose (same reason)</td>
+    </tr>
+  </tbody>
+</table>
+
+<blockquote>
+Inside a Docker container, <code>localhost</code> means <strong>the container itself</strong> — not your host machine, not another container. So when the app container tries <code>localhost:5432</code>, it's knocking on <em>its own</em> door. Postgres isn't there. The container crashes with <code>P1001</code>.
+</blockquote>
+
+<p>This is why Coolify deployments fail: the <code>DATABASE_URL</code> you set in Coolify's env panel still says <code>localhost</code> from your dev file. The fix is simple: replace <code>localhost</code> with the hostname that reaches Postgres — the Docker container name (<code>db</code>) if Postgres is another container, or Coolify's internal database hostname if you're using Coolify's managed Postgres service.</p>
+
+<h2>What about <code>.env</code> itself?</h2>
+
+<p>The <code>.env</code> file is for <strong>your local machine</strong>. When you run <code>docker compose up</code>, Compose reads the <code>.env</code> file in the same directory and substitutes <code>${VAR}</code> placeholders in <code>compose.yml</code>.</p>
+
+<p><strong>But inside the Docker container, the app doesn't read <code>.env</code></strong>. The env vars reach the container through the <code>environment:</code> block in <code>compose.yml</code> (or via Coolify's env panel, or <code>docker run -e</code>). The container never touches your <code>.env</code> file.</p>
+
+<div class="callout">
+  <p class="h">Key insight</p>
+  <p>There are three separate mechanisms for setting env vars, and they don't mix:</p>
+  <ol>
+    <li><strong><code>.env</code></strong> — local dev, read by Compose for substitution, <em>not</em> by the running app</li>
+    <li><strong><code>compose.yml environment:</code></strong> — what the container actually receives</li>
+    <li><strong>Coolify env panel</strong> — production env vars, injected at deploy time</li>
+  </ol>
+</div>
+
+<h2>Check your understanding</h2>
+
+<figure class="quiz" data-correct="B" data-explain="Right. <code>localhost</code> inside a container points at the container itself. The app is looking for Postgres inside itself. It needs the database container's hostname — <code>db</code> — so Docker's built-in DNS resolves it to the right container.">
+  <p class="quiz-q">Your Coolify deploy fails with <code>P1001</code>. The likely cause is…</p>
+  <ul class="quiz-opts">
+    <li><button data-k="A">Postgres isn't installed on the server</button></li>
+    <li><button data-k="B">DATABASE_URL uses <code>localhost</code> — wrong hostname for Docker</button></li>
+    <li><button data-k="C">NEXTAUTH_SECRET is too short</button></li>
+    <li><button data-k="D">The <code>.env</code> file wasn't copied into the image</button></li>
+  </ul>
+  <p class="quiz-feedback" hidden></p>
+</figure>
+
+<figure class="quiz" data-correct="D" data-explain="Correct — the <code>environment:</code> block in compose.yml is what the container actually receives. <code>.env</code> just feeds variable substitution into Compose; without compose.yml's block, the container never sees the values.">
+  <p class="quiz-q">Where does a Docker container actually get its env vars from?</p>
+  <ul class="quiz-opts">
+    <li><button data-k="A">The repo's <code>.env</code> file</button></li>
+    <li><button data-k="B">The <code>RUN export</code> command in the Dockerfile</button></li>
+    <li><button data-k="C">NextAuth's built-in defaults</button></li>
+    <li><button data-k="D">The <code>environment:</code> block in compose.yml</button></li>
+  </ul>
+  <p class="quiz-feedback" hidden></p>
+</figure>
+
+<figure class="quiz" data-correct="C" data-explain="Right. The app runs without SMTP — it just won't send email notifications. So you can defer email setup until after the first successful deploy.">
+  <p class="quiz-q">Which env var group is optional — the app runs without it?</p>
+  <ul class="quiz-opts">
+    <li><button data-k="A">Database vars</button></li>
+    <li><button data-k="B">Auth vars</button></li>
+    <li><button data-k="C">SMTP vars</button></li>
+    <li><button data-k="D">None — all are required</button></li>
+  </ul>
+  <p class="quiz-feedback" hidden></p>
+</figure>
+
+<div class="win">
+  <p class="h">Your win for this lesson</p>
+  <p>You can now look at a <code>DATABASE_URL</code> that says <code>localhost</code> and know immediately: "that will crash inside a container." And you know which three groups exist, which are required, and how env vars actually reach the running app.</p>
+</div>
+
+<h2>Do this next</h2>
+<ul class="step">
+  <li>Open your repo's <code>.env</code> and <code>.env.example</code> side by side. Notice which variables are in one but not the other — and why <code>.env.example</code> uses <code>db</code> while <code>.env</code> uses <code>localhost</code>.</li>
+  <li>Open Coolify → your app → Environment Variables. Check what <code>DATABASE_URL</code> currently says. If it says <code>localhost</code>, you've found the bug.</li>
+  <li><strong>Primary source:</strong> <a href="https://docs.docker.com/compose/environment-variables/" target="_blank" rel="noopener">Docker Compose environment variables</a> — official docs on how env vars flow from <code>.env</code> → Compose → container.</li>
+</ul>
+
+<div class="ask">
+  <p class="h">Still cloudy?</p>
+  <p>Ask me: "Why can't the container just read <code>.env</code>?" or "How do I find the database hostname in Coolify?" — each one is a follow-up I can walk you through.</p>
+</div>
+
+</main>
+
+<nav class="lesson-nav">
+  <a href="0001b-image-vs-container-reteach.html">← Lesson 0001b: image vs container</a>
+  <span>Next: how Dockerfile builds and Coolify builds differ</span>
+</nav>
+
+<footer class="lesson-foot">
+  Lesson 0002 of the <em>Deploy deplacementapp on Coolify</em> course.
+  See <a href="../MISSION.md">MISSION.md</a>, <a href="../reference/GLOSSARY.md">GLOSSARY.md</a>, and the <a href="../.env.example">.env.example</a> in your repo.
+</footer>
+
+</body>
+</html>
