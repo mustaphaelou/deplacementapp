@@ -7,7 +7,7 @@ import {
   InvalidTransitionError,
 } from "./errors"
 import { canTransition, buildTransition, fromLegacyStatus } from "./workflow"
-import type { WorkflowAction } from "./workflow"
+import type { WorkflowAction, Decision } from "./workflow"
 import type { Actor } from "./demande-types"
 
 export class DemandeWorkflow {
@@ -40,7 +40,7 @@ export class DemandeWorkflow {
       throw new UnauthorizedActionError()
     }
 
-    const transitionParams: { comment?: string; assigneAId?: string; decision?: string } = { decision }
+    const transitionParams: { comment?: string; assigneAId?: string; decision?: Decision } = { decision }
     if (action === "approuver") {
       transitionParams.assigneAId = actor.id
       if (params.comment) transitionParams.comment = params.comment

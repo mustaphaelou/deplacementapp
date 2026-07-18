@@ -15,6 +15,9 @@
     "prisma:seed": "tsx prisma/seed.ts",
     "test": "vitest run",
     "test:watch": "vitest",
+    "docker:dev": "docker compose -f compose.yml -f compose.dev.yml up --build",
+    "docker:prod": "docker compose up --build",
+    "docker:down": "docker compose down -v",
     "postinstall": "prisma generate"
   },
   "prisma": {

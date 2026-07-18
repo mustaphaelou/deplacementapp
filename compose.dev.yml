@@ -9,6 +9,7 @@ services:
 
   app:
     environment:
+      - HOSTNAME=0.0.0.0
       - DATABASE_URL=postgresql://user:pass@db:5432/hay2010
       - NEXTAUTH_SECRET=dev-secret-not-for-production-use
       - NEXTAUTH_URL=http://localhost:${PORT:-3000}
