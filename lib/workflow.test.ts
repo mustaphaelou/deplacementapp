@@ -7,6 +7,10 @@ import {
   getAllowedActions,
   canTransitionFromLegacy,
   buildTransitionFromLegacy,
+  queueStatuts,
+  committedStatuts,
+  rollupStatuts,
+  laneOrderByColumn,
 } from "./workflow"
 
 // ─── Legacy mappers ──────────────────────────────────────────────────────────
@@ -96,6 +100,94 @@ describe("fromLegacyStatus", () => {
 
   it("maps RETIREE to DRAFT+WITHDRAWN", () => {
     expect(fromLegacyStatus("RETIREE")).toEqual({ etape: "DRAFT", decision: "WITHDRAWN" })
+  })
+})
+
+// ─── Read-model: queueStatuts ────────────────────────────────────────────────
+
+describe("queueStatuts", () => {
+  it("returns BROUILLON for EMPLOYEE", () => {
+    expect(queueStatuts("EMPLOYEE")).toEqual(["BROUILLON"])
+  })
+
+  it("returns SOUMISE for MANAGER", () => {
+    expect(queueStatuts("MANAGER")).toEqual(["SOUMISE"])
+  })
+
+  it("returns APPROUVEE_MANAGER for FINANCE_ADMIN", () => {
+    expect(queueStatuts("FINANCE_ADMIN")).toEqual(["APPROUVEE_MANAGER"])
+  })
+
+  it("returns APPROUVEE_FINANCE for GENERAL_DIRECTION", () => {
+    expect(queueStatuts("GENERAL_DIRECTION")).toEqual(["APPROUVEE_FINANCE"])
+  })
+})
+
+// ─── Read-model: committedStatuts ────────────────────────────────────────────
+
+describe("committedStatuts", () => {
+  it("returns APPROUVEE for EMPLOYEE", () => {
+    expect(committedStatuts("EMPLOYEE")).toEqual(["APPROUVEE"])
+  })
+
+  it("returns APPROUVEE for MANAGER", () => {
+    expect(committedStatuts("MANAGER")).toEqual(["APPROUVEE"])
+  })
+
+  it("returns APPROUVEE for FINANCE_ADMIN", () => {
+    expect(committedStatuts("FINANCE_ADMIN")).toEqual(["APPROUVEE"])
+  })
+
+  it("returns the full approved-and-pending budget set for GENERAL_DIRECTION", () => {
+    expect(committedStatuts("GENERAL_DIRECTION")).toEqual([
+      "APPROUVEE",
+      "APPROUVEE_FINANCE",
+      "APPROUVEE_MANAGER",
+    ])
+  })
+})
+
+// ─── Read-model: rollupStatuts ───────────────────────────────────────────────
+
+describe("rollupStatuts", () => {
+  it("returns active-and-approved stages for EMPLOYEE", () => {
+    expect(rollupStatuts("EMPLOYEE")).toEqual(["BROUILLON", "SOUMISE", "APPROUVEE"])
+  })
+
+  it("returns the queue view for MANAGER", () => {
+    expect(rollupStatuts("MANAGER")).toEqual(["SOUMISE"])
+  })
+
+  it("returns the queue view for FINANCE_ADMIN", () => {
+    expect(rollupStatuts("FINANCE_ADMIN")).toEqual(["APPROUVEE_MANAGER"])
+  })
+
+  it("returns the queue view for GENERAL_DIRECTION", () => {
+    expect(rollupStatuts("GENERAL_DIRECTION")).toEqual(["APPROUVEE_FINANCE"])
+  })
+})
+
+// ─── Read-model: laneOrderByColumn ───────────────────────────────────────────
+
+describe("laneOrderByColumn", () => {
+  it("orders MANAGER_REVIEW by soumiseLe desc", () => {
+    expect(laneOrderByColumn("MANAGER_REVIEW")).toEqual({ column: "soumiseLe", direction: "desc" })
+  })
+
+  it("orders FINANCE_REVIEW by approuveeManagerLe desc", () => {
+    expect(laneOrderByColumn("FINANCE_REVIEW")).toEqual({ column: "approuveeManagerLe", direction: "desc" })
+  })
+
+  it("orders DIRECTION_REVIEW by approuveeFinanceLe desc", () => {
+    expect(laneOrderByColumn("DIRECTION_REVIEW")).toEqual({ column: "approuveeFinanceLe", direction: "desc" })
+  })
+
+  it("orders FINAL by approuveeDirectionLe desc", () => {
+    expect(laneOrderByColumn("FINAL")).toEqual({ column: "approuveeDirectionLe", direction: "desc" })
+  })
+
+  it("orders DRAFT by retireeLe desc", () => {
+    expect(laneOrderByColumn("DRAFT")).toEqual({ column: "retireeLe", direction: "desc" })
   })
 })
 

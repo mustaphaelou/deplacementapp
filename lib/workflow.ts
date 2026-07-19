@@ -91,7 +91,7 @@ export interface TransitionEffect {
   setAssignee?: boolean
 }
 
-export const TRANSITION_EFFECTS: readonly TransitionEffect[] = [
+export const TRANSITION_EFFECTS = [
   {
     from: "DRAFT", action: "submit", to: "MANAGER_REVIEW",
     auditAction: "SOUMISSION", notificationEvent: "DEMANDE_SOUMISE",
@@ -132,7 +132,60 @@ export const TRANSITION_EFFECTS: readonly TransitionEffect[] = [
     auditAction: "RETRAIT", notificationEvent: "DEMANDE_RETIREE",
     timestamps: ["retireeLe"],
   },
-] as const
+] as const satisfies readonly TransitionEffect[]
+
+// ─── Read-model surface (dashboard-facing) ──────────────────────────────────
+
+export type TimestampColumn = (typeof TRANSITION_EFFECTS)[number]["timestamps"][number]
+
+export interface PipelineView {
+  queue: StatutDemande[]
+  committed: StatutDemande[]
+  rollup: StatutDemande[]
+}
+
+export const PIPELINE_VIEWS: Record<Role, PipelineView> = {
+  EMPLOYEE: {
+    queue: ["BROUILLON"],
+    committed: ["APPROUVEE"],
+    rollup: ["BROUILLON", "SOUMISE", "APPROUVEE"],
+  },
+  MANAGER: {
+    queue: ["SOUMISE"],
+    committed: ["APPROUVEE"],
+    rollup: ["SOUMISE"],
+  },
+  FINANCE_ADMIN: {
+    queue: ["APPROUVEE_MANAGER"],
+    committed: ["APPROUVEE"],
+    rollup: ["APPROUVEE_MANAGER"],
+  },
+  GENERAL_DIRECTION: {
+    queue: ["APPROUVEE_FINANCE"],
+    committed: ["APPROUVEE", "APPROUVEE_FINANCE", "APPROUVEE_MANAGER"],
+    rollup: ["APPROUVEE_FINANCE"],
+  },
+}
+
+export function queueStatuts(role: Role): StatutDemande[] {
+  return PIPELINE_VIEWS[role].queue
+}
+
+export function committedStatuts(role: Role): StatutDemande[] {
+  return PIPELINE_VIEWS[role].committed
+}
+
+export function rollupStatuts(role: Role): StatutDemande[] {
+  return PIPELINE_VIEWS[role].rollup
+}
+
+export function laneOrderByColumn(etape: Etape): { column: TimestampColumn; direction: "desc" } {
+  const effect = TRANSITION_EFFECTS.find((e) => e.to === etape)
+  if (!effect) {
+    throw new Error(`Aucun effet de transition ne cible l'étape: ${etape}`)
+  }
+  return { column: effect.timestamps[0], direction: "desc" }
+}
 
 // ─── Public API (kept stable) ────────────────────────────────────────────────
 
