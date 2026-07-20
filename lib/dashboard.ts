@@ -2,7 +2,7 @@ import type { Role } from "@prisma/client"
 import { formatCurrency } from "@/lib/constants"
 import { demandeService } from "./demande-service"
 import type { DemandeQueriesPort } from "./demande-queries"
-import { queueStatuts, committedStatuts, rollupStatuts, laneOrderByColumn } from "./workflow"
+import { queueStatuts, committedStatuts, rollupStatuts, laneOrderByColumn, type Etape } from "./workflow"
 
 export interface DashboardDemandeSummary {
   id: string
@@ -49,6 +49,22 @@ export interface DashboardConfig {
 export interface DashboardPayload {
   config: DashboardConfig
   demandes: DashboardDemandeSummary[]
+}
+
+// ─── Shared fetch pattern ────────────────────────────────────────────────
+
+async function fetchQueueDemandes(
+  queries: DemandeQueriesPort,
+  role: Role,
+  lane: Etape
+): Promise<{ demandes: DashboardDemandeSummary[]; enAttente: number }> {
+  const queue = queueStatuts(role)
+  const order = laneOrderByColumn(lane)
+  const [demandes, queueCounts] = await Promise.all([
+    queries.findByStatuts(queue, { includeEmployee: true, limit: 10, orderBy: { period: order.column, direction: order.direction } }),
+    Promise.all(queue.map((s) => queries.countByStatut(s))),
+  ])
+  return { demandes, enAttente: queueCounts.reduce((a, b) => a + b, 0) }
 }
 
 // ─── Consolidated deep interface ───────────────────────────────────────────
@@ -103,14 +119,7 @@ export async function getDashboardPayload(
       }
     }
     case "MANAGER": {
-      const queue = queueStatuts(role)
-      const order = laneOrderByColumn("MANAGER_REVIEW")
-
-      const [demandes, queueCounts] = await Promise.all([
-        queries.findByStatuts(queue, { includeEmployee: true, limit: 10, orderBy: { period: order.column, direction: order.direction } }),
-        Promise.all(queue.map((s) => queries.countByStatut(s))),
-      ])
-      const enAttente = queueCounts.reduce((a, b) => a + b, 0)
+      const { demandes, enAttente } = await fetchQueueDemandes(queries, role, "MANAGER_REVIEW")
 
       return {
         config: {
@@ -135,14 +144,7 @@ export async function getDashboardPayload(
       }
     }
     case "FINANCE_ADMIN": {
-      const queue = queueStatuts(role)
-      const order = laneOrderByColumn("FINANCE_REVIEW")
-
-      const [demandes, queueCounts] = await Promise.all([
-        queries.findByStatuts(queue, { includeEmployee: true, limit: 10, orderBy: { period: order.column, direction: order.direction } }),
-        Promise.all(queue.map((s) => queries.countByStatut(s))),
-      ])
-      const enAttente = queueCounts.reduce((a, b) => a + b, 0)
+      const { demandes, enAttente } = await fetchQueueDemandes(queries, role, "FINANCE_REVIEW")
 
       return {
         config: {
@@ -167,16 +169,12 @@ export async function getDashboardPayload(
       }
     }
     case "GENERAL_DIRECTION": {
-      const queue = queueStatuts(role)
       const committed = committedStatuts(role)
-      const order = laneOrderByColumn("DIRECTION_REVIEW")
-
-      const [demandes, queueCounts, budgetTotal] = await Promise.all([
-        queries.findByStatuts(queue, { includeEmployee: true, limit: 10, orderBy: { period: order.column, direction: order.direction } }),
-        Promise.all(queue.map((s) => queries.countByStatut(s))),
+      const [queueResult, budgetTotal] = await Promise.all([
+        fetchQueueDemandes(queries, role, "DIRECTION_REVIEW"),
         queries.aggregateBudget(committed),
       ])
-      const enAttente = queueCounts.reduce((a, b) => a + b, 0)
+      const { demandes, enAttente } = queueResult
 
       return {
         config: {
