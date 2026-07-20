@@ -1,7 +1,8 @@
-import type { StatutDemande, Role } from "@prisma/client"
+import type { Role } from "@prisma/client"
 import { formatCurrency } from "@/lib/constants"
 import { demandeService } from "./demande-service"
 import type { DemandeQueriesPort } from "./demande-queries"
+import { queueStatuts, committedStatuts, rollupStatuts, laneOrderByColumn } from "./workflow"
 
 export interface DashboardDemandeSummary {
   id: string
@@ -50,25 +51,6 @@ export interface DashboardPayload {
   demandes: DashboardDemandeSummary[]
 }
 
-// ─── Pure function: stats aggregation ────────────────────────────────────────
-
-export interface DemandesStats {
-  total: number
-  brouillon: number
-  soumises: number
-  approuvees: number
-}
-
-export function computeStats(counts: { statut: string; _count: number }[]): DemandesStats {
-  const byStatut = Object.fromEntries(counts.map((g) => [g.statut, g._count]))
-  return {
-    total: Object.values(byStatut).reduce((a, b) => a + b, 0),
-    brouillon: byStatut["BROUILLON"] ?? 0,
-    soumises: byStatut["SOUMISE"] ?? 0,
-    approuvees: byStatut["APPROUVEE"] ?? 0,
-  }
-}
-
 // ─── Consolidated deep interface ───────────────────────────────────────────
 
 export async function getDashboardPayload(
@@ -79,22 +61,29 @@ export async function getDashboardPayload(
   const queries = svc ?? demandeService.queries
   switch (role) {
     case "EMPLOYEE": {
-      const [demandes, brouillon, soumises, approuvees] = await Promise.all([
+      const queue = queueStatuts(role)
+      const committed = committedStatuts(role)
+      const rollup = rollupStatuts(role)
+
+      const [demandes, rollupCounts] = await Promise.all([
         queries.findByEmployeeId(userId, 5),
-        queries.countByStatut("BROUILLON", userId),
-        queries.countByStatut("SOUMISE", userId),
-        queries.countByStatut("APPROUVEE", userId),
+        Promise.all(rollup.map((s) => queries.countByStatut(s, userId))),
       ])
-      const total = brouillon + soumises + approuvees
+
+      const countMap = Object.fromEntries(rollup.map((s, i) => [s, rollupCounts[i]]))
+      const queueCount = queue.reduce((sum, s) => sum + (countMap[s] ?? 0), 0)
+      const committedCount = committed.reduce((sum, s) => sum + (countMap[s] ?? 0), 0)
+      const total = rollupCounts.reduce((a, b) => a + b, 0)
+      const submittedCount = total - queueCount - committedCount
 
       return {
         config: {
           subtitle: "Bienvenue sur votre espace personnel",
           statPills: [
             { icon: "file-text", label: "Total", value: total, color: "blue" },
-            { icon: "clock", label: "Brouillons", value: brouillon, color: "amber" },
-            { icon: "alert-circle", label: "Soumises", value: soumises, color: "orange" },
-            { icon: "check-circle", label: "Approuvées", value: approuvees, color: "green" },
+            { icon: "clock", label: "Brouillons", value: queueCount, color: "amber" },
+            { icon: "alert-circle", label: "Soumises", value: submittedCount, color: "orange" },
+            { icon: "check-circle", label: "Approuvées", value: committedCount, color: "green" },
           ],
           table: {
             title: "Mes dernières demandes",
@@ -114,10 +103,14 @@ export async function getDashboardPayload(
       }
     }
     case "MANAGER": {
-      const [demandes, enAttente] = await Promise.all([
-        queries.findByStatuts(["SOUMISE"], { includeEmployee: true, limit: 10, orderBy: { soumiseLe: "desc" } }),
-        queries.countByStatut("SOUMISE"),
+      const queue = queueStatuts(role)
+      const order = laneOrderByColumn("MANAGER_REVIEW")
+
+      const [demandes, queueCounts] = await Promise.all([
+        queries.findByStatuts(queue, { includeEmployee: true, limit: 10, orderBy: { period: order.column, direction: order.direction } }),
+        Promise.all(queue.map((s) => queries.countByStatut(s))),
       ])
+      const enAttente = queueCounts.reduce((a, b) => a + b, 0)
 
       return {
         config: {
@@ -142,10 +135,14 @@ export async function getDashboardPayload(
       }
     }
     case "FINANCE_ADMIN": {
-      const [demandes, enAttente] = await Promise.all([
-        queries.findByStatuts(["APPROUVEE_MANAGER"], { includeEmployee: true, limit: 10, orderBy: { approuveeManagerLe: "desc" } }),
-        queries.countByStatut("APPROUVEE_MANAGER"),
+      const queue = queueStatuts(role)
+      const order = laneOrderByColumn("FINANCE_REVIEW")
+
+      const [demandes, queueCounts] = await Promise.all([
+        queries.findByStatuts(queue, { includeEmployee: true, limit: 10, orderBy: { period: order.column, direction: order.direction } }),
+        Promise.all(queue.map((s) => queries.countByStatut(s))),
       ])
+      const enAttente = queueCounts.reduce((a, b) => a + b, 0)
 
       return {
         config: {
@@ -170,11 +167,16 @@ export async function getDashboardPayload(
       }
     }
     case "GENERAL_DIRECTION": {
-      const [demandes, enAttente, budgetTotal] = await Promise.all([
-        queries.findByStatuts(["APPROUVEE_FINANCE"], { includeEmployee: true, limit: 10, orderBy: { approuveeFinanceLe: "desc" } }),
-        queries.countByStatut("APPROUVEE_FINANCE"),
-        queries.aggregateBudget(["APPROUVEE", "APPROUVEE_FINANCE", "APPROUVEE_MANAGER"]),
+      const queue = queueStatuts(role)
+      const committed = committedStatuts(role)
+      const order = laneOrderByColumn("DIRECTION_REVIEW")
+
+      const [demandes, queueCounts, budgetTotal] = await Promise.all([
+        queries.findByStatuts(queue, { includeEmployee: true, limit: 10, orderBy: { period: order.column, direction: order.direction } }),
+        Promise.all(queue.map((s) => queries.countByStatut(s))),
+        queries.aggregateBudget(committed),
       ])
+      const enAttente = queueCounts.reduce((a, b) => a + b, 0)
 
       return {
         config: {

@@ -76,7 +76,7 @@ describe("Dashboard Module - getDashboardPayload", () => {
 
     expect(fakeService.findByStatuts).toHaveBeenCalledWith(
       ["SOUMISE"],
-      { includeEmployee: true, limit: 10, orderBy: { soumiseLe: "desc" } }
+      { includeEmployee: true, limit: 10, orderBy: { period: "soumiseLe", direction: "desc" } }
     )
 
     expect(payload.config.subtitle).toBe("Gérez les demandes de votre équipe")
@@ -115,7 +115,7 @@ describe("Dashboard Module - getDashboardPayload", () => {
 
     expect(fakeService.findByStatuts).toHaveBeenCalledWith(
       ["APPROUVEE_MANAGER"],
-      { includeEmployee: true, limit: 10, orderBy: { approuveeManagerLe: "desc" } }
+      { includeEmployee: true, limit: 10, orderBy: { period: "approuveeManagerLe", direction: "desc" } }
     )
 
     expect(payload.config.subtitle).toBe("Administration & Finances")
@@ -152,7 +152,7 @@ describe("Dashboard Module - getDashboardPayload", () => {
 
     expect(fakeService.findByStatuts).toHaveBeenCalledWith(
       ["APPROUVEE_FINANCE"],
-      { includeEmployee: true, limit: 10, orderBy: { approuveeFinanceLe: "desc" } }
+      { includeEmployee: true, limit: 10, orderBy: { period: "approuveeFinanceLe", direction: "desc" } }
     )
     expect(fakeService.countByStatut).toHaveBeenCalledWith("APPROUVEE_FINANCE")
     expect(fakeService.aggregateBudget).toHaveBeenCalledWith(
