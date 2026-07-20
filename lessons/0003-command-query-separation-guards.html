@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lesson: CQS and State Machine Guards</title>
+  <link rel="stylesheet" href="../assets/lesson.css">
+</head>
+<body>
+<h1>Lesson: Should you keep the query?</h1>
+
+<p>You're collapsing three guard layers into one. The question is: does <code>canTransition</code> survive?</p>
+
+<h2>The current design (before refactor)</h2>
+
+<pre><code>demande-workflow.ts:
+
+  // Layer 1: cheap boolean check (query)
+  if (!canTransition(role, etape, action, decision))
+    throw new UnauthorizedActionError()
+
+  // Layer 2: build (command) — returns null on failure
+  const result = buildTransition(role, etape, action, params)
+  if (!result) throw new InvalidTransitionError()</code></pre>
+
+<p>Two functions, two error types, two checks. The handoff says: make <code>buildTransition</code> the single decider that throws instead of returning <code>null</code>.</p>
+
+<div class="callout">
+  <strong>Key insight:</strong> In the new design, <code>buildTransition</code> does double duty — it BOTH validates the transition AND builds the payload. That makes it a <strong>command</strong> that can throw.
+</div>
+
+<h2>The trade-off</h2>
+
+<table>
+  <tr>
+    <th>If you keep <code>canTransition</code> as…</th>
+    <th>Pro</th>
+    <th>Con</th>
+  </tr>
+  <tr>
+    <td><strong>Exported</strong> (public)</td>
+    <td>UI can call it to show/hide action buttons without try/catch</td>
+    <td>Two public entry points to reason about; someone might add a third layer again</td>
+  </tr>
+  <tr>
+    <td><strong>Internal only</strong> (not exported)</td>
+    <td>Still available inside <code>workflow.ts</code> for <code>getAllowedActions</code>; not leaked to callers</td>
+    <td>None — this is the sweet spot if <code>getAllowedActions</code> has a future use</td>
+  </tr>
+  <tr>
+    <td><strong>Deleted</strong></td>
+    <td>Zero dead code; one entry point</td>
+    <td>No cheap query exists. If the UI needs action buttons later, you reintroduce a query or use try/catch</td>
+  </tr>
+</table>
+
+<h2>The crux: <code>getAllowedActions</code></h2>
+
+<p><code>getAllowedActions</code> currently has <strong>zero production callers</strong> — only tests. It wraps 4 calls to <code>canTransition</code> plus ownership checks:</p>
+
+<pre><code>getAllowedActions(role, userId, demande) → {
+  canSubmit:   canTransition(r, etape, "submit",    decision) && isOwner,
+  canApprove:  canTransition(r, etape, "approuver", decision),
+  canReject:   canTransition(r, etape, "rejeter",   decision),
+  canWithdraw: canTransition(r, etape, "retirer",   decision) && isOwner,
+}</code></pre>
+
+<div class="callout callout-warn">
+  <strong>Warning:</strong> Even though <code>getAllowedActions</code> has no callers today, the <em>reason</em> it exists is obvious — the UI needs to know which buttons to render. Deleting it means work later when someone builds the UI actions panel.
+</div>
+
+<h2>The recommendation</h2>
+
+<p>The handoff suggests option <strong>keep it internal</strong> — and I agree. Here's why:</p>
+
+<ul>
+  <li><code>canTransition</code> stays in <code>workflow.ts</code> but isn't exported from the module.</li>
+  <li><code>getAllowedActions</code> still uses it internally — you delete <code>getAllowedActions</code> from exports too (zero callers), but the pattern is preserved <em>inside</em> the module if you ever need to re-export it.</li>
+  <li><code>buildTransition</code> throws <code>UnauthorizedActionError</code> for role/policy guards and <code>InvalidTransitionError</code> for terminal/invalid state.</li>
+  <li><code>demande-workflow.ts</code> drops the <code>canTransition</code> call — it just calls <code>buildTransition</code> and lets it throw.</li>
+</ul>
+
+<h2>Check your understanding</h2>
+
+<ol>
+  <li>What happens if someone calls <code>buildTransition</code> from a UI component to decide whether to show a button?</li>
+  <li>What's the difference between a function returning <code>false</code> vs throwing — which one is "control flow" and which is "exceptional"?</li>
+  <li>If <code>getAllowedActions</code> is deleted, where would you add it back when the UI needs it?</li>
+</ol>
+
+<p><em>Ask me follow-up questions if any of this is unclear.</em></p>
+</body>
+</html>
