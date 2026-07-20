@@ -38,7 +38,7 @@ export interface DemandeQueriesPort {
   ): Promise<DemandeWithRelations & DemandeFindByIdExtra<I>>
   findMany(role: string, userId: string, params: DemandeQueryParams): Promise<{ demandes: DashboardDemandeSummary[]; total: number }>
   findByEmployeeId(userId: string, limit?: number): Promise<DashboardDemandeSummary[]>
-  findByStatuts(statuts: StatutDemande[], opts?: { limit?: number; includeEmployee?: boolean; orderBy?: any | OrderByTimestamp }): Promise<DashboardDemandeSummary[]>
+  findByStatuts(statuts: StatutDemande[], opts?: { limit?: number; includeEmployee?: boolean; orderBy?: OrderByTimestamp }): Promise<DashboardDemandeSummary[]>
   countByStatut(statut: StatutDemande, userId?: string): Promise<number>
   aggregateBudget(statuts: StatutDemande[]): Promise<number>
   findAllForExport(): Promise<DemandeExportRow[]>
@@ -144,12 +144,10 @@ export class DemandeQueries {
 
   async findByStatuts(
     statuts: StatutDemande[],
-    opts: { limit?: number; includeEmployee?: boolean; orderBy?: any | OrderByTimestamp } = {}
+    opts: { limit?: number; includeEmployee?: boolean; orderBy?: OrderByTimestamp } = {}
   ): Promise<DashboardDemandeSummary[]> {
-    const { limit = 10, includeEmployee = false, orderBy = { creeLe: "desc" } } = opts
-    const prismaOrderBy = orderBy && "period" in orderBy
-      ? { [orderBy.period]: orderBy.direction }
-      : orderBy
+    const { limit = 10, includeEmployee = false, orderBy = { period: "creeLe" as TimestampColumn, direction: "desc" as const } } = opts
+    const prismaOrderBy = { [orderBy.period]: orderBy.direction }
     const demandes = await this.db.demandeDeplacement.findMany({
       where: { statut: { in: statuts }, deletedAt: null },
       orderBy: prismaOrderBy,

@@ -20,9 +20,7 @@ describe("Dashboard Module - getDashboardPayload", () => {
       },
     ]
 
-    const fakeService: DemandeQueriesPort = {
-      findById: vi.fn(),
-      findMany: vi.fn(),
+    const fakeService = {
       findByEmployeeId: vi.fn().mockResolvedValue(mockDemandes as DashboardDemandeSummary[]),
       findByStatuts: vi.fn(),
       countByStatut: vi.fn().mockImplementation((statut: string) => {
@@ -31,10 +29,9 @@ describe("Dashboard Module - getDashboardPayload", () => {
         return Promise.resolve(0)
       }),
       aggregateBudget: vi.fn(),
-      findAllForExport: vi.fn(),
-    }
+    } satisfies Partial<DemandeQueriesPort>
 
-    const payload = await getDashboardPayload("user-emp", "EMPLOYEE", fakeService)
+    const payload = await getDashboardPayload("user-emp", "EMPLOYEE", fakeService as unknown as DemandeQueriesPort)
 
     expect(payload.config.subtitle).toBe("Bienvenue sur votre espace personnel")
     expect(payload.config.statPills).toEqual([
@@ -62,17 +59,14 @@ describe("Dashboard Module - getDashboardPayload", () => {
       },
     ]
 
-    const fakeService: DemandeQueriesPort = {
-      findById: vi.fn(),
-      findMany: vi.fn(),
+    const fakeService = {
       findByEmployeeId: vi.fn(),
       findByStatuts: vi.fn().mockResolvedValue(mockDemandes as DashboardDemandeSummary[]),
       countByStatut: vi.fn().mockResolvedValue(1),
       aggregateBudget: vi.fn(),
-      findAllForExport: vi.fn(),
-    }
+    } satisfies Partial<DemandeQueriesPort>
 
-    const payload = await getDashboardPayload("user-mgr", "MANAGER", fakeService)
+    const payload = await getDashboardPayload("user-mgr", "MANAGER", fakeService as unknown as DemandeQueriesPort)
 
     expect(fakeService.findByStatuts).toHaveBeenCalledWith(
       ["SOUMISE"],
@@ -101,17 +95,14 @@ describe("Dashboard Module - getDashboardPayload", () => {
       },
     ]
 
-    const fakeService: DemandeQueriesPort = {
-      findById: vi.fn(),
-      findMany: vi.fn(),
+    const fakeService = {
       findByEmployeeId: vi.fn(),
       findByStatuts: vi.fn().mockResolvedValue(mockDemandes as DashboardDemandeSummary[]),
       countByStatut: vi.fn().mockResolvedValue(1),
       aggregateBudget: vi.fn(),
-      findAllForExport: vi.fn(),
-    }
+    } satisfies Partial<DemandeQueriesPort>
 
-    const payload = await getDashboardPayload("user-fin", "FINANCE_ADMIN", fakeService)
+    const payload = await getDashboardPayload("user-fin", "FINANCE_ADMIN", fakeService as unknown as DemandeQueriesPort)
 
     expect(fakeService.findByStatuts).toHaveBeenCalledWith(
       ["APPROUVEE_MANAGER"],
@@ -138,17 +129,14 @@ describe("Dashboard Module - getDashboardPayload", () => {
       },
     ]
 
-    const fakeService: DemandeQueriesPort = {
-      findById: vi.fn(),
-      findMany: vi.fn(),
+    const fakeService = {
       findByEmployeeId: vi.fn(),
       findByStatuts: vi.fn().mockResolvedValue(mockDemandes as DashboardDemandeSummary[]),
       countByStatut: vi.fn().mockResolvedValue(1),
       aggregateBudget: vi.fn().mockResolvedValue(15000),
-      findAllForExport: vi.fn(),
-    }
+    } satisfies Partial<DemandeQueriesPort>
 
-    const payload = await getDashboardPayload("user-dir", "GENERAL_DIRECTION", fakeService)
+    const payload = await getDashboardPayload("user-dir", "GENERAL_DIRECTION", fakeService as unknown as DemandeQueriesPort)
 
     expect(fakeService.findByStatuts).toHaveBeenCalledWith(
       ["APPROUVEE_FINANCE"],
