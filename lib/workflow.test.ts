@@ -10,6 +10,10 @@ import {
   queueStatuts,
   committedStatuts,
   rollupStatuts,
+  queueEtapes,
+  committedEtapes,
+  rollupEtapes,
+  resolveStatuts,
   laneOrderByColumn,
 } from "./workflow"
 
@@ -164,6 +168,102 @@ describe("rollupStatuts", () => {
 
   it("returns the queue view for GENERAL_DIRECTION", () => {
     expect(rollupStatuts("GENERAL_DIRECTION")).toEqual(["APPROUVEE_FINANCE"])
+  })
+})
+
+// ─── Read-model: queueEtapes (Etape-based) ─────────────────────────────────────
+
+describe("queueEtapes", () => {
+  it("returns DRAFT for EMPLOYEE", () => {
+    expect(queueEtapes("EMPLOYEE")).toEqual(["DRAFT"])
+  })
+
+  it("returns MANAGER_REVIEW for MANAGER", () => {
+    expect(queueEtapes("MANAGER")).toEqual(["MANAGER_REVIEW"])
+  })
+
+  it("returns FINANCE_REVIEW for FINANCE_ADMIN", () => {
+    expect(queueEtapes("FINANCE_ADMIN")).toEqual(["FINANCE_REVIEW"])
+  })
+
+  it("returns DIRECTION_REVIEW for GENERAL_DIRECTION", () => {
+    expect(queueEtapes("GENERAL_DIRECTION")).toEqual(["DIRECTION_REVIEW"])
+  })
+})
+
+// ─── Read-model: committedEtapes (Etape-based) ────────────────────────────────
+
+describe("committedEtapes", () => {
+  it("returns FINAL for EMPLOYEE", () => {
+    expect(committedEtapes("EMPLOYEE")).toEqual(["FINAL"])
+  })
+
+  it("returns FINAL for MANAGER", () => {
+    expect(committedEtapes("MANAGER")).toEqual(["FINAL"])
+  })
+
+  it("returns FINAL for FINANCE_ADMIN", () => {
+    expect(committedEtapes("FINANCE_ADMIN")).toEqual(["FINAL"])
+  })
+
+  it("returns FINAL + DIRECTION_REVIEW + FINANCE_REVIEW for GENERAL_DIRECTION", () => {
+    expect(committedEtapes("GENERAL_DIRECTION")).toEqual([
+      "FINAL",
+      "DIRECTION_REVIEW",
+      "FINANCE_REVIEW",
+    ])
+  })
+})
+
+// ─── Read-model: rollupEtapes (Etape-based) ───────────────────────────────────
+
+describe("rollupEtapes", () => {
+  it("returns DRAFT + MANAGER_REVIEW + FINAL for EMPLOYEE", () => {
+    expect(rollupEtapes("EMPLOYEE")).toEqual(["DRAFT", "MANAGER_REVIEW", "FINAL"])
+  })
+
+  it("returns MANAGER_REVIEW for MANAGER", () => {
+    expect(rollupEtapes("MANAGER")).toEqual(["MANAGER_REVIEW"])
+  })
+
+  it("returns FINANCE_REVIEW for FINANCE_ADMIN", () => {
+    expect(rollupEtapes("FINANCE_ADMIN")).toEqual(["FINANCE_REVIEW"])
+  })
+
+  it("returns DIRECTION_REVIEW for GENERAL_DIRECTION", () => {
+    expect(rollupEtapes("GENERAL_DIRECTION")).toEqual(["DIRECTION_REVIEW"])
+  })
+})
+
+// ─── resolveStatuts ──────────────────────────────────────────────────────────
+
+describe("resolveStatuts", () => {
+  it("converts DRAFT to BROUILLON", () => {
+    expect(resolveStatuts(["DRAFT"])).toEqual(["BROUILLON"])
+  })
+
+  it("converts MANAGER_REVIEW to SOUMISE", () => {
+    expect(resolveStatuts(["MANAGER_REVIEW"])).toEqual(["SOUMISE"])
+  })
+
+  it("converts FINANCE_REVIEW to APPROUVEE_MANAGER", () => {
+    expect(resolveStatuts(["FINANCE_REVIEW"])).toEqual(["APPROUVEE_MANAGER"])
+  })
+
+  it("converts DIRECTION_REVIEW to APPROUVEE_FINANCE", () => {
+    expect(resolveStatuts(["DIRECTION_REVIEW"])).toEqual(["APPROUVEE_FINANCE"])
+  })
+
+  it("converts FINAL to APPROUVEE", () => {
+    expect(resolveStatuts(["FINAL"])).toEqual(["APPROUVEE"])
+  })
+
+  it("converts multiple etapes in order", () => {
+    expect(resolveStatuts(["DRAFT", "MANAGER_REVIEW", "FINAL"])).toEqual([
+      "BROUILLON",
+      "SOUMISE",
+      "APPROUVEE",
+    ])
   })
 })
 

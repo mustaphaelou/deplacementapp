@@ -2,7 +2,7 @@ import type { Role } from "@prisma/client"
 import { formatCurrency } from "@/lib/constants"
 import { demandeService } from "./demande-service"
 import type { DemandeQueriesPort } from "./demande-queries"
-import { queueStatuts, committedStatuts, rollupStatuts, laneOrderByColumn, type Etape } from "./workflow"
+import { queueEtapes, committedEtapes, rollupEtapes, resolveStatuts, laneOrderByColumn, type Etape } from "./workflow"
 
 export interface DashboardDemandeSummary {
   id: string
@@ -58,10 +58,10 @@ async function fetchQueueDemandes(
   role: Role,
   lane: Etape
 ): Promise<{ demandes: DashboardDemandeSummary[]; enAttente: number }> {
-  const queue = queueStatuts(role)
+  const queue = resolveStatuts(queueEtapes(role))
   const order = laneOrderByColumn(lane)
   const [demandes, queueCounts] = await Promise.all([
-    queries.findByStatuts(queue, { includeEmployee: true, limit: 10, orderBy: { period: order.column, direction: order.direction } }),
+    queries.findByStatuts(queue, { includeEmployee: true, limit: 10, orderBy: order }),
     Promise.all(queue.map((s) => queries.countByStatut(s))),
   ])
   return { demandes, enAttente: queueCounts.reduce((a, b) => a + b, 0) }
@@ -77,9 +77,9 @@ export async function getDashboardPayload(
   const queries = svc ?? demandeService.queries
   switch (role) {
     case "EMPLOYEE": {
-      const queue = queueStatuts(role)
-      const committed = committedStatuts(role)
-      const rollup = rollupStatuts(role)
+      const queue = resolveStatuts(queueEtapes(role))
+      const committed = resolveStatuts(committedEtapes(role))
+      const rollup = resolveStatuts(rollupEtapes(role))
 
       const [demandes, rollupCounts] = await Promise.all([
         queries.findByEmployeeId(userId, 5),
@@ -136,7 +136,7 @@ export async function getDashboardPayload(
               { id: "date", label: "Date", hideAt: "md" },
               { id: "statut", label: "Statut" },
             ],
-            viewAllHref: "/demandes?statut=SOUMISE",
+            viewAllHref: `/demandes?statut=${resolveStatuts(queueEtapes(role))[0]}`,
             emptyMessage: "Aucune demande en attente.",
           },
         },
@@ -161,7 +161,7 @@ export async function getDashboardPayload(
               { id: "total", label: "Total", hideAt: "md" },
               { id: "statut", label: "Statut" },
             ],
-            viewAllHref: "/demandes?statut=APPROUVEE_MANAGER",
+            viewAllHref: `/demandes?statut=${resolveStatuts(queueEtapes(role))[0]}`,
             emptyMessage: "Aucune demande en attente.",
           },
         },
@@ -169,7 +169,7 @@ export async function getDashboardPayload(
       }
     }
     case "GENERAL_DIRECTION": {
-      const committed = committedStatuts(role)
+      const committed = resolveStatuts(committedEtapes(role))
       const [queueResult, budgetTotal] = await Promise.all([
         fetchQueueDemandes(queries, role, "DIRECTION_REVIEW"),
         queries.aggregateBudget(committed),
@@ -192,7 +192,7 @@ export async function getDashboardPayload(
               { id: "total", label: "Total", hideAt: "md" },
               { id: "statut", label: "Statut" },
             ],
-            viewAllHref: "/demandes?statut=APPROUVEE_FINANCE",
+            viewAllHref: `/demandes?statut=${resolveStatuts(queueEtapes(role))[0]}`,
             emptyMessage: "Aucune demande en attente.",
           },
         },

@@ -139,44 +139,63 @@ export const TRANSITION_EFFECTS = [
 export type TimestampColumn = (typeof TRANSITION_EFFECTS)[number]["timestamps"][number]
 
 export interface PipelineView {
-  queue: StatutDemande[]
-  committed: StatutDemande[]
-  rollup: StatutDemande[]
+  queue: Etape[]
+  committed: Etape[]
+  rollup: Etape[]
 }
 
 export const PIPELINE_VIEWS: Record<Role, PipelineView> = {
   EMPLOYEE: {
-    queue: ["BROUILLON"],
-    committed: ["APPROUVEE"],
-    rollup: ["BROUILLON", "SOUMISE", "APPROUVEE"],
+    queue: ["DRAFT"],
+    committed: ["FINAL"],
+    rollup: ["DRAFT", "MANAGER_REVIEW", "FINAL"],
   },
   MANAGER: {
-    queue: ["SOUMISE"],
-    committed: ["APPROUVEE"],
-    rollup: ["SOUMISE"],
+    queue: ["MANAGER_REVIEW"],
+    committed: ["FINAL"],
+    rollup: ["MANAGER_REVIEW"],
   },
   FINANCE_ADMIN: {
-    queue: ["APPROUVEE_MANAGER"],
-    committed: ["APPROUVEE"],
-    rollup: ["APPROUVEE_MANAGER"],
+    queue: ["FINANCE_REVIEW"],
+    committed: ["FINAL"],
+    rollup: ["FINANCE_REVIEW"],
   },
   GENERAL_DIRECTION: {
-    queue: ["APPROUVEE_FINANCE"],
-    committed: ["APPROUVEE", "APPROUVEE_FINANCE", "APPROUVEE_MANAGER"],
-    rollup: ["APPROUVEE_FINANCE"],
+    queue: ["DIRECTION_REVIEW"],
+    committed: ["FINAL", "DIRECTION_REVIEW", "FINANCE_REVIEW"],
+    rollup: ["DIRECTION_REVIEW"],
   },
 }
 
-export function queueStatuts(role: Role): StatutDemande[] {
+export function queueEtapes(role: Role): Etape[] {
   return PIPELINE_VIEWS[role].queue
 }
 
-export function committedStatuts(role: Role): StatutDemande[] {
+export function committedEtapes(role: Role): Etape[] {
   return PIPELINE_VIEWS[role].committed
 }
 
-export function rollupStatuts(role: Role): StatutDemande[] {
+export function rollupEtapes(role: Role): Etape[] {
   return PIPELINE_VIEWS[role].rollup
+}
+
+export function resolveStatuts(etapes: Etape[]): StatutDemande[] {
+  return etapes.map((e) => toLegacyStatus(e, "PENDING"))
+}
+
+/** @deprecated Use queueEtapes() + resolveStatuts() instead */
+export function queueStatuts(role: Role): StatutDemande[] {
+  return resolveStatuts(queueEtapes(role))
+}
+
+/** @deprecated Use committedEtapes() + resolveStatuts() instead */
+export function committedStatuts(role: Role): StatutDemande[] {
+  return resolveStatuts(committedEtapes(role))
+}
+
+/** @deprecated Use rollupEtapes() + resolveStatuts() instead */
+export function rollupStatuts(role: Role): StatutDemande[] {
+  return resolveStatuts(rollupEtapes(role))
 }
 
 export function laneOrderByColumn(etape: Etape): { column: TimestampColumn; direction: "desc" } {
