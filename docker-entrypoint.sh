@@ -8,4 +8,4 @@ echo "==> Seeding reference data..."
 node prisma/seed-production.js
 
 echo "==> Starting application..."
-node server.js
+HOSTNAME=0.0.0.0 node server.js

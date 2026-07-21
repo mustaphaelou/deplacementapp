@@ -5,6 +5,7 @@ services:
     expose:
       - "3000"
     environment:
+      - HOSTNAME=0.0.0.0
       - DATABASE_URL=${DATABASE_URL}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
       - NEXTAUTH_URL=${NEXTAUTH_URL}
