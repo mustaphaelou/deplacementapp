@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -12,22 +12,9 @@ import { Loader2 } from "lucide-react"
 
 export default function LoginPage() {
   const router = useRouter()
-  const [checking, setChecking] = useState(true)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
-
-  useEffect(() => {
-    fetch("/api/setup")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.setupNeeded) {
-          router.replace("/setup")
-        }
-        setChecking(false)
-      })
-      .catch(() => setChecking(false))
-  }, [router])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -48,14 +35,6 @@ export default function LoginPage() {
 
     router.push("/")
     router.refresh()
-  }
-
-  if (checking) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Loader2 className="size-8 animate-spin text-muted-foreground" />
-      </div>
-    )
   }
 
   return (
