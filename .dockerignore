@@ -10,3 +10,10 @@ coverage
 error.log
 *.tsbuildinfo
 architecture-report-*.html
+.gitattributes
+.prettierignore
+.prettierrc
+docker-compose*.yml
+Dockerfile
+eslint.config.mjs
+vitest.config.ts

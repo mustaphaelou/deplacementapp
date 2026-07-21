@@ -7,6 +7,12 @@ services:
       - POSTGRES_USER=user
       - POSTGRES_PASSWORD=pass
       - POSTGRES_DB=hay2010
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d hay2010"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
 
   app:
     depends_on:
