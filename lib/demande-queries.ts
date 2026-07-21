@@ -4,7 +4,7 @@ import type { DemandeWithRelations } from "./demande-types"
 import { DemandeNotFoundError } from "./errors"
 import type { TimestampColumn } from "./workflow"
 
-export type OrderByTimestamp = { period: TimestampColumn; direction: "asc" | "desc" }
+export type OrderByTimestamp = { column: TimestampColumn; direction: "asc" | "desc" }
 
 export interface DemandeExportRow {
   numero: string
@@ -146,8 +146,8 @@ export class DemandeQueries {
     statuts: StatutDemande[],
     opts: { limit?: number; includeEmployee?: boolean; orderBy?: OrderByTimestamp } = {}
   ): Promise<DashboardDemandeSummary[]> {
-    const { limit = 10, includeEmployee = false, orderBy = { period: "creeLe" as TimestampColumn, direction: "desc" as const } } = opts
-    const prismaOrderBy = { [orderBy.period]: orderBy.direction }
+    const { limit = 10, includeEmployee = false, orderBy = { column: "creeLe" as TimestampColumn, direction: "desc" as const } } = opts
+    const prismaOrderBy = { [orderBy.column]: orderBy.direction }
     const demandes = await this.db.demandeDeplacement.findMany({
       where: { statut: { in: statuts }, deletedAt: null },
       orderBy: prismaOrderBy,
