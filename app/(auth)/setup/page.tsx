@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,19 +9,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
 
-export default function LoginPage() {
+export default function SetupPage() {
   const router = useRouter()
+  const [loading, setLoading] = useState(false)
   const [checking, setChecking] = useState(true)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [loading, setLoading] = useState(false)
+  const [nom, setNom] = useState("")
+  const [prenom, setPrenom] = useState("")
 
   useEffect(() => {
     fetch("/api/setup")
       .then((r) => r.json())
       .then((data) => {
-        if (data.setupNeeded) {
-          router.replace("/setup")
+        if (!data.setupNeeded) {
+          router.replace("/login")
         }
         setChecking(false)
       })
@@ -33,21 +34,22 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
 
-    const result = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
+    const res = await fetch("/api/setup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, nom, prenom }),
     })
 
     setLoading(false)
 
-    if (result?.error) {
-      toast.error("Email ou mot de passe incorrect")
+    if (!res.ok) {
+      const data = await res.json()
+      toast.error(data.error || "Erreur lors de la création")
       return
     }
 
-    router.push("/")
-    router.refresh()
+    toast.success("Administrateur créé avec succès")
+    router.push("/login")
   }
 
   if (checking) {
@@ -67,17 +69,37 @@ export default function LoginPage() {
               H
             </div>
           </div>
-          <CardTitle>HAY 2010 SARL</CardTitle>
-          <CardDescription>Connexion à votre espace de travail</CardDescription>
+          <CardTitle>Configuration initiale</CardTitle>
+          <CardDescription>Créez le compte administrateur principal</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="prenom">Prénom</Label>
+              <Input
+                id="prenom"
+                placeholder="Ahmed"
+                value={prenom}
+                onChange={(e) => setPrenom(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="nom">Nom</Label>
+              <Input
+                id="nom"
+                placeholder="Directeur"
+                value={nom}
+                onChange={(e) => setNom(e.target.value)}
+                required
+              />
+            </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="vous@hay2010.ma"
+                placeholder="directeur@hay2010.ma"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -92,16 +114,14 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                minLength={6}
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading && <Loader2 className="mr-2 size-4 animate-spin" />}
-              Se connecter
+              Créer l'administrateur
             </Button>
           </form>
-          <p className="mt-4 text-center text-xs text-muted-foreground">
-            Application de gestion des demandes de déplacement
-          </p>
         </CardContent>
       </Card>
     </div>
