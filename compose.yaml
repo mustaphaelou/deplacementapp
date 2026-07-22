@@ -1,0 +1,36 @@
+services:
+  migrate:
+    build:
+      context: .
+      target: migrator
+    environment:
+      - DATABASE_URL=${DATABASE_URL:?Set DATABASE_URL in the Coolify UI}
+    restart: "no"
+
+  app:
+    build:
+      context: .
+      target: runner
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      - DATABASE_URL=${DATABASE_URL:?Set DATABASE_URL in the Coolify UI}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:?Set NEXTAUTH_SECRET in the Coolify UI}
+      - NEXTAUTH_URL=${NEXTAUTH_URL:?Set NEXTAUTH_URL in the Coolify UI}
+      - SMTP_HOST=${SMTP_HOST:?Set SMTP_HOST in the Coolify UI}
+      - SMTP_PORT=${SMTP_PORT:?Set SMTP_PORT in the Coolify UI}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM=${SMTP_FROM:?Set SMTP_FROM in the Coolify UI}
+    volumes:
+      - uploads:/app/public/uploads
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  uploads:

@@ -14,6 +14,12 @@ architecture-report-*.html
 .prettierignore
 .prettierrc
 docker-compose*.yml
+compose.yaml
+compose.dev.yml
 Dockerfile
 eslint.config.mjs
 vitest.config.ts
+docs
+reference
+learning-records
+lessons
