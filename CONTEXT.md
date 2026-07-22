@@ -93,6 +93,10 @@ _Avoid_: Profile picture, profile photo, user image
 **Document**:
 A file attached to a DemandeDeplacement (e.g., invoice, receipt, PDF). The `type` field is free-text (typically a MIME type or descriptive label), not a fixed enum.
 
+**Amorçage (Setup)**:
+The bootstrap lifecycle state of the system while zero Utilisateurs exist. It is not a persistent entity — it is a lifecycle state, detected by counting Utilisateurs. While in Amorçage, the /login page renders a setup wizard instead of the sign-in form; the wizard creates the initial Departements and the first Utilisateur (Role GENERAL_DIRECTION), after which the system leaves Amorçage permanently and the wizard never appears again.
+_Avoid_: Onboarding, initialization, installation
+
 ## Relationships
 
 - A **DemandeDeplacement** is created by exactly one **Utilisateur** (the employee).

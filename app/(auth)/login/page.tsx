@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -9,12 +9,31 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
+import { SetupWizard } from "./setup-wizard"
+
+interface SetupStatus {
+  needsSetup: boolean
+  departements: string[]
+}
 
 export default function LoginPage() {
   const router = useRouter()
+  const [setupStatus, setSetupStatus] = useState<SetupStatus | null>(null)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    fetch("/api/setup/status")
+      .then((r) => r.json())
+      .then((data) => {
+        setSetupStatus({
+          needsSetup: Boolean(data.needsSetup),
+          departements: Array.isArray(data.departements) ? data.departements : [],
+        })
+      })
+      .catch(() => setSetupStatus({ needsSetup: false, departements: [] }))
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -35,6 +54,18 @@ export default function LoginPage() {
 
     router.push("/")
     router.refresh()
+  }
+
+  if (setupStatus === null) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-muted/30">
+        <Loader2 className="size-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  if (setupStatus.needsSetup) {
+    return <SetupWizard initialDepartements={setupStatus.departements} />
   }
 
   return (

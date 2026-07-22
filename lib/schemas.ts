@@ -110,6 +110,20 @@ export const passwordChangeSchema = z.object({
   newPassword: z.string().min(6, "Le nouveau mot de passe doit contenir au moins 6 caractères"),
 })
 
+export const setupRegisterSchema = z.object({
+  departements: z
+    .array(z.string().min(1, "Nom de département requis"))
+    .min(1, "Ajoutez au moins un département"),
+  admin: z.object({
+    email: z.string().email("Email invalide"),
+    password: z.string().min(8, "Le mot de passe doit contenir au moins 8 caractères"),
+    nom: z.string().min(1, "Nom requis"),
+    prenom: z.string().min(1, "Prénom requis"),
+    poste: z.string().min(1, "Poste requis"),
+    departementNom: z.string().min(1, "Département requis"),
+  }),
+})
+
 export const demandeQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(10),
