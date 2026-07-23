@@ -1,6 +1,6 @@
 ﻿import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { demandeService } from "@/lib/demande-service";
+import { demandeService } from "@/lib/demande/di";
 import type { StatutDemande } from "@prisma/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency, STATUT_LABELS } from "@/lib/constants";

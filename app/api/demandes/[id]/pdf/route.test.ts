@@ -9,18 +9,14 @@ vi.mock("@/lib/auth-utils", () => ({
   requireAuth: vi.fn(),
 }))
 
-vi.mock("@/lib/demande-service", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/demande-service")>()
-  return {
-    ...actual,
-    demandeService: {
-      queries: {
-        findById: vi.fn(),
-      },
-      recordDocument: vi.fn().mockResolvedValue(undefined),
+vi.mock("@/lib/demande/di", () => ({
+  demandeService: {
+    queries: {
+      findById: vi.fn(),
     },
-  }
-})
+    recordDocument: vi.fn().mockResolvedValue(undefined),
+  },
+}))
 
 vi.mock("@/components/pdf/travel-request-pdf-adapter", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/components/pdf/travel-request-pdf-adapter")>()
@@ -157,7 +153,7 @@ describe("PDF route integration", () => {
 
   it("GET returns a PDF buffer when demande is found", async () => {
     const { requireAuth } = await import("@/lib/auth-utils")
-    const { demandeService } = await import("@/lib/demande-service")
+    const { demandeService } = await import("@/lib/demande/di")
     const { pdfAdapter } = await import("@/components/pdf/travel-request-pdf-adapter")
 
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
@@ -191,7 +187,7 @@ describe("PDF route integration", () => {
 
   it("GET returns 404 when demande is soft-deleted or missing", async () => {
     const { requireAuth } = await import("@/lib/auth-utils")
-    const { demandeService } = await import("@/lib/demande-service")
+    const { demandeService } = await import("@/lib/demande/di")
 
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
     ;(demandeService.queries.findById as ReturnType<typeof vi.fn>).mockRejectedValue(new DemandeNotFoundError())
@@ -206,7 +202,7 @@ describe("PDF route integration", () => {
 
   it("GET returns 500 when PDF render fails and does not create a document", async () => {
     const { requireAuth } = await import("@/lib/auth-utils")
-    const { demandeService } = await import("@/lib/demande-service")
+    const { demandeService } = await import("@/lib/demande/di")
     const { pdfAdapter } = await import("@/components/pdf/travel-request-pdf-adapter")
 
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())

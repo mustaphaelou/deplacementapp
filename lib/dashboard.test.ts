@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest"
 import { getDashboardPayload } from "./dashboard"
-import type { DemandeQueriesPort } from "./demande-queries"
+import type { DemandeQueryPort } from "./demande/ports/demande-query-port"
 import type { DashboardDemandeSummary } from "./dashboard"
 import { formatCurrency } from "@/lib/constants"
 
@@ -29,9 +29,9 @@ describe("Dashboard Module - getDashboardPayload", () => {
         return Promise.resolve(0)
       }),
       aggregateBudget: vi.fn(),
-    } satisfies Partial<DemandeQueriesPort>
+    } satisfies Partial<DemandeQueryPort>
 
-    const payload = await getDashboardPayload("user-emp", "EMPLOYEE", fakeService as unknown as DemandeQueriesPort)
+    const payload = await getDashboardPayload("user-emp", "EMPLOYEE", fakeService as unknown as DemandeQueryPort)
 
     expect(payload.config.subtitle).toBe("Bienvenue sur votre espace personnel")
     expect(payload.config.statPills).toEqual([
@@ -64,9 +64,9 @@ describe("Dashboard Module - getDashboardPayload", () => {
       findByStatuts: vi.fn().mockResolvedValue(mockDemandes as DashboardDemandeSummary[]),
       countByStatut: vi.fn().mockResolvedValue(1),
       aggregateBudget: vi.fn(),
-    } satisfies Partial<DemandeQueriesPort>
+    } satisfies Partial<DemandeQueryPort>
 
-    const payload = await getDashboardPayload("user-mgr", "MANAGER", fakeService as unknown as DemandeQueriesPort)
+    const payload = await getDashboardPayload("user-mgr", "MANAGER", fakeService as unknown as DemandeQueryPort)
 
     expect(fakeService.findByStatuts).toHaveBeenCalledWith(
       ["SOUMISE"],
@@ -100,9 +100,9 @@ describe("Dashboard Module - getDashboardPayload", () => {
       findByStatuts: vi.fn().mockResolvedValue(mockDemandes as DashboardDemandeSummary[]),
       countByStatut: vi.fn().mockResolvedValue(1),
       aggregateBudget: vi.fn(),
-    } satisfies Partial<DemandeQueriesPort>
+    } satisfies Partial<DemandeQueryPort>
 
-    const payload = await getDashboardPayload("user-fin", "FINANCE_ADMIN", fakeService as unknown as DemandeQueriesPort)
+    const payload = await getDashboardPayload("user-fin", "FINANCE_ADMIN", fakeService as unknown as DemandeQueryPort)
 
     expect(fakeService.findByStatuts).toHaveBeenCalledWith(
       ["APPROUVEE_MANAGER"],
@@ -134,9 +134,9 @@ describe("Dashboard Module - getDashboardPayload", () => {
       findByStatuts: vi.fn().mockResolvedValue(mockDemandes as DashboardDemandeSummary[]),
       countByStatut: vi.fn().mockResolvedValue(1),
       aggregateBudget: vi.fn().mockResolvedValue(15000),
-    } satisfies Partial<DemandeQueriesPort>
+    } satisfies Partial<DemandeQueryPort>
 
-    const payload = await getDashboardPayload("user-dir", "GENERAL_DIRECTION", fakeService as unknown as DemandeQueriesPort)
+    const payload = await getDashboardPayload("user-dir", "GENERAL_DIRECTION", fakeService as unknown as DemandeQueryPort)
 
     expect(fakeService.findByStatuts).toHaveBeenCalledWith(
       ["APPROUVEE_FINANCE"],

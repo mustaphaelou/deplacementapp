@@ -1,57 +1,11 @@
-import type { Document, Prisma, PrismaClient, StatutDemande } from "@prisma/client"
-import type { DashboardDemandeSummary } from "./dashboard"
-import type { DemandeWithRelations } from "./demande-types"
-import { DemandeNotFoundError } from "./errors"
-import type { TimestampColumn } from "./workflow"
+import type { PrismaClient, StatutDemande } from "@prisma/client"
+import type { DashboardDemandeSummary } from "../../dashboard"
+import type { DemandeWithRelations } from "../../demande-types"
+import { DemandeNotFoundError } from "../../errors"
+import type { DemandeQueryPort, DemandeQueryParams, DemandeFindByIdInclude, DemandeFindByIdExtra, DemandeExportRow, OrderByTimestamp } from "../ports/demande-query-port"
+import type { TimestampColumn } from "../../workflow"
 
-export type OrderByTimestamp = { column: TimestampColumn; direction: "asc" | "desc" }
-
-export interface DemandeExportRow {
-  numero: string
-  destination: string
-  dateDepart: Date
-  dateRetour: Date
-  typeTransport: string
-  totalEstime: number | null
-  statut: string
-  creeLe: Date
-  employe: { prenom: string; nom: string } | null
-}
-
-type DemandeFindByIdIncludableRelations = {
-  documents: Document
-}
-
-export type DemandeFindByIdInclude = {
-  [K in keyof DemandeFindByIdIncludableRelations]?: boolean
-}
-
-export type DemandeFindByIdExtra<I extends DemandeFindByIdInclude> = {
-  [K in keyof I & keyof DemandeFindByIdIncludableRelations as I[K] extends true ? K : never]: DemandeFindByIdIncludableRelations[K][]
-}
-
-export interface DemandeQueriesPort {
-  findById(id: string): Promise<DemandeWithRelations>
-  findById<I extends DemandeFindByIdInclude>(
-    id: string,
-    options: { include: I }
-  ): Promise<DemandeWithRelations & DemandeFindByIdExtra<I>>
-  findMany(role: string, userId: string, params: DemandeQueryParams): Promise<{ demandes: DashboardDemandeSummary[]; total: number }>
-  findByEmployeeId(userId: string, limit?: number): Promise<DashboardDemandeSummary[]>
-  findByStatuts(statuts: StatutDemande[], opts?: { limit?: number; includeEmployee?: boolean; orderBy?: OrderByTimestamp }): Promise<DashboardDemandeSummary[]>
-  countByStatut(statut: StatutDemande, userId?: string): Promise<number>
-  aggregateBudget(statuts: StatutDemande[]): Promise<number>
-  findAllForExport(): Promise<DemandeExportRow[]>
-}
-
-export interface DemandeQueryParams {
-  page: number
-  limit: number
-  statut?: string
-  recherche?: string
-}
-
-export class DemandeQueries {
+export class DemandeQueryAdapter implements DemandeQueryPort {
   constructor(private db: PrismaClient) {}
 
   private mapToDemandeSummary(demande: { id: string; numero: string; destination: string; dateDepart: Date; dateRetour: Date; totalEstime: { toNumber?: () => number } | number | null; statut: string; employe: { prenom: string; nom: string } | null }): DashboardDemandeSummary {
@@ -146,12 +100,12 @@ export class DemandeQueries {
     statuts: StatutDemande[],
     opts: { limit?: number; includeEmployee?: boolean; orderBy?: OrderByTimestamp } = {}
   ): Promise<DashboardDemandeSummary[]> {
-    const { limit = 10, includeEmployee = false, orderBy = { column: "creeLe" as TimestampColumn, direction: "desc" as const } } = opts
+    const { limit: take = 10, includeEmployee = false, orderBy = { column: "creeLe" as TimestampColumn, direction: "desc" as const } } = opts
     const prismaOrderBy = { [orderBy.column]: orderBy.direction }
     const demandes = await this.db.demandeDeplacement.findMany({
       where: { statut: { in: statuts }, deletedAt: null },
       orderBy: prismaOrderBy,
-      take: limit,
+      take,
       include: includeEmployee ? { employe: { select: { prenom: true, nom: true } } } : undefined,
     })
     return demandes.map((d) => this.mapToDemandeSummary(d))
@@ -161,7 +115,7 @@ export class DemandeQueries {
     statut: StatutDemande,
     userId?: string
   ): Promise<number> {
-    const where: Prisma.DemandeDeplacementCountArgs["where"] = {
+    const where: Record<string, unknown> = {
       statut,
       deletedAt: null,
     }

@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { demandeService, DemandeNotFoundError } from "@/lib/demande-service";
+import { demandeService } from "@/lib/demande/di";
+import { DemandeNotFoundError } from "@/lib/demande-service";
 import { DemandeDetail } from "@/components/demande-detail";
 import type { DemandeWithRelations } from "@/lib/demande-types";
 import { notFound } from "next/navigation";

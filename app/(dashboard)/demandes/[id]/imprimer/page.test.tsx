@@ -6,17 +6,13 @@ vi.mock("@/lib/auth", () => ({
   auth: vi.fn(),
 }))
 
-vi.mock("@/lib/demande-service", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/demande-service")>()
-  return {
-    ...actual,
-    demandeService: {
-      queries: {
-        findById: vi.fn(),
-      },
+vi.mock("@/lib/demande/di", () => ({
+  demandeService: {
+    queries: {
+      findById: vi.fn(),
     },
-  }
-})
+  },
+}))
 
 vi.mock("next/navigation", () => ({
   redirect: vi.fn((path: string) => {
@@ -111,7 +107,7 @@ describe("Imprimer page", () => {
 
   it("renders the demande when found", async () => {
     const { auth } = await import("@/lib/auth")
-    const { demandeService } = await import("@/lib/demande-service")
+    const { demandeService } = await import("@/lib/demande/di")
 
     ;(auth as ReturnType<typeof vi.fn>).mockResolvedValue(mockSession())
     ;(demandeService.queries.findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockDemande)
@@ -125,7 +121,7 @@ describe("Imprimer page", () => {
 
   it("redirects when the demande is soft-deleted or missing", async () => {
     const { auth } = await import("@/lib/auth")
-    const { demandeService } = await import("@/lib/demande-service")
+    const { demandeService } = await import("@/lib/demande/di")
     const { redirect } = await import("next/navigation")
 
     ;(auth as ReturnType<typeof vi.fn>).mockResolvedValue(mockSession())

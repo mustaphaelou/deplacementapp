@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth-utils";
-import { demandeService } from "@/lib/demande-service";
+import { demandeService } from "@/lib/demande/di";
 import { handleServiceError } from "@/lib/errors";
 
 export async function GET(

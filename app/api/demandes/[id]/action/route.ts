@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { demandeService } from "@/lib/demande-service"
+import { demandeService } from "@/lib/demande/di"
 import { actionBodySchema } from "@/lib/schemas"
 import { withValidation } from "@/lib/api-utils"
 import { handleServiceError } from "@/lib/errors"

@@ -1,12 +1,14 @@
 import type { Prisma, PrismaClient } from "@prisma/client"
-import type { NotificationEventType, NotificationPayload } from "./notification-bus"
-import type { DemandeEventBus } from "./demande-event-bus"
-import type { CreateDemandeData } from "./demande-utils"
-import type { Actor } from "./demande-types"
-import { UnauthorizedActionError, InvalidTransitionError } from "./errors"
-import { buildTransition } from "./workflow"
+import type { DemandeFactoryPort } from "../ports/demande-factory-port"
+import type { CreateDemandeData } from "../../demande-utils"
+import type { Actor, DemandeWithRelations } from "../../demande-types"
+import type { PrismaTransactionClient } from "../../prisma"
+import type { DemandeEventBus } from "../../demande-event-bus"
+import type { NotificationEventType, NotificationPayload } from "../../notification-bus"
+import { UnauthorizedActionError, InvalidTransitionError } from "../../errors"
+import { buildTransition } from "../../workflow"
 
-export class DemandeFactory {
+export class DemandeFactoryAdapter implements DemandeFactoryPort {
   constructor(
     private db: PrismaClient,
     private events: DemandeEventBus
@@ -34,26 +36,37 @@ export class DemandeFactory {
     )
   }
 
-  async createDraft(data: CreateDemandeData, actor: Actor) {
-    return this.createDemande(data, actor, false)
+  async createDraft(
+    data: CreateDemandeData,
+    actor: Actor,
+    tx?: PrismaTransactionClient
+  ): Promise<{ demande: DemandeWithRelations }> {
+    return this.createDemande(data, actor, false, tx)
   }
 
-  async createAndSubmit(data: CreateDemandeData, actor: Actor) {
-    return this.createDemande(data, actor, true)
+  async createAndSubmit(
+    data: CreateDemandeData,
+    actor: Actor,
+    tx?: PrismaTransactionClient
+  ): Promise<{ demande: DemandeWithRelations }> {
+    return this.createDemande(data, actor, true, tx)
   }
 
   private async createDemande(
     data: CreateDemandeData,
     actor: Actor,
-    submit: boolean
+    submit: boolean,
+    tx?: PrismaTransactionClient
   ) {
-    const user = await this.db.utilisateur.findUnique({
+    const db = tx ?? this.db
+
+    const user = await db.utilisateur.findUnique({
       where: { id: actor.id },
       include: { departement: true },
     })
     if (!user) throw new UnauthorizedActionError("Utilisateur introuvable")
 
-    const nextNum = (await this.db.demandeDeplacement.count()) + 1
+    const nextNum = (await db.demandeDeplacement.count()) + 1
     const numero = `DD-${new Date().getFullYear()}-${String(nextNum).padStart(4, "0")}`
 
     const motifArray = this.processMotif(data.motif, data.motifAutre)
@@ -100,7 +113,7 @@ export class DemandeFactory {
       }
     }
 
-    const demande = await this.db.demandeDeplacement.create({
+    const demande = await db.demandeDeplacement.create({
       data: createData,
     })
 
@@ -113,6 +126,6 @@ export class DemandeFactory {
       notificationPayload,
     })
 
-    return { demande }
+    return { demande: demande as unknown as DemandeWithRelations }
   }
 }

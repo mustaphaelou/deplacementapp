@@ -1,30 +1,36 @@
 import type { Prisma, PrismaClient } from "@prisma/client"
-import type { NotificationPayload } from "./notification-bus"
-import type { DemandeEventBus } from "./demande-event-bus"
+import type { DemandeWorkflowPort } from "../ports/demande-workflow-port"
+import type { Actor, DemandeWithRelations } from "../../demande-types"
+import type { PrismaTransactionClient } from "../../prisma"
+import type { DemandeEventBus } from "../../demande-event-bus"
+import type { NotificationPayload } from "../../notification-bus"
 import {
   DemandeNotFoundError,
   UnauthorizedActionError,
   InvalidTransitionError,
-} from "./errors"
-import { canTransition, buildTransition, fromLegacyStatus } from "./workflow"
-import type { WorkflowAction, Decision } from "./workflow"
-import type { Actor } from "./demande-types"
+} from "../../errors"
+import { canTransition, buildTransition, fromLegacyStatus } from "../../workflow"
+import type { WorkflowAction, Decision } from "../../workflow"
 
-export class DemandeWorkflow {
+export class DemandeWorkflowAdapter implements DemandeWorkflowPort {
   constructor(
     private db: PrismaClient,
     private events: DemandeEventBus
   ) {}
 
-  async executeTransition(params: {
-    demandeId: string
-    action: "submit" | "approuver" | "rejeter" | "retirer"
-    actor: Actor
-    comment?: string
-  }) {
+  async executeTransition(
+    params: {
+      demandeId: string
+      action: "submit" | "approuver" | "rejeter" | "retirer"
+      actor: Actor
+      comment?: string
+    },
+    tx?: PrismaTransactionClient
+  ): Promise<{ demande: DemandeWithRelations }> {
+    const db = tx ?? this.db
     const { action, demandeId, actor } = params
 
-    const demande = await this.db.demandeDeplacement.findUnique({
+    const demande = await db.demandeDeplacement.findUnique({
       where: { id: demandeId },
       include: { employe: { select: { id: true, prenom: true, nom: true, departementId: true } } },
     })
@@ -57,7 +63,7 @@ export class DemandeWorkflow {
     )
     if (!transition) throw new InvalidTransitionError()
 
-    const updated = await this.db.demandeDeplacement.update({
+    const updated = await db.demandeDeplacement.update({
       where: { id: demandeId },
       data: transition.transition.fields as Prisma.DemandeDeplacementUncheckedUpdateInput,
     })
@@ -84,6 +90,6 @@ export class DemandeWorkflow {
       notificationPayload,
     })
 
-    return { demande: updated }
+    return { demande: updated as DemandeWithRelations }
   }
 }

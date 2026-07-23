@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth-utils";
 import { requireAnyRole } from "@/lib/authorization";
-import { demandeService } from "@/lib/demande-service";
+import { demandeService } from "@/lib/demande/di";
 import { handleServiceError } from "@/lib/errors";
 import type { Role } from "@/lib/roles";
 

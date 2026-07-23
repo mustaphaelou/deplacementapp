@@ -1,33 +1,20 @@
 import type { PrismaClient } from "@prisma/client"
-import { prisma } from "./prisma"
-import { demandeEventBus } from "./demande-event-bus"
-import type { DemandeEventBus } from "./demande-event-bus"
-import { DemandeQueries } from "./demande-queries"
-import type { DemandeQueryParams } from "./demande-queries"
+import type { DemandeQueryPort, DemandeQueryParams } from "./demande/ports/demande-query-port"
+import type { DemandeFactoryPort } from "./demande/ports/demande-factory-port"
+import type { DemandeWorkflowPort } from "./demande/ports/demande-workflow-port"
 import type { CreateDemandeData } from "./demande-utils"
-import { DemandeFactory } from "./demande-factory"
-import { DemandeWorkflow } from "./demande-workflow"
 
 import type { Actor, ExecuteParams } from "./demande-types"
-export { DemandeWorkflow } from "./demande-workflow"
 export { DemandeNotFoundError, UnauthorizedActionError, InvalidTransitionError } from "./errors"
 export type { Actor, ExecuteParams, CreateDemandeData, DemandeQueryParams }
 
 export class DemandeDeplacementService {
-  queries: DemandeQueries
-  factory: DemandeFactory
-  workflow: DemandeWorkflow
-  private db: PrismaClient
-
   constructor(
-    db: PrismaClient,
-    events: DemandeEventBus = demandeEventBus
-  ) {
-    this.db = db
-    this.queries = new DemandeQueries(db)
-    this.factory = new DemandeFactory(db, events)
-    this.workflow = new DemandeWorkflow(db, events)
-  }
+    readonly queries: DemandeQueryPort,
+    readonly factory: DemandeFactoryPort,
+    readonly workflow: DemandeWorkflowPort,
+    private db?: PrismaClient
+  ) {}
 
   async executeAction(params: ExecuteParams) {
     switch (params.action) {
@@ -57,6 +44,7 @@ export class DemandeDeplacementService {
     demandeId: string,
     params: { type: string; chemin: string }
   ) {
+    if (!this.db) throw new Error("PrismaClient not available for recordDocument")
     await this.db.document.create({
       data: {
         demandeId,
@@ -66,5 +54,3 @@ export class DemandeDeplacementService {
     })
   }
 }
-
-export const demandeService = new DemandeDeplacementService(prisma)

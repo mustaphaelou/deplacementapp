@@ -1,7 +1,7 @@
 import type { Role } from "@prisma/client"
 import { formatCurrency } from "@/lib/constants"
-import { demandeService } from "./demande-service"
-import type { DemandeQueriesPort } from "./demande-queries"
+import { demandeService } from "./demande/di"
+import type { DemandeQueryPort } from "./demande/ports/demande-query-port"
 import { queueEtapes, committedEtapes, rollupEtapes, resolveStatuts, laneOrderByColumn, type Etape } from "./workflow"
 
 export interface DashboardDemandeSummary {
@@ -54,7 +54,7 @@ export interface DashboardPayload {
 // ─── Shared fetch pattern ────────────────────────────────────────────────
 
 async function fetchQueueDemandes(
-  queries: DemandeQueriesPort,
+  queries: DemandeQueryPort,
   role: Role,
   lane: Etape
 ): Promise<{ demandes: DashboardDemandeSummary[]; enAttente: number }> {
@@ -72,7 +72,7 @@ async function fetchQueueDemandes(
 export async function getDashboardPayload(
   userId: string,
   role: Role,
-  svc?: DemandeQueriesPort
+  svc?: DemandeQueryPort
 ): Promise<DashboardPayload> {
   const queries = svc ?? demandeService.queries
   switch (role) {

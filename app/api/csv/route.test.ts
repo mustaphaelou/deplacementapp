@@ -1,21 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import type { DemandeExportRow } from "@/lib/demande-queries"
+import type { DemandeExportRow } from "@/lib/demande/ports/demande-query-port"
 
 vi.mock("@/lib/auth-utils", () => ({
   requireAuth: vi.fn(),
 }))
 
-vi.mock("@/lib/demande-service", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/demande-service")>()
-  return {
-    ...actual,
-    demandeService: {
-      queries: {
-        findAllForExport: vi.fn(),
-      },
+vi.mock("@/lib/demande/di", () => ({
+  demandeService: {
+    queries: {
+      findAllForExport: vi.fn(),
     },
-  }
-})
+  },
+}))
 
 const mockExportRows: DemandeExportRow[] = [
   {
@@ -64,7 +60,7 @@ describe("CSV export route", () => {
 
   it("GET exports demandes through the queries port and returns CSV", async () => {
     const { requireAuth } = await import("@/lib/auth-utils")
-    const { demandeService } = await import("@/lib/demande-service")
+    const { demandeService } = await import("@/lib/demande/di")
 
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
     ;(demandeService.queries.findAllForExport as ReturnType<typeof vi.fn>).mockResolvedValue(mockExportRows)
@@ -107,7 +103,7 @@ describe("CSV export route", () => {
 
   it("GET returns 500 when the queries port throws", async () => {
     const { requireAuth } = await import("@/lib/auth-utils")
-    const { demandeService } = await import("@/lib/demande-service")
+    const { demandeService } = await import("@/lib/demande/di")
 
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
     ;(demandeService.queries.findAllForExport as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("DB down"))

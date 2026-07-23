@@ -6,18 +6,14 @@ vi.mock("@/lib/auth", () => ({
   auth: vi.fn(),
 }))
 
-vi.mock("@/lib/demande-service", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/demande-service")>()
-  return {
-    ...actual,
-    demandeService: {
-      queries: {
-        countByStatut: vi.fn(),
-        aggregateBudget: vi.fn(),
-      },
+vi.mock("@/lib/demande/di", () => ({
+  demandeService: {
+    queries: {
+      countByStatut: vi.fn(),
+      aggregateBudget: vi.fn(),
     },
-  }
-})
+  },
+}))
 
 vi.mock("next/navigation", () => ({
   redirect: vi.fn((path: string) => {
@@ -58,7 +54,7 @@ describe("Rapports page", () => {
 
   it("reads counts and budget through the queries port and renders them", async () => {
     const { auth } = await import("@/lib/auth")
-    const { demandeService } = await import("@/lib/demande-service")
+    const { demandeService } = await import("@/lib/demande/di")
 
     ;(auth as ReturnType<typeof vi.fn>).mockResolvedValue(mockSession())
     ;(demandeService.queries.countByStatut as ReturnType<typeof vi.fn>).mockImplementation((statut: string) =>
