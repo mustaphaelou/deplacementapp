@@ -58,6 +58,6 @@ export function withValidation<T, P = unknown>(
     const validation = validateRequest(schema, body)
     if (!validation.ok) return validation.response
 
-    return handler(req, auth.user, validation.data, params)
+    return handler(req, auth.user, validation.data, await params)
   }
 }

@@ -1,4 +1,4 @@
-import type { PrismaClient, StatutDemande } from "@prisma/client"
+import type { Prisma, PrismaClient, StatutDemande } from "@prisma/client"
 import type { DashboardDemandeSummary } from "../../dashboard"
 import type { DemandeWithRelations } from "../../demande-types"
 import { DemandeNotFoundError } from "../../errors"
@@ -51,14 +51,14 @@ export class DemandeQueryAdapter implements DemandeQueryPort {
     params: DemandeQueryParams
   ): Promise<{ demandes: DashboardDemandeSummary[]; total: number }> {
     const { page, limit, statut, recherche } = params
-    const where: Parameters<typeof this.db.demandeDeplacement.findMany>[0]["where"] = { deletedAt: null }
+    const where: Prisma.DemandeDeplacementWhereInput = { deletedAt: null }
 
     if (role === "EMPLOYEE") {
       where.employeId = userId
     }
 
     if (statut) {
-      where.statut = statut
+      where.statut = statut as StatutDemande
     }
 
     if (recherche) {
@@ -92,6 +92,7 @@ export class DemandeQueryAdapter implements DemandeQueryPort {
       where: { employeId: userId, deletedAt: null },
       orderBy: { creeLe: "desc" },
       take: limit,
+      include: { employe: { select: { prenom: true, nom: true } } },
     })
     return demandes.map((d) => this.mapToDemandeSummary(d))
   }
@@ -106,7 +107,7 @@ export class DemandeQueryAdapter implements DemandeQueryPort {
       where: { statut: { in: statuts }, deletedAt: null },
       orderBy: prismaOrderBy,
       take,
-      include: includeEmployee ? { employe: { select: { prenom: true, nom: true } } } : undefined,
+      include: { employe: { select: { prenom: true, nom: true } } },
     })
     return demandes.map((d) => this.mapToDemandeSummary(d))
   }

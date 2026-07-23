@@ -28,7 +28,7 @@ export async function getAuthUser(): Promise<AuthUser | null> {
 
 export function getSessionUser(user: { id?: string; email?: string | null; name?: string | null; role?: string; departementId?: string; departement?: string; poste?: string }): AuthUser {
   return {
-    id: user.id ?? user.email,
+    id: user.id ?? user.email ?? "",
     email: user.email ?? "",
     name: user.name ?? "",
     role: user.role ?? "",
