@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { demandeService, DemandeNotFoundError } from "@/lib/demande-service";
 import { DemandeDetail } from "@/components/demande-detail";
+import type { DemandeWithRelations } from "@/lib/demande-types";
 import { notFound } from "next/navigation";
 import { getAllowedActions } from "@/lib/workflow";
 
@@ -14,7 +15,7 @@ export default async function DemandeDetailPage({
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  let demande: any;
+  let demande: DemandeWithRelations;
   try {
     demande = await demandeService.queries.findById(id);
   } catch (e) {

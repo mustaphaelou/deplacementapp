@@ -1,15 +1,15 @@
 "use client"
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
-import { DemandeStatusBadge } from "@/components/demande-status-badge"
-import { formatCurrency, formatDate, formatDateTime, TRANSPORT_LABELS, STATUT_LABELS, PURPOSE_OPTIONS } from "@/lib/constants"
+
+import { formatCurrency, formatDate, formatDateTime, TRANSPORT_LABELS, STATUT_LABELS } from "@/lib/constants"
 import { parseMotif } from "@/lib/demande-types"
 import type { DemandeDetail } from "@/lib/demande-types"
-import { CheckCircle, XCircle, ArrowLeft, Download, Printer, Ban, ChevronRight, ChevronLeft, Loader2, Save } from "lucide-react"
+import { CheckCircle, XCircle, ArrowLeft, Download, Printer, Ban, ChevronRight, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { useDemandeActions } from "@/hooks/use-demande-actions"
 
@@ -25,7 +25,7 @@ interface DemandeDetailProps {
 const stepOrder = ["BROUILLON", "SOUMISE", "APPROUVEE_MANAGER", "APPROUVEE_FINANCE", "APPROUVEE"]
 const rejectStatuses = ["REJETEE_MANAGER", "REJETEE_FINANCE", "REJETEE_DIRECTION"]
 
-export function DemandeDetail({ demande, canApprove, canReject, canWithdraw, isOwner, userRole }: DemandeDetailProps) {
+export function DemandeDetail({ demande, canApprove, canReject, canWithdraw }: DemandeDetailProps) {
   const {
     commentaire,
     setCommentaire,

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth-utils"
 import { requireRole } from "@/lib/authorization"
 import { vehiculeService } from "@/lib/vehicule-service"

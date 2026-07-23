@@ -60,7 +60,6 @@ describe("PATCH /api/notifications/[id]", () => {
     const { notificationBus } = await import("@/lib/notification-bus")
 
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth("u-1"))
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(notificationBus.markAsRead as any).mockResolvedValue(undefined)
 
     const { PATCH } = await import("./route")

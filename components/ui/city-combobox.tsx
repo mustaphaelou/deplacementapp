@@ -4,7 +4,7 @@ import { Combobox as ComboboxPrimitive } from "@base-ui/react/combobox"
 import { cn } from "@/lib/utils"
 import { Label } from "./label"
 import { Check, ChevronDown, Search, X } from "lucide-react"
-import { MOROCCAN_CITIES, REGIONS, getCityRegion } from "@/lib/cities-morocco"
+import { MOROCCAN_CITIES } from "@/lib/cities-morocco"
 
 const POPULAR_CITIES = ["Casablanca", "Rabat", "Tanger", "Marrakech", "Agadir", "Fès"]
 

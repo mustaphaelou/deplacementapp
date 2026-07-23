@@ -39,7 +39,7 @@ export default async function RapportsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Rapports</h1>
-        <p className="text-sm text-muted-foreground">Vue d'ensemble des demandes de déplacement</p>
+        <p className="text-sm text-muted-foreground">Vue d&apos;ensemble des demandes de déplacement</p>
       </div>
       <div className="grid gap-4 md:grid-cols-4">
         <StatCard icon={FileText} label="Total demandes" value={totalDemandes} />
@@ -75,7 +75,7 @@ export default async function RapportsPage() {
   );
 }
 
-function StatCard({ icon: Icon, label, value }: { icon: any; label: string; value: string | number }) {
+function StatCard({ icon: Icon, label, value }: { icon: React.ComponentType<{ className?: string }>; label: string; value: string | number }) {
   return (
     <Card>
       <CardContent className="flex items-center gap-4 p-5">

@@ -43,7 +43,7 @@ export function Navbar({ onOpenMobileNav }: NavbarProps) {
         </span>
         <span className="text-muted-foreground/50 text-xs hidden sm:inline">•</span>
         <span className="text-muted-foreground text-xs hidden sm:inline">
-          {ROLE_LABELS[(session?.user as any)?.role ?? ""] ?? (session?.user as any)?.role}
+          {ROLE_LABELS[session?.user?.role ?? ""] ?? session?.user?.role}
         </span>
       </div>
       <div className="flex items-center gap-3">

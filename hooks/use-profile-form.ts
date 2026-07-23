@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { signOut } from "next-auth/react"
 import { toast } from "sonner"
@@ -14,7 +14,6 @@ interface ProfileUser {
 
 export function useProfileForm(user: ProfileUser) {
   const router = useRouter()
-  const fileRef = useRef<HTMLInputElement>(null)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [telephone, setTelephone] = useState(user.telephone ?? "")
@@ -114,7 +113,6 @@ export function useProfileForm(user: ProfileUser) {
   }
 
   return {
-    fileRef,
     editing,
     setEditing,
     saving,

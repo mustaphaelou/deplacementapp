@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest"
 import { DemandeQueries } from "./demande-queries"
 import { DemandeNotFoundError } from "./errors"
-import type { PrismaClient, StatutDemande } from "@prisma/client"
+import type { PrismaClient } from "@prisma/client"
 
 interface MockedDb {
   demandeDeplacement: {

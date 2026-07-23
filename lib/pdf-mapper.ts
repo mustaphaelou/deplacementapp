@@ -3,8 +3,8 @@ import { parseMotif, type DemandeWithRelations } from "./demande-types"
 
 function toNumber(value: unknown): number {
   if (typeof value === "number") return value
-  if (value && typeof (value as any).toNumber === "function") {
-    return (value as any).toNumber()
+  if (value && typeof (value as { toNumber: () => number }).toNumber === "function") {
+    return (value as { toNumber: () => number }).toNumber()
   }
   return Number(value) || 0
 }

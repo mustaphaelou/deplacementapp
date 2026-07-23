@@ -2,7 +2,6 @@
 
 import { Badge } from "@/components/ui/badge"
 import { STATUT_LABELS } from "@/lib/constants"
-import { cn } from "@/lib/utils"
 
 const variantMap: Record<string, "default" | "secondary" | "destructive" | "outline" | "success" | "warning"> = {
   BROUILLON: "outline",

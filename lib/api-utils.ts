@@ -48,8 +48,8 @@ export function validateQueryParams<T>(
 
 export function withValidation<T>(
   schema: z.ZodType<T>,
-  handler: (req: NextRequest, auth: AuthUser, data: T, params: any) => Promise<NextResponse>
-): (req: NextRequest, context: { params: Promise<any> }) => Promise<NextResponse> {
+  handler: (req: NextRequest, auth: AuthUser, data: T, params: unknown) => Promise<NextResponse>
+): (req: NextRequest, context: { params: Promise<unknown> }) => Promise<NextResponse> {
   return async (req, { params }) => {
     const auth = await requireAuth()
     if (!auth.ok) return auth.response

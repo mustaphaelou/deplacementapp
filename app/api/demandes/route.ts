@@ -28,7 +28,7 @@ export const POST = withValidation(demandeSchema, async (req, auth, data, _param
     const result = await demandeService.executeAction({
       action: serviceAction,
       data: serviceData,
-      actor: { id: auth.id, role: auth.role as any },
+      actor: { id: auth.id, role: auth.role as Parameters<typeof demandeService.executeAction>[0]["actor"]["role"] },
     });
     return NextResponse.json({ demande: result.demande });
   } catch (e) {

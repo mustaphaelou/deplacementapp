@@ -14,11 +14,17 @@ export default async function DashboardPage() {
 
   const navItems = [...NAV_ITEMS.common, ...(NAV_ITEMS[role as keyof typeof NAV_ITEMS] ?? [])]
 
+  let config: Awaited<ReturnType<typeof getDashboardPayload>>["config"]
+  let demandes: Awaited<ReturnType<typeof getDashboardPayload>>["demandes"]
   try {
-    const { config, demandes } = await getDashboardPayload(userId, role)
-    return <DashboardLayout config={config} navItems={navItems} demandes={demandes} />
+    const payload = await getDashboardPayload(userId, role)
+    config = payload.config
+    demandes = payload.demandes
   } catch (error) {
     console.error("Failed to load dashboard payload:", error)
     redirect("/login")
+    return
   }
+
+  return <DashboardLayout config={config} navItems={navItems} demandes={demandes} />
 }

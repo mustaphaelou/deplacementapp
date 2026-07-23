@@ -14,7 +14,7 @@ export interface AuthUser {
 export async function getAuthUser(): Promise<AuthUser | null> {
   const session = await auth()
   if (!session?.user) return null
-  const u = session.user as any
+  const u = session.user
   return {
     id: u.id ?? u.email,
     email: u.email ?? "",
@@ -26,7 +26,7 @@ export async function getAuthUser(): Promise<AuthUser | null> {
   }
 }
 
-export function getSessionUser(user: any): AuthUser {
+export function getSessionUser(user: { id?: string; email?: string | null; name?: string | null; role?: string; departementId?: string; departement?: string; poste?: string }): AuthUser {
   return {
     id: user.id ?? user.email,
     email: user.email ?? "",

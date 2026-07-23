@@ -111,7 +111,7 @@ describe("DemandeFactory", () => {
   it("replaces 'autre' with 'Autre: ...' when motifAutre provided", async () => {
     const db = mockDb()
     db.utilisateur.findUnique.mockResolvedValue(makeUser())
-    db.demandeDeplacement.create.mockImplementation((args: any) =>
+    db.demandeDeplacement.create.mockImplementation((_args: any) =>
       Promise.resolve(makeDemande({ statut: "BROUILLON" }))
     )
 

@@ -7,7 +7,9 @@ import { PdfRenderError } from "@/lib/errors"
 export class TravelRequestPdfAdapter implements PdfRendererAdapter {
   async render(data: PdfRenderData): Promise<Buffer> {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const element = React.createElement(TravelRequestPdf as any, { data })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return renderToBuffer(element as any)
     } catch (e) {
       console.error("PDF render failed:", e)

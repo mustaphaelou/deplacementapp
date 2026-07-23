@@ -3,7 +3,7 @@ export const authConfig = {
     signIn: "/login",
   },
   callbacks: {
-    authorized({ auth, request: { nextUrl } }: { auth: any; request: { nextUrl: any } }) {
+    authorized({ auth, request: { nextUrl } }: { auth: { user: unknown } | null; request: { nextUrl: { pathname: string } } }) {
       const isLoggedIn = !!auth?.user
       const isOnDashboard = nextUrl.pathname !== "/login"
       if (isOnDashboard) {
@@ -12,7 +12,7 @@ export const authConfig = {
       }
       return true
     },
-    async jwt({ token, user }: { token: any; user: any }) {
+    async jwt({ token, user }: { token: { role?: string; departementId?: string; departement?: string; poste?: string; avatarUrl?: string | null; name?: string; email?: string; picture?: string; sub?: string }; user?: { role?: string; departementId?: string; departement?: string; poste?: string; avatarUrl?: string | null } }) {
       if (user) {
         token.role = user.role
         token.departementId = user.departementId
@@ -22,7 +22,7 @@ export const authConfig = {
       }
       return token
     },
-    async session({ session, token }: { session: any; token: any }) {
+    async session({ session, token }: { session: { user?: { id?: string; role?: string; departementId?: string; departement?: string; poste?: string; avatarUrl?: string | null; name?: string | null; email?: string | null; image?: string | null } }; token: { sub?: string; role?: string; departementId?: string; departement?: string; poste?: string; avatarUrl?: string | null } }) {
       if (session.user) {
         session.user.id = token.sub
         session.user.role = token.role

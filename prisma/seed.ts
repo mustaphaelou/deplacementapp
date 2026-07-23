@@ -35,7 +35,7 @@ async function main() {
     create: { nom: "Technique" },
   })
 
-  const deptProd = await prisma.departement.upsert({
+  await prisma.departement.upsert({
     where: { nom: "Production" },
     update: {},
     create: { nom: "Production" },

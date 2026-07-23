@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient, Role } from "@prisma/client"
+import type { Prisma, PrismaClient } from "@prisma/client"
 import type { NotificationEventType, NotificationPayload } from "./notification-bus"
 import type { DemandeEventBus } from "./demande-event-bus"
 import type { CreateDemandeData } from "./demande-utils"

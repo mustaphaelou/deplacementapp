@@ -23,7 +23,7 @@ export async function GET() {
   const header = "Numero,Employe,Destination,DateDepart,DateRetour,Transport,Total,Statut,CreeLe\n";
   const rows = demandes
     .map(
-      (d: any) =>
+      (d: { numero: string; employe: { prenom: string; nom: string } | null; destination: string; dateDepart: Date; dateRetour: Date; typeTransport: string; totalEstime: number | null; statut: string; creeLe: Date }) =>
         `"${d.numero}","${d.employe ? `${d.employe.prenom} ${d.employe.nom}` : ""}","${d.destination}","${d.dateDepart.toISOString().split("T")[0]}","${d.dateRetour.toISOString().split("T")[0]}","${d.typeTransport}","${d.totalEstime ?? 0}","${d.statut}","${d.creeLe.toISOString()}"`
     )
     .join("\n");

@@ -36,8 +36,8 @@ export function useDemandeActions(demandeId: string, numero: string) {
       }
       toast.success(messages[action] ?? "Action effectuée")
       router.refresh()
-    } catch (err: any) {
-      toast.error(err.message || "Erreur")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erreur")
     } finally {
       setActionLoading(null)
     }

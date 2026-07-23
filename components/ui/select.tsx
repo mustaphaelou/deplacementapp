@@ -24,7 +24,8 @@ function Select({
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
       {label && <Label>{label}</Label>}
-      <SelectPrimitive.Root value={value} onValueChange={onValueChange as any} {...props as any}>
+      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+      <SelectPrimitive.Root value={value as string | undefined} onValueChange={(v) => onValueChange?.(v ?? null)} {...props as any}>
         <SelectPrimitive.Trigger
           className={cn(
             "border-input flex h-8 w-full items-center justify-between rounded-lg border bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none",

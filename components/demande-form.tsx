@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useForm } from "react-hook-form"
+import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { DateRangePicker } from "@/components/ui/date-range-picker"
 import { CityCombobox } from "@/components/ui/city-combobox"
-import { Loader2, Globe, Save, Send, Calendar, MapPin, Truck, DollarSign, Wallet, ClipboardList, ArrowLeft, ArrowRight } from "lucide-react"
+import { Loader2, Globe, Save, Send, Calendar, Truck, DollarSign, ClipboardList, ArrowLeft, ArrowRight } from "lucide-react"
 import { PURPOSE_OPTIONS, TRANSPORT_LABELS } from "@/lib/constants"
 import { useDemandeForm } from "@/hooks/use-demande-form"
 import { demandeSchema, type DemandeFormValues } from "@/lib/schemas"
@@ -34,9 +34,9 @@ export function DemandeForm() {
   const {
     register,
     handleSubmit,
-    watch,
     setValue,
     trigger,
+    control,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(demandeSchema),
@@ -47,9 +47,17 @@ export function DemandeForm() {
     },
   })
 
-  const selectedMotifs = watch("motif")
-  const typeTransport = watch("typeTransport")
-  const avanceRequise = watch("avanceRequise")
+  const selectedMotifs = useWatch({ control, name: "motif" })
+  const typeTransport = useWatch({ control, name: "typeTransport" })
+  const avanceRequise = useWatch({ control, name: "avanceRequise" })
+  const fTransport = parseFloat(useWatch({ control, name: "fraisTransport" }) || "0")
+  const fHebergement = parseFloat(useWatch({ control, name: "fraisHebergement" }) || "0")
+  const fRepas = parseFloat(useWatch({ control, name: "fraisRepas" }) || "0")
+  const fDivers = parseFloat(useWatch({ control, name: "fraisDivers" }) || "0")
+  const total = fTransport + fHebergement + fRepas + fDivers
+  const dateDepart = useWatch({ control, name: "dateDepart" })
+  const dateRetour = useWatch({ control, name: "dateRetour" })
+  const destination = useWatch({ control, name: "destination" })
 
   function toggleMotif(value: string) {
     const current = selectedMotifs || []
@@ -61,12 +69,6 @@ export function DemandeForm() {
   }
 
   const showVehicleField = typeTransport === "VOITURE_SOCIETE"
-
-  const fTransport = parseFloat(watch("fraisTransport") || "0")
-  const fHebergement = parseFloat(watch("fraisHebergement") || "0")
-  const fRepas = parseFloat(watch("fraisRepas") || "0")
-  const fDivers = parseFloat(watch("fraisDivers") || "0")
-  const total = fTransport + fHebergement + fRepas + fDivers
 
   const handleNext = async () => {
     let fieldsToValidate: (keyof FormValues)[] = []
@@ -240,8 +242,8 @@ export function DemandeForm() {
               <div className="space-y-3">
                 <Label className="text-sm font-semibold">Dates de déplacement</Label>
                 <DateRangePicker
-                  dateDepart={watch("dateDepart")}
-                  dateRetour={watch("dateRetour")}
+                  dateDepart={dateDepart}
+                  dateRetour={dateRetour}
                   onDateDepartChange={(v) => setValue("dateDepart", v)}
                   onDateRetourChange={(v) => setValue("dateRetour", v)}
                   errorDepart={errors.dateDepart?.message}
@@ -285,7 +287,7 @@ export function DemandeForm() {
                   <CityCombobox
                     id="destination"
                     label=""
-                    value={watch("destination")}
+                    value={destination}
                     onValueChange={(v) => setValue("destination", v ?? "")}
                     error={errors.destination?.message}
                     placeholder="Sélectionner la ville de destination..."
@@ -416,7 +418,7 @@ export function DemandeForm() {
 
                 {avanceRequise && (
                   <div className="p-4 bg-zinc-50 dark:bg-zinc-900 border rounded-lg space-y-2 animate-in fade-in duration-200">
-                    <Label htmlFor="montantAvance" className="text-sm font-semibold">Montant de l'avance (Dhs)</Label>
+                    <Label htmlFor="montantAvance" className="text-sm font-semibold">Montant de l&apos;avance (Dhs)</Label>
                     <Input id="montantAvance" type="number" min="0" step="0.01" {...register("montantAvance")} className="max-w-xs" />
                   </div>
                 )}

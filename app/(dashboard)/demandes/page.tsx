@@ -1,14 +1,14 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useSession } from "next-auth/react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { DemandeStatusBadge } from "@/components/demande-status-badge"
-import { formatCurrency, formatDate, STATUT_LABELS, ITEMS_PER_PAGE } from "@/lib/constants"
+import { formatCurrency, formatDate, STATUT_LABELS } from "@/lib/constants"
 import { Search, ChevronLeft, ChevronRight, FileText, Download } from "lucide-react"
 import { toast } from "sonner"
 
@@ -26,7 +26,6 @@ interface Demande {
 
 export default function DemandesListPage() {
   const { data: session } = useSession()
-  const router = useRouter()
   const searchParams = useSearchParams()
   const [demandes, setDemandes] = useState<Demande[]>([])
   const [total, setTotal] = useState(0)
@@ -36,9 +35,9 @@ export default function DemandesListPage() {
 
   const statutFilter = searchParams.get("statut") || ""
   const perPage = 10
-  const role = (session?.user as any)?.role
+  const role = session?.user?.role
 
-  async function fetchDemandes() {
+  const fetchDemandes = useCallback(async () => {
     setLoading(true)
     const params = new URLSearchParams()
     params.set("page", page.toString())
@@ -56,11 +55,12 @@ export default function DemandesListPage() {
     } catch {} finally {
       setLoading(false)
     }
-  }
+  }, [page, search, statutFilter])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchDemandes()
-  }, [page, statutFilter, search])
+  }, [fetchDemandes])
 
   const totalPages = Math.ceil(total / perPage)
 

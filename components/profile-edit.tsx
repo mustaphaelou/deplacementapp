@@ -1,5 +1,6 @@
 "use client"
 
+import { useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -31,6 +32,7 @@ function getInitials(prenom: string, nom: string) {
 }
 
 export default function ProfileEdit({ user }: { user: UserData }) {
+  const fileRef = useRef<HTMLInputElement>(null)
   const profile = useProfileForm({
     email: user.email,
     telephone: user.telephone,
@@ -62,7 +64,7 @@ export default function ProfileEdit({ user }: { user: UserData }) {
               <div className="absolute inset-0 flex items-center justify-center">
                 <button
                   type="button"
-                  onClick={() => profile.fileRef.current?.click()}
+                  onClick={() => fileRef.current?.click()}
                   className="flex size-full items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity hover:opacity-100 cursor-pointer"
                 >
                   <Camera className="size-6 text-white" />
@@ -70,7 +72,7 @@ export default function ProfileEdit({ user }: { user: UserData }) {
               </div>
             )}
             <input
-              ref={profile.fileRef}
+              ref={fileRef}
               type="file"
               accept="image/jpeg,image/png,image/webp"
               className="hidden"

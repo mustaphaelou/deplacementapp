@@ -54,7 +54,7 @@ export interface DemandeQueryParams {
 export class DemandeQueries {
   constructor(private db: PrismaClient) {}
 
-  private mapToDemandeSummary(demande: any): DashboardDemandeSummary {
+  private mapToDemandeSummary(demande: { id: string; numero: string; destination: string; dateDepart: Date; dateRetour: Date; totalEstime: { toNumber?: () => number } | number | null; statut: string; employe: { prenom: string; nom: string } | null }): DashboardDemandeSummary {
     return {
       id: demande.id,
       numero: demande.numero,
@@ -97,7 +97,7 @@ export class DemandeQueries {
     params: DemandeQueryParams
   ): Promise<{ demandes: DashboardDemandeSummary[]; total: number }> {
     const { page, limit, statut, recherche } = params
-    const where: any = { deletedAt: null }
+    const where: Parameters<typeof this.db.demandeDeplacement.findMany>[0]["where"] = { deletedAt: null }
 
     if (role === "EMPLOYEE") {
       where.employeId = userId
