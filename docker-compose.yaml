@@ -1,16 +1,12 @@
 services:
   migrate:
-    build:
-      context: .
-      target: migrator
+    image: ghcr.io/mustaphaelou/deplacementapp-migrator:latest
     environment:
       - DATABASE_URL=${DATABASE_URL:?Set DATABASE_URL in the Coolify UI}
     restart: "no"
 
   app:
-    build:
-      context: .
-      target: runner
+    image: ghcr.io/mustaphaelou/deplacementapp:latest
     depends_on:
       migrate:
         condition: service_completed_successfully
