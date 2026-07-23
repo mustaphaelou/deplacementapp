@@ -5,8 +5,8 @@ import { withValidation } from "@/lib/api-utils"
 import { handleServiceError } from "@/lib/errors"
 import type { Role } from "@prisma/client"
 
-export const POST = withValidation(actionBodySchema, async (req, auth, data, params) => {
-  const { id } = await params
+export const POST = withValidation(actionBodySchema, async (req, auth, data, params: { id: string }) => {
+  const { id } = params
 
   try {
     switch (data.action) {
