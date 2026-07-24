@@ -1,9 +1,7 @@
 name: Docker Build & Publish
 
 on:
-  push:
-    branches: [main]
-    tags: ['v*']
+  workflow_dispatch:
 
 permissions:
   contents: read
