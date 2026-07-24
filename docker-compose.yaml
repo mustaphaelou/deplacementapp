@@ -6,7 +6,7 @@ services:
     restart: "no"
 
   app:
-    image: ghcr.io/mustaphaelou/deplacementapp:latest
+    image: ghcr.io/mustaphaelou/deplacementapp/runner:latest
     depends_on:
       migrate:
         condition: service_completed_successfully
