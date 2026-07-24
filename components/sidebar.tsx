@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { X, BarChart3, FileText, FilePlus, Users, Clock, DollarSign, Car, CheckCircle, type LucideIcon } from "lucide-react"
+import { X, BarChart3, FileText, FilePlus, Users, Clock, DollarSign, Car, CheckCircle, Building, type LucideIcon } from "lucide-react"
 import type { NavItem } from "@/lib/roles"
 
 const iconMap: Record<string, LucideIcon> = {
@@ -15,23 +15,35 @@ const iconMap: Record<string, LucideIcon> = {
   "dollar-sign": DollarSign,
   car: Car,
   "check-circle": CheckCircle,
+  building: Building,
 }
 
 interface SidebarProps {
   items: NavItem[]
+  societeNom: string
+  societeLogoUrl: string | null
   closeNav?: () => void
 }
 
-export function Sidebar({ items, closeNav }: SidebarProps) {
+export function Sidebar({ items, societeNom, societeLogoUrl, closeNav }: SidebarProps) {
   const pathname = usePathname()
+  const initial = societeNom?.charAt(0)?.toUpperCase() ?? "?"
 
   return (
     <aside className="bg-sidebar text-sidebar-foreground flex h-full w-60 flex-col border-r">
       <div className="flex h-14 items-center gap-2 border-b px-5">
-        <div className="bg-primary flex size-8 items-center justify-center rounded-lg text-primary-foreground text-sm font-bold">
-          H
-        </div>
-        <span className="text-sm font-semibold flex-1">HAY 2010 SARL</span>
+        {societeLogoUrl ? (
+          <img
+            src={societeLogoUrl}
+            alt={societeNom}
+            className="size-8 rounded-lg object-contain"
+          />
+        ) : (
+          <div className="bg-primary flex size-8 items-center justify-center rounded-lg text-primary-foreground text-sm font-bold">
+            {initial}
+          </div>
+        )}
+        <span className="text-sm font-semibold flex-1 truncate">{societeNom}</span>
         {closeNav && (
           <button
             onClick={closeNav}
@@ -65,7 +77,7 @@ export function Sidebar({ items, closeNav }: SidebarProps) {
         })}
       </nav>
       <div className="border-t p-3 text-center text-xs text-sidebar-foreground/50">
-        HAY 2010 SARL v1.0
+        {societeNom} v1.0
       </div>
     </aside>
   )

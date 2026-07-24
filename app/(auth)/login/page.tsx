@@ -11,14 +11,17 @@ import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
 import { SetupWizard } from "./setup-wizard"
 
-interface SetupStatus {
-  needsSetup: boolean
-  departements: string[]
+interface Societe {
+  nom: string
+  logoUrl: string | null
+  faviconUrl: string | null
+  couleurPrimaire: string | null
 }
 
 export default function LoginPage() {
   const router = useRouter()
-  const [setupStatus, setSetupStatus] = useState<SetupStatus | null>(null)
+  const [needsSetup, setNeedsSetup] = useState<boolean | null>(null)
+  const [societe, setSociete] = useState<Societe | null>(null)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
@@ -27,12 +30,15 @@ export default function LoginPage() {
     fetch("/api/setup/status")
       .then((r) => r.json())
       .then((data) => {
-        setSetupStatus({
-          needsSetup: Boolean(data.needsSetup),
-          departements: Array.isArray(data.departements) ? data.departements : [],
-        })
+        setNeedsSetup(Boolean(data.needsSetup))
+        if (!data.needsSetup) {
+          fetch("/api/societe")
+            .then((r) => r.json())
+            .then((s) => setSociete(s))
+            .catch(() => {})
+        }
       })
-      .catch(() => setSetupStatus({ needsSetup: false, departements: [] }))
+      .catch(() => setNeedsSetup(true))
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {
@@ -56,7 +62,7 @@ export default function LoginPage() {
     router.refresh()
   }
 
-  if (setupStatus === null) {
+  if (needsSetup === null) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-muted/30">
         <Loader2 className="size-8 animate-spin text-muted-foreground" />
@@ -64,20 +70,30 @@ export default function LoginPage() {
     )
   }
 
-  if (setupStatus.needsSetup) {
-    return <SetupWizard initialDepartements={setupStatus.departements} />
+  if (needsSetup) {
+    return <SetupWizard />
   }
+
+  const initial = societe?.nom?.charAt(0)?.toUpperCase() ?? "?"
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <div className="mb-2 flex justify-center">
-            <div className="bg-primary flex size-12 items-center justify-center rounded-xl text-primary-foreground text-lg font-bold">
-              H
-            </div>
+            {societe?.logoUrl ? (
+              <img
+                src={societe.logoUrl}
+                alt={societe.nom}
+                className="size-12 rounded-xl object-contain"
+              />
+            ) : (
+              <div className="bg-primary flex size-12 items-center justify-center rounded-xl text-primary-foreground text-lg font-bold">
+                {initial}
+              </div>
+            )}
           </div>
-          <CardTitle>HAY 2010 SARL</CardTitle>
+          <CardTitle>{societe?.nom ?? "Application"}</CardTitle>
           <CardDescription>Connexion à votre espace de travail</CardDescription>
         </CardHeader>
         <CardContent>
@@ -87,7 +103,7 @@ export default function LoginPage() {
               <Input
                 id="email"
                 type="email"
-                placeholder="vous@hay2010.ma"
+                placeholder="vous@exemple.ma"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required

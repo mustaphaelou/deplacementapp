@@ -9,10 +9,12 @@ import type { NavItem } from "@/lib/roles"
 
 interface DashboardShellProps {
   navItems: NavItem[]
+  societeNom: string
+  societeLogoUrl: string | null
   children: React.ReactNode
 }
 
-export function DashboardShell({ navItems, children }: DashboardShellProps) {
+export function DashboardShell({ navItems, societeNom, societeLogoUrl, children }: DashboardShellProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   function closeNav() {
@@ -24,7 +26,7 @@ export function DashboardShell({ navItems, children }: DashboardShellProps) {
     <div className="flex h-screen overflow-hidden">
       {/* Desktop sidebar */}
       <div className="hidden md:flex md:shrink-0">
-        <Sidebar items={navItems} />
+        <Sidebar items={navItems} societeNom={societeNom} societeLogoUrl={societeLogoUrl} />
       </div>
 
       {/* Mobile sidebar drawer */}
@@ -32,7 +34,7 @@ export function DashboardShell({ navItems, children }: DashboardShellProps) {
         <DialogPrimitive.Portal>
           <DialogPrimitive.Backdrop className="fixed inset-0 z-40 bg-black/40 transition-opacity data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" />
           <DialogPrimitive.Popup className="fixed inset-y-0 left-0 z-50 flex w-[280px] flex-col bg-sidebar text-sidebar-foreground shadow-xl transition-transform duration-300 data-[ending-style]:-translate-x-full data-[starting-style]:-translate-x-full">
-            <Sidebar items={navItems} closeNav={closeNav} />
+            <Sidebar items={navItems} closeNav={closeNav} societeNom={societeNom} societeLogoUrl={societeLogoUrl} />
           </DialogPrimitive.Popup>
         </DialogPrimitive.Portal>
       </DialogPrimitive.Root>

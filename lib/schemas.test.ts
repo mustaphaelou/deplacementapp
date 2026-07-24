@@ -125,6 +125,7 @@ describe("updateUtilisateurSchema", () => {
       prenom: "Jean",
       poste: "Dev",
       role: "EMPLOYEE",
+      societeId: "soc-1",
       departementId: "dep-1",
     })
     expect(result.success).toBe(true)

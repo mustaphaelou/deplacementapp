@@ -68,6 +68,7 @@ const mockDemande: DemandeDeplacement & { employe: Utilisateur; vehicule: Vehicu
     prenom: "Jean",
     poste: "Développeur",
     role: "EMPLOYEE" as Role,
+    societeId: "default",
     departementId: "dep-1",
     avatarUrl: null,
     telephone: null,

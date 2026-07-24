@@ -11,10 +11,12 @@ import { Select, SelectItem } from "@/components/ui/select"
 import { toast } from "sonner"
 import { Loader2, Plus, Trash2 } from "lucide-react"
 
-export function SetupWizard({ initialDepartements }: { initialDepartements: string[] }) {
+export function SetupWizard() {
   const router = useRouter()
-  const [step, setStep] = useState<1 | 2>(1)
-  const [departements, setDepartements] = useState<string[]>(initialDepartements)
+  const [step, setStep] = useState<1 | 2 | 3>(1)
+  const [societeNom, setSocieteNom] = useState("")
+  const [societeEmailDomain, setSocieteEmailDomain] = useState("")
+  const [departements, setDepartements] = useState<string[]>([])
   const [newDepartement, setNewDepartement] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -41,10 +43,18 @@ export function SetupWizard({ initialDepartements }: { initialDepartements: stri
   }
 
   function goToStep2() {
+    if (!societeNom.trim()) {
+      toast.error("Veuillez saisir le nom de votre société")
+      return
+    }
+    setStep(2)
+  }
+
+  function goToStep3() {
     if (!departementNom && departements.length > 0) {
       setDepartementNom(departements[0])
     }
-    setStep(2)
+    setStep(3)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -65,6 +75,8 @@ export function SetupWizard({ initialDepartements }: { initialDepartements: stri
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        societeNom,
+        societeEmailDomain: societeEmailDomain || undefined,
         departements,
         admin: { email, password, nom, prenom, poste, departementNom },
       }),
@@ -95,20 +107,51 @@ export function SetupWizard({ initialDepartements }: { initialDepartements: stri
     <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mb-2 flex justify-center">
-            <div className="bg-primary flex size-12 items-center justify-center rounded-xl text-primary-foreground text-lg font-bold">
-              H
-            </div>
-          </div>
           <CardTitle>Configuration initiale</CardTitle>
           <CardDescription>
             {step === 1
-              ? "Départements de l'organisation (1/2)"
-              : "Compte administrateur (2/2)"}
+              ? "Informations de la société (1/3)"
+              : step === 2
+                ? "Départements de l'organisation (2/3)"
+                : "Compte administrateur (3/3)"}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {step === 1 ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="societe-nom">Nom de la société</Label>
+                <Input
+                  id="societe-nom"
+                  placeholder="Ma Société SARL"
+                  value={societeNom}
+                  onChange={(e) => setSocieteNom(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="societe-email-domain">
+                  Domaine email <span className="text-muted-foreground text-xs">(optionnel)</span>
+                </Label>
+                <Input
+                  id="societe-email-domain"
+                  placeholder="masociete.ma"
+                  value={societeEmailDomain}
+                  onChange={(e) => setSocieteEmailDomain(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Exemple: masociete.ma → noreply@masociete.ma
+                </p>
+              </div>
+              <Button
+                type="button"
+                className="w-full"
+                onClick={goToStep2}
+              >
+                Continuer
+              </Button>
+            </div>
+          ) : step === 2 ? (
             <div className="space-y-4">
               {departements.length > 0 ? (
                 <ul className="space-y-2">
@@ -146,14 +189,23 @@ export function SetupWizard({ initialDepartements }: { initialDepartements: stri
                   Ajouter
                 </Button>
               </form>
-              <Button
-                type="button"
-                className="w-full"
-                disabled={departements.length === 0}
-                onClick={goToStep2}
-              >
-                Continuer
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setStep(1)}
+                >
+                  Retour
+                </Button>
+                <Button
+                  type="button"
+                  className="flex-1"
+                  disabled={departements.length === 0}
+                  onClick={goToStep3}
+                >
+                  Continuer
+                </Button>
+              </div>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -184,7 +236,7 @@ export function SetupWizard({ initialDepartements }: { initialDepartements: stri
                 <Input
                   id="setup-email"
                   type="email"
-                  placeholder="vous@hay2010.ma"
+                  placeholder="vous@exemple.ma"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -239,7 +291,7 @@ export function SetupWizard({ initialDepartements }: { initialDepartements: stri
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setStep(1)}
+                  onClick={() => setStep(2)}
                   disabled={loading}
                 >
                   Retour

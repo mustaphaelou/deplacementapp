@@ -7,8 +7,8 @@ import { handleServiceError } from "@/lib/errors"
 
 export async function POST(req: NextRequest) {
   try {
-    const userCount = await prisma.utilisateur.count()
-    if (userCount > 0) {
+    const societeCount = await prisma.societe.count()
+    if (societeCount > 0) {
       return NextResponse.json(
         { error: "Cette instance est déjà configurée." },
         { status: 409 }
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}))
     const validation = validateRequest(setupRegisterSchema, body)
     if (!validation.ok) return validation.response
-    const { departements, admin } = validation.data
+    const { societeNom, societeEmailDomain, departements, admin } = validation.data
 
     if (!departements.includes(admin.departementNom)) {
       return NextResponse.json(
@@ -27,12 +27,19 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    const societe = await prisma.societe.create({
+      data: {
+        nom: societeNom,
+        domaineEmail: societeEmailDomain || null,
+      },
+    })
+
     const departementIds = new Map<string, string>()
     for (const nom of departements) {
       const departement = await prisma.departement.upsert({
-        where: { nom },
+        where: { nom_societeId: { nom, societeId: societe.id } },
         update: {},
-        create: { nom },
+        create: { nom, societeId: societe.id },
       })
       departementIds.set(nom, departement.id)
     }
@@ -48,6 +55,7 @@ export async function POST(req: NextRequest) {
         poste: admin.poste,
         role: "GENERAL_DIRECTION",
         actif: true,
+        societeId: societe.id,
         departementId: departementIds.get(admin.departementNom)!,
       },
     })

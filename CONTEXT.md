@@ -6,12 +6,17 @@ A travel request system where employees submit trip requests that flow through a
 
 ### Core domain
 
+**Societe**:
+The organisation that deploys and operates this instance of the application. Every deployment belongs to exactly one Societe. The Societe controls the visual identity (name, logo, colour, favicon) and email branding (sender name, domain) of the instance. Created during Amorçage and mutable via the administration settings.
+_Includes_: Société, entreprise, association, administration, etc.
+_Avoid_: Organisation, company, tenant
+
 **DemandeDeplacement**:
 A request submitted by an employee to travel for business purposes. Has a lifecycle through a multi-stage approval pipeline. Contains an intentional point-in-time snapshot of the employee's data (name, department, position) so historical requests are unaffected by future employee transfers or title changes.
 _Avoid_: Trip, request, travel form
 
 **Utilisateur**:
-A person who uses the system. Has a role and belongs to exactly one Departement.
+A person who uses the system. Has a role, belongs to exactly one Departement, and belongs to exactly one Societe.
 _Avoid_: User, account, person
 
 **Departement**:
@@ -94,16 +99,32 @@ _Avoid_: Profile picture, profile photo, user image
 A file attached to a DemandeDeplacement (e.g., invoice, receipt, PDF). The `type` field is free-text (typically a MIME type or descriptive label), not a fixed enum.
 
 **Amorçage (Setup)**:
-The bootstrap lifecycle state of the system while zero Utilisateurs exist. It is not a persistent entity — it is a lifecycle state, detected by counting Utilisateurs. While in Amorçage, the /login page renders a setup wizard instead of the sign-in form; the wizard creates the initial Departements and the first Utilisateur (Role GENERAL_DIRECTION), after which the system leaves Amorçage permanently and the wizard never appears again.
+The bootstrap lifecycle state of the system while zero Societes exist. It is not a persistent entity — it is a lifecycle state, detected by counting Societes. While in Amorçage, the /login page renders a setup wizard instead of the sign-in form; the wizard creates the initial Societe, the first Departements, and the first Utilisateur (Role GENERAL_DIRECTION), after which the system leaves Amorçage permanently and the wizard never appears again.
 _Avoid_: Onboarding, initialization, installation
+
+### Branding
+
+**IdentiteVisuelle (Visual Identity)**:
+The set of configurable visual properties of a Societe: its display name (`nom`), logo image (`logoUrl`), favicon image (`faviconUrl`), and primary colour (`couleurPrimaire`). These values are used in the UI header, sidebar, login page, emails, and generated PDFs. Changes are logged in JournalAudit.
+_Avoid_: Theme, skin, branding
+
+**NomExpediteurEmail (Email Sender Name)**:
+The human-readable name shown as the sender of outgoing notification emails (e.g. "Acme Corp" instead of the app placeholder). Configured per Societe.
+_Avoid_: From name, display name
+
+**DomaineEmail (Email Domain)**:
+The domain part of the sender email address, e.g. "acme.com" produces "noreply@acme.com". Configured per Societe. Falls back to the SMTP_FROM env var if not set.
+_Avoid_: Email suffix, mail domain
 
 ## Relationships
 
+- A **Societe** has one or more **Utilisateurs** and one or more **Departements**.
 - A **DemandeDeplacement** is created by exactly one **Utilisateur** (the employee).
 - A **DemandeDeplacement** can be assigned to at most one **Utilisateur** (the **Assignataire** — the approver who last acted on it).
 - A **DemandeDeplacement** may be associated with zero or one **VehiculeEntreprise**.
 - A **DemandeDeplacement** has exactly one **Etape** and exactly one current **Decision**.
-- A **Utilisateur** belongs to exactly one **Departement**.
+- A **Utilisateur** belongs to exactly one **Departement** and exactly one **Societe**.
+- A **Departement** belongs to exactly one **Societe**.
 - An **Utilisateur** can create zero or more **DemandeDeplacement** requests.
 - A **Notification** pertains to exactly one **DemandeDeplacement** and one receiving **Utilisateur**.
 - A **JournalAudit** entry pertains to one **Utilisateur** (the actor).

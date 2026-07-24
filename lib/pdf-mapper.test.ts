@@ -54,6 +54,7 @@ function makeEmploye(overrides?: Partial<Utilisateur>): Utilisateur {
     prenom: "Jean",
     poste: "Développeur",
     role: "EMPLOYEE" as any,
+    societeId: "default",
     departementId: "dep-1",
     avatarUrl: null,
     telephone: null,

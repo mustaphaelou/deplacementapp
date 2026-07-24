@@ -71,6 +71,7 @@ export class UtilisateurService {
       prenom: string
       poste: string
       role: Role
+      societeId: string
       departementId: string
       telephone?: string
     },
@@ -86,6 +87,7 @@ export class UtilisateurService {
         prenom: data.prenom,
         poste: data.poste,
         role: data.role,
+        societeId: data.societeId,
         departementId: data.departementId,
         telephone: data.telephone || null,
       },

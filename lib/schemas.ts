@@ -74,6 +74,7 @@ export const utilisateurSchema = z.object({
   prenom: z.string().min(1, "Prénom requis"),
   poste: z.string().min(1, "Poste requis"),
   role: z.enum(["EMPLOYEE", "MANAGER", "FINANCE_ADMIN", "GENERAL_DIRECTION"]),
+  societeId: z.string().min(1, "Société requise"),
   departementId: z.string().min(1, "Département requis"),
   telephone: z.string().optional(),
   motDePasse: z.string().min(6, "Minimum 6 caractères").optional().or(z.literal("")),
@@ -111,6 +112,8 @@ export const passwordChangeSchema = z.object({
 })
 
 export const setupRegisterSchema = z.object({
+  societeNom: z.string().min(1, "Nom de la société requis"),
+  societeEmailDomain: z.string().optional(),
   departements: z
     .array(z.string().min(1, "Nom de département requis"))
     .min(1, "Ajoutez au moins un département"),

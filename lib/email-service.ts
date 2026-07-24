@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer"
 import type { Transporter } from "nodemailer"
+import { prisma } from "./prisma"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -17,13 +18,6 @@ export interface EmailResult {
 
 // ─── Email Service ─────────────────────────────────────────────────────────
 
-/**
- * Thin wrapper around nodemailer that reads SMTP config from env vars.
- *
- * When SMTP_HOST is empty or undefined the service logs a warning and
- * returns `{ success: true }` — this lets the app run locally without an
- * SMTP server while keeping the call-sites unaware of the difference.
- */
 export class EmailService {
   private transporter: Transporter | null = null
 
@@ -42,7 +36,6 @@ export class EmailService {
       host,
       port: Number(port),
       secure: Number(port) === 465,
-      // Only add auth when credentials are provided (Mailpit needs none)
       ...(process.env.SMTP_USER && process.env.SMTP_PASS
         ? { auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } }
         : {}),
@@ -51,12 +44,23 @@ export class EmailService {
 
   async send(options: EmailOptions): Promise<EmailResult> {
     if (!this.transporter) {
-      return { success: true } // gracefully skip when SMTP is not configured
+      return { success: true }
     }
 
     try {
+      let fromName = process.env.SMTP_FROM_NAME ?? "Notification"
+      let fromEmail = process.env.SMTP_FROM ?? "noreply@exemple.ma"
+
+      try {
+        const societe = await prisma.societe.findFirst()
+        if (societe) {
+          if (societe.nomExpediteurEmail) fromName = societe.nomExpediteurEmail
+          if (societe.domaineEmail) fromEmail = `noreply@${societe.domaineEmail}`
+        }
+      } catch {}
+
       await this.transporter.sendMail({
-        from: process.env.SMTP_FROM ?? "noreply@hay2010.ma",
+        from: `"${fromName}" <${fromEmail}>`,
         to: options.to,
         subject: options.subject,
         text: options.text,

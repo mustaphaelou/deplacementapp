@@ -11,49 +11,55 @@ const prisma = new PrismaClient({ adapter })
 async function main() {
   const hashedPassword = await hash("password123", 12)
 
+  const societe = await prisma.societe.upsert({
+    where: { id: "default" },
+    update: { nom: "Ma Société" },
+    create: { nom: "Ma Société" },
+  })
+
   const deptDG = await prisma.departement.upsert({
-    where: { nom: "Direction Générale" },
+    where: { nom_societeId: { nom: "Direction Générale", societeId: societe.id } },
     update: {},
-    create: { nom: "Direction Générale" },
+    create: { nom: "Direction Générale", societeId: societe.id },
   })
 
   const deptFin = await prisma.departement.upsert({
-    where: { nom: "Administration et Finances" },
+    where: { nom_societeId: { nom: "Administration et Finances", societeId: societe.id } },
     update: {},
-    create: { nom: "Administration et Finances" },
+    create: { nom: "Administration et Finances", societeId: societe.id },
   })
 
   const deptCom = await prisma.departement.upsert({
-    where: { nom: "Commercial" },
+    where: { nom_societeId: { nom: "Commercial", societeId: societe.id } },
     update: {},
-    create: { nom: "Commercial" },
+    create: { nom: "Commercial", societeId: societe.id },
   })
 
   const deptTech = await prisma.departement.upsert({
-    where: { nom: "Technique" },
+    where: { nom_societeId: { nom: "Technique", societeId: societe.id } },
     update: {},
-    create: { nom: "Technique" },
+    create: { nom: "Technique", societeId: societe.id },
   })
 
   await prisma.departement.upsert({
-    where: { nom: "Production" },
+    where: { nom_societeId: { nom: "Production", societeId: societe.id } },
     update: {},
-    create: { nom: "Production" },
+    create: { nom: "Production", societeId: societe.id },
   })
 
   const users = [
-    { email: "directeur@hay2010.ma", nom: "Directeur", prenom: "Ahmed", poste: "Directeur Général", role: "GENERAL_DIRECTION" as Role, departementId: deptDG.id },
-    { email: "finance@hay2010.ma", nom: "Comptable", prenom: "Fatima", poste: "Responsable Financier", role: "FINANCE_ADMIN" as Role, departementId: deptFin.id },
-    { email: "manager@hay2010.ma", nom: "Chef", prenom: "Hassan", poste: "Chef de projet", role: "MANAGER" as Role, departementId: deptTech.id },
-    { email: "employe@hay2010.ma", nom: "Employe", prenom: "Youssef", poste: "Conducteur", role: "EMPLOYEE" as Role, departementId: deptTech.id },
-    { email: "commercial@hay2010.ma", nom: "Commercial", prenom: "Karim", poste: "Commercial", role: "EMPLOYEE" as Role, departementId: deptCom.id },
+    { email: "directeur@exemple.ma", nom: "Directeur", prenom: "Ahmed", poste: "Directeur Général", role: "GENERAL_DIRECTION" as Role, departementId: deptDG.id },
+    { email: "finance@exemple.ma", nom: "Comptable", prenom: "Fatima", poste: "Responsable Financier", role: "FINANCE_ADMIN" as Role, departementId: deptFin.id },
+    { email: "manager@exemple.ma", nom: "Chef", prenom: "Hassan", poste: "Chef de projet", role: "MANAGER" as Role, departementId: deptTech.id },
+    { email: "employe@exemple.ma", nom: "Employe", prenom: "Youssef", poste: "Conducteur", role: "EMPLOYEE" as Role, departementId: deptTech.id },
+    { email: "commercial@exemple.ma", nom: "Commercial", prenom: "Karim", poste: "Commercial", role: "EMPLOYEE" as Role, departementId: deptCom.id },
   ]
 
   for (const user of users) {
     await prisma.utilisateur.upsert({
       where: { email: user.email },
       update: {},
-      create: { ...user, motDePasse: hashedPassword },
+      create: { ...user, motDePasse: hashedPassword, societeId: societe.id },
     })
   }
 

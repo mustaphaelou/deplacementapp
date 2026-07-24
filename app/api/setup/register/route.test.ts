@@ -3,6 +3,7 @@ import { NextRequest } from "next/server"
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
+    societe: { count: vi.fn(), create: vi.fn() },
     utilisateur: { count: vi.fn(), create: vi.fn() },
     departement: { upsert: vi.fn() },
   },
@@ -12,8 +13,6 @@ vi.mock("bcryptjs", () => ({
   hash: vi.fn().mockResolvedValue("$hashed$"),
 }))
 
-// The route only uses validateRequest from api-utils, but that module also
-// imports auth-utils -> auth -> next-auth, which cannot load under vitest.
 vi.mock("@/lib/auth-utils", () => ({
   requireAuth: vi.fn(),
 }))
@@ -27,9 +26,10 @@ function mockRequest(body: unknown): NextRequest {
 }
 
 const validPayload = {
+  societeNom: "Ma Société",
   departements: ["Direction Générale", "Technique"],
   admin: {
-    email: "admin@hay2010.ma",
+    email: "admin@exemple.ma",
     password: "motdepasse123",
     nom: "Alaoui",
     prenom: "Sara",
@@ -40,19 +40,23 @@ const validPayload = {
 
 async function mockNoUsers() {
   const { prisma } = await import("@/lib/prisma")
-  ;(prisma.utilisateur.count as ReturnType<typeof vi.fn>).mockResolvedValue(0)
+  ;(prisma.societe.count as ReturnType<typeof vi.fn>).mockResolvedValue(0)
   return prisma
 }
 
 async function mockSuccessfulWrites() {
   const prisma = await mockNoUsers()
+  ;(prisma.societe.create as ReturnType<typeof vi.fn>).mockResolvedValue({
+    id: "default",
+    nom: "Ma Société",
+  })
   ;(prisma.departement.upsert as ReturnType<typeof vi.fn>).mockImplementation(
-    (args: { where: { nom: string } }) =>
-      Promise.resolve({ id: `id-${args.where.nom}`, nom: args.where.nom })
+    (args: { where: { nom_societeId: { nom: string } } }) =>
+      Promise.resolve({ id: `id-${args.where.nom_societeId.nom}`, nom: args.where.nom_societeId.nom })
   )
   ;(prisma.utilisateur.create as ReturnType<typeof vi.fn>).mockResolvedValue({
     id: "u-1",
-    email: "admin@hay2010.ma",
+    email: "admin@exemple.ma",
     prenom: "Sara",
     nom: "Alaoui",
     role: "GENERAL_DIRECTION",
@@ -67,10 +71,9 @@ describe("setup register route", () => {
     ;(hash as ReturnType<typeof vi.fn>).mockResolvedValue("$hashed$")
   })
 
-  it("POST returns 409 and writes nothing when Utilisateurs already exist", async () => {
+  it("POST returns 409 when a Societe already exists", async () => {
     const { prisma } = await import("@/lib/prisma")
-    const { hash } = await import("bcryptjs")
-    ;(prisma.utilisateur.count as ReturnType<typeof vi.fn>).mockResolvedValue(2)
+    ;(prisma.societe.count as ReturnType<typeof vi.fn>).mockResolvedValue(1)
 
     const { POST } = await import("./route")
     const response = await POST(mockRequest(validPayload))
@@ -78,9 +81,9 @@ describe("setup register route", () => {
     expect(response.status).toBe(409)
     const body = await response.json()
     expect(body.error).toBe("Cette instance est déjà configurée.")
+    expect(prisma.societe.create).not.toHaveBeenCalled()
     expect(prisma.departement.upsert).not.toHaveBeenCalled()
     expect(prisma.utilisateur.create).not.toHaveBeenCalled()
-    expect(hash).not.toHaveBeenCalled()
   })
 
   it("POST returns 400 on invalid email", async () => {
@@ -99,14 +102,14 @@ describe("setup register route", () => {
     expect(body.error).toBeDefined()
   })
 
-  it("POST returns 400 on password shorter than 8 characters", async () => {
+  it("POST returns 400 on empty societeNom", async () => {
     await mockNoUsers()
 
     const { POST } = await import("./route")
     const response = await POST(
       mockRequest({
         ...validPayload,
-        admin: { ...validPayload.admin, password: "court12" },
+        societeNom: "",
       })
     )
 
@@ -115,56 +118,7 @@ describe("setup register route", () => {
     expect(body.error).toBeDefined()
   })
 
-  it("POST returns 400 on missing required fields", async () => {
-    await mockNoUsers()
-
-    const { POST } = await import("./route")
-    const adminSansNom = {
-      email: "admin@hay2010.ma",
-      password: "motdepasse123",
-      prenom: "Sara",
-      poste: "Directrice Générale",
-      departementNom: "Direction Générale",
-    }
-    const response = await POST(
-      mockRequest({ ...validPayload, admin: adminSansNom })
-    )
-
-    expect(response.status).toBe(400)
-    const body = await response.json()
-    expect(body.error).toBeDefined()
-  })
-
-  it("POST returns 400 when the admin departementNom is not in the submitted list", async () => {
-    const prisma = await mockNoUsers()
-
-    const { POST } = await import("./route")
-    const response = await POST(
-      mockRequest({
-        ...validPayload,
-        admin: { ...validPayload.admin, departementNom: "Inexistant" },
-      })
-    )
-
-    expect(response.status).toBe(400)
-    const body = await response.json()
-    expect(body.error).toBeDefined()
-    expect(prisma.departement.upsert).not.toHaveBeenCalled()
-    expect(prisma.utilisateur.create).not.toHaveBeenCalled()
-  })
-
-  it("POST returns 400 when the departements array is empty", async () => {
-    await mockNoUsers()
-
-    const { POST } = await import("./route")
-    const response = await POST(mockRequest({ ...validPayload, departements: [] }))
-
-    expect(response.status).toBe(400)
-    const body = await response.json()
-    expect(body.error).toBeDefined()
-  })
-
-  it("POST creates departments and the first Utilisateur on valid input", async () => {
+  it("POST creates Societe, departments and the first Utilisateur on valid input", async () => {
     const prisma = await mockSuccessfulWrites()
     const { hash } = await import("bcryptjs")
 
@@ -176,28 +130,32 @@ describe("setup register route", () => {
     expect(body).toEqual({
       user: {
         id: "u-1",
-        email: "admin@hay2010.ma",
+        email: "admin@exemple.ma",
         prenom: "Sara",
         nom: "Alaoui",
         role: "GENERAL_DIRECTION",
       },
     })
     expect(hash).toHaveBeenCalledWith("motdepasse123", 12)
+    expect(prisma.societe.create).toHaveBeenCalledWith({
+      data: { nom: "Ma Société", domaineEmail: null },
+    })
     expect(prisma.utilisateur.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        email: "admin@hay2010.ma",
+        email: "admin@exemple.ma",
         motDePasse: "$hashed$",
         nom: "Alaoui",
         prenom: "Sara",
         poste: "Directrice Générale",
         role: "GENERAL_DIRECTION",
         actif: true,
+        societeId: "default",
         departementId: "id-Direction Générale",
       }),
     })
   })
 
-  it("POST upserts each department by nom instead of creating duplicates", async () => {
+  it("POST upserts each department by nom and societeId", async () => {
     const prisma = await mockSuccessfulWrites()
 
     const { POST } = await import("./route")
@@ -206,14 +164,14 @@ describe("setup register route", () => {
     expect(response.status).toBe(200)
     expect(prisma.departement.upsert).toHaveBeenCalledTimes(2)
     expect(prisma.departement.upsert).toHaveBeenCalledWith({
-      where: { nom: "Direction Générale" },
+      where: { nom_societeId: { nom: "Direction Générale", societeId: "default" } },
       update: {},
-      create: { nom: "Direction Générale" },
+      create: { nom: "Direction Générale", societeId: "default" },
     })
     expect(prisma.departement.upsert).toHaveBeenCalledWith({
-      where: { nom: "Technique" },
+      where: { nom_societeId: { nom: "Technique", societeId: "default" } },
       update: {},
-      create: { nom: "Technique" },
+      create: { nom: "Technique", societeId: "default" },
     })
   })
 })

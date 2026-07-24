@@ -28,6 +28,7 @@ export const NAV_ITEMS: Record<string, NavItem[]> = {
   ],
   FINANCE_ADMIN: [
     { label: "Approbations Budget", href: "/demandes", icon: "dollar-sign", description: "Validation budgétaire des demandes" },
+    { label: "Société", href: "/administration/societe", icon: "building", description: "Paramètres de la société" },
     { label: "Utilisateurs", href: "/administration/utilisateurs", icon: "users", description: "Gestion des comptes et rôles" },
     { label: "Véhicules", href: "/administration/vehicules", icon: "car", description: "Gestion du parc automobile" },
     { label: "Rapports", href: "/administration/rapports", icon: "bar-chart-3", description: "Statistiques et exports" },

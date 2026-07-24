@@ -40,6 +40,23 @@ enum TypeTransport {
   @@map("types_transport")
 }
 
+model Societe {
+  id                 String   @id @default("default")
+  nom                String
+  logoUrl            String?
+  faviconUrl         String?
+  couleurPrimaire    String?
+  nomExpediteurEmail String?
+  domaineEmail       String?
+  creeLe             DateTime @default(now())
+  modifieLe          DateTime @updatedAt
+
+  utilisateurs Utilisateur[]
+  departements Departement[]
+
+  @@map("societes")
+}
+
 model Utilisateur {
   id            String    @id @default(cuid())
   email         String    @unique
@@ -50,6 +67,8 @@ model Utilisateur {
   role          Role      @default(EMPLOYEE)
   departementId String
   departement   Departement @relation(fields: [departementId], references: [id])
+  societeId     String
+  societe       Societe   @relation(fields: [societeId], references: [id])
   avatarUrl     String?
   telephone     String?
   dateEmbauche  DateTime?
@@ -66,12 +85,15 @@ model Utilisateur {
 }
 
 model Departement {
-  id   String @id @default(cuid())
-  nom  String @unique
+  id        String @id @default(cuid())
+  nom       String
+  societeId String
+  societe   Societe @relation(fields: [societeId], references: [id])
   creeLe DateTime @default(now())
 
   utilisateurs Utilisateur[]
 
+  @@unique([nom, societeId])
   @@map("departements")
 }
 

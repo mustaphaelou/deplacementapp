@@ -64,6 +64,7 @@ const makeUser = (overrides?: Partial<Utilisateur>): Utilisateur => ({
   prenom: "Jean",
   poste: "Dev",
   role: "EMPLOYEE",
+  societeId: "default",
   departementId: "d-1",
   avatarUrl: null,
   telephone: null,
@@ -110,6 +111,7 @@ describe("UtilisateurService", () => {
           prenom: "User",
           poste: "QA",
           role: "EMPLOYEE",
+          societeId: "default",
           departementId: "d-1",
         },
         "u-1"
@@ -139,6 +141,7 @@ describe("UtilisateurService", () => {
           prenom: "User",
           poste: "QA",
           role: "EMPLOYEE",
+          societeId: "default",
           departementId: "d-1",
         },
         "u-1"

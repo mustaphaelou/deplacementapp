@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { DashboardShell } from "@/components/dashboard-shell"
 import { NAV_ITEMS } from "@/lib/roles"
+import { getSocieteBranding } from "@/lib/societe"
 
 export default async function DashboardLayout({
   children,
@@ -17,5 +18,15 @@ export default async function DashboardLayout({
     ...(NAV_ITEMS[role as keyof typeof NAV_ITEMS] ?? []),
   ]
 
-  return <DashboardShell navItems={navItems}>{children}</DashboardShell>
+  const societe = await getSocieteBranding()
+
+  return (
+    <DashboardShell
+      navItems={navItems}
+      societeNom={societe?.nom ?? "Application"}
+      societeLogoUrl={societe?.logoUrl ?? null}
+    >
+      {children}
+    </DashboardShell>
+  )
 }

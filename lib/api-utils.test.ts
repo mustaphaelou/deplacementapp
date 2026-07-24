@@ -64,6 +64,7 @@ describe("validateRequest", () => {
       prenom: "Jean",
       poste: "Dev",
       role: "EMPLOYEE",
+      societeId: "soc-1",
       departementId: "dep-1",
     })
 
@@ -108,7 +109,7 @@ describe("withValidation", () => {
       req,
       expect.objectContaining({ id: "user-1" }),
       { email: "a@b.com", password: "secret" },
-      expect.any(Promise)
+      {}
     )
   })
 
@@ -203,7 +204,7 @@ describe("password route integration (withValidation + passwordChangeSchema)", (
       req,
       expect.objectContaining({ id: "u-1" }),
       { currentPassword: "old", newPassword: "newpass123" },
-      expect.any(Promise)
+      {}
     )
   })
 

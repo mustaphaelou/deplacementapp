@@ -47,6 +47,7 @@ const validUserPayload = {
   prenom: "Jean",
   poste: "Dev",
   role: "EMPLOYEE",
+  societeId: "soc-1",
   departementId: "d-1",
 }
 
