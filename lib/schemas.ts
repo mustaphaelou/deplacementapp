@@ -111,6 +111,26 @@ export const passwordChangeSchema = z.object({
   newPassword: z.string().min(6, "Le nouveau mot de passe doit contenir au moins 6 caractères"),
 })
 
+export const setupWizardSchema = z.object({
+  societeNom: z.string().min(1, "Nom de la société requis"),
+  societeEmailDomain: z.string().optional(),
+  departements: z
+    .array(z.string().min(1, "Nom de département requis"))
+    .min(1, "Ajoutez au moins un département"),
+  prenom: z.string().min(1, "Prénom requis"),
+  nom: z.string().min(1, "Nom requis"),
+  email: z.string().email("Email invalide"),
+  poste: z.string().min(1, "Poste requis"),
+  password: z.string().min(8, "8 caractères minimum"),
+  confirmPassword: z.string().min(1, "Confirmez le mot de passe"),
+  departementNom: z.string().min(1, "Sélectionnez un département"),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Les mots de passe ne correspondent pas",
+  path: ["confirmPassword"],
+})
+
+export type SetupWizardValues = z.infer<typeof setupWizardSchema>
+
 export const setupRegisterSchema = z.object({
   societeNom: z.string().min(1, "Nom de la société requis"),
   societeEmailDomain: z.string().optional(),

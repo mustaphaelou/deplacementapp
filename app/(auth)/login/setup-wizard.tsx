@@ -1,6 +1,8 @@
 "use client"
 
 import { useState } from "react"
+import { useForm, useWatch } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
 import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -10,90 +12,113 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectItem } from "@/components/ui/select"
 import { toast } from "sonner"
 import { Loader2, Plus, Trash2 } from "lucide-react"
+import { setupWizardSchema, type SetupWizardValues } from "@/lib/schemas"
+import {
+  PasswordStrength,
+  checkPasswordEntropy,
+  getPasswordStrengthLabel,
+  getPasswordStrengthColor,
+  getPasswordStrengthWidth,
+} from "@/lib/password-strength"
+
+const STEP_FIELDS: Record<number, (keyof SetupWizardValues)[]> = {
+  1: ["societeNom"],
+  2: ["departements"],
+  3: ["prenom", "nom", "email", "poste", "password", "confirmPassword", "departementNom"],
+}
 
 export function SetupWizard() {
   const router = useRouter()
   const [step, setStep] = useState<1 | 2 | 3>(1)
-  const [societeNom, setSocieteNom] = useState("")
-  const [societeEmailDomain, setSocieteEmailDomain] = useState("")
   const [departements, setDepartements] = useState<string[]>([])
   const [newDepartement, setNewDepartement] = useState("")
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-  const [nom, setNom] = useState("")
-  const [prenom, setPrenom] = useState("")
-  const [poste, setPoste] = useState("")
-  const [departementNom, setDepartementNom] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    trigger,
+    control,
+    formState: { errors },
+  } = useForm<SetupWizardValues>({
+    resolver: zodResolver(setupWizardSchema),
+    defaultValues: {
+      departements: [],
+    },
+  })
+
+  const watchedPassword = useWatch({ control, name: "password" })
+  const watchedDepartementNom = useWatch({ control, name: "departementNom" })
+  const passwordStrength = watchedPassword ? checkPasswordEntropy(watchedPassword) : null
+
+  function syncDepartements(deps: string[]) {
+    setDepartements(deps)
+    setValue("departements", deps, { shouldValidate: true })
+  }
 
   function addDepartement(e: React.FormEvent) {
     e.preventDefault()
     const name = newDepartement.trim()
     if (!name) return
     if (!departements.includes(name)) {
-      setDepartements([...departements, name])
+      syncDepartements([...departements, name])
     }
     setNewDepartement("")
   }
 
   function removeDepartement(name: string) {
-    setDepartements(departements.filter((d) => d !== name))
-    if (departementNom === name) setDepartementNom(null)
+    syncDepartements(departements.filter((d) => d !== name))
   }
 
-  function goToStep2() {
-    if (!societeNom.trim()) {
-      toast.error("Veuillez saisir le nom de votre société")
-      return
-    }
+  async function goToStep2() {
+    const valid = await trigger(STEP_FIELDS[1])
+    if (!valid) return
     setStep(2)
   }
 
-  function goToStep3() {
-    if (!departementNom && departements.length > 0) {
-      setDepartementNom(departements[0])
+  async function goToStep3() {
+    const valid = await trigger(STEP_FIELDS[2])
+    if (!valid) return
+    if (departements.length > 0) {
+      setValue("departementNom", departements[0], { shouldValidate: true })
     }
     setStep(3)
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-
-    if (password !== confirmPassword) {
-      toast.error("Les mots de passe ne correspondent pas")
-      return
-    }
-    if (!departementNom || !departements.includes(departementNom)) {
-      toast.error("Sélectionnez un département")
-      return
-    }
-
+  async function onSubmit(data: SetupWizardValues) {
     setLoading(true)
 
     const res = await fetch("/api/setup/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        societeNom,
-        societeEmailDomain: societeEmailDomain || undefined,
-        departements,
-        admin: { email, password, nom, prenom, poste, departementNom },
+        societeNom: data.societeNom,
+        societeEmailDomain: data.societeEmailDomain || undefined,
+        departements: data.departements,
+        admin: {
+          email: data.email,
+          password: data.password,
+          nom: data.nom,
+          prenom: data.prenom,
+          poste: data.poste,
+          departementNom: data.departementNom,
+        },
       }),
     })
 
     if (!res.ok) {
       setLoading(false)
-      const data = await res.json().catch(() => ({}))
-      toast.error(data.error || "Erreur lors de la configuration")
+      const err = await res.json().catch(() => ({}))
+      toast.error(err.error || "Erreur lors de la configuration")
       return
     }
 
-    const result = await signIn("credentials", { email, password, redirect: false })
+    const result = await signIn("credentials", { email: data.email, password: data.password, redirect: false })
 
     if (result?.error) {
       setLoading(false)
-      toast.error("Compte créé — veuillez vous connecter")
+      toast.success("Compte créé — veuillez vous connecter")
       window.location.assign("/login")
       return
     }
@@ -124,10 +149,12 @@ export function SetupWizard() {
                 <Input
                   id="societe-nom"
                   placeholder="Ma Société SARL"
-                  value={societeNom}
-                  onChange={(e) => setSocieteNom(e.target.value)}
-                  required
+                  {...register("societeNom")}
+                  aria-invalid={!!errors.societeNom}
                 />
+                {errors.societeNom && (
+                  <p className="mt-1 text-xs text-destructive">{errors.societeNom.message}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="societe-email-domain">
@@ -136,18 +163,13 @@ export function SetupWizard() {
                 <Input
                   id="societe-email-domain"
                   placeholder="masociete.ma"
-                  value={societeEmailDomain}
-                  onChange={(e) => setSocieteEmailDomain(e.target.value)}
+                  {...register("societeEmailDomain")}
                 />
                 <p className="text-xs text-muted-foreground">
                   Exemple: masociete.ma → noreply@masociete.ma
                 </p>
               </div>
-              <Button
-                type="button"
-                className="w-full"
-                onClick={goToStep2}
-              >
+              <Button type="button" className="w-full" onClick={goToStep2}>
                 Continuer
               </Button>
             </div>
@@ -178,6 +200,9 @@ export function SetupWizard() {
                   Aucun département pour le moment — ajoutez-en au moins un.
                 </p>
               )}
+              {errors.departements && (
+                <p className="text-xs text-destructive">{errors.departements.message}</p>
+              )}
               <form onSubmit={addDepartement} className="flex gap-2">
                 <Input
                   placeholder="Nom du département"
@@ -190,11 +215,7 @@ export function SetupWizard() {
                 </Button>
               </form>
               <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setStep(1)}
-                >
+                <Button type="button" variant="outline" onClick={() => setStep(1)}>
                   Retour
                 </Button>
                 <Button
@@ -208,27 +229,31 @@ export function SetupWizard() {
               </div>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="prenom">Prénom</Label>
                   <Input
                     id="prenom"
                     placeholder="Sara"
-                    value={prenom}
-                    onChange={(e) => setPrenom(e.target.value)}
-                    required
+                    {...register("prenom")}
+                    aria-invalid={!!errors.prenom}
                   />
+                  {errors.prenom && (
+                    <p className="mt-1 text-xs text-destructive">{errors.prenom.message}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="nom">Nom</Label>
                   <Input
                     id="nom"
                     placeholder="Alaoui"
-                    value={nom}
-                    onChange={(e) => setNom(e.target.value)}
-                    required
+                    {...register("nom")}
+                    aria-invalid={!!errors.nom}
                   />
+                  {errors.nom && (
+                    <p className="mt-1 text-xs text-destructive">{errors.nom.message}</p>
+                  )}
                 </div>
               </div>
               <div className="space-y-2">
@@ -237,25 +262,29 @@ export function SetupWizard() {
                   id="setup-email"
                   type="email"
                   placeholder="vous@exemple.ma"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
+                  {...register("email")}
+                  aria-invalid={!!errors.email}
                 />
+                {errors.email && (
+                  <p className="mt-1 text-xs text-destructive">{errors.email.message}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="poste">Poste</Label>
                 <Input
                   id="poste"
                   placeholder="Directeur Général"
-                  value={poste}
-                  onChange={(e) => setPoste(e.target.value)}
-                  required
+                  {...register("poste")}
+                  aria-invalid={!!errors.poste}
                 />
+                {errors.poste && (
+                  <p className="mt-1 text-xs text-destructive">{errors.poste.message}</p>
+                )}
               </div>
               <Select
                 label="Département"
-                value={departementNom}
-                onValueChange={setDepartementNom}
+                value={watchedDepartementNom ?? ""}
+                onValueChange={(v) => { if (v) setValue("departementNom", v, { shouldValidate: true }) }}
               >
                 {departements.map((dep) => (
                   <SelectItem key={dep} value={dep}>
@@ -263,17 +292,35 @@ export function SetupWizard() {
                   </SelectItem>
                 ))}
               </Select>
+              {errors.departementNom && (
+                <p className="text-xs text-destructive">{errors.departementNom.message}</p>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="setup-password">Mot de passe</Label>
                 <Input
                   id="setup-password"
                   type="password"
                   placeholder="8 caractères minimum"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={8}
+                  {...register("password")}
+                  aria-invalid={!!errors.password}
                 />
+                {errors.password && (
+                  <p className="mt-1 text-xs text-destructive">{errors.password.message}</p>
+                )}
+                {watchedPassword && watchedPassword.length >= 8 && passwordStrength !== null && (
+                  <div className="mt-2 space-y-1">
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                      <div
+                        className={`h-full rounded-full transition-all ${getPasswordStrengthColor(passwordStrength)} ${getPasswordStrengthWidth(passwordStrength)}`}
+                      />
+                    </div>
+                    <p
+                      className={`text-xs ${passwordStrength >= PasswordStrength.Moderate ? "text-muted-foreground" : "text-destructive"}`}
+                    >
+                      Mot de passe : {getPasswordStrengthLabel(passwordStrength)}
+                    </p>
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="confirm-password">Confirmer le mot de passe</Label>
@@ -281,19 +328,15 @@ export function SetupWizard() {
                   id="confirm-password"
                   type="password"
                   placeholder="••••••••"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  minLength={8}
+                  {...register("confirmPassword")}
+                  aria-invalid={!!errors.confirmPassword}
                 />
+                {errors.confirmPassword && (
+                  <p className="mt-1 text-xs text-destructive">{errors.confirmPassword.message}</p>
+                )}
               </div>
               <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setStep(2)}
-                  disabled={loading}
-                >
+                <Button type="button" variant="outline" onClick={() => setStep(2)} disabled={loading}>
                   Retour
                 </Button>
                 <Button type="submit" className="flex-1" disabled={loading}>
