@@ -35,7 +35,7 @@ UPDATE "departements" SET "societeId" = 'default';
 ALTER TABLE "departements" ALTER COLUMN "societeId" SET NOT NULL;
 
 -- Drop old unique constraint on departements.nom
-ALTER TABLE "departements" DROP CONSTRAINT "departements_nom_key";
+DROP INDEX IF EXISTS "departements_nom_key";
 
 -- CreateIndex
 CREATE UNIQUE INDEX "departements_nom_societeId_key" ON "departements"("nom", "societeId");

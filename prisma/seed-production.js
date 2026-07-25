@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client"
 import { PrismaPg } from "@prisma/adapter-pg"
+import { hash } from "bcryptjs"
 import pkg from "pg"
 const { Pool } = pkg
 
@@ -8,20 +9,60 @@ const adapter = new PrismaPg(pool)
 const prisma = new PrismaClient({ adapter })
 
 async function main() {
+  const hashedPassword = await hash("password123", 12)
+
+  console.log("==> Ensuring default société...")
+  await prisma.societe.upsert({
+    where: { id: "default" },
+    update: {},
+    create: { id: "default", nom: "Ma Société", modifieLe: new Date() },
+  })
+
   console.log("==> Seeding departments...")
-  const depts = [
-    "Direction Générale",
-    "Administration et Finances",
-    "Commercial",
-    "Technique",
-    "Production"
+  const deptDG = await prisma.departement.upsert({
+    where: { nom_societeId: { nom: "Direction Générale", societeId: "default" } },
+    update: {},
+    create: { nom: "Direction Générale", societeId: "default" },
+  })
+
+  const deptFin = await prisma.departement.upsert({
+    where: { nom_societeId: { nom: "Administration et Finances", societeId: "default" } },
+    update: {},
+    create: { nom: "Administration et Finances", societeId: "default" },
+  })
+
+  const deptCom = await prisma.departement.upsert({
+    where: { nom_societeId: { nom: "Commercial", societeId: "default" } },
+    update: {},
+    create: { nom: "Commercial", societeId: "default" },
+  })
+
+  const deptTech = await prisma.departement.upsert({
+    where: { nom_societeId: { nom: "Technique", societeId: "default" } },
+    update: {},
+    create: { nom: "Technique", societeId: "default" },
+  })
+
+  await prisma.departement.upsert({
+    where: { nom_societeId: { nom: "Production", societeId: "default" } },
+    update: {},
+    create: { nom: "Production", societeId: "default" },
+  })
+
+  console.log("==> Seeding users...")
+  const users = [
+    { email: "directeur@exemple.ma", nom: "Directeur", prenom: "Ahmed", poste: "Directeur Général", role: "GENERAL_DIRECTION", departementId: deptDG.id },
+    { email: "finance@exemple.ma", nom: "Comptable", prenom: "Fatima", poste: "Responsable Financier", role: "FINANCE_ADMIN", departementId: deptFin.id },
+    { email: "manager@exemple.ma", nom: "Chef", prenom: "Hassan", poste: "Chef de projet", role: "MANAGER", departementId: deptTech.id },
+    { email: "employe@exemple.ma", nom: "Employe", prenom: "Youssef", poste: "Conducteur", role: "EMPLOYEE", departementId: deptTech.id },
+    { email: "commercial@exemple.ma", nom: "Commercial", prenom: "Karim", poste: "Commercial", role: "EMPLOYEE", departementId: deptCom.id },
   ]
 
-  for (const dept of depts) {
-    await prisma.departement.upsert({
-      where: { nom: dept },
+  for (const user of users) {
+    await prisma.utilisateur.upsert({
+      where: { email: user.email },
       update: {},
-      create: { nom: dept },
+      create: { ...user, motDePasse: hashedPassword, societeId: "default" },
     })
   }
 
