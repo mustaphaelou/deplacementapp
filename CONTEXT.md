@@ -56,9 +56,9 @@ At each Etape exactly one Role is permitted to act. The pairing is fixed:
 
 Once a Decision of APPROVED, REJECTED, or WITHDRAWN is recorded at any Etape, no further transitions are permitted from that Etape.
 
-**StatutDemande (persisted state)**:
-The single persisted column on a DemandeDeplacement row that records its current state. One of: BROUILLON, SOUMISE, APPROUVEE_MANAGER, APPROUVEE_FINANCE, APPROUVEE, REJETEE_MANAGER, REJETEE_FINANCE, REJETEE_DIRECTION, RETIREE. **Etape + Decision are a derived in-memory read-model computed from StatutDemande** via `fromLegacyStatus`, not the other way around. New code is encouraged to reason in terms of Etape + Decision (clearer) but must persist via StatutDemande; the `toLegacyStatus` function maps the other direction for writes.
-_Avoid_: Treating Etape + Decision as the source of truth; the enum is.
+**StatutDemande**:
+_Legacy, no longer persisted._ Was previously a single-column enum on DemandeDeplacement. As of ADR-0005, replaced by separate persisted `etape` + `decision` columns. The `fromLegacyStatus` / `toLegacyStatus` mapping functions are removed. The `statuts_demande` enum type is dropped from the database schema.
+_Avoid_: Using the StatutDemande enum; use Etape + Decision instead.
 
 **TypeTransport**:
 The mode of transport for a DemandeDeplacement. One of: VOITURE_PERSONNELLE, VOITURE_SOCIETE, BUS, AVION, TRAIN, AUTRE.
@@ -140,5 +140,5 @@ _Avoid_: Email suffix, mail domain
 ## Flagged ambiguities
 
 - "approved" was used to mean both a stage-level outcome (manager said yes) and a terminal outcome (whole pipeline complete). Resolved by splitting into **Etape** (where we are) and **Decision** (what happened there). Terminal approval is `Etape: FINAL, Decision: APPROVED`.
-- "status" / "statut" was used for both the single-field legacy representation and the conceptual state machine. Resolved: **StatutDemande** is the *persisted* source of truth (the actual stored column); **Etape** + **Decision** are the *conceptual* read-model computed from it. New code reasons in Etape + Decision but persists via StatutDemande.
-- "retirée" (withdrawn) was treated as a separate StatutDemande value. Resolved: withdrawal is a **Decision** (`WITHDRAWN`) and a terminal outcome, not a stage.
+- "status" / "statut" was previously a single-column legacy enum resolved to **StatutDemande**. As of ADR-0005, the column is split into two persisted columns: **Etape + Decision**. The old `fromLegacyStatus`/`toLegacyStatus` bridging layer is removed.
+- "retirée" (withdrawn) was initially treated as a separate StatutDemande value. Resolved: withdrawal is a **Decision** (`WITHDRAWN`) and a terminal outcome, not a stage.
