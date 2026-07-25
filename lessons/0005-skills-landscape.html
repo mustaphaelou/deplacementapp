@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lesson: The Skills Landscape</title>
+  <link rel="stylesheet" href="../assets/lesson.css">
+  <link rel="stylesheet" href="../assets/quiz.css">
+  <style>
+    .skill-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .6em 1.2em;
+      margin: 1em 0;
+    }
+    @media (max-width: 600px) {
+      .skill-grid { grid-template-columns: 1fr; }
+    }
+    .skill-tag {
+      display: inline-block;
+      font-family: monospace;
+      font-size: .82em;
+      background: #1a1a1a;
+      color: #f0f0f0;
+      padding: .15em .5em;
+      border-radius: 3px;
+    }
+    .category {
+      border-left: 4px solid #2196F3;
+      padding-left: 1em;
+      margin: 1.5em 0;
+    }
+    .category h3 {
+      margin-top: 0;
+    }
+    .chain {
+      background: #e8f5e9;
+      border-left: 4px solid #4caf50;
+      padding: .75em 1em;
+      margin: 1em 0;
+      border-radius: 0 4px 4px 0;
+    }
+    .chain code { background: #c8e6c9; }
+    .flow { font-family: monospace; font-size: 1.1em; }
+  </style>
+</head>
+<body>
+
+<h1>The Skills Landscape</h1>
+
+<p>
+  You have about 35+ skills available. This lesson gives you a mental map of the whole terrain — how skills are organized, what pattern they follow, and which ones chain together naturally.
+</p>
+
+<h2>The shape of a skill</h2>
+
+<p>
+  Every skill in the Matt Pocock system follows the same pattern. Learning this pattern once lets you understand any skill without reading its full <code>SKILL.md</code>:
+</p>
+
+<ol>
+  <li><strong>Trigger</strong> — a specific situation where you'd invoke it (e.g., "the user says diagnose/debug this")</li>
+  <li><strong>Context load</strong> — what the skill reads from the conversation or repo to understand the situation</li>
+  <li><strong>Procedure</strong> — the steps the skill follows (often using parallel sub-agents)</li>
+  <li><strong>Completion criteria</strong> — what signals the skill is done</li>
+</ol>
+
+<div class="callout">
+  <strong>Key insight:</strong> Skills are <em>model-invoked</em> (the agent decides when they match) or <em>user-invoked</em> (you explicitly ask). Most of the Matt skills are user-invoked — you steer.
+</div>
+
+<h2>The landscape by category</h2>
+
+<div class="category">
+  <h3>1. Foundation</h3>
+  <p>Run once per repo. These set up the infrastructure the other skills expect.</p>
+  <div class="skill-grid">
+    <div><span class="skill-tag">setup-matt-pocock-skills</span><br><small>Bootstraps the repo: issue tracker, triage labels, domain doc layout.</small></div>
+    <div><span class="skill-tag">writing-great-skills</span><br><small>Reference for <em>authoring</em> skills. Not a runner — read it when you want to write your own.</small></div>
+  </div>
+</div>
+
+<div class="category">
+  <h3>2. Discovery &amp; Research</h3>
+  <p>Understand the problem space before deciding what to do.</p>
+  <div class="skill-grid">
+    <div><span class="skill-tag">research</span><br><small>Investigate a question against primary sources. Writes findings to a .md file.</small></div>
+    <div><span class="skill-tag">ubiquitous-language</span><br><small>Extract DDD-style glossary from conversation. Writes to UBIQUITOUS_LANGUAGE.md.</small></div>
+    <div><span class="skill-tag">domain-modeling</span><br><small>Sharpen fuzzy terms, create ADRs for hard-to-reverse decisions.</small></div>
+    <div><span class="skill-tag">codebase-design</span><br><small>Shared vocabulary for deep modules — interface vs implementation, seams, depth.</small></div>
+  </div>
+</div>
+
+<div class="category">
+  <h3>3. Design &amp; Planning</h3>
+  <p>Decide what to build and in what order.</p>
+  <div class="skill-grid">
+    <div><span class="skill-tag">design-an-interface</span><br><small>Spawn parallel sub-agents with different constraints to generate interface alternatives.</small></div>
+    <div><span class="skill-tag">to-spec</span><br><small>Synthesize conversation into a PRD issue. No interview — pure synthesis.</small></div>
+    <div><span class="skill-tag">to-tickets</span><br><small>Break a spec into vertical-slice tracer-bullet tickets with blocking edges.</small></div>
+    <div><span class="skill-tag">request-refactor-plan</span><br><small>Interactive interview → tiny-commit plan → GitHub issue.</small></div>
+    <div><span class="skill-tag">wayfinder</span><br><small>Plan huge work across multiple sessions: decision tickets resolved one at a time.</small></div>
+  </div>
+</div>
+
+<div class="category">
+  <h3>4. Critique</h3>
+  <p>Stress-test a plan, design, or idea before committing to it.</p>
+  <div class="skill-grid">
+    <div><span class="skill-tag">grill-me</span><br><small>Relentless interview — sharpens a plan or design through hard questions.</small></div>
+    <div><span class="skill-tag">grilling</span><br><small>Same loop, different entry point (used by other skills internally).</small></div>
+    <div><span class="skill-tag">grill-with-docs</span><br><small>Grill + create ADRs and glossary as you go.</small></div>
+    <div><span class="skill-tag">batch-grill-me</span><br><small>Many questions at once, round by round. More efficient.</small></div>
+  </div>
+</div>
+
+<div class="category">
+  <h3>5. Building</h3>
+  <p>Write code.</p>
+  <div class="skill-grid">
+    <div><span class="skill-tag">tdd</span><br><small>Reference for the red-green loop. Use when building test-first.</small></div>
+    <div><span class="skill-tag">implement</span><br><small>Implement from a spec or set of tickets. The workhorse builder.</small></div>
+    <div><span class="skill-tag">prototype</span><br><small>Build a throwaway to answer a design question. No quality bar.</small></div>
+  </div>
+</div>
+
+<div class="category">
+  <h3>6. Quality</h3>
+  <p>Catch issues before they land.</p>
+  <div class="skill-grid">
+    <div><span class="skill-tag">code-review</span><br><small>Two-axis review: Standards (code style + smells) and Spec (matches the issue?). Uses parallel sub-agents.</small></div>
+    <div><span class="skill-tag">qa</span><br><small>Interactive QA session — you report bugs conversationally, agent files GitHub issues.</small></div>
+    <div><span class="skill-tag">triage</span><br><small>Move issues through the state machine: needs-triage → needs-info → ready-for-agent/human.</small></div>
+  </div>
+</div>
+
+<div class="category">
+  <h3>7. Handoff</h3>
+  <p>Pass work between sessions or agents.</p>
+  <div class="skill-grid">
+    <div><span class="skill-tag">handoff</span><br><small>Compact conversation into a handoff doc for the next agent. Saves to temp dir.</small></div>
+    <div><span class="skill-tag">claude-handoff</span><br><small>Hand off to a fresh background agent that starts working immediately.</small></div>
+  </div>
+</div>
+
+<div class="category">
+  <h3>8. Specialized tools</h3>
+  <p>Narrow-purpose skills for specific frameworks or workflows.</p>
+  <div class="skill-grid">
+    <div><span class="skill-tag">shadcn</span><br><small>Add, fix, debug shadcn/ui components.</small></div>
+    <div><span class="skill-tag">wizard</span><br><small>Generate interactive bash wizards for multi-step manual procedures.</small></div>
+    <div><span class="skill-tag">migrate-radix-to-base</span><br><small>Convert Radix UI primitives to Base UI.</small></div>
+    <div><span class="skill-tag">migrate-to-shoehorn</span><br><small>Replace <code>as</code> type assertions with @total-typescript/shoehorn.</small></div>
+    <div><span class="skill-tag">setup-pre-commit</span><br><small>Add Husky + lint-staged + typecheck + tests as pre-commit hooks.</small></div>
+    <div><span class="skill-tag">setup-ts-deep-modules</span><br><small>Wire dependency-cruiser for deep module constraints.</small></div>
+    <div><span class="skill-tag">git-guardrails-claude-code</span><br><small>Block dangerous git commands (push, reset, clean).</small></div>
+    <div><span class="skill-tag">obsidian-vault</span><br><small>Search, create, manage Obsidian notes with wikilinks.</small></div>
+    <div><span class="skill-tag">scaffold-exercises</span><br><small>Create exercise directory structures for teaching.</small></div>
+  </div>
+</div>
+
+<div class="category">
+  <h3>9. Writing</h3>
+  <p>Produce long-form text.</p>
+  <div class="skill-grid">
+    <div><span class="skill-tag">writing-fragments</span><br><small>Explore raw material — mine fragments, no structure yet.</small></div>
+    <div><span class="skill-tag">writing-shape</span><br><small>Shape raw material into an article, paragraph by paragraph.</small></div>
+    <div><span class="skill-tag">writing-beats</span><br><small>Assemble raw material into a journey of beats — the final drafting step.</small></div>
+    <div><span class="skill-tag">edit-article</span><br><small>Restructure, improve clarity, tighten prose on an existing draft.</small></div>
+  </div>
+</div>
+
+<div class="category">
+  <h3>10. Meta</h3>
+  <p>Skills about skills.</p>
+  <div class="skill-grid">
+    <div><span class="skill-tag">ask-matt</span><br><small>Router — "which skill fits my situation?" Use this when you're not sure.</small></div>
+    <div><span class="skill-tag">customize-opencode</span><br><small>Edit opencode.json, .opencode/, agent config, MCP servers.</small></div>
+    <div><span class="skill-tag">teach</span><br><small>(This current skill.) One-on-one interactive teaching.</small></div>
+    <div><span class="skill-tag">loop-me</span><br><small>Grill about specs for the workflows you want to build.</small></div>
+  </div>
+</div>
+
+<h2>How skills chain together</h2>
+
+<p>Skills are designed to compose. Here's a typical workflow that chains through several categories:</p>
+
+<div class="chain">
+  <p class="flow"><strong>research</strong> → <strong>domain-modeling</strong> → <strong>grill-me</strong> → <strong>to-spec</strong> → <strong>to-tickets</strong> → <strong>implement</strong> → <strong>code-review</strong> → <strong>qa</strong></p>
+  <ol>
+    <li><strong>research</strong> — gather facts from primary sources</li>
+    <li><strong>domain-modeling</strong> — sharpen terminology, create ADRs</li>
+    <li><strong>grill-me</strong> — stress-test the approach before writing a spec</li>
+    <li><strong>to-spec</strong> — synthesize into a PRD issue</li>
+    <li><strong>to-tickets</strong> — break the PRD into vertical-slice tickets</li>
+    <li><strong>implement</strong> — build each ticket</li>
+    <li><strong>code-review</strong> — review what was built</li>
+    <li><strong>qa</strong> — file issues from testing</li>
+  </ol>
+</div>
+
+<p>Other common chains:</p>
+<ul>
+  <li><strong>Refactor:</strong> <code>request-refactor-plan</code> → <code>grill-me</code> → <code>implement</code> → <code>code-review</code></li>
+  <li><strong>Interface design:</strong> <code>design-an-interface</code> → <code>grill-me</code> → <code>implement</code></li>
+  <li><strong>Quick prototype:</strong> <code>prototype</code> → <code>qa</code></li>
+  <li><strong>Session handoff:</strong> <code>handoff</code> → (next session uses the handoff doc)</li>
+</ul>
+
+<h2>Check your understanding</h2>
+
+<div class="callout">
+  <p><strong>Question 1:</strong> You're starting a new feature and need to understand the problem domain first, then plan it, then build it. Which three skills do you chain?</p>
+  <p><em>Think about it, then ask me. I'll tell you if you're right.</em></p>
+</div>
+
+<div class="callout">
+  <p><strong>Question 2:</strong> You're in the middle of work and realize you're not sure what skill to use. Which skill can you ask for help?</p>
+  <p><em>Think about it, then ask me.</em></p>
+</div>
+
+<figure class="quiz" data-correct="B" data-explain="Skills in each category share a purpose (e.g., all &#8220;Quality&#8221; skills help catch issues), but they don&#8217;t all activate at the same time. A QA session is different from triage which is different from code review. They&#8217;re peers, not variants.">
+  <p class="quiz-q">Which statement about the skills categories is correct?</p>
+  <ul class="quiz-opts">
+    <li><button data-k="A">Skills within a category are interchangeable — pick any one</button></li>
+    <li><button data-k="B">Skills within a category share a purpose but do different work</button></li>
+    <li><button data-k="C">Categories determine the order you must invoke skills in</button></li>
+    <li><button data-k="D">Categories are just for display — they have no effect on usage</button></li>
+  </ul>
+  <p class="quiz-feedback" hidden></p>
+</figure>
+
+<figure class="quiz" data-correct="C" data-explain="&#8220;User-invoked&#8221; means the user decides when the skill runs. Most Matt skills work this way — you say &#8220;triage this issue&#8221; or &#8220;grill my plan&#8221;. The agent doesn&#8217;t barge in uninvited.">
+  <p class="quiz-q">Most Matt Pocock skills are "user-invoked." What does that mean?</p>
+  <ul class="quiz-opts">
+    <li><button data-k="A">The skill runs automatically for every conversation</button></li>
+    <li><button data-k="B">The skill runs only when the repo config says so</button></li>
+    <li><button data-k="C">You explicitly ask for the skill when you need it</button></li>
+    <li><button data-k="D">The skill decides for itself when to activate</button></li>
+  </ul>
+  <p class="quiz-feedback" hidden></p>
+</figure>
+
+<h2>Recommended primary source</h2>
+
+<p>
+  Read <code>writing-great-skills</code> in <code>C:\Users\musta\.agents\skills\writing-great-skills\SKILL.md</code> — it's the "language of skills" reference, defining the vocabulary (model-invoked vs user-invoked, context load, progressive disclosure) that every skill in the system speaks.
+</p>
+
+<h2>What's next?</h2>
+
+<p>Now that you have the map, you can drill into any category that interests you. Some suggestions:</p>
+<ul>
+  <li><strong>Deep dive into Critique</strong> — learn how to use <code>grill-me</code> to sharpen your plans</li>
+  <li><strong>Design &amp; Planning pipeline</strong> — learn <code>to-spec</code> → <code>to-tickets</code> → <code>implement</code></li>
+  <li><strong>Quality workflow</strong> — learn <code>code-review</code> and <code>qa</code></li>
+  <li><strong>Pick any single skill</strong> — tell me which one and I'll build a dedicated lesson</li>
+</ul>
+
+<p><em>Ask me follow-up questions if any of this is unclear — or tell me which category to dive into next.</em></p>
+
+<script src="../assets/quiz.js"></script>
+</body>
+</html>

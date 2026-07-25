@@ -1,7 +1,10 @@
 # Mission (this session)
 
-Understand the trade-offs around **whether to keep or delete a query function** (`canTransition`) when collapsing a three-layer state-machine guard into a single throwing function (`buildTransition`). This is a concrete exercise in **Command-Query Separation** applied to state machine design.
+Understand the whole system of **Matt Pocock engineering skills** — what each skill does, how they relate to each other, and what pattern they follow — so I can decide which ones to invoke in my day-to-day work.
 
 ## Why
 
-I'm designing a refactor of the DemandeDeplacement workflow and need to decide the fate of `canTransition` — keep it (internal or exported), or delete it entirely. I want to understand the consequences of each choice so I can make an informed decision.
+I have 16+ skills available through my agent, but I don't know what most of them do or when to use them. I want a mental map of the landscape so I can:
+- Pick the right skill for the task at hand
+- Understand how skills chain together (e.g., `research` → `to-spec` → `to-tickets` → `implement`)
+- Eventually feel confident enough to write my own skills
