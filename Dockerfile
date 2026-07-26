@@ -10,6 +10,16 @@ COPY package.json package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm \
     npm ci --ignore-scripts
 
+# --- migrator stage: run database migrations at container start ---
+FROM base AS migrator
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+    COPY drizzle.config.ts ./drizzle.config.ts
+    COPY db ./db
+    COPY drizzle ./drizzle
+ENV NODE_ENV=production
+CMD ["npx", "drizzle-kit", "push"]
+
 # --- builder stage: build Next.js standalone output ---
 FROM base AS builder
 WORKDIR /app
