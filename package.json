@@ -30,13 +30,11 @@
     "@hugeicons/react": "^1.1.9",
 
     "@react-pdf/renderer": "^4.5.1",
-    "@types/bcryptjs": "^2.4.6",
-    "@types/pg": "^8.20.0",
+
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
-    "drizzle-kit": "^0.30.6",
     "drizzle-orm": "^0.43.1",
     "lucide-react": "^1.26.0",
     "next": "16.2.11",
@@ -55,10 +53,13 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "drizzle-kit": "^0.30.6",
 
     "@tailwindcss/postcss": "^4.3.3",
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^25.9.5",
     "@types/nodemailer": "^8.0.1",
+    "@types/pg": "^8.20.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitest/coverage-v8": "^4.1.10",

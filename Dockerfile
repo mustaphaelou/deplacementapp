@@ -1,7 +1,6 @@
 # syntax=docker/dockerfile:1
 
 FROM node:24-alpine AS base
-RUN apk add --no-cache libc6-compat
 
 # --- deps stage: full install ---
 FROM base AS deps
@@ -21,8 +20,12 @@ COPY drizzle ./drizzle
 ENV NODE_ENV=production
 CMD ["npx", "drizzle-kit", "push"]
 
+# --- build environment: adds glibc compat for native build tools (tailwindcss oxide, swc, etc.) ---
+FROM base AS build-env
+RUN apk add --no-cache libc6-compat
+
 # --- builder stage: build Next.js standalone output ---
-FROM base AS builder
+FROM build-env AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
