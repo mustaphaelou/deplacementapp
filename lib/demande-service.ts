@@ -1,4 +1,4 @@
-import type { DrizzleDb } from "./prisma"
+import type { DrizzleDb } from "../db"
 import { documents } from "../db/schema/documents"
 import type { DemandeQueryPort, DemandeQueryParams } from "./demande/ports/demande-query-port"
 import type { DemandeFactoryPort } from "./demande/ports/demande-factory-port"

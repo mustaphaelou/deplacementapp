@@ -1,5 +1,5 @@
-import type { DrizzleDb } from "./prisma"
-import { db } from "./prisma"
+import type { DrizzleDb } from "../db"
+import { db } from "../db"
 import { journalAudit } from "../db/schema/journal-audit"
 
 export interface AuditEvent {

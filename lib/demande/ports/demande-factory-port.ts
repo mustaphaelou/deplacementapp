@@ -1,6 +1,6 @@
 import type { CreateDemandeData } from "../../demande-utils"
 import type { Actor, DemandeWithRelations } from "../../demande-types"
-import type { DrizzleTransactionClient } from "../../prisma"
+import type { DrizzleTransactionClient } from "../../../db"
 import { UnauthorizedActionError, InvalidTransitionError } from "../../errors"
 
 export interface DemandeFactoryPort {

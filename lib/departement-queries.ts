@@ -1,6 +1,6 @@
 import { asc } from "drizzle-orm"
-import type { DrizzleDb } from "./prisma"
-import { db } from "./prisma"
+import type { DrizzleDb } from "../db"
+import { db } from "../db"
 import { departements } from "../db/schema/departements"
 
 export interface DepartementQueriesPort {

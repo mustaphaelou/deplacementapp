@@ -1,6 +1,6 @@
 import { eq, and, count } from "drizzle-orm"
-import type { DrizzleDb } from "./prisma"
-import { db } from "./prisma"
+import type { DrizzleDb } from "../db"
+import { db } from "../db"
 import { notifications } from "../db/schema/notifications"
 import { utilisateurs } from "../db/schema/utilisateurs"
 import { emailService } from "./email-service"

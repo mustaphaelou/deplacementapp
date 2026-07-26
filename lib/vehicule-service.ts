@@ -1,7 +1,7 @@
 import { eq, asc, desc } from "drizzle-orm"
-import type { DrizzleDb } from "./prisma"
+import type { DrizzleDb } from "../db"
 import { vehiculesEntreprise } from "../db/schema/vehicules-entreprise"
-import { db } from "./prisma"
+import { db } from "../db"
 import { auditBus } from "./audit-bus"
 import { VehiculeNotFoundError } from "./errors"
 

@@ -1,4 +1,4 @@
-import type { DrizzleTransactionClient } from "../../prisma"
+import type { DrizzleTransactionClient } from "../../../db"
 import type { Actor, DemandeWithRelations } from "../../demande-types"
 import {
   DemandeNotFoundError,

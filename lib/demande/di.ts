@@ -1,4 +1,4 @@
-import { db } from "../prisma"
+import { db } from "../../db"
 import { demandeEventBus } from "../demande-event-bus"
 import { DemandeQueryAdapter } from "./adapters/demande-query-adapter"
 import { DemandeFactoryAdapter } from "./adapters/demande-factory-adapter"

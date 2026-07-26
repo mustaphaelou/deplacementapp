@@ -1,6 +1,6 @@
 import nodemailer from "nodemailer"
 import type { Transporter } from "nodemailer"
-import { db } from "./prisma"
+import { db } from "../db"
 import { societes } from "../db/schema/societes"
 
 // ─── Types ───────────────────────────────────────────────────────────────────

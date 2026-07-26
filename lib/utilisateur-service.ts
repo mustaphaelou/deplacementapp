@@ -1,7 +1,7 @@
 import { eq, asc } from "drizzle-orm"
 import { hash, compare } from "bcryptjs"
-import type { DrizzleDb } from "./prisma"
-import { db } from "./prisma"
+import type { DrizzleDb } from "../db"
+import { db } from "../db"
 import { utilisateurs } from "../db/schema/utilisateurs"
 import { auditBus } from "./audit-bus"
 import {

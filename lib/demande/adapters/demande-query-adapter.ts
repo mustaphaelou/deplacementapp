@@ -1,5 +1,5 @@
 import { eq, and, or, isNull, ilike, desc, asc, inArray, count, sum, type SQL } from "drizzle-orm"
-import type { DrizzleDb } from "../../prisma"
+import type { DrizzleDb } from "../../../db"
 import { demandesDeplacement } from "../../../db/schema/demandes-deplacement"
 import type { StatutDemande } from "../../workflow"
 import type { DashboardDemandeSummary } from "../../dashboard"

@@ -1,5 +1,5 @@
 import { eq, count } from "drizzle-orm"
-import type { DrizzleDb, DrizzleTransactionClient } from "../../prisma"
+import type { DrizzleDb, DrizzleTransactionClient } from "../../../db"
 import { utilisateurs } from "../../../db/schema/utilisateurs"
 import { departements } from "../../../db/schema/departements"
 import { demandesDeplacement } from "../../../db/schema/demandes-deplacement"

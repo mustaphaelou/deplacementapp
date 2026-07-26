@@ -3,6 +3,7 @@ import { Pool } from "pg"
 import * as schema from "./schema"
 
 export type DrizzleDb = ReturnType<typeof drizzle<typeof schema>>
+export type DrizzleTransactionClient = DrizzleDb
 
 const globalForDrizzle = globalThis as unknown as { db: DrizzleDb }
 

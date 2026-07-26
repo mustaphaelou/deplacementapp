@@ -1,5 +1,5 @@
 import { eq, isNull } from "drizzle-orm"
-import type { DrizzleDb, DrizzleTransactionClient } from "../../prisma"
+import type { DrizzleDb, DrizzleTransactionClient } from "../../../db"
 import { demandesDeplacement } from "../../../db/schema/demandes-deplacement"
 import type { DemandeWorkflowPort } from "../ports/demande-workflow-port"
 import type { Actor, DemandeWithRelations } from "../../demande-types"
