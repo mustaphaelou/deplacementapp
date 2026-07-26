@@ -40,6 +40,8 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}/runner:latest
             ghcr.io/${{ github.repository }}/runner:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Build and push migrator
         uses: docker/build-push-action@v7
@@ -51,3 +53,5 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}-migrator:latest
             ghcr.io/${{ github.repository }}-migrator:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

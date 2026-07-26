@@ -23,3 +23,7 @@ docs
 reference
 learning-records
 lessons
+tmp/
+.github/
+scripts/
+spec-*
