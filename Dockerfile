@@ -10,8 +10,12 @@ RUN --mount=type=bind,source=package.json,target=package.json \
     --mount=type=cache,target=/root/.npm \
     npm ci --ignore-scripts
 
+# --- build environment: adds glibc compat for native build tools (tailwindcss oxide, swc, etc.) ---
+FROM base AS build-env
+RUN apk add --no-cache libc6-compat
+
 # --- migrator stage: run database migrations at container start ---
-FROM base AS migrator
+FROM build-env AS migrator
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY drizzle.config.ts ./drizzle.config.ts
@@ -19,10 +23,6 @@ COPY db ./db
 COPY drizzle ./drizzle
 ENV NODE_ENV=production
 CMD ["npx", "drizzle-kit", "push"]
-
-# --- build environment: adds glibc compat for native build tools (tailwindcss oxide, swc, etc.) ---
-FROM base AS build-env
-RUN apk add --no-cache libc6-compat
 
 # --- builder stage: build Next.js standalone output ---
 FROM build-env AS builder
