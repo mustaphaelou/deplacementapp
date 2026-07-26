@@ -6,24 +6,24 @@ RUN apk add --no-cache libc6-compat
 # --- deps stage: full install ---
 FROM base AS deps
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN --mount=type=cache,target=/root/.npm \
+RUN --mount=type=bind,source=package.json,target=package.json \
+    --mount=type=bind,source=package-lock.json,target=package-lock.json \
+    --mount=type=cache,target=/root/.npm \
     npm ci --ignore-scripts
 
 # --- migrator stage: run database migrations at container start ---
 FROM base AS migrator
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-    COPY drizzle.config.ts ./drizzle.config.ts
-    COPY db ./db
-    COPY drizzle ./drizzle
+COPY drizzle.config.ts ./drizzle.config.ts
+COPY db ./db
+COPY drizzle ./drizzle
 ENV NODE_ENV=production
 CMD ["npx", "drizzle-kit", "push"]
 
 # --- builder stage: build Next.js standalone output ---
 FROM base AS builder
 WORKDIR /app
-ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
@@ -31,12 +31,12 @@ RUN npm run build
 # --- runner stage: minimal production image ---
 FROM base AS runner
 WORKDIR /app
-ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
-ENV HOSTNAME=0.0.0.0
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    HOSTNAME=0.0.0.0
 
 RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
+    adduser --system --uid 1001 --no-log-init nextjs
 
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
@@ -44,6 +44,13 @@ COPY --from=builder /app/.next/static ./.next/static
 
 RUN mkdir -p public/uploads/avatars && \
     chown -R nextjs:nodejs public/uploads
+
+LABEL org.opencontainers.image.title="DeplacementApp" \
+      org.opencontainers.image.description="Travel request management system" \
+      org.opencontainers.image.authors="Mustapha Elouardi" \
+      org.opencontainers.image.source="https://github.com/mustaphaelou/deplacementapp" \
+      org.opencontainers.image.vendor="Mustapha Elouardi" \
+      org.opencontainers.image.licenses="UNLICENSED"
 
 USER nextjs
 

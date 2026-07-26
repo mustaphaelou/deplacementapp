@@ -8,6 +8,8 @@ coverage
 .out-of-scope
 .antigravitycli
 error.log
+npm-debug.log*
+yarn-debug.log*
 *.tsbuildinfo
 architecture-report-*.html
 .gitattributes
