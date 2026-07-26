@@ -13,6 +13,7 @@ import {
   Plus,
   ArrowRight,
   ArrowUpRight,
+  Building,
   type LucideIcon,
 } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -51,6 +52,7 @@ const iconMap: Record<string, LucideIcon> = {
   "check-circle": CheckCircle,
   "alert-circle": AlertCircle,
   plus: Plus,
+  building: Building,
 }
 
 interface DashboardLayoutProps {
