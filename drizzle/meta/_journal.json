@@ -21,6 +21,13 @@
       "when": 1785069431548,
       "tag": "0002_solid_the_leader",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785097776049,
+      "tag": "0003_stormy_molly_hayes",
+      "breakpoints": true
     }
   ]
 }

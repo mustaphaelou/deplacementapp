@@ -29,7 +29,11 @@ export const POST = withValidation(utilisateurSchema, async (_req, auth, data) =
 
   try {
     const user = await utilisateurService.create(
-      { ...data, motDePasse: data.motDePasse || "password123" },
+      {
+        ...data,
+        motDePasse: data.motDePasse || undefined,
+        googleAuthEnabled: data.googleAuthEnabled ?? false,
+      },
       auth.id
     )
     return NextResponse.json({ user })

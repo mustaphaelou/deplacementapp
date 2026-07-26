@@ -70,7 +70,7 @@ export class UtilisateurService {
   async create(
     data: {
       email: string
-      motDePasse: string
+      motDePasse?: string
       nom: string
       prenom: string
       poste: string
@@ -78,10 +78,11 @@ export class UtilisateurService {
       societeId: string
       departementId: string
       telephone?: string
+      googleAuthEnabled?: boolean
     },
     actorId: string
   ) {
-    const hashedPassword = await hash(data.motDePasse || "password123", 12)
+    const hashedPassword = data.motDePasse ? await hash(data.motDePasse, 12) : undefined
 
     const [user] = await this._db
       .insert(utilisateurs)
@@ -89,6 +90,7 @@ export class UtilisateurService {
         id: crypto.randomUUID(),
         email: data.email,
         motDePasse: hashedPassword,
+        googleAuthEnabled: data.googleAuthEnabled ?? false,
         nom: data.nom,
         prenom: data.prenom,
         poste: data.poste,
@@ -122,6 +124,7 @@ export class UtilisateurService {
       role?: string
       departementId?: string
       telephone?: string | null
+      googleAuthEnabled?: boolean
     },
     actorId: string
   ) {
@@ -161,6 +164,7 @@ export class UtilisateurService {
       .where(eq(utilisateurs.id, userId))
       .limit(1)
     if (!user) throw new UtilisateurNotFoundError()
+    if (!user.motDePasse) throw new MotDePasseIncorrectError()
 
     const isValid = await compare(currentPassword, user.motDePasse)
     if (!isValid) throw new MotDePasseIncorrectError()
@@ -211,6 +215,7 @@ export class UtilisateurService {
       if (!data.currentPassword) {
         throw new EmailChangeRequiresPasswordError()
       }
+      if (!user.motDePasse) throw new MotDePasseIncorrectError()
       const isValid = await compare(data.currentPassword, user.motDePasse)
       if (!isValid) throw new MotDePasseIncorrectError()
       updateData.email = data.email

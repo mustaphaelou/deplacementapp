@@ -1,5 +1,6 @@
 import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
+import Google from "next-auth/providers/google"
 import { authConfig } from "./auth.config"
 import { eq } from "drizzle-orm"
 import { db } from "../db"
@@ -27,6 +28,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           .limit(1)
 
         if (!user || !user.actif) return null
+        if (!user.motDePasse) return null
 
         const { compare } = await import("bcryptjs")
         const isValid = await compare(password, user.motDePasse)
@@ -44,7 +46,26 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
       },
     }),
+    Google,
   ],
+  callbacks: {
+    ...authConfig.callbacks,
+    async signIn({ user, account }) {
+      if (account?.provider === "google") {
+        const dbUser = await db.query.utilisateurs.findFirst({
+          where: eq(utilisateurs.email, user.email!),
+        })
+        if (!dbUser || !dbUser.actif || !dbUser.googleAuthEnabled) return false
+        user.id = dbUser.id
+        user.role = dbUser.role
+        user.departementId = dbUser.departementId
+        user.departement = ""
+        user.poste = dbUser.poste
+        user.avatarUrl = dbUser.avatarUrl
+      }
+      return true
+    },
+  },
 })
 
 export const GET = handlers.GET

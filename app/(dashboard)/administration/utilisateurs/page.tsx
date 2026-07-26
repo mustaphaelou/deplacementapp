@@ -18,6 +18,7 @@ interface Utilisateur {
   role: string
   actif: boolean
   telephone: string | null
+  googleAuthEnabled: boolean
   departement: { id: string; nom: string }
 }
 
@@ -49,6 +50,7 @@ export default function UtilisateursPage() {
     departementId: "",
     telephone: "",
     motDePasse: "",
+    googleAuthEnabled: false,
   })
   const [search, setSearch] = useState("")
 
@@ -86,13 +88,14 @@ export default function UtilisateursPage() {
       departementId: user.departement.id,
       telephone: user.telephone || "",
       motDePasse: "",
+      googleAuthEnabled: user.googleAuthEnabled,
     })
     setOpen(true)
   }
 
   function openCreate() {
     setEditingUser(null)
-    setForm({ email: "", nom: "", prenom: "", poste: "", role: "EMPLOYEE", departementId: departements[0]?.id || "", telephone: "", motDePasse: "" })
+    setForm({ email: "", nom: "", prenom: "", poste: "", role: "EMPLOYEE", departementId: departements[0]?.id || "", telephone: "", motDePasse: "", googleAuthEnabled: false })
     setOpen(true)
   }
 
@@ -168,6 +171,7 @@ export default function UtilisateursPage() {
                 <th className="p-3 font-medium hidden lg:table-cell">Département</th>
                 <th className="p-3 font-medium">Rôle</th>
                 <th className="p-3 font-medium">Statut</th>
+                <th className="p-3 font-medium hidden lg:table-cell">Auth</th>
                 <th className="p-3 font-medium">Actions</th>
               </tr>
             </thead>
@@ -194,6 +198,13 @@ export default function UtilisateursPage() {
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${u.actif ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300" : "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"}`}>
                       {u.actif ? "Actif" : "Inactif"}
                     </span>
+                  </td>
+                  <td className="p-3">
+                    {u.googleAuthEnabled && (
+                      <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
+                        Google
+                      </span>
+                    )}
                   </td>
                   <td className="p-3">
                     <Button variant="ghost" size="icon" onClick={() => openEdit(u)}>
@@ -265,8 +276,17 @@ export default function UtilisateursPage() {
             </div>
             <div className="space-y-2">
               <Label>{editingUser ? "Nouveau mot de passe (laisser vide pour conserver)" : "Mot de passe"}</Label>
-              <Input type="password" value={form.motDePasse} onChange={(e) => setForm({ ...form, motDePasse: e.target.value })} required={!editingUser} minLength={6} />
+              <Input type="password" value={form.motDePasse} onChange={(e) => setForm({ ...form, motDePasse: e.target.value })} required={!editingUser && !form.googleAuthEnabled} minLength={6} />
             </div>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={form.googleAuthEnabled}
+                onChange={(e) => setForm({ ...form, googleAuthEnabled: e.target.checked })}
+                className="size-4 rounded border-border accent-primary"
+              />
+              Connexion Google autorisée
+            </label>
             <Button type="submit" className="w-full" disabled={saving}>
               {saving && <Loader2 className="mr-2 size-4 animate-spin" />}
               {editingUser ? "Modifier" : "Créer"}

@@ -78,6 +78,7 @@ export const utilisateurSchema = z.object({
   departementId: z.string().min(1, "Département requis"),
   telephone: z.string().optional(),
   motDePasse: z.string().min(6, "Minimum 6 caractères").optional().or(z.literal("")),
+  googleAuthEnabled: z.boolean().optional(),
 })
 
 export const vehiculeSchema = z.object({
