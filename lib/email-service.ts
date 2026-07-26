@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer"
 import type { Transporter } from "nodemailer"
-import { prisma } from "./prisma"
+import { db } from "./prisma"
+import { societes } from "../db/schema/societes"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -52,7 +53,7 @@ export class EmailService {
       let fromEmail = process.env.SMTP_FROM ?? "noreply@exemple.ma"
 
       try {
-        const societe = await prisma.societe.findFirst()
+        const [societe] = await db.select().from(societes).limit(1)
         if (societe) {
           if (societe.nomExpediteurEmail) fromName = societe.nomExpediteurEmail
           if (societe.domaineEmail) fromEmail = `noreply@${societe.domaineEmail}`

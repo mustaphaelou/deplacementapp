@@ -1,7 +1,7 @@
 ﻿import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { demandeService } from "@/lib/demande/di";
-import type { StatutDemande } from "@prisma/client";
+import type { StatutDemande } from "@/lib/workflow";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency, STATUT_LABELS } from "@/lib/constants";
 import { hasAnyRole } from "@/lib/authorization";

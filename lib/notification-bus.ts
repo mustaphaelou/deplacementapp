@@ -1,5 +1,8 @@
-import type { PrismaClient, Role } from "@prisma/client"
-import { prisma } from "./prisma"
+import { eq, and, count } from "drizzle-orm"
+import type { DrizzleDb } from "./prisma"
+import { db } from "./prisma"
+import { notifications } from "../db/schema/notifications"
+import { utilisateurs } from "../db/schema/utilisateurs"
 import { emailService } from "./email-service"
 import { NotificationNotFoundError, UnauthorizedActionError } from "./errors"
 
@@ -17,19 +20,14 @@ export type NotificationEventType =
   | "DEMANDE_NOTIFICATION_LUE"
 
 export interface NotificationPayload {
-  /** Demande identifier */
   demandeId: string
-  /** Human readable request number */
   numero: string
-  /** Employee who initiated the request */
   employe: {
     id: string
     prenom: string
     nom: string
-    /** Department ID — required for read-receipt routing */
     departementId?: string
   }
-  /** Optional: the assigned approver (for withdraw notifications) */
   assigneAId?: string | null
 }
 
@@ -48,32 +46,29 @@ export interface AdapterResult {
 }
 
 export interface NotificationAdapter {
-  /** Persist a single notification. Returns result so the caller can aggregate. */
   send(notification: NotificationMessage): Promise<AdapterResult>
 }
 
-// ─── Default Prisma adapter (the only production adapter for now) ──────────
+// ─── Default Drizzle adapter (the only production adapter for now) ──────────
 
-class PrismaNotificationAdapter implements NotificationAdapter {
-  constructor(private db: PrismaClient) {}
+class DrizzleNotificationAdapter implements NotificationAdapter {
+  constructor(private _db: DrizzleDb) {}
 
   async send(notification: NotificationMessage): Promise<AdapterResult> {
     try {
-      // 1. Persist in-app notification
-      await this.db.notification.create({
-        data: {
-          utilisateurId: notification.utilisateurId,
-          titre: notification.titre,
-          message: notification.message,
-          demandeId: notification.demandeId,
-        },
+      await this._db.insert(notifications).values({
+        id: crypto.randomUUID(),
+        utilisateurId: notification.utilisateurId,
+        titre: notification.titre,
+        message: notification.message,
+        demandeId: notification.demandeId,
       })
 
-      // 2. Send email (best-effort — failures are logged but don't fail the notification)
-      const recipient = await this.db.utilisateur.findUnique({
-        where: { id: notification.utilisateurId },
-        select: { email: true, prenom: true, nom: true },
-      })
+      const [recipient] = await this._db
+        .select({ email: utilisateurs.email, prenom: utilisateurs.prenom, nom: utilisateurs.nom })
+        .from(utilisateurs)
+        .where(eq(utilisateurs.id, notification.utilisateurId))
+        .limit(1)
 
       if (recipient?.email) {
         await emailService.send({
@@ -104,10 +99,8 @@ class PrismaNotificationAdapter implements NotificationAdapter {
 
 // ─── Recipient resolver: who should receive which event ──────────────────────
 
-// Map each event to the roles that should be notified.
-// `departmentScoped: true` restricts to the employee's department.
 interface RoleTarget {
-  role: Role
+  role: "EMPLOYEE" | "MANAGER" | "FINANCE_ADMIN" | "GENERAL_DIRECTION"
   departmentScoped: boolean
 }
 
@@ -121,56 +114,45 @@ const EVENT_ROLE_MAP: Record<NotificationEventType, RoleTarget[]> = {
   DEMANDE_NOTIFICATION_LUE: [{ role: "MANAGER", departmentScoped: true }],
 }
 
-// Events that go to the employee who owns the request.
 const EMPLOYEE_EVENTS: NotificationEventType[] = [
   "DEMANDE_APPROBATION_FINALE",
   "DEMANDE_REJETEE",
 ]
 
-// Events that go to the assignee (for withdraw).
 const ASSIGNEE_EVENTS: NotificationEventType[] = ["DEMANDE_RETIREE"]
 
 async function resolveRecipients(
   event: NotificationEventType,
   payload: NotificationPayload,
-  db: PrismaClient
+  _db: DrizzleDb
 ): Promise<string[]> {
   const ids = new Set<string>()
 
-  // 1. Role-based recipients (department-scoped or org-wide)
   const roleTargets = EVENT_ROLE_MAP[event]
   for (const target of roleTargets) {
-    const where: { role: Role; actif: boolean; departementId?: string } = {
-      role: target.role,
-      actif: true,
-    }
+    const conditions = [eq(utilisateurs.role, target.role), eq(utilisateurs.actif, true)]
     if (target.departmentScoped && payload.employe.departementId) {
-      where.departementId = payload.employe.departementId
+      conditions.push(eq(utilisateurs.departementId, payload.employe.departementId))
     }
-    // Skip department-scoped lookups when no departementId is available
     if (target.departmentScoped && !payload.employe.departementId) continue
 
-    const users = await db.utilisateur.findMany({
-      where,
-      select: { id: true },
-    })
+    const users = await _db
+      .select({ id: utilisateurs.id })
+      .from(utilisateurs)
+      .where(and(...conditions))
     users.forEach((u) => ids.add(u.id))
   }
 
-  // 2. Specific employee (for final approval / reject)
   if (EMPLOYEE_EVENTS.includes(event)) {
     ids.add(payload.employe.id)
   }
 
-  // 3. Assignee (for withdraw)
   if (ASSIGNEE_EVENTS.includes(event) && payload.assigneAId) {
     ids.add(payload.assigneAId)
   }
 
   return Array.from(ids)
 }
-
-// ─── Message builder: how each event is phrased ────────────────────────────
 
 function buildMessage(
   event: NotificationEventType,
@@ -217,7 +199,6 @@ function buildMessage(
         message: `${fullName} a lu la notification concernant la demande ${numero}.`,
       }
     default:
-      // exhaustive check
       const _exhaustive: never = event
       throw new Error(`Unknown event type: ${_exhaustive}`)
   }
@@ -237,27 +218,16 @@ export interface DispatchResult {
   failures: DispatchFailure[]
 }
 
-// ─── Notification Bus (the deep module) ─────────────────────────────────────
+// ─── Notification Bus ─────────────────────────────────────────────────────
 
-/**
- * The NotificationBus is the single interface for dispatching domain events to
- * users.  It owns:
- *  - which events exist
- *  - who receives each event
- *  - how the message is phrased
- *  - how the notification is persisted (via the adapter)
- *
- * Callers only need to know the event type and payload.  All the rest is hidden
- * behind this module.
- */
 export class NotificationBus {
   constructor(
     private adapter: NotificationAdapter,
-    private db: PrismaClient
+    private _db: DrizzleDb
   ) {}
 
   async dispatch(event: NotificationEventType, payload: NotificationPayload): Promise<DispatchResult> {
-    const recipients = await resolveRecipients(event, payload, this.db)
+    const recipients = await resolveRecipients(event, payload, this._db)
     const { titre, message } = buildMessage(event, payload)
 
     const results = await Promise.allSettled(
@@ -292,22 +262,12 @@ export class NotificationBus {
     return { total: recipients.length, succeeded, failed, failures }
   }
 
-  /**
-   * Mark a notification as read (lu) and, if the reader is an EMPLOYEE,
-   * dispatch a DEMANDE_NOTIFICATION_LUE event to the managers of the
-   * employee's department (AccuseLecture / read receipt).
-   *
-   * The bus owns the ownership check: the notifier must exist and must belong
-   * to the requesting Utilisateur. Throws `NotificationNotFoundError` (404)
-   * when the notification is missing and `UnauthorizedActionError("Non autorisé")`
-   * (403) when the requester is not the owner.
-   */
   async markAsRead(notificationId: string, userId: string): Promise<void> {
-    const notification = await this.db.notification.findUnique({
-      where: { id: notificationId },
-      include: {
-        utilisateur: { select: { id: true, prenom: true, nom: true, role: true, departementId: true } },
-        demande: { select: { id: true, numero: true } },
+    const notification = await this._db.query.notifications.findFirst({
+      where: eq(notifications.id, notificationId),
+      with: {
+        utilisateur: { columns: { id: true, prenom: true, nom: true, role: true, departementId: true } },
+        demande: { columns: { id: true, numero: true } },
       },
     })
 
@@ -315,24 +275,19 @@ export class NotificationBus {
       throw new NotificationNotFoundError()
     }
 
-    // Ownership check: the requester must be the notification's recipient.
     if (notification.utilisateurId !== userId) {
       throw new UnauthorizedActionError("Non autorisé")
     }
 
-    // Guard: already read — no-op
     if (notification.lu) {
       return
     }
 
-    // Mark as read
-    await this.db.notification.update({
-      where: { id: notificationId },
-      data: { lu: true },
-    })
+    await this._db
+      .update(notifications)
+      .set({ lu: true })
+      .where(eq(notifications.id, notificationId))
 
-    // Dispatch read receipt only when the reader is an EMPLOYEE
-    // and the notification is linked to a demande
     if (notification.utilisateur.role === "EMPLOYEE" && notification.demande) {
       await this.dispatch("DEMANDE_NOTIFICATION_LUE", {
         demandeId: notification.demande.id,
@@ -348,7 +303,7 @@ export class NotificationBus {
   }
 }
 
-// ─── Singleton for use in route handlers ───────────────────────────────────
+// ─── Singleton ───────────────────────────────────────────────────────────────
 
-const defaultAdapter = new PrismaNotificationAdapter(prisma)
-export const notificationBus = new NotificationBus(defaultAdapter, prisma)
+const defaultAdapter = new DrizzleNotificationAdapter(db)
+export const notificationBus = new NotificationBus(defaultAdapter, db)

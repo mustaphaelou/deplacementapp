@@ -1,7 +1,8 @@
-import type { Prisma, PrismaClient } from "@prisma/client"
+import { eq, isNull } from "drizzle-orm"
+import type { DrizzleDb, DrizzleTransactionClient } from "../../prisma"
+import { demandesDeplacement } from "../../../db/schema/demandes-deplacement"
 import type { DemandeWorkflowPort } from "../ports/demande-workflow-port"
 import type { Actor, DemandeWithRelations } from "../../demande-types"
-import type { PrismaTransactionClient } from "../../prisma"
 import type { DemandeEventBus } from "../../demande-event-bus"
 import type { NotificationPayload } from "../../notification-bus"
 import {
@@ -14,7 +15,7 @@ import type { WorkflowAction, Decision } from "../../workflow"
 
 export class DemandeWorkflowAdapter implements DemandeWorkflowPort {
   constructor(
-    private db: PrismaClient,
+    private db: DrizzleDb,
     private events: DemandeEventBus
   ) {}
 
@@ -25,18 +26,20 @@ export class DemandeWorkflowAdapter implements DemandeWorkflowPort {
       actor: Actor
       comment?: string
     },
-    tx?: PrismaTransactionClient
+    tx?: DrizzleTransactionClient
   ): Promise<{ demande: DemandeWithRelations }> {
     const db = tx ?? this.db
     const { action, demandeId, actor } = params
 
-    const demande = await db.demandeDeplacement.findUnique({
-      where: { id: demandeId },
-      include: { employe: { select: { id: true, prenom: true, nom: true, departementId: true } } },
+    const demande = await db.query.demandesDeplacement.findFirst({
+      where: eq(demandesDeplacement.id, demandeId),
+      with: {
+        employe: { columns: { id: true, prenom: true, nom: true, departementId: true } },
+      },
     })
     if (!demande || demande.deletedAt) throw new DemandeNotFoundError()
 
-    const { etape, decision } = fromLegacyStatus(demande.statut)
+    const { etape, decision } = fromLegacyStatus(demande.statut as Parameters<typeof fromLegacyStatus>[0])
 
     if ((action === "retirer" || action === "submit") && demande.employeId !== actor.id) {
       throw new UnauthorizedActionError("Seul le proprietaire peut " + (action === "submit" ? "soumettre" : "retirer") + " la demande")
@@ -63,10 +66,11 @@ export class DemandeWorkflowAdapter implements DemandeWorkflowPort {
     )
     if (!transition) throw new InvalidTransitionError()
 
-    const updated = await db.demandeDeplacement.update({
-      where: { id: demandeId },
-      data: transition.transition.fields as Prisma.DemandeDeplacementUncheckedUpdateInput,
-    })
+    const [updated] = await db
+      .update(demandesDeplacement)
+      .set(transition.transition.fields)
+      .where(eq(demandesDeplacement.id, demandeId))
+      .returning()
 
     const notificationPayload: Omit<NotificationPayload, "demandeId" | "numero"> = {
       employe: {
@@ -90,6 +94,6 @@ export class DemandeWorkflowAdapter implements DemandeWorkflowPort {
       notificationPayload,
     })
 
-    return { demande: updated as DemandeWithRelations }
+    return { demande: updated as unknown as DemandeWithRelations }
   }
 }

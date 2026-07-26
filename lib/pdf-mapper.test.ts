@@ -1,15 +1,16 @@
 import { expect, describe, it } from "vitest"
-import type { DemandeDeplacement, Utilisateur, VehiculeEntreprise } from "@prisma/client"
 import { type DemandeWithRelations } from "./demande-types"
 import { toPdfRenderData } from "./pdf-mapper"
 
-function makeDemande(overrides?: Partial<DemandeDeplacement>): DemandeDeplacement {
+function makeDemande(overrides?: Record<string, unknown>): DemandeWithRelations {
   return {
     id: "d-1",
     numero: "DD-2025-0001",
     employeId: "u-1",
     assigneAId: null,
-    statut: "APPROUVEE_MANAGER" as any,
+    statut: "APPROUVEE_MANAGER",
+    etape: "",
+    decision: "",
     employeNom: "Dupont",
     employePrenom: "Jean",
     employePoste: "Développeur",
@@ -18,14 +19,14 @@ function makeDemande(overrides?: Partial<DemandeDeplacement>): DemandeDeplacemen
     dateDepart: new Date("2025-06-01"),
     dateRetour: new Date("2025-06-05"),
     destination: "Casablanca",
-    typeTransport: "AVION" as any,
+    typeTransport: "AVION",
     autreTransport: null,
     vehiculeId: null,
-    fraisTransport: { toNumber: () => 100 } as any,
-    fraisHebergement: { toNumber: () => 200 } as any,
-    fraisRepas: { toNumber: () => 50 } as any,
-    fraisDivers: { toNumber: () => 30 } as any,
-    totalEstime: { toNumber: () => 380 } as any,
+    fraisTransport: 100,
+    fraisHebergement: 200,
+    fraisRepas: 50,
+    fraisDivers: 30,
+    totalEstime: 380,
     avanceRequise: false,
     montantAvance: null,
     description: null,
@@ -41,53 +42,22 @@ function makeDemande(overrides?: Partial<DemandeDeplacement>): DemandeDeplacemen
     deletedAt: null,
     creeLe: new Date("2025-05-24"),
     modifieLe: new Date("2025-05-24"),
-    ...overrides,
-  }
-}
-
-function makeEmploye(overrides?: Partial<Utilisateur>): Utilisateur {
-  return {
-    id: "u-1",
-    email: "jean.dupont@example.com",
-    motDePasse: "hashed",
-    nom: "Dupont",
-    prenom: "Jean",
-    poste: "Développeur",
-    role: "EMPLOYEE" as any,
-    societeId: "default",
-    departementId: "dep-1",
-    avatarUrl: null,
-    telephone: null,
-    dateEmbauche: null,
-    actif: true,
-    creeLe: new Date("2020-01-01"),
-    modifieLe: new Date("2020-01-01"),
-    ...overrides,
-  }
-}
-
-function makeVehicule(overrides?: Partial<VehiculeEntreprise>): VehiculeEntreprise {
-  return {
-    id: "v-1",
-    nom: "Peugeot 3008",
-    immatriculation: "AB-123-CD",
-    disponible: true,
-    creeLe: new Date("2023-01-01"),
+    employe: { id: "u-1", prenom: "Jean", nom: "Dupont", email: "jean.dupont@example.com", poste: "Développeur" },
+    vehicule: null,
+    assigneA: null,
     ...overrides,
   }
 }
 
 function makeDemandeWithRelations(overrides?: {
-  demande?: Partial<DemandeDeplacement>
-  employe?: Partial<Utilisateur>
-  vehicule?: Partial<VehiculeEntreprise> | null
-  assigneA?: Partial<Utilisateur> | null
+  demande?: Record<string, unknown>
+  vehicule?: Record<string, unknown> | null
+  assigneA?: Record<string, unknown> | null
 }): DemandeWithRelations {
   return {
     ...makeDemande(overrides?.demande),
-    employe: makeEmploye(overrides?.employe),
-    vehicule: overrides?.vehicule === null ? null : makeVehicule(overrides?.vehicule),
-    assigneA: overrides?.assigneA === null ? null : overrides?.assigneA ? makeEmploye(overrides.assigneA) : null,
+    vehicule: overrides?.vehicule === null ? null : overrides?.vehicule ? { nom: overrides.vehicule.nom as string, immatriculation: overrides.vehicule.immatriculation as string } : null,
+    assigneA: overrides?.assigneA === null ? null : overrides?.assigneA ? { id: overrides.assigneA.id as string, nom: overrides.assigneA.nom as string, prenom: overrides.assigneA.prenom as string } : null,
   }
 }
 
@@ -98,11 +68,11 @@ describe("toPdfRenderData", () => {
         motif: '["Réunion client","Formation"]',
         autreTransport: "Taxi",
         avanceRequise: true,
-        montantAvance: { toNumber: () => 500 } as any,
+        montantAvance: 500,
         description: "Description test",
       },
       vehicule: { nom: "Renault Clio", immatriculation: "XY-999-ZZ" },
-      assigneA: { id: "u-2", nom: "Bernard", prenom: "Pierre" } as any,
+      assigneA: { id: "u-2", nom: "Bernard", prenom: "Pierre" },
     })
 
     const result = toPdfRenderData(demande)
@@ -143,14 +113,14 @@ describe("toPdfRenderData", () => {
     expect(result.motif).toEqual(["not-json"])
   })
 
-  it("converts Decimal fields to numbers", () => {
+  it("converts string number fields to numbers", () => {
     const demande = makeDemandeWithRelations({
       demande: {
-        fraisTransport: { toNumber: () => 999 } as any,
-        fraisHebergement: { toNumber: () => 888 } as any,
-        fraisRepas: { toNumber: () => 777 } as any,
-        fraisDivers: { toNumber: () => 666 } as any,
-        totalEstime: { toNumber: () => 3330 } as any,
+        fraisTransport: "999",
+        fraisHebergement: "888",
+        fraisRepas: "777",
+        fraisDivers: "666",
+        totalEstime: "3330",
       },
     })
 
@@ -163,14 +133,14 @@ describe("toPdfRenderData", () => {
     expect(result.couts.total).toBe(3330)
   })
 
-  it("handles missing Decimal toNumber by coercing via Number()", () => {
+  it("handles numeric values directly", () => {
     const demande = makeDemandeWithRelations({
       demande: {
-        fraisTransport: 42 as any,
-        fraisHebergement: 0 as any,
-        fraisRepas: 7 as any,
-        fraisDivers: 1 as any,
-        totalEstime: 50 as any,
+        fraisTransport: 42,
+        fraisHebergement: 0,
+        fraisRepas: 7,
+        fraisDivers: 1,
+        totalEstime: 50,
       },
     })
 

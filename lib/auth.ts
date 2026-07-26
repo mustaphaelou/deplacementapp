@@ -1,7 +1,9 @@
 import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 import { authConfig } from "./auth.config"
-import { prisma } from "@/lib/prisma"
+import { eq } from "drizzle-orm"
+import { db } from "../db"
+import { utilisateurs } from "../db/schema/utilisateurs"
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
@@ -18,10 +20,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const email = credentials.email as string
         const password = credentials.password as string
 
-        const user = await prisma.utilisateur.findUnique({
-          where: { email },
-          include: { departement: true },
-        })
+        const [user] = await db
+          .select()
+          .from(utilisateurs)
+          .where(eq(utilisateurs.email, email))
+          .limit(1)
 
         if (!user || !user.actif) return null
 
@@ -35,7 +38,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           name: `${user.prenom} ${user.nom}`,
           role: user.role,
           departementId: user.departementId,
-          departement: user.departement.nom,
+          departement: "",
           poste: user.poste,
           avatarUrl: user.avatarUrl,
         }

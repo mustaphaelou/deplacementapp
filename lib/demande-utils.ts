@@ -1,4 +1,10 @@
-import type { TypeTransport } from "@prisma/client"
+export type TypeTransport =
+  | "VOITURE_PERSONNELLE"
+  | "VOITURE_SOCIETE"
+  | "BUS"
+  | "AVION"
+  | "TRAIN"
+  | "AUTRE"
 
 export interface CreateDemandeData {
   motif: string[]

@@ -1,7 +1,15 @@
-import type { StatutDemande, Document } from "@prisma/client"
+import type { StatutDemande } from "../../workflow"
 import type { DashboardDemandeSummary } from "../../dashboard"
 import type { DemandeWithRelations } from "../../demande-types"
 import type { TimestampColumn } from "../../workflow"
+
+export interface Document {
+  id: string
+  demandeId: string
+  type: string
+  chemin: string
+  creeLe: Date
+}
 
 export type OrderByTimestamp = { column: TimestampColumn; direction: "asc" | "desc" }
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import type { DemandeDeplacement, Utilisateur, VehiculeEntreprise, Role, StatutDemande, TypeTransport } from "@prisma/client"
 import { DemandeNotFoundError } from "@/lib/demande-service"
+import type { DemandeWithRelations } from "@/lib/demande-types"
 
 vi.mock("@/lib/auth", () => ({
   auth: vi.fn(),
@@ -23,12 +23,14 @@ vi.mock("next/navigation", () => ({
   }),
 }))
 
-const mockDemande: DemandeDeplacement & { employe: Utilisateur; vehicule: VehiculeEntreprise | null; assigneA: Utilisateur | null } = {
+const mockDemande: DemandeWithRelations = {
   id: "d-1",
   numero: "DD-2025-0001",
   employeId: "u-1",
   assigneAId: null,
-  statut: "APPROUVEE_MANAGER" as StatutDemande,
+  statut: "APPROUVEE_MANAGER",
+  etape: "",
+  decision: "",
   employeNom: "Dupont",
   employePrenom: "Jean",
   employePoste: "Développeur",
@@ -37,14 +39,14 @@ const mockDemande: DemandeDeplacement & { employe: Utilisateur; vehicule: Vehicu
   dateDepart: new Date("2025-06-01"),
   dateRetour: new Date("2025-06-05"),
   destination: "Casablanca",
-  typeTransport: "AVION" as TypeTransport,
+  typeTransport: "AVION",
   autreTransport: null,
   vehiculeId: "v-1",
-  fraisTransport: { toNumber: () => 100 } as unknown as DemandeDeplacement["fraisTransport"],
-  fraisHebergement: { toNumber: () => 200 } as unknown as DemandeDeplacement["fraisHebergement"],
-  fraisRepas: { toNumber: () => 50 } as unknown as DemandeDeplacement["fraisRepas"],
-  fraisDivers: { toNumber: () => 30 } as unknown as DemandeDeplacement["fraisDivers"],
-  totalEstime: { toNumber: () => 380 } as unknown as DemandeDeplacement["totalEstime"],
+  fraisTransport: 100,
+  fraisHebergement: 200,
+  fraisRepas: 50,
+  fraisDivers: 30,
+  totalEstime: 380,
   avanceRequise: false,
   montantAvance: null,
   description: null,
@@ -63,26 +65,13 @@ const mockDemande: DemandeDeplacement & { employe: Utilisateur; vehicule: Vehicu
   employe: {
     id: "u-1",
     email: "jean.dupont@example.com",
-    motDePasse: "hashed",
-    nom: "Dupont",
-    prenom: "Jean",
     poste: "Développeur",
-    role: "EMPLOYEE" as Role,
-    societeId: "default",
-    departementId: "dep-1",
-    avatarUrl: null,
-    telephone: null,
-    dateEmbauche: null,
-    actif: true,
-    creeLe: new Date("2020-01-01"),
-    modifieLe: new Date("2020-01-01"),
+    prenom: "Jean",
+    nom: "Dupont",
   },
   vehicule: {
-    id: "v-1",
     nom: "Peugeot 3008",
     immatriculation: "AB-123-CD",
-    disponible: true,
-    creeLe: new Date("2023-01-01"),
   },
   assigneA: null,
 }

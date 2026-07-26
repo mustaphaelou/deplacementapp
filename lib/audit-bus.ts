@@ -1,5 +1,6 @@
-import type { PrismaClient } from "@prisma/client"
-import { prisma } from "./prisma"
+import type { DrizzleDb } from "./prisma"
+import { db } from "./prisma"
+import { journalAudit } from "../db/schema/journal-audit"
 
 export interface AuditEvent {
   utilisateurId: string
@@ -10,19 +11,18 @@ export interface AuditEvent {
 }
 
 export class AuditBus {
-  constructor(private db: PrismaClient) {}
+  constructor(private _db: DrizzleDb) {}
 
   async log(event: AuditEvent): Promise<void> {
-    await this.db.journalAudit.create({
-      data: {
-        utilisateurId: event.utilisateurId,
-        action: event.action,
-        entite: event.entite,
-        entiteId: event.entiteId ?? null,
-        details: event.details ? JSON.stringify(event.details) : null,
-      },
+    await this._db.insert(journalAudit).values({
+      id: crypto.randomUUID(),
+      utilisateurId: event.utilisateurId,
+      action: event.action,
+      entite: event.entite,
+      entiteId: event.entiteId ?? null,
+      details: event.details ? JSON.stringify(event.details) : null,
     })
   }
 }
 
-export const auditBus = new AuditBus(prisma)
+export const auditBus = new AuditBus(db)

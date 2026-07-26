@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from "next/server"
 import { hash } from "bcryptjs"
-import { prisma } from "@/lib/prisma"
+import { eq, count } from "drizzle-orm"
+import { db } from "@/db"
+import { societes } from "@/db/schema/societes"
+import { departements } from "@/db/schema/departements"
+import { utilisateurs } from "@/db/schema/utilisateurs"
 import { validateRequest } from "@/lib/api-utils"
 import { setupRegisterSchema } from "@/lib/schemas"
 import { handleServiceError } from "@/lib/errors"
 
 export async function POST(req: NextRequest) {
   try {
-    const societeCount = await prisma.societe.count()
-    if (societeCount > 0) {
+    const [societeCount] = await db.select({ value: count() }).from(societes)
+    if ((societeCount?.value ?? 0) > 0) {
       return NextResponse.json(
         { error: "Cette instance est déjà configurée." },
         { status: 409 }
@@ -18,55 +22,58 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}))
     const validation = validateRequest(setupRegisterSchema, body)
     if (!validation.ok) return validation.response
-    const { societeNom, societeEmailDomain, departements, admin } = validation.data
+    const { societeNom, societeEmailDomain, departements: departementNames, admin } = validation.data
 
-    if (!departements.includes(admin.departementNom)) {
+    if (!departementNames.includes(admin.departementNom)) {
       return NextResponse.json(
         { error: "Le département de l'administrateur doit faire partie des départements déclarés" },
         { status: 400 }
       )
     }
 
-    const societe = await prisma.societe.create({
-      data: {
-        nom: societeNom,
-        domaineEmail: societeEmailDomain || null,
-      },
+    const societeId = crypto.randomUUID()
+    await db.insert(societes).values({
+      id: societeId,
+      nom: societeNom,
+      domaineEmail: societeEmailDomain || null,
+      modifieLe: new Date(),
     })
 
     const departementIds = new Map<string, string>()
-    for (const nom of departements) {
-      const departement = await prisma.departement.upsert({
-        where: { nom_societeId: { nom, societeId: societe.id } },
-        update: {},
-        create: { nom, societeId: societe.id },
+    for (const nom of departementNames) {
+      const deptId = crypto.randomUUID()
+      await db.insert(departements).values({
+        id: deptId,
+        nom,
+        societeId,
       })
-      departementIds.set(nom, departement.id)
+      departementIds.set(nom, deptId)
     }
 
     const hashedPassword = await hash(admin.password, 12)
+    const userId = crypto.randomUUID()
 
-    const user = await prisma.utilisateur.create({
-      data: {
-        email: admin.email,
-        motDePasse: hashedPassword,
-        nom: admin.nom,
-        prenom: admin.prenom,
-        poste: admin.poste,
-        role: "GENERAL_DIRECTION",
-        actif: true,
-        societeId: societe.id,
-        departementId: departementIds.get(admin.departementNom)!,
-      },
+    await db.insert(utilisateurs).values({
+      id: userId,
+      email: admin.email,
+      motDePasse: hashedPassword,
+      nom: admin.nom,
+      prenom: admin.prenom,
+      poste: admin.poste,
+      role: "GENERAL_DIRECTION" as const,
+      actif: true,
+      societeId,
+      departementId: departementIds.get(admin.departementNom)!,
+      modifieLe: new Date(),
     })
 
     return NextResponse.json({
       user: {
-        id: user.id,
-        email: user.email,
-        prenom: user.prenom,
-        nom: user.nom,
-        role: user.role,
+        id: userId,
+        email: admin.email,
+        prenom: admin.prenom,
+        nom: admin.nom,
+        role: "GENERAL_DIRECTION",
       },
     })
   } catch (e) {

@@ -1,4 +1,5 @@
-import type { PrismaClient } from "@prisma/client"
+import type { DrizzleDb } from "./prisma"
+import { documents } from "../db/schema/documents"
 import type { DemandeQueryPort, DemandeQueryParams } from "./demande/ports/demande-query-port"
 import type { DemandeFactoryPort } from "./demande/ports/demande-factory-port"
 import type { DemandeWorkflowPort } from "./demande/ports/demande-workflow-port"
@@ -13,7 +14,7 @@ export class DemandeDeplacementService {
     readonly queries: DemandeQueryPort,
     readonly factory: DemandeFactoryPort,
     readonly workflow: DemandeWorkflowPort,
-    private db?: PrismaClient
+    private _db?: DrizzleDb
   ) {}
 
   async executeAction(params: ExecuteParams) {
@@ -44,13 +45,12 @@ export class DemandeDeplacementService {
     demandeId: string,
     params: { type: string; chemin: string }
   ) {
-    if (!this.db) throw new Error("PrismaClient not available for recordDocument")
-    await this.db.document.create({
-      data: {
-        demandeId,
-        type: params.type,
-        chemin: params.chemin,
-      },
+    if (!this._db) throw new Error("DrizzleDb not available for recordDocument")
+    await this._db.insert(documents).values({
+      id: crypto.randomUUID(),
+      demandeId,
+      type: params.type,
+      chemin: params.chemin,
     })
   }
 }

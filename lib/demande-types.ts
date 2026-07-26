@@ -1,4 +1,4 @@
-import type { DemandeDeplacement, Utilisateur, VehiculeEntreprise, Role } from "@prisma/client"
+import type { Role } from "./roles"
 import type { CreateDemandeData } from "./demande-utils"
 
 export function parseMotif(motif: string): string[] {
@@ -11,10 +11,51 @@ export function parseMotif(motif: string): string[] {
   }
 }
 
+export type DemandeDeplacement = {
+  id: string
+  numero: string
+  employeId: string
+  assigneAId: string | null
+  statut: string
+  etape: string
+  decision: string
+  employeNom: string
+  employePrenom: string
+  employePoste: string
+  employeDepartement: string
+  motif: string
+  dateDepart: Date
+  dateRetour: Date
+  destination: string
+  typeTransport: string
+  autreTransport: string | null
+  vehiculeId: string | null
+  fraisTransport: number | string | null
+  fraisHebergement: number | string | null
+  fraisRepas: number | string | null
+  fraisDivers: number | string | null
+  totalEstime: number | string | null
+  avanceRequise: boolean
+  montantAvance: number | string | null
+  description: string | null
+  commentaireManager: string | null
+  commentaireFinance: string | null
+  commentaireDirection: string | null
+  soumiseLe: Date | null
+  approuveeManagerLe: Date | null
+  approuveeFinanceLe: Date | null
+  approuveeDirectionLe: Date | null
+  rejeteeLe: Date | null
+  retireeLe: Date | null
+  deletedAt: Date | null
+  creeLe: Date
+  modifieLe: Date
+}
+
 export type DemandeWithRelations = DemandeDeplacement & {
-  employe: Pick<Utilisateur, "id" | "prenom" | "nom" | "email" | "poste">
-  vehicule: Pick<VehiculeEntreprise, "nom" | "immatriculation"> | null
-  assigneA: Pick<Utilisateur, "id" | "prenom" | "nom"> | null
+  employe: { id: string; prenom: string; nom: string; email: string; poste: string }
+  vehicule: { nom: string; immatriculation: string } | null
+  assigneA: { id: string; prenom: string; nom: string } | null
 }
 
 export interface DemandeDetail {
@@ -57,7 +98,7 @@ export interface DemandeDetail {
   modifieLe: string
 }
 
-export type Vehicule = Pick<VehiculeEntreprise, "id" | "nom" | "immatriculation" | "disponible">
+export type Vehicule = { id: string; nom: string; immatriculation: string; disponible: boolean }
 
 export interface Actor {
   id: string

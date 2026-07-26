@@ -1,5 +1,7 @@
-import type { PrismaClient, VehiculeEntreprise } from "@prisma/client"
-import { prisma } from "./prisma"
+import { eq, asc, desc } from "drizzle-orm"
+import type { DrizzleDb } from "./prisma"
+import { vehiculesEntreprise } from "../db/schema/vehicules-entreprise"
+import { db } from "./prisma"
 import { auditBus } from "./audit-bus"
 import { VehiculeNotFoundError } from "./errors"
 
@@ -7,27 +9,24 @@ export { VehiculeNotFoundError }
 
 export class VehiculeService {
   constructor(
-    private db: PrismaClient,
+    private _db: DrizzleDb,
     private audit = auditBus
   ) {}
 
-  async list(): Promise<VehiculeEntreprise[]> {
-    return this.db.vehiculeEntreprise.findMany({
-      orderBy: { nom: "asc" },
+  async list() {
+    return this._db.query.vehiculesEntreprise.findMany({
+      orderBy: [asc(vehiculesEntreprise.nom)],
     })
   }
 
   async create(
     data: { nom: string; immatriculation: string; disponible?: boolean },
     actorId: string
-  ): Promise<VehiculeEntreprise> {
-    const vehicule = await this.db.vehiculeEntreprise.create({
-      data: {
-        nom: data.nom,
-        immatriculation: data.immatriculation,
-        disponible: data.disponible ?? true,
-      },
-    })
+  ) {
+    const [vehicule] = await this._db
+      .insert(vehiculesEntreprise)
+      .values({ id: crypto.randomUUID(), ...data, disponible: data.disponible ?? true })
+      .returning()
 
     await this.audit.log({
       utilisateurId: actorId,
@@ -44,41 +43,41 @@ export class VehiculeService {
     id: string,
     data: { nom?: string; immatriculation?: string; disponible?: boolean },
     actorId: string
-  ): Promise<VehiculeEntreprise> {
-    try {
-      const vehicule = await this.db.vehiculeEntreprise.update({
-        where: { id },
-        data,
-      })
+  ) {
+    const [vehicule] = await this._db
+      .update(vehiculesEntreprise)
+      .set(data)
+      .where(eq(vehiculesEntreprise.id, id))
+      .returning()
 
-      await this.audit.log({
-        utilisateurId: actorId,
-        action: "MODIFICATION_VEHICULE",
-        entite: "VehiculeEntreprise",
-        entiteId: vehicule.id,
-        details: { nom: vehicule.nom },
-      })
+    if (!vehicule) throw new VehiculeNotFoundError()
 
-      return vehicule
-    } catch {
-      throw new VehiculeNotFoundError()
-    }
+    await this.audit.log({
+      utilisateurId: actorId,
+      action: "MODIFICATION_VEHICULE",
+      entite: "VehiculeEntreprise",
+      entiteId: vehicule.id,
+      details: { nom: vehicule.nom },
+    })
+
+    return vehicule
   }
 
   async delete(id: string, actorId: string): Promise<void> {
-    try {
-      await this.db.vehiculeEntreprise.delete({ where: { id } })
+    const [vehicule] = await this._db
+      .delete(vehiculesEntreprise)
+      .where(eq(vehiculesEntreprise.id, id))
+      .returning()
 
-      await this.audit.log({
-        utilisateurId: actorId,
-        action: "SUPPRESSION_VEHICULE",
-        entite: "VehiculeEntreprise",
-        entiteId: id,
-      })
-    } catch {
-      throw new VehiculeNotFoundError()
-    }
+    if (!vehicule) throw new VehiculeNotFoundError()
+
+    await this.audit.log({
+      utilisateurId: actorId,
+      action: "SUPPRESSION_VEHICULE",
+      entite: "VehiculeEntreprise",
+      entiteId: id,
+    })
   }
 }
 
-export const vehiculeService = new VehiculeService(prisma)
+export const vehiculeService = new VehiculeService(db)

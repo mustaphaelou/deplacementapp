@@ -1,20 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
-vi.mock("@/lib/prisma", () => ({
-  prisma: {
-    societe: { count: vi.fn() },
-  },
+let mockCount = 0
+const mockDb = {
+  select: vi.fn(() => ({
+    from: vi.fn(() => [{ value: mockCount }]),
+  })),
+}
+
+vi.mock("@/db", () => ({
+  db: mockDb,
 }))
 
 describe("setup status route", () => {
   beforeEach(() => {
-    vi.resetAllMocks()
+    mockCount = 0
+    vi.clearAllMocks()
   })
 
   it("GET returns needsSetup: true with no departements when no Societe exists", async () => {
-    const { prisma } = await import("@/lib/prisma")
-    ;(prisma.societe.count as ReturnType<typeof vi.fn>).mockResolvedValue(0)
-
     const { GET } = await import("./route")
     const response = await GET()
 
@@ -25,8 +28,7 @@ describe("setup status route", () => {
   })
 
   it("GET returns needsSetup: false when at least one Societe exists", async () => {
-    const { prisma } = await import("@/lib/prisma")
-    ;(prisma.societe.count as ReturnType<typeof vi.fn>).mockResolvedValue(1)
+    mockCount = 1
 
     const { GET } = await import("./route")
     const response = await GET()

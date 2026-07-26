@@ -1,14 +1,25 @@
-import type { Prisma, PrismaClient, StatutDemande } from "@prisma/client"
+import { eq, and, or, isNull, ilike, desc, asc, inArray, count, sum, type SQL } from "drizzle-orm"
+import type { DrizzleDb } from "../../prisma"
+import { demandesDeplacement } from "../../../db/schema/demandes-deplacement"
+import type { StatutDemande } from "../../workflow"
 import type { DashboardDemandeSummary } from "../../dashboard"
 import type { DemandeWithRelations } from "../../demande-types"
 import { DemandeNotFoundError } from "../../errors"
 import type { DemandeQueryPort, DemandeQueryParams, DemandeFindByIdInclude, DemandeFindByIdExtra, DemandeExportRow, OrderByTimestamp } from "../ports/demande-query-port"
-import type { TimestampColumn } from "../../workflow"
 
 export class DemandeQueryAdapter implements DemandeQueryPort {
-  constructor(private db: PrismaClient) {}
+  constructor(private db: DrizzleDb) {}
 
-  private mapToDemandeSummary(demande: { id: string; numero: string; destination: string; dateDepart: Date; dateRetour: Date; totalEstime: { toNumber?: () => number } | number | null; statut: string; employe: { prenom: string; nom: string } | null }): DashboardDemandeSummary {
+  private mapToDemandeSummary(demande: {
+    id: string
+    numero: string
+    destination: string
+    dateDepart: Date
+    dateRetour: Date
+    totalEstime: string | null
+    statut: string
+    employe: { prenom: string; nom: string } | null
+  }): DashboardDemandeSummary {
     return {
       id: demande.id,
       numero: demande.numero,
@@ -17,10 +28,20 @@ export class DemandeQueryAdapter implements DemandeQueryPort {
       dateRetour: demande.dateRetour,
       totalEstime: demande.totalEstime ? Number(demande.totalEstime) : null,
       statut: demande.statut,
-      employe: demande.employe
-        ? { prenom: demande.employe.prenom, nom: demande.employe.nom }
-        : null,
+      employe: demande.employe ?? null,
     }
+  }
+
+  private buildWithClause(options?: { include?: DemandeFindByIdInclude }) {
+    const withClause: Record<string, true | { columns: Record<string, boolean> }> = {
+      employe: { columns: { id: true, prenom: true, nom: true, email: true, poste: true } },
+      assigneA: { columns: { id: true, prenom: true, nom: true } },
+      vehicule: { columns: { nom: true, immatriculation: true } },
+    }
+    if (options?.include?.documents) {
+      withClause.documents = true
+    }
+    return withClause
   }
 
   findById(id: string): Promise<DemandeWithRelations>
@@ -32,17 +53,12 @@ export class DemandeQueryAdapter implements DemandeQueryPort {
     id: string,
     options?: { include?: DemandeFindByIdInclude }
   ): Promise<DemandeWithRelations> {
-    const demande = await this.db.demandeDeplacement.findUnique({
-      where: { id, deletedAt: null },
-      include: {
-        employe: { select: { id: true, prenom: true, nom: true, email: true, poste: true } },
-        assigneA: { select: { id: true, prenom: true, nom: true } },
-        vehicule: { select: { nom: true, immatriculation: true } },
-        ...(options?.include?.documents ? { documents: true } : {}),
-      },
+    const demande = await this.db.query.demandesDeplacement.findFirst({
+      where: and(eq(demandesDeplacement.id, id), isNull(demandesDeplacement.deletedAt)),
+      with: this.buildWithClause(options),
     })
-    if (!demande || demande.deletedAt) throw new DemandeNotFoundError()
-    return demande
+    if (!demande) throw new DemandeNotFoundError()
+    return demande as unknown as DemandeWithRelations
   }
 
   async findMany(
@@ -51,48 +67,54 @@ export class DemandeQueryAdapter implements DemandeQueryPort {
     params: DemandeQueryParams
   ): Promise<{ demandes: DashboardDemandeSummary[]; total: number }> {
     const { page, limit, statut, recherche } = params
-    const where: Prisma.DemandeDeplacementWhereInput = { deletedAt: null }
+    const conditions: (SQL | undefined)[] = [isNull(demandesDeplacement.deletedAt)]
 
     if (role === "EMPLOYEE") {
-      where.employeId = userId
+      conditions.push(eq(demandesDeplacement.employeId, userId))
     }
 
     if (statut) {
-      where.statut = statut as StatutDemande
+      conditions.push(eq(demandesDeplacement.statut, statut as StatutDemande))
     }
 
     if (recherche) {
-      where.OR = [
-        { destination: { contains: recherche, mode: "insensitive" } },
-        { numero: { contains: recherche, mode: "insensitive" } },
-      ]
+      conditions.push(
+        or(
+          ilike(demandesDeplacement.destination, `%${recherche}%`),
+          ilike(demandesDeplacement.numero, `%${recherche}%`),
+        )
+      )
     }
 
-    const [demandes, total] = await Promise.all([
-      this.db.demandeDeplacement.findMany({
-        where,
-        orderBy: { creeLe: "desc" },
-        skip: (page - 1) * limit,
-        take: limit,
-        include: {
-          employe: { select: { id: true, prenom: true, nom: true } },
+    const [demandes, countResult] = await Promise.all([
+      this.db.query.demandesDeplacement.findMany({
+        where: and(...conditions),
+        orderBy: [desc(demandesDeplacement.creeLe)],
+        limit,
+        offset: (page - 1) * limit,
+        with: {
+          employe: { columns: { id: true, prenom: true, nom: true } },
         },
       }),
-      this.db.demandeDeplacement.count({ where }),
+      this.db
+        .select({ value: count() })
+        .from(demandesDeplacement)
+        .where(and(...conditions))
+        .then((r) => r[0]?.value ?? 0),
     ])
 
-    return { demandes: demandes.map((d) => this.mapToDemandeSummary(d)), total }
+    return { demandes: demandes.map((d) => this.mapToDemandeSummary(d)), total: countResult }
   }
 
   async findByEmployeeId(
     userId: string,
     limit = 5
   ): Promise<DashboardDemandeSummary[]> {
-    const demandes = await this.db.demandeDeplacement.findMany({
-      where: { employeId: userId, deletedAt: null },
-      orderBy: { creeLe: "desc" },
-      take: limit,
-      include: { employe: { select: { prenom: true, nom: true } } },
+    const demandes = await this.db.query.demandesDeplacement.findMany({
+      where: and(eq(demandesDeplacement.employeId, userId), isNull(demandesDeplacement.deletedAt)),
+      orderBy: [desc(demandesDeplacement.creeLe)],
+      limit,
+      with: { employe: { columns: { prenom: true, nom: true } } },
     })
     return demandes.map((d) => this.mapToDemandeSummary(d))
   }
@@ -101,13 +123,14 @@ export class DemandeQueryAdapter implements DemandeQueryPort {
     statuts: StatutDemande[],
     opts: { limit?: number; includeEmployee?: boolean; orderBy?: OrderByTimestamp } = {}
   ): Promise<DashboardDemandeSummary[]> {
-    const { limit: take = 10, includeEmployee = false, orderBy = { column: "creeLe" as TimestampColumn, direction: "desc" as const } } = opts
-    const prismaOrderBy = { [orderBy.column]: orderBy.direction }
-    const demandes = await this.db.demandeDeplacement.findMany({
-      where: { statut: { in: statuts }, deletedAt: null },
-      orderBy: prismaOrderBy,
-      take,
-      include: { employe: { select: { prenom: true, nom: true } } },
+    const { limit: take = 10, orderBy = { column: "creeLe" as const, direction: "desc" as const } } = opts
+    const col = demandesDeplacement[orderBy.column as keyof typeof demandesDeplacement]
+    const orderFn = orderBy.direction === "desc" ? desc : asc
+    const demandes = await this.db.query.demandesDeplacement.findMany({
+      where: and(inArray(demandesDeplacement.statut, statuts), isNull(demandesDeplacement.deletedAt)),
+      orderBy: [orderFn(col as typeof demandesDeplacement.creeLe)],
+      limit: take,
+      with: { employe: { columns: { prenom: true, nom: true } } },
     })
     return demandes.map((d) => this.mapToDemandeSummary(d))
   }
@@ -116,28 +139,32 @@ export class DemandeQueryAdapter implements DemandeQueryPort {
     statut: StatutDemande,
     userId?: string
   ): Promise<number> {
-    const where: Record<string, unknown> = {
-      statut,
-      deletedAt: null,
-    }
-    if (userId) where.employeId = userId
-    return this.db.demandeDeplacement.count({ where })
+    const conditions: (SQL | undefined)[] = [
+      eq(demandesDeplacement.statut, statut),
+      isNull(demandesDeplacement.deletedAt),
+    ]
+    if (userId) conditions.push(eq(demandesDeplacement.employeId, userId))
+    const result = await this.db
+      .select({ value: count() })
+      .from(demandesDeplacement)
+      .where(and(...conditions))
+    return result[0]?.value ?? 0
   }
 
   async aggregateBudget(statuts: StatutDemande[]): Promise<number> {
-    const result = await this.db.demandeDeplacement.aggregate({
-      _sum: { totalEstime: true },
-      where: { statut: { in: statuts }, deletedAt: null },
-    })
-    return Number(result._sum?.totalEstime ?? 0)
+    const result = await this.db
+      .select({ total: sum(demandesDeplacement.totalEstime) })
+      .from(demandesDeplacement)
+      .where(and(inArray(demandesDeplacement.statut, statuts), isNull(demandesDeplacement.deletedAt)))
+    return Number(result[0]?.total ?? 0)
   }
 
   async findAllForExport(): Promise<DemandeExportRow[]> {
-    const demandes = await this.db.demandeDeplacement.findMany({
-      where: { deletedAt: null },
-      orderBy: { creeLe: "desc" },
-      include: {
-        employe: { select: { prenom: true, nom: true } },
+    const demandes = await this.db.query.demandesDeplacement.findMany({
+      where: isNull(demandesDeplacement.deletedAt),
+      orderBy: [desc(demandesDeplacement.creeLe)],
+      with: {
+        employe: { columns: { prenom: true, nom: true } },
       },
     })
     return demandes.map((d) => ({

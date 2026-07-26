@@ -1,27 +1,31 @@
-import type { PrismaClient, Notification } from "@prisma/client"
-import { prisma } from "./prisma"
+import { eq, desc, count } from "drizzle-orm"
+import type { DrizzleDb } from "./prisma"
+import { db } from "./prisma"
+import { notifications } from "../db/schema/notifications"
 
 export interface NotificationQueriesPort {
-  listForUser(userId: string): Promise<Notification[]>
+  listForUser(userId: string): Promise<unknown[]>
   countUnread(userId: string): Promise<number>
 }
 
 export class NotificationQueries {
-  constructor(private db: PrismaClient) {}
+  constructor(private _db: DrizzleDb) {}
 
-  async listForUser(userId: string): Promise<Notification[]> {
-    return this.db.notification.findMany({
-      where: { utilisateurId: userId },
-      orderBy: { creeLe: "desc" },
-      take: 50,
+  async listForUser(userId: string) {
+    return this._db.query.notifications.findMany({
+      where: eq(notifications.utilisateurId, userId),
+      orderBy: [desc(notifications.creeLe)],
+      limit: 50,
     })
   }
 
   async countUnread(userId: string): Promise<number> {
-    return this.db.notification.count({
-      where: { utilisateurId: userId, lu: false },
-    })
+    const result = await this._db
+      .select({ value: count() })
+      .from(notifications)
+      .where(eq(notifications.utilisateurId, userId))
+    return result[0]?.value ?? 0
   }
 }
 
-export const notificationQueries = new NotificationQueries(prisma)
+export const notificationQueries = new NotificationQueries(db)

@@ -1,1 +1,19 @@
-{"version":"1","entries":[{"idx":0,"version":"1","when":1746034560000,"tag":"0000_add_etape_decision","breakpoints":true}]}
+{
+  "version": "1",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "1",
+      "when": 1746034560000,
+      "tag": "0000_add_etape_decision",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785027059303,
+      "tag": "0001_colorful_cerise",
+      "breakpoints": true
+    }
+  ]
+}

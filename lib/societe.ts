@@ -1,4 +1,5 @@
-import { prisma } from "@/lib/prisma"
+import { db } from "../db"
+import { societes } from "../db/schema/societes"
 
 export interface SocieteBranding {
   id: string
@@ -12,7 +13,8 @@ export interface SocieteBranding {
 
 export async function getSocieteBranding(): Promise<SocieteBranding | null> {
   try {
-    return await prisma.societe.findFirst()
+    const [result] = await db.select().from(societes).limit(1)
+    return result ?? null
   } catch {
     return null
   }

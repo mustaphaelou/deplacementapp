@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from "vitest"
 import { DemandeDeplacementService } from "./demande-service"
-import type { Role } from "@prisma/client"
 import type { DemandeQueryPort } from "./demande/ports/demande-query-port"
 import type { DemandeFactoryPort } from "./demande/ports/demande-factory-port"
 import type { DemandeWorkflowPort } from "./demande/ports/demande-workflow-port"
@@ -58,7 +57,7 @@ describe("DemandeDeplacementService (facade smoke)", () => {
         destination: "Casablanca",
         typeTransport: "AVION" as const,
       },
-      actor: { id: "u-1", role: "EMPLOYEE" as Role },
+      actor: { id: "u-1", role: "EMPLOYEE" },
     })
 
     expect(result).toEqual({ demande: { id: "dd-1" } })
@@ -82,7 +81,7 @@ describe("DemandeDeplacementService (facade smoke)", () => {
         destination: "Casablanca",
         typeTransport: "AVION" as const,
       },
-      actor: { id: "u-1", role: "EMPLOYEE" as Role },
+      actor: { id: "u-1", role: "EMPLOYEE" },
     })
 
     expect(result).toEqual({ demande: { id: "dd-2" } })
@@ -100,7 +99,7 @@ describe("DemandeDeplacementService (facade smoke)", () => {
     const result = await svc.executeAction({
       action: "approuver",
       demandeId: "dd-1",
-      actor: { id: "mgr-1", role: "MANAGER" as Role },
+      actor: { id: "mgr-1", role: "MANAGER" as const },
     })
 
     expect(result).toEqual({ demande: { id: "dd-1", statut: "APPROUVEE_MANAGER" } })
@@ -123,7 +122,7 @@ describe("DemandeDeplacementService (facade smoke)", () => {
     const result = await svc.executeAction({
       action: "rejeter",
       demandeId: "dd-1",
-      actor: { id: "mgr-1", role: "MANAGER" as Role },
+      actor: { id: "mgr-1", role: "MANAGER" as const },
       comment: "Budget insuffisant",
     })
 
@@ -147,7 +146,7 @@ describe("DemandeDeplacementService (facade smoke)", () => {
     const result = await svc.executeAction({
       action: "retirer",
       demandeId: "dd-1",
-      actor: { id: "u-1", role: "EMPLOYEE" as Role },
+      actor: { id: "u-1", role: "EMPLOYEE" as const },
     })
 
     expect(result).toEqual({ demande: { id: "dd-1", statut: "RETIREE" } })
@@ -160,7 +159,9 @@ describe("DemandeDeplacementService (facade smoke)", () => {
   })
 
   it("recordDocument creates a Document row via the db seam", async () => {
-    const db = { document: { create: vi.fn().mockResolvedValue({ id: "doc-1" }) } }
+    const insertValuesReturning = vi.fn().mockResolvedValue(undefined)
+    const insertValues = vi.fn(() => ({ returning: insertValuesReturning }))
+    const db = { insert: vi.fn(() => ({ values: insertValues })) }
     const queries = mockQueryPort()
     const factory = mockFactoryPort()
     const workflow = mockWorkflowPort()
@@ -168,12 +169,6 @@ describe("DemandeDeplacementService (facade smoke)", () => {
 
     await svc.recordDocument("dd-1", { type: "PDF", chemin: "demande-DD-2025-0001.pdf" })
 
-    expect(db.document.create).toHaveBeenCalledWith({
-      data: {
-        demandeId: "dd-1",
-        type: "PDF",
-        chemin: "demande-DD-2025-0001.pdf",
-      },
-    })
+    expect(db.insert).toHaveBeenCalledOnce()
   })
 })

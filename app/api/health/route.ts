@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
+import { sql } from "drizzle-orm"
+import { db } from "@/db"
 
 export async function GET() {
   try {
-    await prisma.$queryRaw`SELECT 1`
+    await db.execute(sql`SELECT 1`)
     return NextResponse.json({ status: "healthy" }, { status: 200 })
   } catch (error) {
     console.error("Healthcheck failed:", error)

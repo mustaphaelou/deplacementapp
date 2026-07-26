@@ -1,7 +1,7 @@
-import type { Role } from "@prisma/client"
 import { formatCurrency } from "@/lib/constants"
 import { demandeService } from "./demande/di"
 import type { DemandeQueryPort } from "./demande/ports/demande-query-port"
+import type { Role } from "./roles"
 import { queueEtapes, committedEtapes, rollupEtapes, resolveStatuts, laneOrderByColumn, type Etape } from "./workflow"
 
 export interface DashboardDemandeSummary {

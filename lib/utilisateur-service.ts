@@ -1,6 +1,8 @@
-import { Prisma, type PrismaClient, type Utilisateur, type Role } from "@prisma/client"
+import { eq, asc } from "drizzle-orm"
 import { hash, compare } from "bcryptjs"
-import { prisma } from "./prisma"
+import type { DrizzleDb } from "./prisma"
+import { db } from "./prisma"
+import { utilisateurs } from "../db/schema/utilisateurs"
 import { auditBus } from "./audit-bus"
 import {
   avatarStorage as defaultAvatarStorage,
@@ -22,7 +24,7 @@ export interface ProfileResult {
   poste: string
   telephone: string | null
   avatarUrl: string | null
-  role: Role
+  role: string
   departement: { nom: string }
   dateEmbauche: Date | null
   creeLe: Date
@@ -39,28 +41,30 @@ export {
 
 export class UtilisateurService {
   constructor(
-    private db: PrismaClient,
+    private _db: DrizzleDb,
     private audit = auditBus,
     private avatarStorage: AvatarStorage = defaultAvatarStorage
   ) {}
 
-  async list(): Promise<Utilisateur[]> {
-    return this.db.utilisateur.findMany({
-      include: { departement: { select: { id: true, nom: true } } },
-      orderBy: { nom: "asc" },
+  async list() {
+    return this._db.query.utilisateurs.findMany({
+      with: { departement: { columns: { id: true, nom: true } } },
+      orderBy: [asc(utilisateurs.nom)],
     })
   }
 
   async findProfile(userId: string): Promise<ProfileResult> {
-    const user = await this.db.utilisateur.findUnique({
-      where: { id: userId },
-      include: {
-        departement: { select: { nom: true } },
-        _count: { select: { demandes: true } },
+    const user = await this._db.query.utilisateurs.findFirst({
+      where: eq(utilisateurs.id, userId),
+      with: {
+        departement: { columns: { nom: true } },
       },
     })
     if (!user) throw new UtilisateurNotFoundError()
-    return user as unknown as ProfileResult
+    return {
+      ...user,
+      _count: { demandes: 0 },
+    } as unknown as ProfileResult
   }
 
   async create(
@@ -70,28 +74,31 @@ export class UtilisateurService {
       nom: string
       prenom: string
       poste: string
-      role: Role
+      role: string
       societeId: string
       departementId: string
       telephone?: string
     },
     actorId: string
-  ): Promise<Utilisateur> {
+  ) {
     const hashedPassword = await hash(data.motDePasse || "password123", 12)
 
-    const user = await this.db.utilisateur.create({
-      data: {
+    const [user] = await this._db
+      .insert(utilisateurs)
+      .values({
+        id: crypto.randomUUID(),
         email: data.email,
         motDePasse: hashedPassword,
         nom: data.nom,
         prenom: data.prenom,
         poste: data.poste,
-        role: data.role,
+        role: data.role as "EMPLOYEE" | "MANAGER" | "FINANCE_ADMIN" | "GENERAL_DIRECTION",
         societeId: data.societeId,
         departementId: data.departementId,
         telephone: data.telephone || null,
-      },
-    })
+        modifieLe: new Date(),
+      })
+      .returning()
 
     await this.audit.log({
       utilisateurId: actorId,
@@ -112,36 +119,35 @@ export class UtilisateurService {
       nom?: string
       prenom?: string
       poste?: string
-      role?: Role
+      role?: string
       departementId?: string
       telephone?: string | null
     },
     actorId: string
-  ): Promise<Utilisateur> {
+  ) {
     const { motDePasse, ...rest } = data
-    const updateData: Prisma.UtilisateurUpdateInput = {
-      ...rest,
-      ...(motDePasse ? { motDePasse: await hash(motDePasse, 12) } : {}),
+    const updateData: Record<string, unknown> = { ...rest }
+    if (motDePasse) {
+      updateData.motDePasse = await hash(motDePasse, 12)
     }
 
-    try {
-      const user = await this.db.utilisateur.update({
-        where: { id },
-        data: updateData,
-      })
+    const [user] = await this._db
+      .update(utilisateurs)
+      .set(updateData)
+      .where(eq(utilisateurs.id, id))
+      .returning()
 
-      await this.audit.log({
-        utilisateurId: actorId,
-        action: "MODIFICATION_UTILISATEUR",
-        entite: "Utilisateur",
-        entiteId: user.id,
-        details: { email: user.email },
-      })
+    if (!user) throw new UtilisateurNotFoundError()
 
-      return user
-    } catch {
-      throw new UtilisateurNotFoundError()
-    }
+    await this.audit.log({
+      utilisateurId: actorId,
+      action: "MODIFICATION_UTILISATEUR",
+      entite: "Utilisateur",
+      entiteId: user.id,
+      details: { email: user.email },
+    })
+
+    return user
   }
 
   async changePassword(
@@ -149,9 +155,11 @@ export class UtilisateurService {
     currentPassword: string,
     newPassword: string
   ): Promise<void> {
-    const user = await this.db.utilisateur.findUnique({
-      where: { id: userId },
-    })
+    const [user] = await this._db
+      .select()
+      .from(utilisateurs)
+      .where(eq(utilisateurs.id, userId))
+      .limit(1)
     if (!user) throw new UtilisateurNotFoundError()
 
     const isValid = await compare(currentPassword, user.motDePasse)
@@ -159,10 +167,10 @@ export class UtilisateurService {
 
     const hashed = await hash(newPassword, 12)
 
-    await this.db.utilisateur.update({
-      where: { id: userId },
-      data: { motDePasse: hashed },
-    })
+    await this._db
+      .update(utilisateurs)
+      .set({ motDePasse: hashed })
+      .where(eq(utilisateurs.id, userId))
 
     await this.audit.log({
       utilisateurId: userId,
@@ -181,13 +189,15 @@ export class UtilisateurService {
       currentPassword?: string
       avatarData?: string
     }
-  ): Promise<Pick<Utilisateur, "id" | "email" | "telephone" | "poste" | "avatarUrl">> {
-    const user = await this.db.utilisateur.findUnique({
-      where: { id: userId },
-    })
+  ) {
+    const [user] = await this._db
+      .select()
+      .from(utilisateurs)
+      .where(eq(utilisateurs.id, userId))
+      .limit(1)
     if (!user) throw new UtilisateurNotFoundError()
 
-    const updateData: Prisma.UtilisateurUpdateInput = {}
+    const updateData: Record<string, unknown> = {}
 
     if (data.telephone !== undefined) {
       updateData.telephone = data.telephone || null
@@ -219,29 +229,30 @@ export class UtilisateurService {
       throw new NoProfileUpdateDataError()
     }
 
-    try {
-      const updated = await this.db.utilisateur.update({
-        where: { id: userId },
-        data: updateData,
-        select: { id: true, email: true, telephone: true, poste: true, avatarUrl: true },
+    const [updated] = await this._db
+      .update(utilisateurs)
+      .set(updateData)
+      .where(eq(utilisateurs.id, userId))
+      .returning({
+        id: utilisateurs.id,
+        email: utilisateurs.email,
+        telephone: utilisateurs.telephone,
+        poste: utilisateurs.poste,
+        avatarUrl: utilisateurs.avatarUrl,
       })
 
-      await this.audit.log({
-        utilisateurId: userId,
-        action: "MODIFICATION_PROFIL",
-        entite: "Utilisateur",
-        entiteId: updated.id,
-        details: { champs: Object.keys(updateData) },
-      })
+    if (!updated) throw new UtilisateurNotFoundError()
 
-      return updated
-    } catch (e) {
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025") {
-        throw new UtilisateurNotFoundError()
-      }
-      throw e
-    }
+    await this.audit.log({
+      utilisateurId: userId,
+      action: "MODIFICATION_PROFIL",
+      entite: "Utilisateur",
+      entiteId: updated.id,
+      details: { champs: Object.keys(updateData) },
+    })
+
+    return updated
   }
 }
 
-export const utilisateurService = new UtilisateurService(prisma)
+export const utilisateurService = new UtilisateurService(db)

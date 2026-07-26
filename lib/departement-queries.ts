@@ -1,18 +1,20 @@
-import type { Departement, PrismaClient } from "@prisma/client"
-import { prisma } from "./prisma"
+import { asc } from "drizzle-orm"
+import type { DrizzleDb } from "./prisma"
+import { db } from "./prisma"
+import { departements } from "../db/schema/departements"
 
 export interface DepartementQueriesPort {
-  listAll(): Promise<Departement[]>
+  listAll(): Promise<unknown[]>
 }
 
 export class DepartementQueries {
-  constructor(private db: PrismaClient) {}
+  constructor(private _db: DrizzleDb) {}
 
-  async listAll(): Promise<Departement[]> {
-    return this.db.departement.findMany({
-      orderBy: { nom: "asc" },
+  async listAll() {
+    return this._db.query.departements.findMany({
+      orderBy: [asc(departements.nom)],
     })
   }
 }
 
-export const departementQueries = new DepartementQueries(prisma)
+export const departementQueries = new DepartementQueries(db)

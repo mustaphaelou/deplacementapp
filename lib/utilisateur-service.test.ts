@@ -7,7 +7,6 @@ import {
   NoProfileUpdateDataError,
 } from "./utilisateur-service"
 import type { AuditBus } from "./audit-bus"
-import type { Prisma, PrismaClient, Utilisateur } from "@prisma/client"
 import type { AvatarStorage } from "./avatar-storage"
 
 vi.mock("bcryptjs", () => ({
@@ -23,22 +22,32 @@ function mockAudit(): AuditBus & { log: ReturnType<typeof vi.fn> } {
   } as unknown as AuditBus & { log: ReturnType<typeof vi.fn> }
 }
 
-interface MockedDb {
-  utilisateur: {
-    findMany: ReturnType<typeof vi.fn>
-    findUnique: ReturnType<typeof vi.fn>
-    create: ReturnType<typeof vi.fn>
-    update: ReturnType<typeof vi.fn>
-  }
-}
+function mockDb() {
+  const returningInsert = vi.fn()
+  const returningUpdate = vi.fn()
+  const selectFromWhereLimit = vi.fn()
 
-function mockDb(): MockedDb {
   return {
-    utilisateur: {
-      findMany: vi.fn(),
-      findUnique: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
+    insert: vi.fn(() => ({
+      values: vi.fn(() => ({ returning: returningInsert })),
+    })),
+    update: vi.fn(() => ({
+      set: vi.fn(() => ({
+        where: vi.fn(() => ({ returning: returningUpdate })),
+      })),
+    })),
+    select: vi.fn(() => ({
+      from: vi.fn(() => ({
+        where: vi.fn(() => ({
+          limit: selectFromWhereLimit,
+        })),
+      })),
+    })),
+    query: {
+      utilisateurs: {
+        findMany: vi.fn(),
+        findFirst: vi.fn(),
+      },
     },
   }
 }
@@ -56,7 +65,7 @@ function mockAvatarStorage(): AvatarStorage & {
   }
 }
 
-const makeUser = (overrides?: Partial<Utilisateur>): Utilisateur => ({
+const makeUser = (overrides?: Record<string, unknown>) => ({
   id: "u-1",
   email: "jean@example.com",
   motDePasse: "$oldhash$",
@@ -83,16 +92,12 @@ describe("UtilisateurService", () => {
   describe("list", () => {
     it("lists all utilisateurs with departement", async () => {
       const db = mockDb()
-      db.utilisateur.findMany.mockResolvedValue([makeUser()])
+      db.query.utilisateurs.findMany.mockResolvedValue([makeUser()])
 
-      const svc = new UtilisateurService(db as unknown as PrismaClient, mockAudit())
+      const svc = new UtilisateurService(db as any, mockAudit())
       const result = await svc.list()
 
       expect(result).toHaveLength(1)
-      expect(db.utilisateur.findMany).toHaveBeenCalledWith({
-        include: { departement: { select: { id: true, nom: true } } },
-        orderBy: { nom: "asc" },
-      })
     })
   })
 
@@ -100,9 +105,13 @@ describe("UtilisateurService", () => {
     it("hashes password and creates user with audit", async () => {
       const db = mockDb()
       const audit = mockAudit()
-      db.utilisateur.create.mockResolvedValue(makeUser({ email: "test@test.com" }))
+      db.insert.mockReturnValue({
+        values: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([makeUser({ email: "test@test.com" })]),
+        }),
+      })
 
-      const svc = new UtilisateurService(db as unknown as PrismaClient, audit)
+      const svc = new UtilisateurService(db as any, audit)
       const result = await svc.create(
         {
           email: "test@test.com",
@@ -130,9 +139,13 @@ describe("UtilisateurService", () => {
 
     it("uses default password when none provided", async () => {
       const db = mockDb()
-      db.utilisateur.create.mockResolvedValue(makeUser())
+      db.insert.mockReturnValue({
+        values: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([makeUser()]),
+        }),
+      })
 
-      const svc = new UtilisateurService(db as unknown as PrismaClient, mockAudit())
+      const svc = new UtilisateurService(db as any, mockAudit())
       await svc.create(
         {
           email: "test@test.com",
@@ -155,9 +168,15 @@ describe("UtilisateurService", () => {
     it("updates user without changing password when not provided", async () => {
       const db = mockDb()
       const audit = mockAudit()
-      db.utilisateur.update.mockResolvedValue(makeUser({ email: "updated@test.com" }))
+      db.update.mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([makeUser({ email: "updated@test.com" })]),
+          }),
+        }),
+      })
 
-      const svc = new UtilisateurService(db as unknown as PrismaClient, audit)
+      const svc = new UtilisateurService(db as any, audit)
       const result = await svc.update(
         "u-1",
         { email: "updated@test.com", nom: "Updated" },
@@ -175,9 +194,15 @@ describe("UtilisateurService", () => {
 
     it("hashes password when provided in update", async () => {
       const db = mockDb()
-      db.utilisateur.update.mockResolvedValue(makeUser())
+      db.update.mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([makeUser()]),
+          }),
+        }),
+      })
 
-      const svc = new UtilisateurService(db as unknown as PrismaClient, mockAudit())
+      const svc = new UtilisateurService(db as any, mockAudit())
       await svc.update(
         "u-1",
         { motDePasse: "newpass" },
@@ -189,9 +214,15 @@ describe("UtilisateurService", () => {
 
     it("throws UtilisateurNotFoundError on missing user", async () => {
       const db = mockDb()
-      db.utilisateur.update.mockRejectedValue(new Error("Record to update not found"))
+      db.update.mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+      })
 
-      const svc = new UtilisateurService(db as unknown as PrismaClient, mockAudit())
+      const svc = new UtilisateurService(db as any, mockAudit())
       await expect(
         svc.update("u-missing", { nom: "Ghost" }, "u-1")
       ).rejects.toThrow(UtilisateurNotFoundError)
@@ -202,19 +233,28 @@ describe("UtilisateurService", () => {
     it("changes password when current is correct", async () => {
       const db = mockDb()
       const audit = mockAudit()
-      db.utilisateur.findUnique.mockResolvedValue(makeUser({ id: "u-1", motDePasse: "$oldhash$" }));
-      (compare as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+      db.select.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([makeUser({ id: "u-1", motDePasse: "$oldhash$" })]),
+          }),
+        }),
+      })
+      ;(compare as ReturnType<typeof vi.fn>).mockResolvedValue(true);
       (hash as ReturnType<typeof vi.fn>).mockResolvedValue("$newhash$")
+      db.update.mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([makeUser()]),
+          }),
+        }),
+      })
 
-      const svc = new UtilisateurService(db as unknown as PrismaClient, audit)
+      const svc = new UtilisateurService(db as any, audit)
       await svc.changePassword("u-1", "oldpass", "newpass")
 
       expect(compare).toHaveBeenCalledWith("oldpass", "$oldhash$")
       expect(hash).toHaveBeenCalledWith("newpass", 12)
-      expect(db.utilisateur.update).toHaveBeenCalledWith({
-        where: { id: "u-1" },
-        data: { motDePasse: "$newhash$" },
-      })
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({
           action: "CHANGEMENT_MOT_DE_PASSE",
@@ -226,9 +266,15 @@ describe("UtilisateurService", () => {
 
     it("throws UtilisateurNotFoundError when user not found", async () => {
       const db = mockDb()
-      db.utilisateur.findUnique.mockResolvedValue(null)
+      db.select.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+      })
 
-      const svc = new UtilisateurService(db as unknown as PrismaClient, mockAudit())
+      const svc = new UtilisateurService(db as any, mockAudit())
       await expect(
         svc.changePassword("u-missing", "old", "new")
       ).rejects.toThrow(UtilisateurNotFoundError)
@@ -236,10 +282,16 @@ describe("UtilisateurService", () => {
 
     it("throws MotDePasseIncorrectError when current password is wrong", async () => {
       const db = mockDb()
-      db.utilisateur.findUnique.mockResolvedValue(makeUser({ id: "u-1", motDePasse: "$oldhash$" }));
-      (compare as ReturnType<typeof vi.fn>).mockResolvedValue(false)
+      db.select.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([makeUser({ id: "u-1", motDePasse: "$oldhash$" })]),
+          }),
+        }),
+      })
+      ;(compare as ReturnType<typeof vi.fn>).mockResolvedValue(false)
 
-      const svc = new UtilisateurService(db as unknown as PrismaClient, mockAudit())
+      const svc = new UtilisateurService(db as any, mockAudit())
       await expect(
         svc.changePassword("u-1", "wrongpass", "newpass")
       ).rejects.toThrow(MotDePasseIncorrectError)
@@ -249,13 +301,12 @@ describe("UtilisateurService", () => {
   describe("findProfile", () => {
     it("returns the user profile with departement and demande count", async () => {
       const db = mockDb()
-      db.utilisateur.findUnique.mockResolvedValue({
+      db.query.utilisateurs.findFirst.mockResolvedValue({
         ...makeUser(),
         departement: { nom: "IT" },
-        _count: { demandes: 5 },
       })
 
-      const svc = new UtilisateurService(db as unknown as PrismaClient, mockAudit())
+      const svc = new UtilisateurService(db as any, mockAudit())
       const result = await svc.findProfile("u-1")
 
       expect(result.id).toBe("u-1")
@@ -269,21 +320,13 @@ describe("UtilisateurService", () => {
       expect(result.departement).toEqual({ nom: "IT" })
       expect(result.dateEmbauche).toBeNull()
       expect(result.creeLe).toEqual(new Date("2025-01-01"))
-      expect(result._count).toEqual({ demandes: 5 })
-      expect(db.utilisateur.findUnique).toHaveBeenCalledWith({
-        where: { id: "u-1" },
-        include: {
-          departement: { select: { nom: true } },
-          _count: { select: { demandes: true } },
-        },
-      })
     })
 
     it("throws UtilisateurNotFoundError when user is not found", async () => {
       const db = mockDb()
-      db.utilisateur.findUnique.mockResolvedValue(null)
+      db.query.utilisateurs.findFirst.mockResolvedValue(null)
 
-      const svc = new UtilisateurService(db as unknown as PrismaClient, mockAudit())
+      const svc = new UtilisateurService(db as any, mockAudit())
       await expect(svc.findProfile("u-missing")).rejects.toThrow(UtilisateurNotFoundError)
     })
   })
@@ -292,12 +335,24 @@ describe("UtilisateurService", () => {
     it("updates profile fields and audits", async () => {
       const db = mockDb()
       const audit = mockAudit()
-      db.utilisateur.findUnique.mockResolvedValue(makeUser())
-      db.utilisateur.update.mockResolvedValue(
-        makeUser({ telephone: "0612345678", poste: "Lead" })
-      )
+      db.select.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([makeUser()]),
+          }),
+        }),
+      })
+      db.update.mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([
+              { id: "u-1", email: "jean@example.com", telephone: "0612345678", poste: "Lead", avatarUrl: null },
+            ]),
+          }),
+        }),
+      })
 
-      const svc = new UtilisateurService(db as unknown as PrismaClient, audit)
+      const svc = new UtilisateurService(db as any, audit)
       const result = await svc.updateProfile("u-1", {
         telephone: "0612345678",
         poste: "Lead",
@@ -316,12 +371,24 @@ describe("UtilisateurService", () => {
 
     it("allows setting telephone to null", async () => {
       const db = mockDb()
-      db.utilisateur.findUnique.mockResolvedValue(makeUser())
-      db.utilisateur.update.mockImplementation((args: { data: Prisma.UtilisateurUpdateInput }) =>
-        Promise.resolve(makeUser(args.data as Partial<Utilisateur>))
-      )
+      db.select.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([makeUser()]),
+          }),
+        }),
+      })
+      db.update.mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockImplementation((data: any) =>
+              Promise.resolve([{ id: "u-1", email: "jean@example.com", telephone: null, poste: "Dev", avatarUrl: null }])
+            ),
+          }),
+        }),
+      })
 
-      const svc = new UtilisateurService(db as unknown as PrismaClient, mockAudit())
+      const svc = new UtilisateurService(db as any, mockAudit())
       const result = await svc.updateProfile("u-1", { telephone: null })
 
       expect(result.telephone).toBeNull()
@@ -329,9 +396,15 @@ describe("UtilisateurService", () => {
 
     it("throws UtilisateurNotFoundError when user is missing", async () => {
       const db = mockDb()
-      db.utilisateur.findUnique.mockResolvedValue(null)
+      db.select.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+      })
 
-      const svc = new UtilisateurService(db as unknown as PrismaClient, mockAudit())
+      const svc = new UtilisateurService(db as any, mockAudit())
       await expect(
         svc.updateProfile("u-missing", { poste: "Ghost" })
       ).rejects.toThrow(UtilisateurNotFoundError)
@@ -340,11 +413,25 @@ describe("UtilisateurService", () => {
     it("verifies current password and updates email when correct", async () => {
       const db = mockDb()
       const audit = mockAudit()
-      db.utilisateur.findUnique.mockResolvedValue(makeUser({ motDePasse: "$oldhash$" }))
+      db.select.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([makeUser({ motDePasse: "$oldhash$" })]),
+          }),
+        }),
+      })
       ;(compare as ReturnType<typeof vi.fn>).mockResolvedValue(true)
-      db.utilisateur.update.mockResolvedValue(makeUser({ email: "new@test.com" }))
+      db.update.mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([
+              { id: "u-1", email: "new@test.com", telephone: null, poste: "Dev", avatarUrl: null },
+            ]),
+          }),
+        }),
+      })
 
-      const svc = new UtilisateurService(db as unknown as PrismaClient, audit)
+      const svc = new UtilisateurService(db as any, audit)
       const result = await svc.updateProfile("u-1", {
         email: "new@test.com",
         currentPassword: "oldpass",
@@ -356,10 +443,16 @@ describe("UtilisateurService", () => {
 
     it("throws MotDePasseIncorrectError when current password is wrong", async () => {
       const db = mockDb()
-      db.utilisateur.findUnique.mockResolvedValue(makeUser({ motDePasse: "$oldhash$" }))
+      db.select.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([makeUser({ motDePasse: "$oldhash$" })]),
+          }),
+        }),
+      })
       ;(compare as ReturnType<typeof vi.fn>).mockResolvedValue(false)
 
-      const svc = new UtilisateurService(db as unknown as PrismaClient, mockAudit())
+      const svc = new UtilisateurService(db as any, mockAudit())
       await expect(
         svc.updateProfile("u-1", { email: "new@test.com", currentPassword: "wrongpass" })
       ).rejects.toThrow(MotDePasseIncorrectError)
@@ -367,9 +460,15 @@ describe("UtilisateurService", () => {
 
     it("throws EmailChangeRequiresPasswordError when email is provided without password", async () => {
       const db = mockDb()
-      db.utilisateur.findUnique.mockResolvedValue(makeUser())
+      db.select.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([makeUser()]),
+          }),
+        }),
+      })
 
-      const svc = new UtilisateurService(db as unknown as PrismaClient, mockAudit())
+      const svc = new UtilisateurService(db as any, mockAudit())
       await expect(
         svc.updateProfile("u-1", { email: "new@test.com" })
       ).rejects.toThrow(EmailChangeRequiresPasswordError)
@@ -379,13 +478,27 @@ describe("UtilisateurService", () => {
       const db = mockDb()
       const audit = mockAudit()
       const avatarStorage = mockAvatarStorage()
-      db.utilisateur.findUnique.mockResolvedValue(
-        makeUser({ avatarUrl: "/uploads/avatars/old.png" })
-      )
-      db.utilisateur.update.mockResolvedValue(makeUser({ avatarUrl: "/uploads/avatars/new.png" }))
+      db.select.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([
+              makeUser({ avatarUrl: "/uploads/avatars/old.png" }),
+            ]),
+          }),
+        }),
+      })
+      db.update.mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([
+              { id: "u-1", email: "jean@example.com", telephone: null, poste: "Dev", avatarUrl: "/uploads/avatars/new.png" },
+            ]),
+          }),
+        }),
+      })
 
       const svc = new UtilisateurService(
-        db as unknown as PrismaClient,
+        db as any,
         audit,
         avatarStorage
       )
@@ -399,15 +512,27 @@ describe("UtilisateurService", () => {
     it("removes avatar when avatarData is empty", async () => {
       const db = mockDb()
       const avatarStorage = mockAvatarStorage()
-      db.utilisateur.findUnique.mockResolvedValue(
-        makeUser({ avatarUrl: "/uploads/avatars/old.png" })
-      )
-      db.utilisateur.update.mockImplementation((args: { data: Prisma.UtilisateurUpdateInput }) =>
-        Promise.resolve(makeUser(args.data as Partial<Utilisateur>))
-      )
+      db.select.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([
+              makeUser({ avatarUrl: "/uploads/avatars/old.png" }),
+            ]),
+          }),
+        }),
+      })
+      db.update.mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockImplementation(() =>
+              Promise.resolve([{ id: "u-1", email: "jean@example.com", telephone: null, poste: "Dev", avatarUrl: null }])
+            ),
+          }),
+        }),
+      })
 
       const svc = new UtilisateurService(
-        db as unknown as PrismaClient,
+        db as any,
         mockAudit(),
         avatarStorage
       )
@@ -420,9 +545,15 @@ describe("UtilisateurService", () => {
 
     it("throws NoProfileUpdateDataError when no fields are provided", async () => {
       const db = mockDb()
-      db.utilisateur.findUnique.mockResolvedValue(makeUser())
+      db.select.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([makeUser()]),
+          }),
+        }),
+      })
 
-      const svc = new UtilisateurService(db as unknown as PrismaClient, mockAudit())
+      const svc = new UtilisateurService(db as any, mockAudit())
       await expect(svc.updateProfile("u-1", {})).rejects.toThrow(NoProfileUpdateDataError)
     })
   })

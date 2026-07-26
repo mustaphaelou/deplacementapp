@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
+import { eq } from "drizzle-orm"
+import { db } from "@/db"
+import { societes } from "@/db/schema/societes"
 import { requireAuth } from "@/lib/auth-utils"
 import { handleServiceError } from "@/lib/errors"
 import { auditBus } from "@/lib/audit-bus"
 
 export async function GET() {
   try {
-    const societe = await prisma.societe.findFirst()
+    const [societe] = await db.select().from(societes).limit(1)
     if (!societe) {
       return NextResponse.json({ error: "Aucune société configurée" }, { status: 404 })
     }
@@ -23,7 +25,7 @@ export async function PATCH(req: NextRequest) {
       return session.response
     }
 
-    const societe = await prisma.societe.findFirst()
+    const [societe] = await db.select().from(societes).limit(1)
     if (!societe) {
       return NextResponse.json({ error: "Aucune société configurée" }, { status: 404 })
     }
@@ -42,10 +44,10 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Aucune donnée à mettre à jour" }, { status: 400 })
     }
 
-    const updated = await prisma.societe.update({
-      where: { id: societe.id },
-      data: changes,
-    })
+    await db
+      .update(societes)
+      .set(changes)
+      .where(eq(societes.id, societe.id))
 
     await auditBus.log({
       utilisateurId: session.user.id,
@@ -55,7 +57,7 @@ export async function PATCH(req: NextRequest) {
       details: { changes: Object.keys(changes) },
     })
 
-    return NextResponse.json(updated)
+    return NextResponse.json(changes)
   } catch (e) {
     return handleServiceError(e)
   }

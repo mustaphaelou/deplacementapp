@@ -10,9 +10,7 @@
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:seed": "tsx prisma/seed.ts",
+
     "drizzle:generate": "drizzle-kit generate",
     "drizzle:migrate": "drizzle-kit migrate",
     "drizzle:push": "drizzle-kit push",
@@ -22,18 +20,15 @@
     "docker:dev": "docker compose -f compose.yaml -f compose.dev.yml up --build",
     "docker:prod": "docker compose up --build",
     "docker:down": "docker compose down -v",
-    "postinstall": "prisma generate"
+    "postinstall": "drizzle-kit generate"
   },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
-  },
+
   "dependencies": {
     "@base-ui/react": "^1.6.0",
     "@hookform/resolvers": "^5.4.0",
     "@hugeicons/core-free-icons": "^4.2.3",
     "@hugeicons/react": "^1.1.9",
-    "@prisma/adapter-pg": "^7.9.0",
-    "@prisma/client": "^7.9.0",
+
     "@react-pdf/renderer": "^4.5.1",
     "@types/bcryptjs": "^2.4.6",
     "@types/pg": "^8.20.0",
@@ -60,7 +55,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
-    "@prisma/config": "^7.9.0",
+
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^25.9.5",
     "@types/nodemailer": "^8.0.1",
@@ -72,7 +67,7 @@
     "postcss": "^8",
     "prettier": "^3.9.6",
     "prettier-plugin-tailwindcss": "^0.8.1",
-    "prisma": "^7.9.0",
+
     "shadcn": "^4.14.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.1",

@@ -1,5 +1,16 @@
-import type { StatutDemande, Role } from "@prisma/client"
+import type { Role } from "./roles"
 import type { NotificationEventType } from "./notification-bus"
+
+export type StatutDemande =
+  | "BROUILLON"
+  | "SOUMISE"
+  | "APPROUVEE_MANAGER"
+  | "APPROUVEE_FINANCE"
+  | "APPROUVEE"
+  | "REJETEE_MANAGER"
+  | "REJETEE_FINANCE"
+  | "REJETEE_DIRECTION"
+  | "RETIREE"
 
 // ─── New canonical model (internal) ──────────────────────────────────────────
 

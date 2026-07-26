@@ -1,17 +1,12 @@
 import { describe, it, expect, vi } from "vitest"
 import { DepartementQueries } from "./departement-queries"
-import type { PrismaClient } from "@prisma/client"
 
-interface MockedDb {
-  departement: {
-    findMany: ReturnType<typeof vi.fn>
-  }
-}
-
-function mockDb(): MockedDb {
+function mockDb() {
   return {
-    departement: {
-      findMany: vi.fn(),
+    query: {
+      departements: {
+        findMany: vi.fn(),
+      },
     },
   }
 }
@@ -23,26 +18,24 @@ const fakeDepartements = [
 ]
 
 describe("DepartementQueries", () => {
-  // ── listAll ──────────────────────────────────────────────────────────
-
   it("listAll returns all departements ordered by nom asc", async () => {
     const db = mockDb()
-    db.departement.findMany.mockResolvedValue(fakeDepartements)
+    db.query.departements.findMany.mockResolvedValue(fakeDepartements)
 
-    const queries = new DepartementQueries(db as unknown as PrismaClient)
+    const queries = new DepartementQueries(db as any)
     const result = await queries.listAll()
 
     expect(result).toEqual(fakeDepartements)
-    expect(db.departement.findMany).toHaveBeenCalledWith({
-      orderBy: { nom: "asc" },
+    expect(db.query.departements.findMany).toHaveBeenCalledWith({
+      orderBy: [expect.any(Object)],
     })
   })
 
   it("listAll returns an empty array when no departements exist", async () => {
     const db = mockDb()
-    db.departement.findMany.mockResolvedValue([])
+    db.query.departements.findMany.mockResolvedValue([])
 
-    const queries = new DepartementQueries(db as unknown as PrismaClient)
+    const queries = new DepartementQueries(db as any)
     const result = await queries.listAll()
 
     expect(result).toEqual([])

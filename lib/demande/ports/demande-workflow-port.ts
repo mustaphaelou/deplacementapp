@@ -1,4 +1,4 @@
-import type { PrismaTransactionClient } from "../../prisma"
+import type { DrizzleTransactionClient } from "../../prisma"
 import type { Actor, DemandeWithRelations } from "../../demande-types"
 import {
   DemandeNotFoundError,
@@ -14,6 +14,6 @@ export interface DemandeWorkflowPort {
       actor: Actor
       comment?: string
     },
-    tx?: PrismaTransactionClient
+    tx?: DrizzleTransactionClient
   ): Promise<{ demande: DemandeWithRelations }>
 }

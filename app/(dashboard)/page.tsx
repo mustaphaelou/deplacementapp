@@ -3,7 +3,7 @@ import { redirect } from "next/navigation"
 import { getDashboardPayload } from "@/lib/dashboard"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { NAV_ITEMS } from "@/lib/roles"
-import type { Role } from "@prisma/client"
+import type { Role } from "@/lib/roles"
 
 export default async function DashboardPage() {
   const session = await auth()
