@@ -14,6 +14,13 @@
       "when": 1785027059303,
       "tag": "0001_colorful_cerise",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785069431548,
+      "tag": "0002_solid_the_leader",
+      "breakpoints": true
     }
   ]
 }

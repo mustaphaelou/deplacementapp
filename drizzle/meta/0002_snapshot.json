@@ -1,0 +1,919 @@
+{
+  "id": "ef2fb49f-52f4-4deb-95aa-90906712601d",
+  "prevId": "5a8b4c4e-dfac-4007-ad1b-a27e56b354e5",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.societes": {
+      "name": "societes",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "'default'"
+        },
+        "nom": {
+          "name": "nom",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "logoUrl": {
+          "name": "logoUrl",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "faviconUrl": {
+          "name": "faviconUrl",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "couleurPrimaire": {
+          "name": "couleurPrimaire",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nomExpediteurEmail": {
+          "name": "nomExpediteurEmail",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "domaineEmail": {
+          "name": "domaineEmail",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "creeLe": {
+          "name": "creeLe",
+          "type": "timestamp (3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "modifieLe": {
+          "name": "modifieLe",
+          "type": "timestamp (3)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.departements": {
+      "name": "departements",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "nom": {
+          "name": "nom",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "societeId": {
+          "name": "societeId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creeLe": {
+          "name": "creeLe",
+          "type": "timestamp (3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "departements_societeId_societes_id_fk": {
+          "name": "departements_societeId_societes_id_fk",
+          "tableFrom": "departements",
+          "tableTo": "societes",
+          "columnsFrom": [
+            "societeId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "departements_nom_societeId_unique": {
+          "name": "departements_nom_societeId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "nom",
+            "societeId"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.utilisateurs": {
+      "name": "utilisateurs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "motDePasse": {
+          "name": "motDePasse",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nom": {
+          "name": "nom",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "prenom": {
+          "name": "prenom",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "poste": {
+          "name": "poste",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "roles",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'EMPLOYEE'"
+        },
+        "departementId": {
+          "name": "departementId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "societeId": {
+          "name": "societeId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "avatarUrl": {
+          "name": "avatarUrl",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "telephone": {
+          "name": "telephone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dateEmbauche": {
+          "name": "dateEmbauche",
+          "type": "timestamp (3)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "actif": {
+          "name": "actif",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "creeLe": {
+          "name": "creeLe",
+          "type": "timestamp (3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "modifieLe": {
+          "name": "modifieLe",
+          "type": "timestamp (3)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "utilisateurs_email_index": {
+          "name": "utilisateurs_email_index",
+          "columns": [
+            {
+              "expression": "email",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "utilisateurs_departementId_departements_id_fk": {
+          "name": "utilisateurs_departementId_departements_id_fk",
+          "tableFrom": "utilisateurs",
+          "tableTo": "departements",
+          "columnsFrom": [
+            "departementId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        },
+        "utilisateurs_societeId_societes_id_fk": {
+          "name": "utilisateurs_societeId_societes_id_fk",
+          "tableFrom": "utilisateurs",
+          "tableTo": "societes",
+          "columnsFrom": [
+            "societeId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.vehicules_entreprise": {
+      "name": "vehicules_entreprise",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "nom": {
+          "name": "nom",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "immatriculation": {
+          "name": "immatriculation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "disponible": {
+          "name": "disponible",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "creeLe": {
+          "name": "creeLe",
+          "type": "timestamp (3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "vehicules_entreprise_immatriculation_index": {
+          "name": "vehicules_entreprise_immatriculation_index",
+          "columns": [
+            {
+              "expression": "immatriculation",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.demandes_deplacement": {
+      "name": "demandes_deplacement",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "numero": {
+          "name": "numero",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "employeId": {
+          "name": "employeId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "assigneAId": {
+          "name": "assigneAId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "etape": {
+          "name": "etape",
+          "type": "etape",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'DRAFT'"
+        },
+        "decision": {
+          "name": "decision",
+          "type": "decision",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'PENDING'"
+        },
+        "employeNom": {
+          "name": "employeNom",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "employePrenom": {
+          "name": "employePrenom",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "employePoste": {
+          "name": "employePoste",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "employeDepartement": {
+          "name": "employeDepartement",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "motif": {
+          "name": "motif",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dateDepart": {
+          "name": "dateDepart",
+          "type": "timestamp (3)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dateRetour": {
+          "name": "dateRetour",
+          "type": "timestamp (3)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "destination": {
+          "name": "destination",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "typeTransport": {
+          "name": "typeTransport",
+          "type": "types_transport",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "autreTransport": {
+          "name": "autreTransport",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vehiculeId": {
+          "name": "vehiculeId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fraisTransport": {
+          "name": "fraisTransport",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'0'"
+        },
+        "fraisHebergement": {
+          "name": "fraisHebergement",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'0'"
+        },
+        "fraisRepas": {
+          "name": "fraisRepas",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'0'"
+        },
+        "fraisDivers": {
+          "name": "fraisDivers",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'0'"
+        },
+        "totalEstime": {
+          "name": "totalEstime",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'0'"
+        },
+        "avanceRequise": {
+          "name": "avanceRequise",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "montantAvance": {
+          "name": "montantAvance",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "commentaireManager": {
+          "name": "commentaireManager",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "commentaireFinance": {
+          "name": "commentaireFinance",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "commentaireDirection": {
+          "name": "commentaireDirection",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "soumiseLe": {
+          "name": "soumiseLe",
+          "type": "timestamp (3)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "approuveeManagerLe": {
+          "name": "approuveeManagerLe",
+          "type": "timestamp (3)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "approuveeFinanceLe": {
+          "name": "approuveeFinanceLe",
+          "type": "timestamp (3)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "approuveeDirectionLe": {
+          "name": "approuveeDirectionLe",
+          "type": "timestamp (3)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rejeteeLe": {
+          "name": "rejeteeLe",
+          "type": "timestamp (3)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "retireeLe": {
+          "name": "retireeLe",
+          "type": "timestamp (3)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deletedAt": {
+          "name": "deletedAt",
+          "type": "timestamp (3)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "creeLe": {
+          "name": "creeLe",
+          "type": "timestamp (3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "modifieLe": {
+          "name": "modifieLe",
+          "type": "timestamp (3)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "demandes_deplacement_numero_index": {
+          "name": "demandes_deplacement_numero_index",
+          "columns": [
+            {
+              "expression": "numero",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "demandes_deplacement_employeId_utilisateurs_id_fk": {
+          "name": "demandes_deplacement_employeId_utilisateurs_id_fk",
+          "tableFrom": "demandes_deplacement",
+          "tableTo": "utilisateurs",
+          "columnsFrom": [
+            "employeId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        },
+        "demandes_deplacement_assigneAId_utilisateurs_id_fk": {
+          "name": "demandes_deplacement_assigneAId_utilisateurs_id_fk",
+          "tableFrom": "demandes_deplacement",
+          "tableTo": "utilisateurs",
+          "columnsFrom": [
+            "assigneAId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "cascade"
+        },
+        "demandes_deplacement_vehiculeId_vehicules_entreprise_id_fk": {
+          "name": "demandes_deplacement_vehiculeId_vehicules_entreprise_id_fk",
+          "tableFrom": "demandes_deplacement",
+          "tableTo": "vehicules_entreprise",
+          "columnsFrom": [
+            "vehiculeId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.notifications": {
+      "name": "notifications",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "utilisateurId": {
+          "name": "utilisateurId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "demandeId": {
+          "name": "demandeId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "titre": {
+          "name": "titre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "message": {
+          "name": "message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "lu": {
+          "name": "lu",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "creeLe": {
+          "name": "creeLe",
+          "type": "timestamp (3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "notifications_utilisateurId_utilisateurs_id_fk": {
+          "name": "notifications_utilisateurId_utilisateurs_id_fk",
+          "tableFrom": "notifications",
+          "tableTo": "utilisateurs",
+          "columnsFrom": [
+            "utilisateurId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        },
+        "notifications_demandeId_demandes_deplacement_id_fk": {
+          "name": "notifications_demandeId_demandes_deplacement_id_fk",
+          "tableFrom": "notifications",
+          "tableTo": "demandes_deplacement",
+          "columnsFrom": [
+            "demandeId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.journal_audit": {
+      "name": "journal_audit",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "utilisateurId": {
+          "name": "utilisateurId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entite": {
+          "name": "entite",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entiteId": {
+          "name": "entiteId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "details": {
+          "name": "details",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "creeLe": {
+          "name": "creeLe",
+          "type": "timestamp (3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "journal_audit_utilisateurId_utilisateurs_id_fk": {
+          "name": "journal_audit_utilisateurId_utilisateurs_id_fk",
+          "tableFrom": "journal_audit",
+          "tableTo": "utilisateurs",
+          "columnsFrom": [
+            "utilisateurId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.documents": {
+      "name": "documents",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "demandeId": {
+          "name": "demandeId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "chemin": {
+          "name": "chemin",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creeLe": {
+          "name": "creeLe",
+          "type": "timestamp (3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "documents_demandeId_demandes_deplacement_id_fk": {
+          "name": "documents_demandeId_demandes_deplacement_id_fk",
+          "tableFrom": "documents",
+          "tableTo": "demandes_deplacement",
+          "columnsFrom": [
+            "demandeId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.decision": {
+      "name": "decision",
+      "schema": "public",
+      "values": [
+        "PENDING",
+        "APPROVED",
+        "REJECTED",
+        "WITHDRAWN"
+      ]
+    },
+    "public.etape": {
+      "name": "etape",
+      "schema": "public",
+      "values": [
+        "DRAFT",
+        "MANAGER_REVIEW",
+        "FINANCE_REVIEW",
+        "DIRECTION_REVIEW",
+        "FINAL"
+      ]
+    },
+    "public.roles": {
+      "name": "roles",
+      "schema": "public",
+      "values": [
+        "EMPLOYEE",
+        "MANAGER",
+        "FINANCE_ADMIN",
+        "GENERAL_DIRECTION"
+      ]
+    },
+    "public.types_transport": {
+      "name": "types_transport",
+      "schema": "public",
+      "values": [
+        "VOITURE_PERSONNELLE",
+        "VOITURE_SOCIETE",
+        "BUS",
+        "AVION",
+        "TRAIN",
+        "AUTRE"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

@@ -1,25 +1,24 @@
-export const STATUT_LABELS: Record<string, string> = {
-  BROUILLON: "Brouillon",
-  SOUMISE: "Soumise",
-  APPROUVEE_MANAGER: "Approuvée (Manager)",
-  APPROUVEE_FINANCE: "Approuvée (Finance)",
-  APPROUVEE: "Approuvée",
-  REJETEE_MANAGER: "Rejetée (Manager)",
-  REJETEE_FINANCE: "Rejetée (Finance)",
-  REJETEE_DIRECTION: "Rejetée (Direction)",
-  RETIREE: "Retirée",
+export const ETAPE_LABELS: Record<string, string> = {
+  DRAFT: "Brouillon",
+  MANAGER_REVIEW: "En attente (Manager)",
+  FINANCE_REVIEW: "En attente (Finance)",
+  DIRECTION_REVIEW: "En attente (Direction)",
+  FINAL: "Finalisé",
 }
 
-export const STATUT_VARIANTS: Record<string, string> = {
-  BROUILLON: "outline",
-  SOUMISE: "secondary",
-  APPROUVEE_MANAGER: "default",
-  APPROUVEE_FINANCE: "default",
-  APPROUVEE: "default",
-  REJETEE_MANAGER: "destructive",
-  REJETEE_FINANCE: "destructive",
-  REJETEE_DIRECTION: "destructive",
-  RETIREE: "ghost",
+export const DECISION_LABELS: Record<string, string> = {
+  PENDING: "En cours",
+  APPROVED: "Approuvée",
+  REJECTED: "Rejetée",
+  WITHDRAWN: "Retirée",
+}
+
+export const ETAPE_VARIANTS: Record<string, string> = {
+  DRAFT: "outline",
+  MANAGER_REVIEW: "secondary",
+  FINANCE_REVIEW: "secondary",
+  DIRECTION_REVIEW: "secondary",
+  FINAL: "default",
 }
 
 export const TRANSPORT_LABELS: Record<string, string> = {

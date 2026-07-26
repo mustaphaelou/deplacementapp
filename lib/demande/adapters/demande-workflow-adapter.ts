@@ -10,8 +10,8 @@ import {
   UnauthorizedActionError,
   InvalidTransitionError,
 } from "../../errors"
-import { canTransition, buildTransition, fromLegacyStatus } from "../../workflow"
-import type { WorkflowAction, Decision } from "../../workflow"
+import { canTransition, buildTransition } from "../../workflow"
+import type { WorkflowAction, Decision, Etape } from "../../workflow"
 
 export class DemandeWorkflowAdapter implements DemandeWorkflowPort {
   constructor(
@@ -39,7 +39,8 @@ export class DemandeWorkflowAdapter implements DemandeWorkflowPort {
     })
     if (!demande || demande.deletedAt) throw new DemandeNotFoundError()
 
-    const { etape, decision } = fromLegacyStatus(demande.statut as Parameters<typeof fromLegacyStatus>[0])
+    const etape = demande.etape as Etape
+    const decision = demande.decision as Decision
 
     if ((action === "retirer" || action === "submit") && demande.employeId !== actor.id) {
       throw new UnauthorizedActionError("Seul le proprietaire peut " + (action === "submit" ? "soumettre" : "retirer") + " la demande")

@@ -12,7 +12,8 @@ export interface PdfRendererAdapter {
 
 export interface PdfRenderData {
   numero: string
-  statut: string
+  etape: string
+  decision: string
   employeNom: string
   employePrenom: string
   employePoste: string

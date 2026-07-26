@@ -16,7 +16,6 @@ export type DemandeDeplacement = {
   numero: string
   employeId: string
   assigneAId: string | null
-  statut: string
   etape: string
   decision: string
   employeNom: string
@@ -62,7 +61,8 @@ export interface DemandeDetail {
   id: string
   numero: string
   employeId: string
-  statut: string
+  etape: string
+  decision: string
   employePrenom: string
   employeNom: string
   employePoste: string

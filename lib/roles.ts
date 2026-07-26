@@ -24,7 +24,7 @@ export const NAV_ITEMS: Record<string, NavItem[]> = {
   ],
   MANAGER: [
     { label: "Demandes Équipe", href: "/demandes", icon: "users", description: "Demandes de votre équipe" },
-    { label: "En Attente", href: "/demandes?statut=SOUMISE", icon: "clock", description: "Demandes en attente d'action" },
+    { label: "En Attente", href: "/demandes?etape=MANAGER_REVIEW", icon: "clock", description: "Demandes en attente d'action" },
   ],
   FINANCE_ADMIN: [
     { label: "Approbations Budget", href: "/demandes", icon: "dollar-sign", description: "Validation budgétaire des demandes" },
@@ -34,7 +34,7 @@ export const NAV_ITEMS: Record<string, NavItem[]> = {
     { label: "Rapports", href: "/administration/rapports", icon: "bar-chart-3", description: "Statistiques et exports" },
   ],
   GENERAL_DIRECTION: [
-    { label: "Approbations Finales", href: "/demandes?statut=APPROUVEE_FINANCE", icon: "check-circle", description: "Validation finale des demandes" },
+    { label: "Approbations Finales", href: "/demandes?etape=DIRECTION_REVIEW", icon: "check-circle", description: "Validation finale des demandes" },
     { label: "Rapports", href: "/administration/rapports", icon: "bar-chart-3", description: "Statistiques et exports" },
   ],
 };

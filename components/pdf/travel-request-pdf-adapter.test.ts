@@ -5,7 +5,8 @@ import type { PdfRenderData } from "@/lib/pdf-types"
 function makePdfRenderData(overrides?: Partial<PdfRenderData>): PdfRenderData {
   return {
     numero: "DD-2025-0001",
-    statut: "APPROUVEE_MANAGER",
+    etape: "MANAGER_REVIEW",
+    decision: "APPROVED",
     employeNom: "Dupont",
     employePrenom: "Jean",
     employePoste: "Développeur",
@@ -52,7 +53,7 @@ describe("TravelRequestPdfAdapter", () => {
 
   it("renders PDF with BROUILLON status (watermark path)", async () => {
     const adapter = new TravelRequestPdfAdapter()
-    const buffer = await adapter.render(makePdfRenderData({ statut: "BROUILLON" }))
+    const buffer = await adapter.render(makePdfRenderData({ etape: "DRAFT" }))
 
     expect(Buffer.isBuffer(buffer)).toBe(true)
     expect(buffer.length).toBeGreaterThan(0)

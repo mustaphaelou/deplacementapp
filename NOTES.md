@@ -15,7 +15,7 @@
 ## Watch-outs in the repo
 - `.env` contains what looks like a real DB password (`Mmmm2005.`) and a placeholder `NEXTAUTH_SECRET`. Flag to user: rotate before deploy. Do NOT commit secrets.
 - `next.config.mjs` uses `output: 'standalone'` — this is why the Dockerfile copies `.next/standalone` and runs `node server.js` (not `next start`). Worth a dedicated mini-lesson; many deploy guides miss it.
-- Prisma is wired deep in the runtime image: migrations run in the entrypoint, and `node_modules/.prisma`, `node_modules/@prisma`, `node_modules/prisma` are copied explicitly. Easy to break with a "tidy" edit.
+- Drizzle is used as the ORM. Migrations run via `npx drizzle-kit migrate` in the Docker entrypoint. The `db/` directory contains schema definitions and migration output.
 
 ## Communities (to surface later once user is deploy-ready)
 - Coolify Discord (linked from https://coolify.io/docs/) — official, active, maintainer-present.

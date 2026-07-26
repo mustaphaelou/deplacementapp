@@ -9,8 +9,8 @@ function mockQueryPort(): DemandeQueryPort {
     findById: vi.fn(),
     findMany: vi.fn(),
     findByEmployeeId: vi.fn(),
-    findByStatuts: vi.fn(),
-    countByStatut: vi.fn(),
+    findByEtapes: vi.fn(),
+    countByEtape: vi.fn(),
     aggregateBudget: vi.fn(),
     findAllForExport: vi.fn(),
   }
@@ -92,7 +92,7 @@ describe("DemandeDeplacementService (facade smoke)", () => {
     const queries = mockQueryPort()
     const factory = mockFactoryPort()
     const workflow = mockWorkflowPort()
-    workflow.executeTransition = vi.fn().mockResolvedValue({ demande: { id: "dd-1", statut: "APPROUVEE_MANAGER" } })
+    workflow.executeTransition = vi.fn().mockResolvedValue({ demande: { id: "dd-1", etape: "FINANCE_REVIEW", decision: "PENDING" } })
 
     const svc = new DemandeDeplacementService(queries, factory, workflow)
 
@@ -102,7 +102,7 @@ describe("DemandeDeplacementService (facade smoke)", () => {
       actor: { id: "mgr-1", role: "MANAGER" as const },
     })
 
-    expect(result).toEqual({ demande: { id: "dd-1", statut: "APPROUVEE_MANAGER" } })
+    expect(result).toEqual({ demande: { id: "dd-1", etape: "FINANCE_REVIEW", decision: "PENDING" } })
     expect(workflow.executeTransition).toHaveBeenCalledWith({
       demandeId: "dd-1",
       action: "approuver",
@@ -115,7 +115,7 @@ describe("DemandeDeplacementService (facade smoke)", () => {
     const queries = mockQueryPort()
     const factory = mockFactoryPort()
     const workflow = mockWorkflowPort()
-    workflow.executeTransition = vi.fn().mockResolvedValue({ demande: { id: "dd-1", statut: "REJETEE_MANAGER" } })
+    workflow.executeTransition = vi.fn().mockResolvedValue({ demande: { id: "dd-1", etape: "MANAGER_REVIEW", decision: "REJECTED" } })
 
     const svc = new DemandeDeplacementService(queries, factory, workflow)
 
@@ -126,7 +126,7 @@ describe("DemandeDeplacementService (facade smoke)", () => {
       comment: "Budget insuffisant",
     })
 
-    expect(result).toEqual({ demande: { id: "dd-1", statut: "REJETEE_MANAGER" } })
+    expect(result).toEqual({ demande: { id: "dd-1", etape: "MANAGER_REVIEW", decision: "REJECTED" } })
     expect(workflow.executeTransition).toHaveBeenCalledWith({
       demandeId: "dd-1",
       action: "rejeter",
@@ -139,7 +139,7 @@ describe("DemandeDeplacementService (facade smoke)", () => {
     const queries = mockQueryPort()
     const factory = mockFactoryPort()
     const workflow = mockWorkflowPort()
-    workflow.executeTransition = vi.fn().mockResolvedValue({ demande: { id: "dd-1", statut: "RETIREE" } })
+    workflow.executeTransition = vi.fn().mockResolvedValue({ demande: { id: "dd-1", etape: "DRAFT", decision: "WITHDRAWN" } })
 
     const svc = new DemandeDeplacementService(queries, factory, workflow)
 
@@ -149,7 +149,7 @@ describe("DemandeDeplacementService (facade smoke)", () => {
       actor: { id: "u-1", role: "EMPLOYEE" as const },
     })
 
-    expect(result).toEqual({ demande: { id: "dd-1", statut: "RETIREE" } })
+    expect(result).toEqual({ demande: { id: "dd-1", etape: "DRAFT", decision: "WITHDRAWN" } })
     expect(workflow.executeTransition).toHaveBeenCalledWith({
       demandeId: "dd-1",
       action: "retirer",

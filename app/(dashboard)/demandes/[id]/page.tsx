@@ -5,7 +5,7 @@ import { DemandeNotFoundError } from "@/lib/demande-service";
 import { DemandeDetail } from "@/components/demande-detail";
 import type { DemandeWithRelations } from "@/lib/demande-types";
 import { notFound } from "next/navigation";
-import { getAllowedActions } from "@/lib/workflow";
+import { getAllowedActions, type Etape, type Decision } from "@/lib/workflow";
 
 export default async function DemandeDetailPage({
   params,
@@ -28,7 +28,8 @@ export default async function DemandeDetailPage({
   const userId = session.user.id;
   const isOwner = demande.employeId === userId;
   const { canApprove, canReject, canWithdraw } = getAllowedActions(userRole, userId, {
-    statut: demande.statut,
+    etape: demande.etape as Etape,
+    decision: demande.decision as Decision,
     employeId: demande.employeId,
   });
 

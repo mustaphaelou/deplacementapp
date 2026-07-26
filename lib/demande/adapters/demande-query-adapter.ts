@@ -1,7 +1,7 @@
 import { eq, and, or, isNull, ilike, desc, asc, inArray, count, sum, type SQL } from "drizzle-orm"
 import type { DrizzleDb } from "../../../db"
 import { demandesDeplacement } from "../../../db/schema/demandes-deplacement"
-import type { StatutDemande } from "../../workflow"
+import type { Etape } from "../../workflow"
 import type { DashboardDemandeSummary } from "../../dashboard"
 import type { DemandeWithRelations } from "../../demande-types"
 import { DemandeNotFoundError } from "../../errors"
@@ -17,7 +17,8 @@ export class DemandeQueryAdapter implements DemandeQueryPort {
     dateDepart: Date
     dateRetour: Date
     totalEstime: string | null
-    statut: string
+    etape: string
+    decision: string
     employe: { prenom: string; nom: string } | null
   }): DashboardDemandeSummary {
     return {
@@ -27,7 +28,8 @@ export class DemandeQueryAdapter implements DemandeQueryPort {
       dateDepart: demande.dateDepart,
       dateRetour: demande.dateRetour,
       totalEstime: demande.totalEstime ? Number(demande.totalEstime) : null,
-      statut: demande.statut,
+      etape: demande.etape,
+      decision: demande.decision,
       employe: demande.employe ?? null,
     }
   }
@@ -66,15 +68,15 @@ export class DemandeQueryAdapter implements DemandeQueryPort {
     userId: string,
     params: DemandeQueryParams
   ): Promise<{ demandes: DashboardDemandeSummary[]; total: number }> {
-    const { page, limit, statut, recherche } = params
+    const { page, limit, etape, recherche } = params
     const conditions: (SQL | undefined)[] = [isNull(demandesDeplacement.deletedAt)]
 
     if (role === "EMPLOYEE") {
       conditions.push(eq(demandesDeplacement.employeId, userId))
     }
 
-    if (statut) {
-      conditions.push(eq(demandesDeplacement.statut, statut as StatutDemande))
+    if (etape) {
+      conditions.push(eq(demandesDeplacement.etape, etape as Etape))
     }
 
     if (recherche) {
@@ -119,15 +121,15 @@ export class DemandeQueryAdapter implements DemandeQueryPort {
     return demandes.map((d) => this.mapToDemandeSummary(d))
   }
 
-  async findByStatuts(
-    statuts: StatutDemande[],
+  async findByEtapes(
+    etapes: Etape[],
     opts: { limit?: number; includeEmployee?: boolean; orderBy?: OrderByTimestamp } = {}
   ): Promise<DashboardDemandeSummary[]> {
     const { limit: take = 10, orderBy = { column: "creeLe" as const, direction: "desc" as const } } = opts
     const col = demandesDeplacement[orderBy.column as keyof typeof demandesDeplacement]
     const orderFn = orderBy.direction === "desc" ? desc : asc
     const demandes = await this.db.query.demandesDeplacement.findMany({
-      where: and(inArray(demandesDeplacement.statut, statuts), isNull(demandesDeplacement.deletedAt)),
+      where: and(inArray(demandesDeplacement.etape, etapes), isNull(demandesDeplacement.deletedAt)),
       orderBy: [orderFn(col as typeof demandesDeplacement.creeLe)],
       limit: take,
       with: { employe: { columns: { prenom: true, nom: true } } },
@@ -135,12 +137,12 @@ export class DemandeQueryAdapter implements DemandeQueryPort {
     return demandes.map((d) => this.mapToDemandeSummary(d))
   }
 
-  async countByStatut(
-    statut: StatutDemande,
+  async countByEtape(
+    etape: Etape,
     userId?: string
   ): Promise<number> {
     const conditions: (SQL | undefined)[] = [
-      eq(demandesDeplacement.statut, statut),
+      eq(demandesDeplacement.etape, etape),
       isNull(demandesDeplacement.deletedAt),
     ]
     if (userId) conditions.push(eq(demandesDeplacement.employeId, userId))
@@ -151,11 +153,11 @@ export class DemandeQueryAdapter implements DemandeQueryPort {
     return result[0]?.value ?? 0
   }
 
-  async aggregateBudget(statuts: StatutDemande[]): Promise<number> {
+  async aggregateBudget(etapes: Etape[]): Promise<number> {
     const result = await this.db
       .select({ total: sum(demandesDeplacement.totalEstime) })
       .from(demandesDeplacement)
-      .where(and(inArray(demandesDeplacement.statut, statuts), isNull(demandesDeplacement.deletedAt)))
+      .where(and(inArray(demandesDeplacement.etape, etapes), isNull(demandesDeplacement.deletedAt)))
     return Number(result[0]?.total ?? 0)
   }
 
@@ -174,7 +176,8 @@ export class DemandeQueryAdapter implements DemandeQueryPort {
       dateRetour: d.dateRetour,
       typeTransport: d.typeTransport,
       totalEstime: d.totalEstime != null ? Number(d.totalEstime) : null,
-      statut: d.statut,
+      etape: d.etape,
+      decision: d.decision,
       creeLe: d.creeLe,
       employe: d.employe ? { prenom: d.employe.prenom, nom: d.employe.nom } : null,
     }))

@@ -2,7 +2,7 @@ import { formatCurrency } from "@/lib/constants"
 import { demandeService } from "./demande/di"
 import type { DemandeQueryPort } from "./demande/ports/demande-query-port"
 import type { Role } from "./roles"
-import { queueEtapes, committedEtapes, rollupEtapes, resolveStatuts, laneOrderByColumn, type Etape } from "./workflow"
+import { queueEtapes, committedEtapes, rollupEtapes, laneOrderByColumn, type Etape } from "./workflow"
 
 export interface DashboardDemandeSummary {
   id: string
@@ -11,7 +11,8 @@ export interface DashboardDemandeSummary {
   dateDepart: Date
   dateRetour: Date
   totalEstime: number | null
-  statut: string
+  etape: string
+  decision: string
   employe: { prenom: string; nom: string } | null
 }
 
@@ -24,7 +25,7 @@ export interface StatPill {
   color: "blue" | "green" | "amber" | "orange" | "purple"
 }
 
-export type TableColumnId = "numero" | "employe" | "destination" | "dates" | "date" | "total" | "statut"
+export type TableColumnId = "numero" | "employe" | "destination" | "dates" | "date" | "total" | "etape"
 
 export interface TableColumn {
   id: TableColumnId
@@ -58,11 +59,11 @@ async function fetchQueueDemandes(
   role: Role,
   lane: Etape
 ): Promise<{ demandes: DashboardDemandeSummary[]; enAttente: number }> {
-  const queue = resolveStatuts(queueEtapes(role))
+  const queue = queueEtapes(role)
   const order = laneOrderByColumn(lane)
   const [demandes, queueCounts] = await Promise.all([
-    queries.findByStatuts(queue, { includeEmployee: true, limit: 10, orderBy: order }),
-    Promise.all(queue.map((s) => queries.countByStatut(s))),
+    queries.findByEtapes(queue, { includeEmployee: true, limit: 10, orderBy: order }),
+    Promise.all(queue.map((s) => queries.countByEtape(s))),
   ])
   return { demandes, enAttente: queueCounts.reduce((a, b) => a + b, 0) }
 }
@@ -77,13 +78,13 @@ export async function getDashboardPayload(
   const queries = svc ?? demandeService.queries
   switch (role) {
     case "EMPLOYEE": {
-      const queue = resolveStatuts(queueEtapes(role))
-      const committed = resolveStatuts(committedEtapes(role))
-      const rollup = resolveStatuts(rollupEtapes(role))
+      const queue = queueEtapes(role)
+      const committed = committedEtapes(role)
+      const rollup = rollupEtapes(role)
 
       const [demandes, rollupCounts] = await Promise.all([
         queries.findByEmployeeId(userId, 5),
-        Promise.all(rollup.map((s) => queries.countByStatut(s, userId))),
+        Promise.all(rollup.map((s) => queries.countByEtape(s, userId))),
       ])
 
       const countMap = Object.fromEntries(rollup.map((s, i) => [s, rollupCounts[i]]))
@@ -108,7 +109,7 @@ export async function getDashboardPayload(
               { id: "destination", label: "Destination", hideAt: "sm" },
               { id: "dates", label: "Dates", hideAt: "md" },
               { id: "total", label: "Total", hideAt: "lg" },
-              { id: "statut", label: "Statut" },
+              { id: "etape", label: "Statut" },
             ],
             viewAllHref: "/demandes",
             emptyMessage: "Aucune demande pour le moment.",
@@ -134,9 +135,9 @@ export async function getDashboardPayload(
               { id: "employe", label: "Employé", hideAt: "sm" },
               { id: "destination", label: "Destination" },
               { id: "date", label: "Date", hideAt: "md" },
-              { id: "statut", label: "Statut" },
+              { id: "etape", label: "Statut" },
             ],
-            viewAllHref: `/demandes?statut=${resolveStatuts(queueEtapes(role))[0]}`,
+            viewAllHref: `/demandes?etape=${queueEtapes(role)[0]}`,
             emptyMessage: "Aucune demande en attente.",
           },
         },
@@ -159,9 +160,9 @@ export async function getDashboardPayload(
               { id: "employe", label: "Employé", hideAt: "sm" },
               { id: "destination", label: "Destination" },
               { id: "total", label: "Total", hideAt: "md" },
-              { id: "statut", label: "Statut" },
+              { id: "etape", label: "Statut" },
             ],
-            viewAllHref: `/demandes?statut=${resolveStatuts(queueEtapes(role))[0]}`,
+            viewAllHref: `/demandes?etape=${queueEtapes(role)[0]}`,
             emptyMessage: "Aucune demande en attente.",
           },
         },
@@ -169,7 +170,7 @@ export async function getDashboardPayload(
       }
     }
     case "GENERAL_DIRECTION": {
-      const committed = resolveStatuts(committedEtapes(role))
+      const committed = committedEtapes(role)
       const [queueResult, budgetTotal] = await Promise.all([
         fetchQueueDemandes(queries, role, "DIRECTION_REVIEW"),
         queries.aggregateBudget(committed),
@@ -190,9 +191,9 @@ export async function getDashboardPayload(
               { id: "employe", label: "Employé", hideAt: "sm" },
               { id: "destination", label: "Destination" },
               { id: "total", label: "Total", hideAt: "md" },
-              { id: "statut", label: "Statut" },
+              { id: "etape", label: "Statut" },
             ],
-            viewAllHref: `/demandes?statut=${resolveStatuts(queueEtapes(role))[0]}`,
+            viewAllHref: `/demandes?etape=${queueEtapes(role)[0]}`,
             emptyMessage: "Aucune demande en attente.",
           },
         },

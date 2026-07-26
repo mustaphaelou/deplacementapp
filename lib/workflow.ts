@@ -1,19 +1,6 @@
 import type { Role } from "./roles"
 import type { NotificationEventType } from "./notification-bus"
 
-export type StatutDemande =
-  | "BROUILLON"
-  | "SOUMISE"
-  | "APPROUVEE_MANAGER"
-  | "APPROUVEE_FINANCE"
-  | "APPROUVEE"
-  | "REJETEE_MANAGER"
-  | "REJETEE_FINANCE"
-  | "REJETEE_DIRECTION"
-  | "RETIREE"
-
-// ─── New canonical model (internal) ──────────────────────────────────────────
-
 export type Etape =
   | "DRAFT"
   | "MANAGER_REVIEW"
@@ -35,58 +22,6 @@ export interface StageDefinition {
   id: Etape
   roleCanAct?: Role
   onApprove?: Etape
-}
-
-// ─── Legacy compatibility ─────────────────────────────────────────────────────
-
-export function toLegacyStatus(etape: Etape, decision: Decision): StatutDemande {
-  if (decision === "WITHDRAWN") return "RETIREE"
-
-  switch (etape) {
-    case "DRAFT":
-      return "BROUILLON"
-    case "MANAGER_REVIEW":
-      if (decision === "PENDING") return "SOUMISE"
-      if (decision === "REJECTED") return "REJETEE_MANAGER"
-      return "APPROUVEE_MANAGER"
-    case "FINANCE_REVIEW":
-      if (decision === "PENDING") return "APPROUVEE_MANAGER"
-      if (decision === "REJECTED") return "REJETEE_FINANCE"
-      return "APPROUVEE_FINANCE"
-    case "DIRECTION_REVIEW":
-      if (decision === "PENDING") return "APPROUVEE_FINANCE"
-      if (decision === "REJECTED") return "REJETEE_DIRECTION"
-      return "APPROUVEE"
-    case "FINAL":
-      return "APPROUVEE"
-    default:
-      return "BROUILLON"
-  }
-}
-
-export function fromLegacyStatus(statut: StatutDemande): { etape: Etape; decision: Decision } {
-  switch (statut) {
-    case "BROUILLON":
-      return { etape: "DRAFT", decision: "PENDING" }
-    case "SOUMISE":
-      return { etape: "MANAGER_REVIEW", decision: "PENDING" }
-    case "APPROUVEE_MANAGER":
-      return { etape: "FINANCE_REVIEW", decision: "PENDING" }
-    case "APPROUVEE_FINANCE":
-      return { etape: "DIRECTION_REVIEW", decision: "PENDING" }
-    case "APPROUVEE":
-      return { etape: "FINAL", decision: "APPROVED" }
-    case "REJETEE_MANAGER":
-      return { etape: "MANAGER_REVIEW", decision: "REJECTED" }
-    case "REJETEE_FINANCE":
-      return { etape: "FINANCE_REVIEW", decision: "REJECTED" }
-    case "REJETEE_DIRECTION":
-      return { etape: "DIRECTION_REVIEW", decision: "REJECTED" }
-    case "RETIREE":
-      return { etape: "DRAFT", decision: "WITHDRAWN" }
-    default:
-      return { etape: "DRAFT", decision: "PENDING" }
-  }
 }
 
 // ─── Transition effects (side-effects per transition) ──────────────────────
@@ -190,25 +125,6 @@ export function rollupEtapes(role: Role): Etape[] {
   return PIPELINE_VIEWS[role].rollup
 }
 
-export function resolveStatuts(etapes: Etape[]): StatutDemande[] {
-  return etapes.map((e) => toLegacyStatus(e, "PENDING"))
-}
-
-/** @deprecated Use queueEtapes() + resolveStatuts() instead */
-export function queueStatuts(role: Role): StatutDemande[] {
-  return resolveStatuts(queueEtapes(role))
-}
-
-/** @deprecated Use committedEtapes() + resolveStatuts() instead */
-export function committedStatuts(role: Role): StatutDemande[] {
-  return resolveStatuts(committedEtapes(role))
-}
-
-/** @deprecated Use rollupEtapes() + resolveStatuts() instead */
-export function rollupStatuts(role: Role): StatutDemande[] {
-  return resolveStatuts(rollupEtapes(role))
-}
-
 export function laneOrderByColumn(etape: Etape): { column: TimestampColumn; direction: "desc" } {
   const effect = TRANSITION_EFFECTS.find((e) => e.to === etape)
   if (!effect) {
@@ -223,7 +139,8 @@ export type WorkflowAction = "submit" | "approuver" | "rejeter" | "retirer"
 
 export interface WorkflowResult {
   transition: {
-    newStatus: StatutDemande
+    newEtape: Etape
+    newDecision: Decision
     fields: Record<string, unknown>
   }
   auditAction: string
@@ -299,9 +216,7 @@ export function buildTransition(
     newDecision = "PENDING"
   }
 
-  const newStatus = toLegacyStatus(effect.to, newDecision)
-
-  const fields: Record<string, unknown> = { statut: newStatus }
+  const fields: Record<string, unknown> = { etape: effect.to, decision: newDecision }
 
   for (const ts of effect.timestamps) {
     fields[ts] = new Date()
@@ -316,7 +231,7 @@ export function buildTransition(
   }
 
   return {
-    transition: { newStatus, fields },
+    transition: { newEtape: effect.to, newDecision, fields },
     auditAction: effect.auditAction,
     notificationEvent: effect.notificationEvent,
   }
@@ -325,37 +240,17 @@ export function buildTransition(
 export function getAllowedActions(
   role: string,
   userId: string,
-  demande: { statut: string; employeId: string }
+  demande: { etape: Etape; decision: Decision; employeId: string }
 ): AllowedActions {
   const isOwner = demande.employeId === userId
   const r = role as Role
-  const { etape, decision } = fromLegacyStatus(demande.statut as StatutDemande)
 
   return {
-    canSubmit: canTransition(r, etape, "submit", decision) && isOwner,
-    canApprove: canTransition(r, etape, "approuver", decision),
-    canReject: canTransition(r, etape, "rejeter", decision),
-    canWithdraw: canTransition(r, etape, "retirer", decision) && isOwner,
+    canSubmit: canTransition(r, demande.etape, "submit", demande.decision) && isOwner,
+    canApprove: canTransition(r, demande.etape, "approuver", demande.decision),
+    canReject: canTransition(r, demande.etape, "rejeter", demande.decision),
+    canWithdraw: canTransition(r, demande.etape, "retirer", demande.decision) && isOwner,
   }
 }
 
-// ─── Legacy wrappers (zero API change for existing callers) ─────────────────
 
-export function canTransitionFromLegacy(
-  role: Role,
-  statut: StatutDemande,
-  action: WorkflowAction
-): boolean {
-  const { etape, decision } = fromLegacyStatus(statut)
-  return canTransition(role, etape, action, decision)
-}
-
-export function buildTransitionFromLegacy(
-  role: Role,
-  statut: StatutDemande,
-  action: WorkflowAction,
-  params?: { comment?: string; assigneAId?: string }
-): WorkflowResult | null {
-  const { etape, decision } = fromLegacyStatus(statut)
-  return buildTransition(role, etape, action, { ...params, decision })
-}

@@ -12,7 +12,8 @@ function toNumber(value: unknown): number {
 export function toPdfRenderData(demande: DemandeWithRelations): PdfRenderData {
   return {
     numero: demande.numero,
-    statut: demande.statut,
+    etape: demande.etape,
+    decision: demande.decision,
     employeNom: demande.employeNom,
     employePrenom: demande.employePrenom,
     employePoste: demande.employePoste,

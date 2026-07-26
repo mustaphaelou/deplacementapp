@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { DemandeStatusBadge } from "@/components/demande-status-badge"
-import { formatCurrency, formatDate, STATUT_LABELS } from "@/lib/constants"
+import { formatCurrency, formatDate, ETAPE_LABELS } from "@/lib/constants"
 import { Search, ChevronLeft, ChevronRight, FileText, Download } from "lucide-react"
 import { toast } from "sonner"
 
@@ -19,7 +19,8 @@ interface Demande {
   dateDepart: string
   dateRetour: string
   totalEstime: number
-  statut: string
+  etape: string
+  decision: string
   employe: { prenom: string; nom: string }
   employeId: string
 }
@@ -33,7 +34,7 @@ export default function DemandesListPage() {
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState("")
 
-  const statutFilter = searchParams.get("statut") || ""
+  const etapeFilter = searchParams.get("etape") || ""
   const perPage = 10
   const role = session?.user?.role
 
@@ -42,7 +43,7 @@ export default function DemandesListPage() {
     const params = new URLSearchParams()
     params.set("page", page.toString())
     params.set("limit", perPage.toString())
-    if (statutFilter) params.set("statut", statutFilter)
+    if (etapeFilter) params.set("etape", etapeFilter)
     if (search) params.set("recherche", search)
 
     try {
@@ -55,7 +56,7 @@ export default function DemandesListPage() {
     } catch {} finally {
       setLoading(false)
     }
-  }, [page, search, statutFilter])
+  }, [page, search, etapeFilter])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -86,8 +87,8 @@ export default function DemandesListPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">
-            {statutFilter
-              ? `${STATUT_LABELS[statutFilter] ?? "Demandes"}`
+            {etapeFilter
+              ? `${ETAPE_LABELS[etapeFilter] ?? "Demandes"}`
               : role === "EMPLOYEE"
               ? "Mes demandes"
               : "Demandes"}
@@ -156,7 +157,7 @@ export default function DemandesListPage() {
                     <td className="p-3">{d.destination}</td>
                     <td className="p-3 hidden md:table-cell">{formatDate(d.dateDepart)}</td>
                     <td className="p-3 hidden lg:table-cell">{formatCurrency(Number(d.totalEstime ?? 0))}</td>
-                    <td className="p-3"><DemandeStatusBadge statut={d.statut} /></td>
+                    <td className="p-3"><DemandeStatusBadge etape={d.etape} /></td>
                     <td className="p-3">
                       <Link href={`/demandes/${d.id}`}>
                         <Button variant="ghost" size="xs">Voir</Button>

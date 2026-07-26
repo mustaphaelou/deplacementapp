@@ -13,7 +13,8 @@ describe("PdfRenderData contract", () => {
 
     const data: PdfRenderData = {
       numero: "DD-2025-0001",
-      statut: "APPROUVEE_MANAGER",
+      etape: "MANAGER_REVIEW",
+      decision: "APPROVED",
       employeNom: "Dupont",
       employePrenom: "Jean",
       employePoste: "Développeur",
@@ -34,7 +35,7 @@ describe("PdfRenderData contract", () => {
     }
 
     expect(data.numero).toBe("DD-2025-0001")
-    expect(data.statut).toBe("APPROUVEE_MANAGER")
+    expect(data.etape).toBe("MANAGER_REVIEW")
     expect(data.employeNom).toBe("Dupont")
     expect(data.employePrenom).toBe("Jean")
     expect(data.employePoste).toBe("Développeur")
@@ -68,7 +69,8 @@ describe("PdfRenderData contract", () => {
 
     const data: PdfRenderData = {
       numero: "DD-2025-0002",
-      statut: "BROUILLON",
+      etape: "DRAFT",
+      decision: "PENDING",
       employeNom: "Martin",
       employePrenom: "Alice",
       employePoste: "Manager",
@@ -104,7 +106,8 @@ describe("PdfRenderData contract", () => {
 
     const data: PdfRenderData = {
       numero: "DD-2025-0003",
-      statut: "SOUMISE",
+      etape: "MANAGER_REVIEW",
+      decision: "PENDING",
       employeNom: "Durand",
       employePrenom: "Marie",
       employePoste: "Commercial",

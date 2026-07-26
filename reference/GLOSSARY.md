@@ -27,5 +27,5 @@ Next.js build mode (`output: 'standalone'` in `next.config.mjs`) that emits the 
 _Avoid_: serverless export, static export (both wrong here)
 
 **Entrypoint (`docker-entrypoint.sh`)**:
-Script that runs every time a container starts. For this app: `prisma migrate deploy` → production seed → `node server.js`. Runs migrations on each boot, which matters for zero-downtime and rolling deploys.
+Script that runs every time a container starts. For this app: `npx drizzle-kit migrate` → production seed → `node server.js`. Runs migrations on each boot, which matters for zero-downtime and rolling deploys.
 _Avoid_: startup script (too vague)

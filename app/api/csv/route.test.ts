@@ -21,7 +21,8 @@ const mockExportRows: DemandeExportRow[] = [
     dateRetour: new Date("2025-06-05"),
     typeTransport: "AVION",
     totalEstime: 380,
-    statut: "APPROUVEE",
+    etape: "FINAL",
+    decision: "APPROVED",
     creeLe: new Date("2025-05-24T10:00:00.000Z"),
     employe: { prenom: "Jean", nom: "Dupont" },
   },
@@ -32,7 +33,8 @@ const mockExportRows: DemandeExportRow[] = [
     dateRetour: new Date("2025-07-12"),
     typeTransport: "BUS",
     totalEstime: null,
-    statut: "SOUMISE",
+    etape: "MANAGER_REVIEW",
+    decision: "PENDING",
     creeLe: new Date("2025-06-15T08:30:00.000Z"),
     employe: null,
   },
@@ -74,8 +76,8 @@ describe("CSV export route", () => {
 
     const csv = await response.text()
     expect(csv).toContain("Numero,Employe,Destination,DateDepart,DateRetour,Transport,Total,Statut,CreeLe")
-    expect(csv).toContain('"DD-2025-0001","Jean Dupont","Casablanca","2025-06-01","2025-06-05","AVION","380","APPROUVEE"')
-    expect(csv).toContain('"DD-2025-0002","","Rabat","2025-07-10","2025-07-12","BUS","0","SOUMISE"')
+    expect(csv).toContain('"DD-2025-0001","Jean Dupont","Casablanca","2025-06-01","2025-06-05","AVION","380","FINAL"')
+    expect(csv).toContain('"DD-2025-0002","","Rabat","2025-07-10","2025-07-12","BUS","0","MANAGER_REVIEW"')
   })
 
   it("GET returns 401 when auth fails", async () => {

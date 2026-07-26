@@ -115,7 +115,7 @@ Uploads (avatars) persist via the `uploads` named volume in `compose.yaml`.
 │   ├── notification-bus.ts
 │   ├── email-service.ts
 │   └── audit-bus.ts
-├── prisma/                  # Schema, migrations, seed
+├── db/                      # Drizzle schema + migrations + seed
 ├── CONTEXT.md               # Domain glossary
 └── Dockerfile               # Multi-stage (4 targets)
 ```
@@ -129,7 +129,7 @@ Uploads (avatars) persist via the `uploads` named volume in `compose.yaml`.
 | **UI** | [React 19](https://react.dev/), [Tailwind CSS v4](https://tailwindcss.com/), [shadcn/ui](https://ui.shadcn.com/) on [Base UI](https://base-ui.com/), [Lucide](https://lucide.dev/) & [Hugeicons](https://hugeicons.com/) |
 | **Auth** | [NextAuth v5](https://next-auth.js.org/) |
 | **Database** | [PostgreSQL](https://www.postgresql.org/) |
-| **ORM** | [Prisma 7](https://www.prisma.io/) |
+| **ORM** | [Drizzle ORM](https://orm.drizzle.team/) |
 | **Forms** | [React Hook Form](https://react-hook-form.com/) + [Zod](https://zod.dev/) |
 | **PDF** | [@react-pdf/renderer](https://react-pdf.org/) |
 | **Email** | [Nodemailer](https://nodemailer.com/) |
@@ -142,7 +142,7 @@ The [domain glossary](CONTEXT.md) uses a strict vocabulary. Key concepts:
 
 - **Societe** — the deploying organisation (branding, email identity)
 - **DemandeDeplacement** — a travel request through 5 stages (DRAFT → MANAGER_REVIEW → FINANCE_REVIEW → DIRECTION_REVIEW → FINAL)
-- **Etape + Decision** — the conceptual state model; **StatutDemande** is the persisted enum
+- **Etape + Decision** — the conceptual state model; persisted as separate columns on `demandes_deplacement`
 - **Utilisateur** — a user with one of 4 roles (EMPLOYEE, MANAGER, FINANCE_ADMIN, GENERAL_DIRECTION)
 - Each stage has exactly one role that can act; terminal outcomes (APPROVED, REJECTED, WITHDRAWN) freeze the demande permanently
 
@@ -158,9 +158,10 @@ The [domain glossary](CONTEXT.md) uses a strict vocabulary. Key concepts:
 | `npm run typecheck` | TypeScript type checking |
 | `npm test` | Run tests (Vitest) |
 | `npm run test:watch` | Watch mode |
-| `npm run prisma:generate` | Generate Prisma client |
-| `npm run prisma:migrate` | Run migrations |
-| `npm run prisma:seed` | Seed database |
+| `npm run db:generate` | Generate Drizzle client |
+| `npm run db:migrate` | Run migrations |
+| `npm run db:seed` | Seed database |
+| `npm run db:studio` | Open Drizzle Studio |
 | `npm run docker:dev` | Start dev Docker stack |
 | `npm run docker:prod` | Start production stack |
 | `npm run docker:down` | Stop and clean volumes |

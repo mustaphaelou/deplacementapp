@@ -91,7 +91,8 @@ export class DemandeFactoryAdapter implements DemandeFactoryPort {
     const createData: Record<string, unknown> = {
       numero,
       employeId: user.id,
-      statut: "BROUILLON",
+      etape: "DRAFT",
+      decision: "PENDING",
       employeNom: user.nom,
       employePrenom: user.prenom,
       employePoste: user.poste,

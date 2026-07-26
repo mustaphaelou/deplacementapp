@@ -15,17 +15,18 @@ describe("Dashboard Module - getDashboardPayload", () => {
         dateDepart: new Date("2026-06-01"),
         dateRetour: new Date("2026-06-05"),
         totalEstime: 1500,
-        statut: "BROUILLON",
+        etape: "DRAFT",
+        decision: "PENDING",
         employe: null,
       },
     ]
 
     const fakeService = {
       findByEmployeeId: vi.fn().mockResolvedValue(mockDemandes as DashboardDemandeSummary[]),
-      findByStatuts: vi.fn(),
-      countByStatut: vi.fn().mockImplementation((statut: string) => {
-        if (statut === "BROUILLON") return Promise.resolve(1)
-        if (statut === "SOUMISE") return Promise.resolve(2)
+      findByEtapes: vi.fn(),
+      countByEtape: vi.fn().mockImplementation((etape: string) => {
+        if (etape === "DRAFT") return Promise.resolve(1)
+        if (etape === "MANAGER_REVIEW") return Promise.resolve(2)
         return Promise.resolve(0)
       }),
       aggregateBudget: vi.fn(),
@@ -54,22 +55,23 @@ describe("Dashboard Module - getDashboardPayload", () => {
         dateDepart: new Date("2026-06-10"),
         dateRetour: new Date("2026-06-12"),
         totalEstime: 800,
-        statut: "SOUMISE",
+        etape: "MANAGER_REVIEW",
+        decision: "PENDING",
         employe: { prenom: "Ali", nom: "Kader" },
       },
     ]
 
     const fakeService = {
       findByEmployeeId: vi.fn(),
-      findByStatuts: vi.fn().mockResolvedValue(mockDemandes as DashboardDemandeSummary[]),
-      countByStatut: vi.fn().mockResolvedValue(1),
+      findByEtapes: vi.fn().mockResolvedValue(mockDemandes as DashboardDemandeSummary[]),
+      countByEtape: vi.fn().mockResolvedValue(1),
       aggregateBudget: vi.fn(),
     } satisfies Partial<DemandeQueryPort>
 
     const payload = await getDashboardPayload("user-mgr", "MANAGER", fakeService as unknown as DemandeQueryPort)
 
-    expect(fakeService.findByStatuts).toHaveBeenCalledWith(
-      ["SOUMISE"],
+    expect(fakeService.findByEtapes).toHaveBeenCalledWith(
+      ["MANAGER_REVIEW"],
       { includeEmployee: true, limit: 10, orderBy: { column: "soumiseLe", direction: "desc" } }
     )
 
@@ -90,22 +92,23 @@ describe("Dashboard Module - getDashboardPayload", () => {
         dateDepart: new Date("2026-06-15"),
         dateRetour: new Date("2026-06-20"),
         totalEstime: 2200,
-        statut: "APPROUVEE_MANAGER",
+        etape: "FINANCE_REVIEW",
+        decision: "PENDING",
         employe: { prenom: "Sarah", nom: "Bennani" },
       },
     ]
 
     const fakeService = {
       findByEmployeeId: vi.fn(),
-      findByStatuts: vi.fn().mockResolvedValue(mockDemandes as DashboardDemandeSummary[]),
-      countByStatut: vi.fn().mockResolvedValue(1),
+      findByEtapes: vi.fn().mockResolvedValue(mockDemandes as DashboardDemandeSummary[]),
+      countByEtape: vi.fn().mockResolvedValue(1),
       aggregateBudget: vi.fn(),
     } satisfies Partial<DemandeQueryPort>
 
     const payload = await getDashboardPayload("user-fin", "FINANCE_ADMIN", fakeService as unknown as DemandeQueryPort)
 
-    expect(fakeService.findByStatuts).toHaveBeenCalledWith(
-      ["APPROUVEE_MANAGER"],
+    expect(fakeService.findByEtapes).toHaveBeenCalledWith(
+      ["FINANCE_REVIEW"],
       { includeEmployee: true, limit: 10, orderBy: { column: "approuveeManagerLe", direction: "desc" } }
     )
 
@@ -124,27 +127,28 @@ describe("Dashboard Module - getDashboardPayload", () => {
         dateDepart: new Date("2026-06-22"),
         dateRetour: new Date("2026-06-25"),
         totalEstime: 5000,
-        statut: "APPROUVEE_FINANCE",
+        etape: "DIRECTION_REVIEW",
+        decision: "PENDING",
         employe: { prenom: "Omar", nom: "Alami" },
       },
     ]
 
     const fakeService = {
       findByEmployeeId: vi.fn(),
-      findByStatuts: vi.fn().mockResolvedValue(mockDemandes as DashboardDemandeSummary[]),
-      countByStatut: vi.fn().mockResolvedValue(1),
+      findByEtapes: vi.fn().mockResolvedValue(mockDemandes as DashboardDemandeSummary[]),
+      countByEtape: vi.fn().mockResolvedValue(1),
       aggregateBudget: vi.fn().mockResolvedValue(15000),
     } satisfies Partial<DemandeQueryPort>
 
     const payload = await getDashboardPayload("user-dir", "GENERAL_DIRECTION", fakeService as unknown as DemandeQueryPort)
 
-    expect(fakeService.findByStatuts).toHaveBeenCalledWith(
-      ["APPROUVEE_FINANCE"],
+    expect(fakeService.findByEtapes).toHaveBeenCalledWith(
+      ["DIRECTION_REVIEW"],
       { includeEmployee: true, limit: 10, orderBy: { column: "approuveeFinanceLe", direction: "desc" } }
     )
-    expect(fakeService.countByStatut).toHaveBeenCalledWith("APPROUVEE_FINANCE")
+    expect(fakeService.countByEtape).toHaveBeenCalledWith("DIRECTION_REVIEW")
     expect(fakeService.aggregateBudget).toHaveBeenCalledWith(
-      ["APPROUVEE", "APPROUVEE_FINANCE", "APPROUVEE_MANAGER"]
+      ["FINAL", "DIRECTION_REVIEW", "FINANCE_REVIEW"]
     )
 
     expect(payload.config.subtitle).toBe("Direction Générale")

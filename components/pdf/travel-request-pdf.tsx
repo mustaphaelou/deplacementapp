@@ -176,17 +176,18 @@ function formatDateTime(date: Date): string {
   return format(new Date(date), "dd MMM yyyy 'a' HH:mm", { locale: fr })
 }
 
-function getStatusColor(status: string): string {
-  if (status.startsWith("APPROUVEE")) return "#16a34a"
-  if (status.startsWith("REJETEE")) return "#dc2626"
-  if (status === "SOUMISE") return "#d97706"
+function getStatusColor(etape: string, decision: string): string {
+  if (decision === "REJECTED" || decision === "WITHDRAWN") return "#dc2626"
+  if (decision === "APPROVED") return "#16a34a"
+  if (etape === "DRAFT") return borders.medium
+  if (etape !== "FINAL") return "#d97706"
   return borders.medium
 }
 
 export function TravelRequestPdf({ data }: { data: PdfRenderData }) {
-  const isDraft = data.statut === "BROUILLON"
-  const statusLabel = STATUS_LABELS[data.statut] || data.statut
-  const statusColor = getStatusColor(data.statut)
+  const isDraft = data.etape === "DRAFT"
+  const statusLabel = data.etape
+  const statusColor = getStatusColor(data.etape, data.decision)
   const transportLabel = TRANSPORT_LABELS[data.typeTransport] || data.typeTransport
 
   return (

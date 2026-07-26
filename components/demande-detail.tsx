@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 
-import { formatCurrency, formatDate, formatDateTime, TRANSPORT_LABELS, STATUT_LABELS } from "@/lib/constants"
+import { formatCurrency, formatDate, formatDateTime, TRANSPORT_LABELS, ETAPE_LABELS, DECISION_LABELS } from "@/lib/constants"
 import { parseMotif } from "@/lib/demande-types"
 import type { DemandeDetail } from "@/lib/demande-types"
 import { CheckCircle, XCircle, ArrowLeft, Download, Printer, Ban, ChevronRight, Loader2 } from "lucide-react"
@@ -22,8 +22,7 @@ interface DemandeDetailProps {
   userRole: string
 }
 
-const stepOrder = ["BROUILLON", "SOUMISE", "APPROUVEE_MANAGER", "APPROUVEE_FINANCE", "APPROUVEE"]
-const rejectStatuses = ["REJETEE_MANAGER", "REJETEE_FINANCE", "REJETEE_DIRECTION"]
+const stepOrder = ["DRAFT", "MANAGER_REVIEW", "FINANCE_REVIEW", "DIRECTION_REVIEW", "FINAL"]
 
 export function DemandeDetail({ demande, canApprove, canReject, canWithdraw }: DemandeDetailProps) {
   const {
@@ -38,8 +37,9 @@ export function DemandeDetail({ demande, canApprove, canReject, canWithdraw }: D
 
   const motifs = parseMotif(demande.motif)
 
-  const currentStepIndex = stepOrder.indexOf(demande.statut)
-  const isRejected = rejectStatuses.includes(demande.statut)
+  const currentStepIndex = stepOrder.indexOf(demande.etape)
+  const isRejected = demande.decision === "REJECTED"
+  const isWithdrawn = demande.decision === "WITHDRAWN"
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -84,7 +84,7 @@ export function DemandeDetail({ demande, canApprove, canReject, canWithdraw }: D
                     isDone ? (isCurrent ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary") : "bg-muted text-muted-foreground"
                   }`}>
                     {i < currentStepIndex ? <CheckCircle className="size-3" /> : null}
-                    {STATUT_LABELS[step]}
+                    {ETAPE_LABELS[step]}
                   </div>
                   {i < stepOrder.length - 1 && (
                     <ChevronRight className={`mx-1 size-4 ${i < currentStepIndex ? "text-primary" : "text-muted-foreground/30"}`} />
@@ -95,12 +95,12 @@ export function DemandeDetail({ demande, canApprove, canReject, canWithdraw }: D
           </div>
           {isRejected && (
             <div className="mt-3">
-              <Badge variant="destructive">{STATUT_LABELS[demande.statut]}</Badge>
+              <Badge variant="destructive">{DECISION_LABELS["REJECTED"]}</Badge>
             </div>
           )}
-          {demande.statut === "RETIREE" && (
+          {isWithdrawn && (
             <div className="mt-3">
-              <Badge variant="outline">{STATUT_LABELS["RETIREE"]}</Badge>
+              <Badge variant="outline">{DECISION_LABELS["WITHDRAWN"]}</Badge>
             </div>
           )}
         </CardContent>

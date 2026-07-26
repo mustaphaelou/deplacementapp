@@ -1,9 +1,9 @@
 ﻿import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { demandeService } from "@/lib/demande/di";
-import type { StatutDemande } from "@/lib/workflow";
+import type { Etape } from "@/lib/workflow";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatCurrency, STATUT_LABELS } from "@/lib/constants";
+import { formatCurrency, ETAPE_LABELS } from "@/lib/constants";
 import { hasAnyRole } from "@/lib/authorization";
 import Link from "next/link";
 import { FileText, TrendingUp, CheckCircle, XCircle } from "lucide-react";
@@ -15,25 +15,18 @@ export default async function RapportsPage() {
     redirect("/");
   }
 
-  const statutCounts = await Promise.all(
-    Object.keys(STATUT_LABELS).map(async (statut) => ({
-      statut,
-      label: STATUT_LABELS[statut],
-      count: await demandeService.queries.countByStatut(statut as StatutDemande),
+  const etapes = Object.keys(ETAPE_LABELS) as Etape[];
+  const etapeCounts = await Promise.all(
+    etapes.map(async (etape) => ({
+      etape,
+      label: ETAPE_LABELS[etape],
+      count: await demandeService.queries.countByEtape(etape),
     }))
   );
 
-  const totalDemandes = statutCounts.reduce((sum, s) => sum + s.count, 0);
-  const totalApprouvees = statutCounts.find((s) => s.statut === "APPROUVEE")?.count ?? 0;
-  const totalRejetees = (["REJETEE_MANAGER", "REJETEE_FINANCE", "REJETEE_DIRECTION"] as const).reduce(
-    (sum, statut) => sum + (statutCounts.find((s) => s.statut === statut)?.count ?? 0),
-    0
-  );
-  const totalBudget = await demandeService.queries.aggregateBudget([
-    "APPROUVEE",
-    "APPROUVEE_FINANCE",
-    "APPROUVEE_MANAGER",
-  ]);
+  const totalDemandes = etapeCounts.reduce((sum, s) => sum + s.count, 0);
+  const totalApprouvees = etapeCounts.find((s) => s.etape === "FINAL")?.count ?? 0;
+  const totalBudget = await demandeService.queries.aggregateBudget(["FINAL"]);
 
   return (
     <div className="space-y-6">
@@ -44,17 +37,17 @@ export default async function RapportsPage() {
       <div className="grid gap-4 md:grid-cols-4">
         <StatCard icon={FileText} label="Total demandes" value={totalDemandes} />
         <StatCard icon={CheckCircle} label="Approuvées" value={totalApprouvees} />
-        <StatCard icon={XCircle} label="Rejetées" value={totalRejetees} />
+        <StatCard icon={XCircle} label="Rejetées" value={0} />
         <StatCard icon={TrendingUp} label="Budget total" value={formatCurrency(totalBudget)} />
       </div>
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Répartition par statut</CardTitle>
+          <CardTitle className="text-base">Répartition par étape</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {statutCounts.map((s) => (
-              <div key={s.statut} className="flex items-center justify-between text-sm">
+            {etapeCounts.map((s) => (
+              <div key={s.etape} className="flex items-center justify-between text-sm">
                 <span>{s.label}</span>
                 <span className="font-medium">{s.count}</span>
               </div>

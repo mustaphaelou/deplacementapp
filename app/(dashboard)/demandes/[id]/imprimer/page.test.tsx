@@ -28,9 +28,9 @@ const mockDemande: DemandeWithRelations = {
   numero: "DD-2025-0001",
   employeId: "u-1",
   assigneAId: null,
-  statut: "APPROUVEE_MANAGER",
-  etape: "",
-  decision: "",
+
+  etape: "MANAGER_REVIEW",
+  decision: "APPROVED",
   employeNom: "Dupont",
   employePrenom: "Jean",
   employePoste: "Développeur",

@@ -1,24 +1,20 @@
 "use client"
 
 import { Badge } from "@/components/ui/badge"
-import { STATUT_LABELS } from "@/lib/constants"
+import { ETAPE_LABELS } from "@/lib/constants"
 
 const variantMap: Record<string, "default" | "secondary" | "destructive" | "outline" | "success" | "warning"> = {
-  BROUILLON: "outline",
-  SOUMISE: "warning",
-  APPROUVEE_MANAGER: "secondary",
-  APPROUVEE_FINANCE: "secondary",
-  APPROUVEE: "success",
-  REJETEE_MANAGER: "destructive",
-  REJETEE_FINANCE: "destructive",
-  REJETEE_DIRECTION: "destructive",
-  RETIREE: "outline",
+  DRAFT: "outline",
+  MANAGER_REVIEW: "warning",
+  FINANCE_REVIEW: "secondary",
+  DIRECTION_REVIEW: "secondary",
+  FINAL: "success",
 }
 
-export function DemandeStatusBadge({ statut }: { statut: string }) {
+export function DemandeStatusBadge({ etape }: { etape: string }) {
   return (
-    <Badge variant={variantMap[statut] ?? "outline"}>
-      {STATUT_LABELS[statut] ?? statut}
+    <Badge variant={variantMap[etape] ?? "outline"}>
+      {ETAPE_LABELS[etape] ?? etape}
     </Badge>
   )
 }

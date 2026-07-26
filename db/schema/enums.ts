@@ -7,18 +7,6 @@ export const roleEnum = pgEnum("roles", [
   "GENERAL_DIRECTION",
 ])
 
-export const statutDemandeEnum = pgEnum("statuts_demande", [
-  "BROUILLON",
-  "SOUMISE",
-  "APPROUVEE_MANAGER",
-  "APPROUVEE_FINANCE",
-  "APPROUVEE",
-  "REJETEE_MANAGER",
-  "REJETEE_FINANCE",
-  "REJETEE_DIRECTION",
-  "RETIREE",
-])
-
 export const typeTransportEnum = pgEnum("types_transport", [
   "VOITURE_PERSONNELLE",
   "VOITURE_SOCIETE",

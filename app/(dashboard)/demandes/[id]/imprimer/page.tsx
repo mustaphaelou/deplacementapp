@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { demandeService } from "@/lib/demande/di";
 import { DemandeNotFoundError } from "@/lib/demande-service";
-import { formatCurrency, formatDate, TRANSPORT_LABELS, STATUT_LABELS } from "@/lib/constants";
+import { formatCurrency, formatDate, TRANSPORT_LABELS, ETAPE_LABELS } from "@/lib/constants";
 import { parseMotif, type DemandeWithRelations } from "@/lib/demande-types";
 
 export default async function ImprimerPage({
@@ -34,7 +34,7 @@ export default async function ImprimerPage({
 
       <section className="mb-6">
         <h2 className="mb-3 text-lg font-semibold">Statut</h2>
-        <p className="text-sm">{STATUT_LABELS[demande.statut]}</p>
+        <p className="text-sm">{ETAPE_LABELS[demande.etape]}</p>
       </section>
 
       <section className="mb-6">

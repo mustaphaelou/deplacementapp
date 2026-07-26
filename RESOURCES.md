@@ -23,8 +23,8 @@ Annotated, high-trust sources only. Knowledge is grouped in teaching order (Dock
 ### This app's specifics
 - [Docs: "Automatically configure static exports" / `output: 'standalone'` — Next.js](https://nextjs.org/docs/app/api-reference/config/next-config-js/output)
   Why the Dockerfile copies `.next/standalone` and runs `node server.js` instead of `next start`. Use for: the "why standalone" mini-lesson. Without this, the runtime image layout is mysterious.
-- [Docs: "Deployment" — Prisma](https://www.prisma.io/docs/orm/prisma-cli/deployment)
-  Why `prisma migrate deploy` (not `migrate dev`) is used in `docker-entrypoint.sh`. Use for: explaining the entrypoint and why production uses `deploy`.
+- [Docs: "Drizzle Kit — Migrations" — Drizzle](https://orm.drizzle.team/docs/kit-installation)
+  Why `npx drizzle-kit migrate` is used in `docker-entrypoint.sh`. Covers the `generate`, `migrate`, and `push` commands used in CI/CD.
 
 ### Coolify
 - [Docs: Coolify — Applications](https://coolify.io/docs/applications)

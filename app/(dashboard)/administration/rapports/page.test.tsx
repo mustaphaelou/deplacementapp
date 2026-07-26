@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { renderToStaticMarkup } from "react-dom/server"
-import { STATUT_LABELS, formatCurrency } from "@/lib/constants"
+import { ETAPE_LABELS, formatCurrency } from "@/lib/constants"
 
 vi.mock("@/lib/auth", () => ({
   auth: vi.fn(),
@@ -9,7 +9,7 @@ vi.mock("@/lib/auth", () => ({
 vi.mock("@/lib/demande/di", () => ({
   demandeService: {
     queries: {
-      countByStatut: vi.fn(),
+      countByEtape: vi.fn(),
       aggregateBudget: vi.fn(),
     },
   },
@@ -35,16 +35,12 @@ function mockSession(role = "FINANCE_ADMIN") {
   }
 }
 
-const STATUT_COUNTS: Record<string, number> = {
-  BROUILLON: 2,
-  SOUMISE: 3,
-  APPROUVEE_MANAGER: 1,
-  APPROUVEE_FINANCE: 0,
-  APPROUVEE: 5,
-  REJETEE_MANAGER: 1,
-  REJETEE_FINANCE: 2,
-  REJETEE_DIRECTION: 0,
-  RETIREE: 1,
+const ETAPE_COUNTS: Record<string, number> = {
+  DRAFT: 2,
+  MANAGER_REVIEW: 3,
+  FINANCE_REVIEW: 1,
+  DIRECTION_REVIEW: 0,
+  FINAL: 5,
 }
 
 describe("Rapports page", () => {
@@ -57,8 +53,8 @@ describe("Rapports page", () => {
     const { demandeService } = await import("@/lib/demande/di")
 
     ;(auth as ReturnType<typeof vi.fn>).mockResolvedValue(mockSession())
-    ;(demandeService.queries.countByStatut as ReturnType<typeof vi.fn>).mockImplementation((statut: string) =>
-      Promise.resolve(STATUT_COUNTS[statut] ?? 0)
+    ;(demandeService.queries.countByEtape as ReturnType<typeof vi.fn>).mockImplementation((etape: string) =>
+      Promise.resolve(ETAPE_COUNTS[etape] ?? 0)
     )
     ;(demandeService.queries.aggregateBudget as ReturnType<typeof vi.fn>).mockResolvedValue(45000)
 
@@ -66,25 +62,18 @@ describe("Rapports page", () => {
     const element = await RapportsPage()
     const html = renderToStaticMarkup(element)
 
-    const statuts = Object.keys(STATUT_LABELS)
-    expect(demandeService.queries.countByStatut).toHaveBeenCalledTimes(statuts.length)
-    statuts.forEach((s) => {
-      expect(demandeService.queries.countByStatut).toHaveBeenCalledWith(s)
+    const etapes = Object.keys(ETAPE_LABELS)
+    expect(demandeService.queries.countByEtape).toHaveBeenCalledTimes(etapes.length)
+    etapes.forEach((s) => {
+      expect(demandeService.queries.countByEtape).toHaveBeenCalledWith(s)
     })
 
-    expect(demandeService.queries.aggregateBudget).toHaveBeenCalledWith([
-      "APPROUVEE",
-      "APPROUVEE_FINANCE",
-      "APPROUVEE_MANAGER",
-    ])
+    expect(demandeService.queries.aggregateBudget).toHaveBeenCalledWith(["FINAL"])
 
-    const total = Object.values(STATUT_COUNTS).reduce((a, b) => a + b, 0)
-    const totalRejetees =
-      STATUT_COUNTS["REJETEE_MANAGER"] + STATUT_COUNTS["REJETEE_FINANCE"] + STATUT_COUNTS["REJETEE_DIRECTION"]
+    const total = Object.values(ETAPE_COUNTS).reduce((a, b) => a + b, 0)
 
     expect(html).toContain(String(total))
-    expect(html).toContain(String(STATUT_COUNTS["APPROUVEE"]))
-    expect(html).toContain(String(totalRejetees))
+    expect(html).toContain(String(ETAPE_COUNTS["FINAL"]))
     expect(html).toContain(formatCurrency(45000))
   })
 

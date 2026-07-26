@@ -33,9 +33,9 @@ const mockDemande: DemandeWithRelations = {
   numero: "DD-2025-0001",
   employeId: "u-1",
   assigneAId: "u-2",
-  statut: "APPROUVEE_MANAGER",
-  etape: "",
-  decision: "",
+
+  etape: "FINANCE_REVIEW",
+  decision: "PENDING",
   employeNom: "Dupont",
   employePrenom: "Jean",
   employePoste: "Développeur",
@@ -114,7 +114,7 @@ describe("PDF route integration", () => {
     const data = toPdfRenderData(mockDemande)
 
     expect(data.numero).toBe("DD-2025-0001")
-    expect(data.statut).toBe("APPROUVEE_MANAGER")
+    expect(data.etape).toBe("FINANCE_REVIEW")
     expect(data.assigneA).toEqual({ id: "u-2", nom: "Bernard", prenom: "Pierre" })
     expect(data.vehicule).toEqual({ nom: "Peugeot 3008", immatriculation: "AB-123-CD" })
   })

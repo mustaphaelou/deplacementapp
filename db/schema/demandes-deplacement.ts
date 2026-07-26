@@ -1,5 +1,5 @@
 import { pgTable, text, timestamp, boolean, decimal, uniqueIndex } from "drizzle-orm/pg-core"
-import { statutDemandeEnum, typeTransportEnum, etapeEnum, decisionEnum } from "./enums"
+import { typeTransportEnum, etapeEnum, decisionEnum } from "./enums"
 import { utilisateurs } from "./utilisateurs"
 import { vehiculesEntreprise } from "./vehicules-entreprise"
 
@@ -15,7 +15,6 @@ export const demandesDeplacement = pgTable(
       onDelete: "set null",
       onUpdate: "cascade",
     }),
-    statut: statutDemandeEnum("statut").notNull().default("BROUILLON"),
     etape: etapeEnum("etape").notNull().default("DRAFT"),
     decision: decisionEnum("decision").notNull().default("PENDING"),
 

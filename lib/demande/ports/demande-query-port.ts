@@ -1,7 +1,6 @@
-import type { StatutDemande } from "../../workflow"
+import type { Etape, TimestampColumn } from "../../workflow"
 import type { DashboardDemandeSummary } from "../../dashboard"
 import type { DemandeWithRelations } from "../../demande-types"
-import type { TimestampColumn } from "../../workflow"
 
 export interface Document {
   id: string
@@ -32,7 +31,8 @@ export interface DemandeExportRow {
   dateRetour: Date
   typeTransport: string
   totalEstime: number | null
-  statut: string
+  etape: string
+  decision: string
   creeLe: Date
   employe: { prenom: string; nom: string } | null
 }
@@ -40,7 +40,7 @@ export interface DemandeExportRow {
 export interface DemandeQueryParams {
   page: number
   limit: number
-  statut?: string
+  etape?: string
   recherche?: string
 }
 
@@ -62,18 +62,18 @@ export interface DemandeQueryPort {
     limit?: number
   ): Promise<DashboardDemandeSummary[]>
 
-  findByStatuts(
-    statuts: StatutDemande[],
+  findByEtapes(
+    etapes: Etape[],
     opts?: { limit?: number; includeEmployee?: boolean; orderBy?: OrderByTimestamp }
   ): Promise<DashboardDemandeSummary[]>
 
-  countByStatut(
-    statut: StatutDemande,
+  countByEtape(
+    etape: Etape,
     userId?: string
   ): Promise<number>
 
   aggregateBudget(
-    statuts: StatutDemande[]
+    etapes: Etape[]
   ): Promise<number>
 
   findAllForExport(): Promise<DemandeExportRow[]>

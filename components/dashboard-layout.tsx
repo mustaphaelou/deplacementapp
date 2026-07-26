@@ -92,7 +92,7 @@ const cellRenderers: Record<TableColumnId, (d: DashboardDemandeSummary) => React
   ),
   date: (d) => <span className="text-xs text-muted-foreground">{formatDate(d.dateDepart)}</span>,
   total: (d) => <span className="tabular-nums">{formatCurrency(Number(d.totalEstime ?? 0))}</span>,
-  statut: (d) => <DemandeStatusBadge statut={d.statut} />,
+  etape: (d) => <DemandeStatusBadge etape={d.etape} />,
 }
 
 export function DashboardLayout({ config, navItems, demandes }: DashboardLayoutProps) {

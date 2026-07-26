@@ -8,9 +8,9 @@ function makeDemande(overrides?: Record<string, unknown>): DemandeWithRelations 
     numero: "DD-2025-0001",
     employeId: "u-1",
     assigneAId: null,
-    statut: "APPROUVEE_MANAGER",
-    etape: "",
-    decision: "",
+
+    etape: "FINANCE_REVIEW",
+    decision: "PENDING",
     employeNom: "Dupont",
     employePrenom: "Jean",
     employePoste: "Développeur",
@@ -78,7 +78,7 @@ describe("toPdfRenderData", () => {
     const result = toPdfRenderData(demande)
 
     expect(result.numero).toBe("DD-2025-0001")
-    expect(result.statut).toBe("APPROUVEE_MANAGER")
+    expect(result.etape).toBe("FINANCE_REVIEW")
     expect(result.employeNom).toBe("Dupont")
     expect(result.employePrenom).toBe("Jean")
     expect(result.employePoste).toBe("Développeur")
