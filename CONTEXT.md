@@ -91,6 +91,11 @@ A Notification automatically sent to the MANAGER of an Employee's Departement wh
 **JournalAudit**:
 A timestamped record of a *committed* state change: who performed what action on which entity. Only successful transitions are recorded — attempts that fail authorization or transition guards (wrong role, invalid action, missing record) throw before the audit dispatch and produce no JournalAudit entry.
 
+**EffetsTransition (Transition Effects)**:
+The side-effects executed immediately following a committed DemandeDeplacement transition, combining JournalAudit logging and Notification dispatches behind a single internal seam.
+_Avoid_: Event bus, side-effect bus, notification bus
+
+
 **AvatarProfil**:
 An optional profile image uploaded by a Utilisateur. Stored as a file on the local filesystem under `/uploads/avatars/` with the URL path saved in `Utilisateur.avatarUrl`.
 _Avoid_: Profile picture, profile photo, user image
