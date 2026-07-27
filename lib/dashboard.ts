@@ -1,6 +1,5 @@
 import { formatCurrency } from "@/lib/constants"
-import { demandeService } from "./demande/di"
-import type { DemandeQueryPort } from "./demande/ports/demande-query-port"
+import { findByEtapes, countByEtape, findByEmployeeId, aggregateBudget } from "./demande"
 import type { Role } from "./roles"
 import { queueEtapes, committedEtapes, rollupEtapes, laneOrderByColumn, type Etape } from "./workflow"
 
@@ -55,15 +54,14 @@ export interface DashboardPayload {
 // ─── Shared fetch pattern ────────────────────────────────────────────────
 
 async function fetchQueueDemandes(
-  queries: DemandeQueryPort,
   role: Role,
   lane: Etape
 ): Promise<{ demandes: DashboardDemandeSummary[]; enAttente: number }> {
   const queue = queueEtapes(role)
   const order = laneOrderByColumn(lane)
   const [demandes, queueCounts] = await Promise.all([
-    queries.findByEtapes(queue, { includeEmployee: true, limit: 10, orderBy: order }),
-    Promise.all(queue.map((s) => queries.countByEtape(s))),
+    findByEtapes(queue, { includeEmployee: true, limit: 10, orderBy: order }),
+    Promise.all(queue.map((s) => countByEtape(s))),
   ])
   return { demandes, enAttente: queueCounts.reduce((a, b) => a + b, 0) }
 }
@@ -73,9 +71,7 @@ async function fetchQueueDemandes(
 export async function getDashboardPayload(
   userId: string,
   role: Role,
-  svc?: DemandeQueryPort
 ): Promise<DashboardPayload> {
-  const queries = svc ?? demandeService.queries
   switch (role) {
     case "EMPLOYEE": {
       const queue = queueEtapes(role)
@@ -83,8 +79,8 @@ export async function getDashboardPayload(
       const rollup = rollupEtapes(role)
 
       const [demandes, rollupCounts] = await Promise.all([
-        queries.findByEmployeeId(userId, 5),
-        Promise.all(rollup.map((s) => queries.countByEtape(s, userId))),
+        findByEmployeeId(userId, 5),
+        Promise.all(rollup.map((s) => countByEtape(s, userId))),
       ])
 
       const countMap = Object.fromEntries(rollup.map((s, i) => [s, rollupCounts[i]]))
@@ -120,7 +116,7 @@ export async function getDashboardPayload(
       }
     }
     case "MANAGER": {
-      const { demandes, enAttente } = await fetchQueueDemandes(queries, role, "MANAGER_REVIEW")
+      const { demandes, enAttente } = await fetchQueueDemandes(role, "MANAGER_REVIEW")
 
       return {
         config: {
@@ -145,7 +141,7 @@ export async function getDashboardPayload(
       }
     }
     case "FINANCE_ADMIN": {
-      const { demandes, enAttente } = await fetchQueueDemandes(queries, role, "FINANCE_REVIEW")
+      const { demandes, enAttente } = await fetchQueueDemandes(role, "FINANCE_REVIEW")
 
       return {
         config: {
@@ -172,8 +168,8 @@ export async function getDashboardPayload(
     case "GENERAL_DIRECTION": {
       const committed = committedEtapes(role)
       const [queueResult, budgetTotal] = await Promise.all([
-        fetchQueueDemandes(queries, role, "DIRECTION_REVIEW"),
-        queries.aggregateBudget(committed),
+        fetchQueueDemandes(role, "DIRECTION_REVIEW"),
+        aggregateBudget(committed),
       ])
       const { demandes, enAttente } = queueResult
 

@@ -6,13 +6,9 @@ vi.mock("@/lib/auth", () => ({
   auth: vi.fn(),
 }))
 
-vi.mock("@/lib/demande/di", () => ({
-  demandeService: {
-    queries: {
-      countByEtape: vi.fn(),
-      aggregateBudget: vi.fn(),
-    },
-  },
+vi.mock("@/lib/demande", () => ({
+  countByEtape: vi.fn(),
+  aggregateBudget: vi.fn(),
 }))
 
 vi.mock("next/navigation", () => ({
@@ -50,25 +46,25 @@ describe("Rapports page", () => {
 
   it("reads counts and budget through the queries port and renders them", async () => {
     const { auth } = await import("@/lib/auth")
-    const { demandeService } = await import("@/lib/demande/di")
+    const { countByEtape: mockCountByEtape, aggregateBudget: mockAggregateBudget } = await import("@/lib/demande")
 
     ;(auth as ReturnType<typeof vi.fn>).mockResolvedValue(mockSession())
-    ;(demandeService.queries.countByEtape as ReturnType<typeof vi.fn>).mockImplementation((etape: string) =>
+    ;(mockCountByEtape as ReturnType<typeof vi.fn>).mockImplementation((etape: string) =>
       Promise.resolve(ETAPE_COUNTS[etape] ?? 0)
     )
-    ;(demandeService.queries.aggregateBudget as ReturnType<typeof vi.fn>).mockResolvedValue(45000)
+    ;(mockAggregateBudget as ReturnType<typeof vi.fn>).mockResolvedValue(45000)
 
     const { default: RapportsPage } = await import("./page")
     const element = await RapportsPage()
     const html = renderToStaticMarkup(element)
 
     const etapes = Object.keys(ETAPE_LABELS)
-    expect(demandeService.queries.countByEtape).toHaveBeenCalledTimes(etapes.length)
+    expect(mockCountByEtape).toHaveBeenCalledTimes(etapes.length)
     etapes.forEach((s) => {
-      expect(demandeService.queries.countByEtape).toHaveBeenCalledWith(s)
+      expect(mockCountByEtape).toHaveBeenCalledWith(s)
     })
 
-    expect(demandeService.queries.aggregateBudget).toHaveBeenCalledWith(["FINAL"])
+    expect(mockAggregateBudget).toHaveBeenCalledWith(["FINAL"])
 
     const total = Object.values(ETAPE_COUNTS).reduce((a, b) => a + b, 0)
 
