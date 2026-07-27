@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, vi } from "vitest"
-import { eq } from "drizzle-orm"
+import { eq, sql } from "drizzle-orm"
 import * as schema from "../../db/schema"
 import * as dbModule from "../../db"
 import { createPgliteDb } from "../test/create-pglite-db"
@@ -621,6 +621,53 @@ describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT, hookTimeou
         .from(schema.notifications)
         .where(eq(schema.notifications.demandeId, demande.id))
       expect(notifRows.length).toBeGreaterThan(0)
+    })
+
+    it("rolls back demande update and JournalAudit if Notification insert fails", async () => {
+      await pgliteDb.execute(sql`
+        CREATE OR REPLACE FUNCTION fail_notification_insert()
+        RETURNS TRIGGER
+        LANGUAGE plpgsql
+        AS $body$ BEGIN RAISE EXCEPTION 'Simulated notification failure'; END; $body$;
+      `)
+      await pgliteDb.execute(sql`
+        CREATE TRIGGER trg_fail_notification
+        BEFORE INSERT ON notifications
+        FOR EACH ROW EXECUTE FUNCTION fail_notification_insert();
+      `)
+
+      const demande = await createDraftDemande()
+
+      try {
+        await expect(
+          executeTransition({
+            demandeId: demande.id,
+            action: "submit",
+            actor: { id: employeeId, role: "EMPLOYEE" },
+          }),
+        ).rejects.toThrow()
+      } finally {
+        await pgliteDb.execute(
+          sql`DROP TRIGGER IF EXISTS trg_fail_notification ON notifications`,
+        )
+        await pgliteDb.execute(
+          sql`DROP FUNCTION IF EXISTS fail_notification_insert()`,
+        )
+      }
+
+      const [row] = await pgliteDb
+        .select()
+        .from(schema.demandesDeplacement)
+        .where(eq(schema.demandesDeplacement.id, demande.id))
+      expect(row.etape).toBe("DRAFT")
+      expect(row.decision).toBe("PENDING")
+
+      const auditRows = await pgliteDb
+        .select()
+        .from(schema.journalAudit)
+        .where(eq(schema.journalAudit.entiteId, demande.id))
+      expect(auditRows).toHaveLength(1)
+      expect(auditRows[0].action).toBe("CREATION")
     })
   })
 
