@@ -25,7 +25,7 @@ const sampleData = {
   description: "Mission client",
 }
 
-describe("Dashboard Module - getDashboardPayload (PGLite)", { timeout: TIMEOUT, hookTimeout: TIMEOUT }, () => {
+describe("Dashboard Module - getDashboardPayload (PGLite)", { timeout: TIMEOUT }, () => {
   let pgliteDb: PgliteDb
   let employeeId: string
   let managerId: string
@@ -36,7 +36,7 @@ describe("Dashboard Module - getDashboardPayload (PGLite)", { timeout: TIMEOUT, 
 
   beforeAll(async () => {
     pgliteDb = await createPgliteDb()
-    vi.spyOn(dbModule, "db", "get").mockReturnValue(pgliteDb)
+    vi.spyOn(dbModule, "db", "get").mockReturnValue(pgliteDb as any)
 
     societeId = crypto.randomUUID()
     departementId = crypto.randomUUID()

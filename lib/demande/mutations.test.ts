@@ -13,7 +13,7 @@ import {
 
 const TIMEOUT = 30_000
 
-describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT, hookTimeout: TIMEOUT }, () => {
+describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT }, () => {
   let pgliteDb: PgliteDb
   let employeeId: string
   let managerId: string
@@ -24,7 +24,7 @@ describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT, hookTimeou
 
   beforeAll(async () => {
     pgliteDb = await createPgliteDb()
-    vi.spyOn(dbModule, "db", "get").mockReturnValue(pgliteDb)
+    vi.spyOn(dbModule, "db", "get").mockReturnValue(pgliteDb as any)
 
     societeId = crypto.randomUUID()
     departementId = crypto.randomUUID()

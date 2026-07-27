@@ -101,6 +101,11 @@ function buildMessage(
         titre: "Demande retirée",
         message: `${fullName} a retiré la demande ${numero}.`,
       }
+    case "DEMANDE_NOTIFICATION_LUE":
+      return {
+        titre: "Notification lue",
+        message: `La notification pour la demande ${numero} a été marquée comme lue.`,
+      }
     default: {
       const _exhaustive: never = event
       throw new Error(`Unknown event type: ${_exhaustive}`)
