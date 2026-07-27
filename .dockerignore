@@ -15,9 +15,8 @@ architecture-report-*.html
 .gitattributes
 .prettierignore
 .prettierrc
-docker-compose*.yml
-compose.yaml
-compose.dev.yml
+docker-compose*
+compose.*
 Dockerfile
 eslint.config.mjs
 vitest.config.ts
