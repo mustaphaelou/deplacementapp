@@ -1,4 +1,4 @@
-import { eq, count } from "drizzle-orm"
+import { eq, and, count } from "drizzle-orm"
 import { db } from "../../db"
 import { demandesDeplacement } from "../../db/schema/demandes-deplacement"
 import { utilisateurs } from "../../db/schema/utilisateurs"
@@ -143,10 +143,14 @@ async function writeNotifications(params: {
   const recipients = new Set<string>()
 
   if (params.event === "DEMANDE_SOUMISE") {
+    const conditions = [eq(utilisateurs.role, "MANAGER")] as const
+    const filter = params.departementId
+      ? and(...conditions, eq(utilisateurs.departementId, params.departementId))
+      : and(...conditions)
     const managers = await db
       .select({ id: utilisateurs.id })
       .from(utilisateurs)
-      .where(eq(utilisateurs.role, "MANAGER"))
+      .where(filter)
     managers.forEach((m) => recipients.add(m.id))
   } else if (params.event === "DEMANDE_APPROBATION_MANAGER") {
     const finance = await db

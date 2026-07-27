@@ -13,7 +13,7 @@ import {
 
 const TIMEOUT = 30_000
 
-describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT }, () => {
+describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT, hookTimeout: TIMEOUT }, () => {
   let pgliteDb: PgliteDb
   let employeeId: string
   let managerId: string
@@ -110,6 +110,16 @@ describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT }, () => {
     avanceRequise: true,
     montantAvance: "2000",
     description: "Mission client a Casablanca",
+  }
+
+  async function createDraftDemande(
+    actorId = employeeId,
+    overrides: Record<string, unknown> = {},
+  ) {
+    return createDraft(
+      { ...sampleData, ...overrides },
+      { id: actorId, role: "EMPLOYEE" },
+    )
   }
 
   // ─── createDraft ──────────────────────────────────────────────────
@@ -286,17 +296,6 @@ describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT }, () => {
   // ─── executeTransition ─────────────────────────────────────────────
 
   describe("executeTransition - guards", () => {
-    async function createDraftDemande(
-      actorId = employeeId,
-      overrides: Record<string, unknown> = {},
-    ) {
-      const demande = await createDraft(
-        { ...sampleData, ...overrides },
-        { id: actorId, role: "EMPLOYEE" },
-      )
-      return demande
-    }
-
     it("EMPLOYEE can submit from DRAFT", async () => {
       const demande = await createDraftDemande()
       const updated = await executeTransition({
@@ -519,10 +518,6 @@ describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT }, () => {
   // ─── executeTransition - side effects ─────────────────────────────
 
   describe("executeTransition - side effects", () => {
-    async function createDraftDemande(actorId = employeeId) {
-      return createDraft(sampleData, { id: actorId, role: "EMPLOYEE" })
-    }
-
     it("committed submit writes JournalAudit + Notification rows", async () => {
       const demande = await createDraftDemande()
 
