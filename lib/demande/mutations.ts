@@ -1,5 +1,6 @@
 import { eq, and, count } from "drizzle-orm"
 import { db } from "../../db"
+import type { PgDatabase } from "drizzle-orm/pg-core"
 import { demandesDeplacement } from "../../db/schema/demandes-deplacement"
 import { utilisateurs } from "../../db/schema/utilisateurs"
 import { departements } from "../../db/schema/departements"
@@ -113,13 +114,17 @@ function buildMessage(
   }
 }
 
-async function writeJournalAudit(params: {
-  utilisateurId: string
-  action: string
-  entiteId: string
-  numero: string
-}): Promise<void> {
-  await db.insert(journalAudit).values({
+async function writeJournalAudit(
+  params: {
+    utilisateurId: string
+    action: string
+    entiteId: string
+    numero: string
+  },
+  tx?: PgDatabase<any, any, any>,
+): Promise<void> {
+  const client = tx ?? db
+  await client.insert(journalAudit).values({
     id: crypto.randomUUID(),
     utilisateurId: params.utilisateurId,
     action: params.action,
@@ -129,16 +134,20 @@ async function writeJournalAudit(params: {
   })
 }
 
-async function writeNotifications(params: {
-  event: NotificationEventType
-  demandeId: string
-  numero: string
-  employeeId: string
-  employeePrenom: string
-  employeeNom: string
-  departementId: string
-  assigneAId?: string | null
-}): Promise<void> {
+async function writeNotifications(
+  params: {
+    event: NotificationEventType
+    demandeId: string
+    numero: string
+    employeeId: string
+    employeePrenom: string
+    employeeNom: string
+    departementId: string
+    assigneAId?: string | null
+  },
+  tx?: PgDatabase<any, any, any>,
+): Promise<void> {
+  const client = tx ?? db
   const { titre, message } = buildMessage(
     params.event,
     params.numero,
@@ -152,19 +161,19 @@ async function writeNotifications(params: {
     const filter = params.departementId
       ? and(...conditions, eq(utilisateurs.departementId, params.departementId))
       : and(...conditions)
-    const managers = await db
+    const managers = await client
       .select({ id: utilisateurs.id })
       .from(utilisateurs)
       .where(filter)
     managers.forEach((m) => recipients.add(m.id))
   } else if (params.event === "DEMANDE_APPROBATION_MANAGER") {
-    const finance = await db
+    const finance = await client
       .select({ id: utilisateurs.id })
       .from(utilisateurs)
       .where(eq(utilisateurs.role, "FINANCE_ADMIN"))
     finance.forEach((f) => recipients.add(f.id))
   } else if (params.event === "DEMANDE_APPROBATION_FINANCE") {
-    const direction = await db
+    const direction = await client
       .select({ id: utilisateurs.id })
       .from(utilisateurs)
       .where(eq(utilisateurs.role, "GENERAL_DIRECTION"))
@@ -180,7 +189,7 @@ async function writeNotifications(params: {
 
   if (recipients.size === 0) return
 
-  await db.insert(notifications).values(
+  await client.insert(notifications).values(
     Array.from(recipients).map((utilisateurId) => ({
       id: crypto.randomUUID(),
       utilisateurId,
@@ -353,28 +362,39 @@ export async function executeTransition(
   if (!transition) throw new InvalidTransitionError()
 
   const fields = { ...transition.transition.fields, modifieLe: new Date() }
-  const [updated] = await db
-    .update(demandesDeplacement)
-    .set(fields)
-    .where(eq(demandesDeplacement.id, demandeId))
-    .returning()
 
-  await writeJournalAudit({
-    utilisateurId: actor.id,
-    action: transition.auditAction,
-    entiteId: demandeId,
-    numero: demande.numero,
-  })
+  const [updated] = await db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(demandesDeplacement)
+      .set(fields)
+      .where(eq(demandesDeplacement.id, demandeId))
+      .returning()
 
-  await writeNotifications({
-    event: transition.notificationEvent,
-    demandeId,
-    numero: demande.numero,
-    employeeId: demande.employe?.id ?? actor.id,
-    employeePrenom: demande.employe?.prenom ?? "",
-    employeeNom: demande.employe?.nom ?? "",
-    departementId: demande.employe?.departementId ?? "",
-    assigneAId: demande.assigneAId,
+    await writeJournalAudit(
+      {
+        utilisateurId: actor.id,
+        action: transition.auditAction,
+        entiteId: demandeId,
+        numero: demande.numero,
+      },
+      tx,
+    )
+
+    await writeNotifications(
+      {
+        event: transition.notificationEvent,
+        demandeId,
+        numero: demande.numero,
+        employeeId: demande.employe?.id ?? actor.id,
+        employeePrenom: demande.employe?.prenom ?? "",
+        employeeNom: demande.employe?.nom ?? "",
+        departementId: demande.employe?.departementId ?? "",
+        assigneAId: demande.assigneAId,
+      },
+      tx,
+    )
+
+    return [updated]
   })
 
   return updated
