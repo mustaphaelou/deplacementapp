@@ -1,7 +1,8 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth-utils";
 import { requireRole } from "@/lib/authorization";
-import { demandeService } from "@/lib/demande/di";
+import { findMany, createDraft, createAndSubmit } from "@/lib/demande";
+import type { Role } from "@/lib/roles";
 import { demandeSchema, demandeQuerySchema } from "@/lib/schemas";
 import { withValidation, validateQueryParams } from "@/lib/api-utils";
 import { handleServiceError } from "@/lib/errors";
@@ -12,7 +13,7 @@ export async function GET(req: NextRequest) {
   const query = validateQueryParams(demandeQuerySchema, req);
   if (!query.ok) return query.response;
   try {
-    const result = await demandeService.queries.findMany(auth.user.role, auth.user.id, query.data);
+    const result = await findMany(auth.user.role, auth.user.id, query.data);
     return NextResponse.json(result);
   } catch (e) {
     return handleServiceError(e);
@@ -23,14 +24,12 @@ export const POST = withValidation(demandeSchema, async (req, auth, data, _param
   const authorized = requireRole(auth, "EMPLOYEE");
   if (!authorized.ok) return authorized.response;
   const { action, ...serviceData } = data;
-  const serviceAction = action === "submit" ? "submit" as const : "create" as const;
+  const actor = { id: auth.id, role: auth.role as Role };
   try {
-    const result = await demandeService.executeAction({
-      action: serviceAction,
-      data: serviceData,
-      actor: { id: auth.id, role: auth.role as Parameters<typeof demandeService.executeAction>[0]["actor"]["role"] },
-    });
-    return NextResponse.json({ demande: result.demande });
+    const demande = action === "submit"
+      ? await createAndSubmit(serviceData, actor)
+      : await createDraft(serviceData, actor);
+    return NextResponse.json({ demande });
   } catch (e) {
     return handleServiceError(e);
   }

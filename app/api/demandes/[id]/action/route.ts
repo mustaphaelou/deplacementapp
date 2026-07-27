@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { demandeService } from "@/lib/demande/di"
+import { executeTransition } from "@/lib/demande"
 import { actionBodySchema } from "@/lib/schemas"
 import { withValidation } from "@/lib/api-utils"
 import { handleServiceError } from "@/lib/errors"
@@ -9,35 +9,14 @@ export const POST = withValidation(actionBodySchema, async (req, auth, data, par
   const { id } = params
 
   try {
-    const actor = { id: auth.id, role: auth.role as Role }
-    switch (data.action) {
-      case "approuver": {
-        const result = await demandeService.executeAction({
-          action: "approuver",
-          demandeId: id,
-          actor,
-          comment: data.commentaire?.trim(),
-        })
-        return NextResponse.json({ demande: result.demande })
-      }
-      case "rejeter": {
-        const result = await demandeService.executeAction({
-          action: "rejeter",
-          demandeId: id,
-          actor,
-          comment: data.commentaire,
-        })
-        return NextResponse.json({ demande: result.demande })
-      }
-      case "retirer": {
-        const result = await demandeService.executeAction({
-          action: "retirer",
-          demandeId: id,
-          actor,
-        })
-        return NextResponse.json({ demande: result.demande })
-      }
-    }
+    const comment = "commentaire" in data ? data.commentaire?.trim() : undefined
+    const demande = await executeTransition({
+      demandeId: id,
+      action: data.action,
+      actor: { id: auth.id, role: auth.role as Role },
+      comment,
+    })
+    return NextResponse.json({ demande })
   } catch (e) {
     return handleServiceError(e)
   }

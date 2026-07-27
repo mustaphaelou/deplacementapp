@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth-utils";
-import { demandeService } from "@/lib/demande/di";
+import { findById } from "@/lib/demande";
 import { handleServiceError } from "@/lib/errors";
 
 export async function GET(
@@ -11,7 +11,7 @@ export async function GET(
   const auth = await requireAuth();
   if (!auth.ok) return auth.response;
   try {
-    const demande = await demandeService.queries.findById(id);
+    const demande = await findById(id);
     return NextResponse.json({ demande });
   } catch (e) {
     return handleServiceError(e);

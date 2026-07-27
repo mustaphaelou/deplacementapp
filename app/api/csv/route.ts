@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth-utils";
 import { requireAnyRole } from "@/lib/authorization";
-import { demandeService } from "@/lib/demande/di";
+import { findAllForExport } from "@/lib/demande";
 import { handleServiceError } from "@/lib/errors";
 import type { Role } from "@/lib/roles";
 
@@ -15,7 +15,7 @@ export async function GET() {
 
   let demandes;
   try {
-    demandes = await demandeService.queries.findAllForExport();
+    demandes = await findAllForExport();
   } catch (e) {
     return handleServiceError(e);
   }
