@@ -9,7 +9,14 @@ export const POST = withValidation(actionBodySchema, async (req, auth, data, par
   const { id } = params
 
   try {
-    const comment = "commentaire" in data ? data.commentaire?.trim() : undefined
+    let comment: string | undefined
+    if (data.action === "retirer") {
+      comment = undefined
+    } else if (data.action === "rejeter") {
+      comment = data.commentaire
+    } else {
+      comment = data.commentaire?.trim()
+    }
     const demande = await executeTransition({
       demandeId: id,
       action: data.action,
