@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth-utils"
-import { demandeService } from "@/lib/demande/di"
+import { findById, recordDocument } from "@/lib/demande"
 import { toPdfRenderData } from "@/lib/pdf-mapper"
 import { pdfAdapter } from "@/components/pdf/travel-request-pdf-adapter"
 import { handleServiceError } from "@/lib/errors"
@@ -14,11 +14,11 @@ export async function GET(
   if (!auth.ok) return auth.response
 
   try {
-    const demande = await demandeService.queries.findById(id)
+    const demande = await findById(id)
     const data = toPdfRenderData(demande)
     const buffer = await pdfAdapter.render(data)
 
-    await demandeService.recordDocument(id, {
+    await recordDocument(id, {
       type: "PDF",
       chemin: `demande-${demande.numero}.pdf`,
     })

@@ -1,16 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import type { DemandeExportRow } from "@/lib/demande/ports/demande-query-port"
+import type { DemandeExportRow } from "@/lib/demande"
 
 vi.mock("@/lib/auth-utils", () => ({
   requireAuth: vi.fn(),
 }))
 
-vi.mock("@/lib/demande/di", () => ({
-  demandeService: {
-    queries: {
-      findAllForExport: vi.fn(),
-    },
-  },
+vi.mock("@/lib/demande", () => ({
+  findAllForExport: vi.fn(),
 }))
 
 const mockExportRows: DemandeExportRow[] = [
@@ -62,15 +58,15 @@ describe("CSV export route", () => {
 
   it("GET exports demandes through the queries port and returns CSV", async () => {
     const { requireAuth } = await import("@/lib/auth-utils")
-    const { demandeService } = await import("@/lib/demande/di")
+    const { findAllForExport } = await import("@/lib/demande")
 
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
-    ;(demandeService.queries.findAllForExport as ReturnType<typeof vi.fn>).mockResolvedValue(mockExportRows)
+    ;(findAllForExport as ReturnType<typeof vi.fn>).mockResolvedValue(mockExportRows)
 
     const { GET } = await import("./route")
     const response = await GET()
 
-    expect(demandeService.queries.findAllForExport).toHaveBeenCalledOnce()
+    expect(findAllForExport).toHaveBeenCalledOnce()
     expect(response.status).toBe(200)
     expect(response.headers.get("Content-Type")).toBe("text/csv; charset=utf-8")
 
@@ -105,10 +101,10 @@ describe("CSV export route", () => {
 
   it("GET returns 500 when the queries port throws", async () => {
     const { requireAuth } = await import("@/lib/auth-utils")
-    const { demandeService } = await import("@/lib/demande/di")
+    const { findAllForExport } = await import("@/lib/demande")
 
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
-    ;(demandeService.queries.findAllForExport as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("DB down"))
+    ;(findAllForExport as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("DB down"))
 
     const { GET } = await import("./route")
     const response = await GET()
