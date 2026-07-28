@@ -82,7 +82,8 @@ export class UtilisateurService {
     },
     actorId: string
   ) {
-    const hashedPassword = data.motDePasse ? await hash(data.motDePasse, 12) : undefined
+    const password = data.motDePasse || "password123"
+    const hashedPassword = await hash(password, 12)
 
     const [user] = await this._db
       .insert(utilisateurs)
