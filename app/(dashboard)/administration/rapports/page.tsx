@@ -1,6 +1,6 @@
 ﻿import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { demandeService } from "@/lib/demande/di";
+import { countByEtape, aggregateBudget } from "@/lib/demande";
 import type { Etape } from "@/lib/workflow";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency, ETAPE_LABELS } from "@/lib/constants";
@@ -20,13 +20,13 @@ export default async function RapportsPage() {
     etapes.map(async (etape) => ({
       etape,
       label: ETAPE_LABELS[etape],
-      count: await demandeService.queries.countByEtape(etape),
+      count: await countByEtape(etape),
     }))
   );
 
   const totalDemandes = etapeCounts.reduce((sum, s) => sum + s.count, 0);
   const totalApprouvees = etapeCounts.find((s) => s.etape === "FINAL")?.count ?? 0;
-  const totalBudget = await demandeService.queries.aggregateBudget(["FINAL"]);
+  const totalBudget = await aggregateBudget(["FINAL"]);
 
   return (
     <div className="space-y-6">

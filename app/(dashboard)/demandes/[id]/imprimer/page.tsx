@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { demandeService } from "@/lib/demande/di";
-import { DemandeNotFoundError } from "@/lib/demande-service";
+import { findById } from "@/lib/demande";
+import { DemandeNotFoundError } from "@/lib/errors";
 import { formatCurrency, formatDate, TRANSPORT_LABELS, ETAPE_LABELS } from "@/lib/constants";
 import { parseMotif, type DemandeWithRelations } from "@/lib/demande-types";
 
@@ -16,7 +16,7 @@ export default async function ImprimerPage({
 
   let demande: DemandeWithRelations;
   try {
-    demande = await demandeService.queries.findById(id);
+    demande = await findById(id);
   } catch (e) {
     if (e instanceof DemandeNotFoundError) redirect("/demandes");
     throw e;

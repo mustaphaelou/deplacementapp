@@ -1,17 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { DemandeNotFoundError } from "@/lib/demande-service"
+import { DemandeNotFoundError } from "@/lib/errors"
 import type { DemandeWithRelations } from "@/lib/demande-types"
 
 vi.mock("@/lib/auth", () => ({
   auth: vi.fn(),
 }))
 
-vi.mock("@/lib/demande/di", () => ({
-  demandeService: {
-    queries: {
-      findById: vi.fn(),
-    },
-  },
+vi.mock("@/lib/demande", () => ({
+  findById: vi.fn(),
 }))
 
 vi.mock("next/navigation", () => ({
@@ -97,25 +93,25 @@ describe("Imprimer page", () => {
 
   it("renders the demande when found", async () => {
     const { auth } = await import("@/lib/auth")
-    const { demandeService } = await import("@/lib/demande/di")
+    const { findById: mockFindById } = await import("@/lib/demande")
 
     ;(auth as ReturnType<typeof vi.fn>).mockResolvedValue(mockSession())
-    ;(demandeService.queries.findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockDemande)
+    ;(mockFindById as ReturnType<typeof vi.fn>).mockResolvedValue(mockDemande)
 
     const { default: ImprimerPage } = await import("./page")
     const element = await ImprimerPage({ params: Promise.resolve({ id: "d-1" }) })
 
-    expect(demandeService.queries.findById).toHaveBeenCalledWith("d-1")
+    expect(mockFindById).toHaveBeenCalledWith("d-1")
     expect(element.props.children[0].props.children[1].props.children).toBe("Formulaire de Demande de Déplacement")
   })
 
   it("redirects when the demande is soft-deleted or missing", async () => {
     const { auth } = await import("@/lib/auth")
-    const { demandeService } = await import("@/lib/demande/di")
+    const { findById: mockFindById } = await import("@/lib/demande")
     const { redirect } = await import("next/navigation")
 
     ;(auth as ReturnType<typeof vi.fn>).mockResolvedValue(mockSession())
-    ;(demandeService.queries.findById as ReturnType<typeof vi.fn>).mockRejectedValue(new DemandeNotFoundError())
+    ;(mockFindById as ReturnType<typeof vi.fn>).mockRejectedValue(new DemandeNotFoundError())
 
     const { default: ImprimerPage } = await import("./page")
     await expect(ImprimerPage({ params: Promise.resolve({ id: "d-1" }) })).rejects.toThrow("NEXT_REDIRECT: /demandes")

@@ -18,7 +18,7 @@ import { DemandeNotFoundError } from "../errors"
 
 const TIMEOUT = 30_000
 
-describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT, hookTimeout: TIMEOUT }, () => {
+describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT }, () => {
   let pgliteDb: PgliteDb
   let employeeId: string
   let managerId: string
@@ -120,7 +120,7 @@ describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT, hookTimeout:
 
   beforeAll(async () => {
     pgliteDb = await createPgliteDb()
-    vi.spyOn(dbModule, "db", "get").mockReturnValue(pgliteDb)
+    vi.spyOn(dbModule, "db", "get").mockReturnValue(pgliteDb as any)
 
     societeId = crypto.randomUUID()
     departementId = crypto.randomUUID()

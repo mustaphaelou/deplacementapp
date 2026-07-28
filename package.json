@@ -19,7 +19,8 @@
     "docker:dev": "docker compose -f docker-compose.yaml -f compose.dev.yml up --build",
     "docker:prod": "docker compose up --build",
     "docker:down": "docker compose down -v",
-    "postinstall": "drizzle-kit generate"
+    "postinstall": "drizzle-kit generate",
+    "sandcastle": "npx tsx ./sandcastle/main.mts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
