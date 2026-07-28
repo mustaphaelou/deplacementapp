@@ -5,12 +5,12 @@ import { notifications } from "../db/schema/notifications"
 import { utilisateurs } from "../db/schema/utilisateurs"
 import { emailService } from "./email-service"
 import { NotificationNotFoundError, UnauthorizedActionError } from "./errors"
-import { NotificationEventType, NotificationPayload, NotificationMessage, EVENT_ROLE_MAP } from "./notification-events"
+import type { NotificationEventType, NotificationPayload, NotificationMessage } from "./notification-events"
+import { EVENT_ROLE_MAP } from "./notification-events"
 
 export { NotificationNotFoundError } from "./errors"
-export type { NotificationEventType, NotificationPayload, NotificationMessage, EVENT_ROLE_MAP } from "./notification-events"
-
-// ─── Types ───────────────────────────────────────────────────────────────────
+export type { NotificationEventType, NotificationPayload, NotificationMessage } from "./notification-events"
+export { EVENT_ROLE_MAP } from "./notification-events"
 
 // ─── Adapter interface ─────────────────────────────────────────────────────
 
