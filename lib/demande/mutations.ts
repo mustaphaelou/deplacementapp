@@ -121,6 +121,7 @@ async function writeJournalAudit(
     entiteId: string
     numero: string
   },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tx?: PgDatabase<any, any, any>,
 ): Promise<void> {
   const client = tx ?? db
@@ -145,6 +146,7 @@ async function writeNotifications(
     departementId: string
     assigneAId?: string | null
   },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tx?: PgDatabase<any, any, any>,
 ): Promise<void> {
   const client = tx ?? db
