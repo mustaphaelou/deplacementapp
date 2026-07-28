@@ -1,42 +1,16 @@
-import { eq, and, count } from "drizzle-orm"
+import { eq, and } from "drizzle-orm"
 import type { DrizzleDb } from "../db"
 import { db } from "../db"
 import { notifications } from "../db/schema/notifications"
 import { utilisateurs } from "../db/schema/utilisateurs"
 import { emailService } from "./email-service"
 import { NotificationNotFoundError, UnauthorizedActionError } from "./errors"
+import { NotificationEventType, NotificationPayload, NotificationMessage, EVENT_ROLE_MAP } from "./notification-events"
 
 export { NotificationNotFoundError } from "./errors"
+export type { NotificationEventType, NotificationPayload, NotificationMessage, EVENT_ROLE_MAP } from "./notification-events"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-
-export type NotificationEventType =
-  | "DEMANDE_SOUMISE"
-  | "DEMANDE_APPROBATION_MANAGER"
-  | "DEMANDE_APPROBATION_FINANCE"
-  | "DEMANDE_APPROBATION_FINALE"
-  | "DEMANDE_REJETEE"
-  | "DEMANDE_RETIREE"
-  | "DEMANDE_NOTIFICATION_LUE"
-
-export interface NotificationPayload {
-  demandeId: string
-  numero: string
-  employe: {
-    id: string
-    prenom: string
-    nom: string
-    departementId?: string
-  }
-  assigneAId?: string | null
-}
-
-export type NotificationMessage = {
-  titre: string
-  message: string
-  utilisateurId: string
-  demandeId: string
-}
 
 // ─── Adapter interface ─────────────────────────────────────────────────────
 
@@ -98,21 +72,6 @@ class DrizzleNotificationAdapter implements NotificationAdapter {
 }
 
 // ─── Recipient resolver: who should receive which event ──────────────────────
-
-interface RoleTarget {
-  role: "EMPLOYEE" | "MANAGER" | "FINANCE_ADMIN" | "GENERAL_DIRECTION"
-  departmentScoped: boolean
-}
-
-const EVENT_ROLE_MAP: Record<NotificationEventType, RoleTarget[]> = {
-  DEMANDE_SOUMISE: [{ role: "MANAGER", departmentScoped: true }],
-  DEMANDE_APPROBATION_MANAGER: [{ role: "FINANCE_ADMIN", departmentScoped: false }],
-  DEMANDE_APPROBATION_FINANCE: [{ role: "GENERAL_DIRECTION", departmentScoped: false }],
-  DEMANDE_APPROBATION_FINALE: [],
-  DEMANDE_REJETEE: [],
-  DEMANDE_RETIREE: [],
-  DEMANDE_NOTIFICATION_LUE: [{ role: "MANAGER", departmentScoped: true }],
-}
 
 const EMPLOYEE_EVENTS: NotificationEventType[] = [
   "DEMANDE_APPROBATION_FINALE",

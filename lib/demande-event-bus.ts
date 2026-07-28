@@ -1,4 +1,5 @@
-import type { NotificationBus, NotificationEventType, NotificationPayload } from "./notification-bus"
+import type { NotificationBus } from "./notification-bus"
+import type { NotificationEventType, NotificationPayload } from "./notification-events"
 import type { AuditBus } from "./audit-bus"
 import { notificationBus } from "./notification-bus"
 import { auditBus } from "./audit-bus"

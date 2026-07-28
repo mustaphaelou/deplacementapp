@@ -1,5 +1,5 @@
 import type { Role } from "./roles"
-import type { NotificationEventType } from "./notification-bus"
+import type { NotificationEventType } from "./notification-events"
 
 export type Etape =
   | "DRAFT"

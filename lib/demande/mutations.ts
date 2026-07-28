@@ -11,7 +11,7 @@ import type { CreateDemandeData } from "../demande-utils"
 import type { Role } from "../roles"
 import { canTransition, buildTransition } from "../workflow"
 import type { Etape, Decision } from "../workflow"
-import type { NotificationEventType } from "../notification-bus"
+import type { NotificationEventType } from "../notification-events"
 import {
   DemandeNotFoundError,
   UnauthorizedActionError,
