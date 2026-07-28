@@ -34,7 +34,7 @@ describe("SocieteIdentity resolver", { timeout: TIMEOUT }, () => {
     const identity = await loadSocieteIdentity()
     expect(identity).toEqual<SocieteIdentity>({
       nomExpediteurEmail: "Test Sender",
-      domaineEmail: "test.ma",
+      domaineEmail: "noreply@test.ma",
     })
   })
 
@@ -49,6 +49,7 @@ describe("SocieteIdentity resolver", { timeout: TIMEOUT }, () => {
 
     const first = await loadSocieteIdentity()
     expect(first.nomExpediteurEmail).toBe("Memo Sender")
+    expect(first.domaineEmail).toBe("noreply@memo.ma")
 
     await pgliteDb
       .update(schema.societes)
@@ -57,7 +58,7 @@ describe("SocieteIdentity resolver", { timeout: TIMEOUT }, () => {
 
     const second = await loadSocieteIdentity()
     expect(second.nomExpediteurEmail).toBe("Memo Sender")
-    expect(second.domaineEmail).toBe("memo.ma")
+    expect(second.domaineEmail).toBe("noreply@memo.ma")
   })
 
   it("returns env fallback when Societe row has null email fields", async () => {
@@ -141,7 +142,7 @@ describe("SocieteIdentity resolver", { timeout: TIMEOUT }, () => {
     const second = await loadSocieteIdentity()
     expect(second).toEqual<SocieteIdentity>({
       nomExpediteurEmail: "Updated Sender",
-      domaineEmail: "updated.ma",
+      domaineEmail: "noreply@updated.ma",
     })
   })
 })

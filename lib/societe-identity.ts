@@ -18,7 +18,7 @@ export async function loadSocieteIdentity(): Promise<SocieteIdentity> {
     if (result?.nomExpediteurEmail && result?.domaineEmail) {
       cachedIdentity = {
         nomExpediteurEmail: result.nomExpediteurEmail,
-        domaineEmail: result.domaineEmail,
+        domaineEmail: `noreply@${result.domaineEmail}`,
       }
       return cachedIdentity
     }
