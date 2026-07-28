@@ -92,7 +92,7 @@ A Notification automatically sent to the MANAGER of an Employee's Departement wh
 A timestamped record of a *committed* state change: who performed what action on which entity. Only successful transitions are recorded — attempts that fail authorization or transition guards (wrong role, invalid action, missing record) throw before the audit dispatch and produce no JournalAudit entry.
 
 **EffetsTransition (Transition Effects)**:
-The side-effects executed immediately following a committed DemandeDeplacement transition, combining JournalAudit logging and Notification dispatches behind a single internal seam.
+The side-effects executed immediately following a committed DemandeDeplacement transition, combining JournalAudit logging and Notification dispatches behind a single internal seam. The seam is **rows-only**: JournalAudit inserts and Notification row inserts run inside the caller's `db.transaction`. Email dispatch is explicitly out of scope — email belongs to the EmailSender module, fired by AccuseLecture, not by transitions.
 _Avoid_: Event bus, side-effect bus, notification bus
 
 
