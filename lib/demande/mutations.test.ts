@@ -712,4 +712,87 @@ describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT }, () => {
       expect(doc).not.toHaveProperty("demande")
     })
   })
+
+  // ─── executeTransition - actif filter ──────────────────────────────
+
+  describe("executeTransition - actif filter (mixed actif values)", () => {
+    let inactiveManagerId: string
+    let inactiveFinanceAdminId: string
+
+    beforeAll(async () => {
+      inactiveManagerId = crypto.randomUUID()
+      inactiveFinanceAdminId = crypto.randomUUID()
+
+      await pgliteDb.insert(schema.utilisateurs).values([
+        {
+          id: inactiveManagerId,
+          email: "inactive-manager@test.com",
+          nom: "Inactif",
+          prenom: "Manager",
+          poste: "Manager",
+          role: "MANAGER",
+          departementId,
+          societeId,
+          actif: false,
+          modifieLe: new Date(),
+        },
+        {
+          id: inactiveFinanceAdminId,
+          email: "inactive-finance@test.com",
+          nom: "Inactif",
+          prenom: "Finance",
+          poste: "Comptable",
+          role: "FINANCE_ADMIN",
+          departementId,
+          societeId,
+          actif: false,
+          modifieLe: new Date(),
+        },
+      ])
+    })
+
+    it("submit writes notifications only to active MANAGER recipients", async () => {
+      const demande = await createDraftDemande()
+      await executeTransition({
+        demandeId: demande.id,
+        action: "submit",
+        actor: { id: employeeId, role: "EMPLOYEE" },
+      })
+
+      const notifRows = await pgliteDb
+        .select()
+        .from(schema.notifications)
+        .where(eq(schema.notifications.demandeId, demande.id))
+
+      const recipientIds = notifRows.map((r) => r.utilisateurId)
+      expect(recipientIds).toContain(managerId)
+      expect(recipientIds).not.toContain(inactiveManagerId)
+      expect(recipientIds).not.toContain(inactiveFinanceAdminId)
+    })
+
+    it("manager approval writes notifications only to active FINANCE_ADMIN recipients", async () => {
+      const demande = await createDraftDemande()
+      await executeTransition({
+        demandeId: demande.id,
+        action: "submit",
+        actor: { id: employeeId, role: "EMPLOYEE" },
+      })
+      await executeTransition({
+        demandeId: demande.id,
+        action: "approuver",
+        actor: { id: managerId, role: "MANAGER" },
+      })
+
+      const notifRows = await pgliteDb
+        .select()
+        .from(schema.notifications)
+        .where(eq(schema.notifications.demandeId, demande.id))
+
+      const recipientIds = notifRows.map((r) => r.utilisateurId)
+      expect(recipientIds).toContain(managerId)
+      expect(recipientIds).toContain(financeAdminId)
+      expect(recipientIds).not.toContain(inactiveManagerId)
+      expect(recipientIds).not.toContain(inactiveFinanceAdminId)
+    })
+  })
 })

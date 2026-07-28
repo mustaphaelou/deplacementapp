@@ -4,6 +4,7 @@ export {
   executeTransition,
   recordDocument,
 } from "./mutations"
+export { appliquerEffets } from "./effets-transition"
 export type {
   DemandeDeplacementRow,
   DocumentRow,

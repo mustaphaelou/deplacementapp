@@ -1,17 +1,15 @@
-import { eq, and, count } from "drizzle-orm"
+import { eq, count } from "drizzle-orm"
 import { db } from "../../db"
-import type { PgDatabase } from "drizzle-orm/pg-core"
 import { demandesDeplacement } from "../../db/schema/demandes-deplacement"
 import { utilisateurs } from "../../db/schema/utilisateurs"
 import { departements } from "../../db/schema/departements"
-import { journalAudit } from "../../db/schema/journal-audit"
-import { notifications } from "../../db/schema/notifications"
 import { documents } from "../../db/schema/documents"
 import type { CreateDemandeData } from "../demande-utils"
 import type { Role } from "../roles"
 import { canTransition, buildTransition } from "../workflow"
 import type { Etape, Decision } from "../workflow"
 import type { NotificationEventType } from "../notification-events"
+import { appliquerEffets } from "./effets-transition"
 import {
   DemandeNotFoundError,
   UnauthorizedActionError,
@@ -61,145 +59,6 @@ async function generateNumero(): Promise<string> {
     .from(demandesDeplacement)
   const nextNum = (result?.value ?? 0) + 1
   return `DD-${new Date().getFullYear()}-${String(nextNum).padStart(4, "0")}`
-}
-
-function buildMessage(
-  event: NotificationEventType,
-  numero: string,
-  employePrenom: string,
-  employeNom: string,
-): { titre: string; message: string } {
-  const fullName = `${employePrenom} ${employeNom}`
-  switch (event) {
-    case "DEMANDE_SOUMISE":
-      return {
-        titre: "Nouvelle demande de déplacement",
-        message: `${fullName} a soumis une demande de déplacement.`,
-      }
-    case "DEMANDE_APPROBATION_MANAGER":
-      return {
-        titre: "Demande approuvée par le manager",
-        message: `La demande ${numero} de ${fullName} a été approuvée par le manager.`,
-      }
-    case "DEMANDE_APPROBATION_FINANCE":
-      return {
-        titre: "Demande approuvée par les finances",
-        message: `La demande ${numero} de ${fullName} est en attente d'approbation finale.`,
-      }
-    case "DEMANDE_APPROBATION_FINALE":
-      return {
-        titre: "Demande approuvée",
-        message: `Votre demande ${numero} a été approuvée.`,
-      }
-    case "DEMANDE_REJETEE":
-      return {
-        titre: "Demande rejetée",
-        message:
-          "Votre demande de déplacement a été rejetée. Consultez les commentaires pour plus de détails.",
-      }
-    case "DEMANDE_RETIREE":
-      return {
-        titre: "Demande retirée",
-        message: `${fullName} a retiré la demande ${numero}.`,
-      }
-    case "DEMANDE_NOTIFICATION_LUE":
-      return {
-        titre: "Notification lue",
-        message: `La notification pour la demande ${numero} a été marquée comme lue.`,
-      }
-    default: {
-      const _exhaustive: never = event
-      throw new Error(`Unknown event type: ${_exhaustive}`)
-    }
-  }
-}
-
-async function writeJournalAudit(
-  params: {
-    utilisateurId: string
-    action: string
-    entiteId: string
-    numero: string
-  },
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  tx?: PgDatabase<any, any, any>,
-): Promise<void> {
-  const client = tx ?? db
-  await client.insert(journalAudit).values({
-    id: crypto.randomUUID(),
-    utilisateurId: params.utilisateurId,
-    action: params.action,
-    entite: "DemandeDeplacement",
-    entiteId: params.entiteId,
-    details: JSON.stringify({ numero: params.numero }),
-  })
-}
-
-async function writeNotifications(
-  params: {
-    event: NotificationEventType
-    demandeId: string
-    numero: string
-    employeeId: string
-    employeePrenom: string
-    employeeNom: string
-    departementId: string
-    assigneAId?: string | null
-  },
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  tx?: PgDatabase<any, any, any>,
-): Promise<void> {
-  const client = tx ?? db
-  const { titre, message } = buildMessage(
-    params.event,
-    params.numero,
-    params.employeePrenom,
-    params.employeeNom,
-  )
-  const recipients = new Set<string>()
-
-  if (params.event === "DEMANDE_SOUMISE") {
-    const conditions = [eq(utilisateurs.role, "MANAGER")] as const
-    const filter = params.departementId
-      ? and(...conditions, eq(utilisateurs.departementId, params.departementId))
-      : and(...conditions)
-    const managers = await client
-      .select({ id: utilisateurs.id })
-      .from(utilisateurs)
-      .where(filter)
-    managers.forEach((m) => recipients.add(m.id))
-  } else if (params.event === "DEMANDE_APPROBATION_MANAGER") {
-    const finance = await client
-      .select({ id: utilisateurs.id })
-      .from(utilisateurs)
-      .where(eq(utilisateurs.role, "FINANCE_ADMIN"))
-    finance.forEach((f) => recipients.add(f.id))
-  } else if (params.event === "DEMANDE_APPROBATION_FINANCE") {
-    const direction = await client
-      .select({ id: utilisateurs.id })
-      .from(utilisateurs)
-      .where(eq(utilisateurs.role, "GENERAL_DIRECTION"))
-    direction.forEach((d) => recipients.add(d.id))
-  } else if (
-    params.event === "DEMANDE_APPROBATION_FINALE" ||
-    params.event === "DEMANDE_REJETEE"
-  ) {
-    recipients.add(params.employeeId)
-  } else if (params.event === "DEMANDE_RETIREE" && params.assigneAId) {
-    recipients.add(params.assigneAId)
-  }
-
-  if (recipients.size === 0) return
-
-  await client.insert(notifications).values(
-    Array.from(recipients).map((utilisateurId) => ({
-      id: crypto.randomUUID(),
-      utilisateurId,
-      demandeId: params.demandeId,
-      titre,
-      message,
-    })),
-  )
 }
 
 async function createDemande(
@@ -268,29 +127,36 @@ async function createDemande(
     notificationEvent = transition.notificationEvent
   }
 
-  const [demande] = await db
-    .insert(demandesDeplacement)
-    .values(createValues as never)
-    .returning()
+  const [demande] = await db.transaction(async (tx) => {
+    const [demande] = await tx
+      .insert(demandesDeplacement)
+      .values(createValues as never)
+      .returning()
 
-  await writeJournalAudit({
-    utilisateurId: userRow.id,
-    action: auditAction,
-    entiteId: demande.id,
-    numero,
-  })
-
-  if (notificationEvent) {
-    await writeNotifications({
-      event: notificationEvent,
-      demandeId: demande.id,
-      numero,
-      employeeId: userRow.id,
-      employeePrenom: userRow.prenom,
-      employeeNom: userRow.nom,
-      departementId: userRow.departementId,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await appliquerEffets(tx as any, {
+      audit: {
+        utilisateurId: userRow.id,
+        action: auditAction,
+        entiteId: demande.id,
+        numero,
+      },
+      notification: notificationEvent
+        ? {
+            event: notificationEvent,
+            demandeId: demande.id,
+            numero,
+            employeeId: userRow.id,
+            employeePrenom: userRow.prenom,
+            employeeNom: userRow.nom,
+            departementId: userRow.departementId ?? "",
+            assigneAId: null,
+          }
+        : null,
     })
-  }
+
+    return [demande]
+  })
 
   return demande
 }
@@ -372,18 +238,15 @@ export async function executeTransition(
       .where(eq(demandesDeplacement.id, demandeId))
       .returning()
 
-    await writeJournalAudit(
-      {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await appliquerEffets(tx as any, {
+      audit: {
         utilisateurId: actor.id,
         action: transition.auditAction,
         entiteId: demandeId,
         numero: demande.numero,
       },
-      tx,
-    )
-
-    await writeNotifications(
-      {
+      notification: {
         event: transition.notificationEvent,
         demandeId,
         numero: demande.numero,
@@ -393,8 +256,7 @@ export async function executeTransition(
         departementId: demande.employe?.departementId ?? "",
         assigneAId: demande.assigneAId,
       },
-      tx,
-    )
+    })
 
     return [updated]
   })
