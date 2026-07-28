@@ -1,5 +1,7 @@
 # DI Wiring Pattern — Proposal for Wiring the Three Repository Ports
 
+<!-- Historical: demandeEventBus was removed when EffetsTransition (ADR-0007) replaced this approach. The adapter wrappers shown below were already removed by ADR-0006. -->
+
 ## Current pattern summary
 
 The codebase uses **manual constructor injection with module-level singletons**. Every service module:
