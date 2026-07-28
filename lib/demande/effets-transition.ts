@@ -9,10 +9,10 @@ import { EVENT_ROLE_MAP } from "../notification-events"
 export function buildMessage(
   event: NotificationEventType,
   numero: string,
-  employePrenom: string,
-  employeNom: string,
+  prenom: string,
+  nom: string,
 ): { titre: string; message: string } {
-  const fullName = `${employePrenom} ${employeNom}`
+  const fullName = `${prenom} ${nom}`
   switch (event) {
     case "DEMANDE_SOUMISE":
       return {
@@ -107,10 +107,7 @@ export async function appliquerEffets(
       event: NotificationEventType
       demandeId: string
       numero: string
-      employeeId: string
-      employeePrenom: string
-      employeeNom: string
-      departementId: string
+      employe: { id: string; prenom: string; nom: string; departementId: string }
       assigneAId?: string | null
     } | null
   },
@@ -125,21 +122,10 @@ export async function appliquerEffets(
   })
 
   if (params.notification) {
-    const { event, demandeId, numero, employeePrenom, employeeNom, employeeId, departementId, assigneAId } = params.notification
-    const { titre, message } = buildMessage(event, numero, employeePrenom, employeeNom)
+    const { event, demandeId, numero, employe, assigneAId } = params.notification
+    const { titre, message } = buildMessage(event, numero, employe.prenom, employe.nom)
 
-    const payload: NotificationPayload = {
-      demandeId,
-      numero,
-      employe: {
-        id: employeeId,
-        prenom: employeePrenom,
-        nom: employeeNom,
-        departementId,
-      },
-      assigneAId,
-    }
-
+    const payload: NotificationPayload = { demandeId, numero, employe, assigneAId }
     const recipientIds = await resolveRecipients(event, payload, tx)
 
     if (recipientIds.length > 0) {

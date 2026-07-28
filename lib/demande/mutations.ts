@@ -146,10 +146,12 @@ async function createDemande(
             event: notificationEvent,
             demandeId: demande.id,
             numero,
-            employeeId: userRow.id,
-            employeePrenom: userRow.prenom,
-            employeeNom: userRow.nom,
-            departementId: userRow.departementId ?? "",
+            employe: {
+              id: userRow.id,
+              prenom: userRow.prenom,
+              nom: userRow.nom,
+              departementId: userRow.departementId ?? "",
+            },
             assigneAId: null,
           }
         : null,
@@ -250,10 +252,12 @@ export async function executeTransition(
         event: transition.notificationEvent,
         demandeId,
         numero: demande.numero,
-        employeeId: demande.employe?.id ?? actor.id,
-        employeePrenom: demande.employe?.prenom ?? "",
-        employeeNom: demande.employe?.nom ?? "",
-        departementId: demande.employe?.departementId ?? "",
+        employe: {
+          id: demande.employe?.id ?? actor.id,
+          prenom: demande.employe?.prenom ?? "",
+          nom: demande.employe?.nom ?? "",
+          departementId: demande.employe?.departementId ?? "",
+        },
         assigneAId: demande.assigneAId,
       },
     })

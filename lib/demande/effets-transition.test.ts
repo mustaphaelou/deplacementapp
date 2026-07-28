@@ -98,10 +98,12 @@ describe("appliquerEffets", { timeout: TIMEOUT }, () => {
           event: "DEMANDE_SOUMISE",
           demandeId,
           numero,
-          employeeId,
-          employeePrenom: "Jean",
-          employeeNom: "Dupont",
-          departementId,
+          employe: {
+            id: employeeId,
+            prenom: "Jean",
+            nom: "Dupont",
+            departementId,
+          },
           assigneAId: null,
         },
       })
@@ -186,10 +188,12 @@ describe("appliquerEffets", { timeout: TIMEOUT }, () => {
             event: "DEMANDE_SOUMISE",
             demandeId: rollbackDemandeId,
             numero,
-            employeeId,
-            employeePrenom: "Jean",
-            employeeNom: "Dupont",
-            departementId,
+            employe: {
+              id: employeeId,
+              prenom: "Jean",
+              nom: "Dupont",
+              departementId,
+            },
             assigneAId: null,
           },
         })
