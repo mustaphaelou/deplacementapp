@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm"
+import { eq } from "drizzle-orm"
 import type { DrizzleDb } from "../db"
 import { db } from "../db"
 import { notifications } from "../db/schema/notifications"
@@ -6,7 +6,7 @@ import { utilisateurs } from "../db/schema/utilisateurs"
 import { emailService } from "./email-service"
 import { NotificationNotFoundError, UnauthorizedActionError } from "./errors"
 import type { NotificationEventType, NotificationPayload, NotificationMessage } from "./notification-events"
-import { EVENT_ROLE_MAP } from "./notification-events"
+import { buildMessage, resolveRecipients } from "./demande/effets-transition"
 
 export { NotificationNotFoundError } from "./errors"
 export type { NotificationEventType, NotificationPayload, NotificationMessage } from "./notification-events"
@@ -71,98 +71,6 @@ class DrizzleNotificationAdapter implements NotificationAdapter {
   }
 }
 
-// ─── Recipient resolver: who should receive which event ──────────────────────
-
-const EMPLOYEE_EVENTS: NotificationEventType[] = [
-  "DEMANDE_APPROBATION_FINALE",
-  "DEMANDE_REJETEE",
-]
-
-const ASSIGNEE_EVENTS: NotificationEventType[] = ["DEMANDE_RETIREE"]
-
-async function resolveRecipients(
-  event: NotificationEventType,
-  payload: NotificationPayload,
-  _db: DrizzleDb
-): Promise<string[]> {
-  const ids = new Set<string>()
-
-  const roleTargets = EVENT_ROLE_MAP[event]
-  for (const target of roleTargets) {
-    const conditions = [eq(utilisateurs.role, target.role), eq(utilisateurs.actif, true)]
-    if (target.departmentScoped && payload.employe.departementId) {
-      conditions.push(eq(utilisateurs.departementId, payload.employe.departementId))
-    }
-    if (target.departmentScoped && !payload.employe.departementId) continue
-
-    const users = await _db
-      .select({ id: utilisateurs.id })
-      .from(utilisateurs)
-      .where(and(...conditions))
-    users.forEach((u) => ids.add(u.id))
-  }
-
-  if (EMPLOYEE_EVENTS.includes(event)) {
-    ids.add(payload.employe.id)
-  }
-
-  if (ASSIGNEE_EVENTS.includes(event) && payload.assigneAId) {
-    ids.add(payload.assigneAId)
-  }
-
-  return Array.from(ids)
-}
-
-function buildMessage(
-  event: NotificationEventType,
-  payload: NotificationPayload
-): { titre: string; message: string } {
-  const { numero, employe } = payload
-  const fullName = `${employe.prenom} ${employe.nom}`
-
-  switch (event) {
-    case "DEMANDE_SOUMISE":
-      return {
-        titre: "Nouvelle demande de déplacement",
-        message: `${fullName} a soumis une demande de déplacement.`,
-      }
-    case "DEMANDE_APPROBATION_MANAGER":
-      return {
-        titre: "Demande approuvée par le manager",
-        message: `La demande ${numero} de ${fullName} a été approuvée par le manager.`,
-      }
-    case "DEMANDE_APPROBATION_FINANCE":
-      return {
-        titre: "Demande approuvée par les finances",
-        message: `La demande ${numero} de ${fullName} est en attente d'approbation finale.`,
-      }
-    case "DEMANDE_APPROBATION_FINALE":
-      return {
-        titre: "Demande approuvée",
-        message: `Votre demande ${numero} a été approuvée.`,
-      }
-    case "DEMANDE_REJETEE":
-      return {
-        titre: "Demande rejetée",
-        message:
-          "Votre demande de déplacement a été rejetée. Consultez les commentaires pour plus de détails.",
-      }
-    case "DEMANDE_RETIREE":
-      return {
-        titre: "Demande retirée",
-        message: `${fullName} a retiré la demande ${numero}.`,
-      }
-    case "DEMANDE_NOTIFICATION_LUE":
-      return {
-        titre: "Notification lue par l'employé",
-        message: `${fullName} a lu la notification concernant la demande ${numero}.`,
-      }
-    default:
-      const _exhaustive: never = event
-      throw new Error(`Unknown event type: ${_exhaustive}`)
-  }
-}
-
 // ─── Dispatch result ─────────────────────────────────────────────────────
 
 export interface DispatchFailure {
@@ -186,8 +94,9 @@ export class NotificationBus {
   ) {}
 
   async dispatch(event: NotificationEventType, payload: NotificationPayload): Promise<DispatchResult> {
-    const recipients = await resolveRecipients(event, payload, this._db)
-    const { titre, message } = buildMessage(event, payload)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const recipients = await resolveRecipients(event, payload, this._db as any)
+    const { titre, message } = buildMessage(event, payload.numero, payload.employe.prenom, payload.employe.nom)
 
     const results = await Promise.allSettled(
       recipients.map((utilisateurId) =>
