@@ -85,8 +85,12 @@ _Avoid_: Approver, assigné, assignee, last-actor
 A message sent to a Utilisateur about a DemandeDeplacement event, delivered via both an in-app alert and an email. MANAGER notifications are scoped to the employee's Departement; FINANCE_ADMIN and GENERAL_DIRECTION notifications are org-wide.
 
 **AccuseLecture (Read Receipt)**:
-A Notification automatically sent to the MANAGER of an Employee's Departement when that Employee marks a Notification related to a DemandeDeplacement as read (lu). Dispatched only when the reader's Role is EMPLOYEE and the Notification is linked to a DemandeDeplacement — reads by MANAGER, FINANCE_ADMIN, or GENERAL_DIRECTION (or reads of demande-less notifications) produce no AccuseLecture.
+A Notification automatically sent to the MANAGER of an Employee's Departement when that Employee marks a Notification related to a DemandeDeplacement as read (lu). Dispatched only when the reader's Role is EMPLOYEE and the Notification is linked to a DemandeDeplacement — reads by MANAGER, FINANCE_ADMIN, or GENERAL_DIRECTION (or reads of demande-less notifications) produce no AccuseLecture. The email step of the AccuseLecture is dispatched via the EmailSender module.
 
+
+**EmailSender**:
+The module that sends outgoing notification emails. Owns the transport seam (SMTP and SMTP-missing strategies) and resolves sender identity from the Societe's `NomExpediteurEmail` + `DomaineEmail` (env fallback `SMTP_FROM_NAME` / `SMTP_FROM` when unset). Single production caller: the AccuseLecture path inside `NotificationBus.markAsRead`.
+_Avoid_: EmailService (the predecessor's name), mailer, email service
 
 **JournalAudit**:
 A timestamped record of a *committed* state change: who performed what action on which entity. Only successful transitions are recorded — attempts that fail authorization or transition guards (wrong role, invalid action, missing record) throw before the audit dispatch and produce no JournalAudit entry.

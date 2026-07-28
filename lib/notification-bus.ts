@@ -3,7 +3,7 @@ import type { DrizzleDb } from "../db"
 import { db } from "../db"
 import { notifications } from "../db/schema/notifications"
 import { utilisateurs } from "../db/schema/utilisateurs"
-import { emailService } from "./email-service"
+import { emailSender } from "./email-sender"
 import { NotificationNotFoundError, UnauthorizedActionError } from "./errors"
 import type { NotificationEventType, NotificationPayload, NotificationMessage } from "./notification-events"
 import { buildMessage, resolveRecipients } from "./demande/effets-transition"
@@ -45,7 +45,7 @@ class DrizzleNotificationAdapter implements NotificationAdapter {
         .limit(1)
 
       if (recipient?.email) {
-        await emailService.send({
+        await emailSender.send({
           to: recipient.email,
           subject: notification.titre,
           text: notification.message,
