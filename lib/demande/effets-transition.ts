@@ -75,10 +75,10 @@ export async function resolveRecipients(
   const roleTargets = EVENT_ROLE_MAP[event]
   for (const target of roleTargets) {
     const conditions = [eq(utilisateurs.role, target.role), eq(utilisateurs.actif, true)]
-    if (target.departmentScoped && payload.employe.departementId) {
+    if (target.departmentScoped) {
+      if (!payload.employe.departementId) continue
       conditions.push(eq(utilisateurs.departementId, payload.employe.departementId))
     }
-    if (target.departmentScoped && !payload.employe.departementId) continue
 
     const users = await tx
       .select({ id: utilisateurs.id })
@@ -125,34 +125,29 @@ export async function appliquerEffets(
   })
 
   if (params.notification) {
-    const n = params.notification
-    const { titre, message } = buildMessage(
-      n.event,
-      n.numero,
-      n.employeePrenom,
-      n.employeeNom,
-    )
+    const { event, demandeId, numero, employeePrenom, employeeNom, employeeId, departementId, assigneAId } = params.notification
+    const { titre, message } = buildMessage(event, numero, employeePrenom, employeeNom)
 
     const payload: NotificationPayload = {
-      demandeId: n.demandeId,
-      numero: n.numero,
+      demandeId,
+      numero,
       employe: {
-        id: n.employeeId,
-        prenom: n.employeePrenom,
-        nom: n.employeeNom,
-        departementId: n.departementId,
+        id: employeeId,
+        prenom: employeePrenom,
+        nom: employeeNom,
+        departementId,
       },
-      assigneAId: n.assigneAId,
+      assigneAId,
     }
 
-    const recipientIds = await resolveRecipients(n.event, payload, tx)
+    const recipientIds = await resolveRecipients(event, payload, tx)
 
     if (recipientIds.length > 0) {
       await tx.insert(notifications).values(
         recipientIds.map((utilisateurId) => ({
           id: crypto.randomUUID(),
           utilisateurId,
-          demandeId: n.demandeId,
+          demandeId,
           titre,
           message,
         })),
