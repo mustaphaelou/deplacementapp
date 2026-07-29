@@ -108,8 +108,13 @@ _Avoid_: Profile picture, profile photo, user image
 A file attached to a DemandeDeplacement (e.g., invoice, receipt, PDF). The `type` field is free-text (typically a MIME type or descriptive label), not a fixed enum.
 
 **Amorçage (Setup)**:
-The bootstrap lifecycle state of the system while zero Societes exist. It is not a persistent entity — it is a lifecycle state, detected by counting Societes. While in Amorçage, the /login page renders a setup wizard instead of the sign-in form; the wizard creates the initial Societe, the first Departements, and the first Utilisateur (Role GENERAL_DIRECTION), after which the system leaves Amorçage permanently and the wizard never appears again.
+The bootstrap lifecycle state of the system while zero Societes exist. It is not a persistent entity — it is a lifecycle state, detected by counting Societes. While in Amorçage, the /login page renders a setup wizard instead of the sign-in form; the wizard creates the initial Societe, the first Departements, and the first Utilisateur (Role GENERAL_DIRECTION), after which the system leaves Amorçage permanently and the wizard never appears again. The lifecycle state is carried in code by the `lib/amorcage` module — `estEnAmorcage` (the count gate) and `quitterAmorcage` (the atomic bootstrap).
 _Avoid_: Onboarding, initialization, installation
+
+**quitterAmorcage**:
+The function that performs the atomic transition out of Amorçage: writes the Societe (incl. `NomExpediteurEmail`), Departements, and first Utilisateur in a single `db.transaction`, or rolls back. Caller: the setup wizard. Throws `AmorcageDejaConfigureError` if invoked after Amorçage has ended.
+_Wikis to_: Amorçage (Setup), NomExpediteurEmail
+_Cites_: ADR-0008 (deferral), ADR-0009
 
 ### Branding
 
