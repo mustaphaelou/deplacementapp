@@ -6,15 +6,9 @@ vi.mock("@/lib/auth-utils", () => ({
   requireAuth: vi.fn(),
 }))
 
-vi.mock("@/lib/notification-bus", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/notification-bus")>()
-  return {
-    ...actual,
-    notificationBus: {
-      markAsRead: vi.fn(),
-    },
-  }
-})
+vi.mock("@/lib/notification", () => ({
+  markAsRead: vi.fn(),
+}))
 
 function mockAuth(userId = "u-1") {
   return {
@@ -57,10 +51,10 @@ describe("PATCH /api/notifications/[id]", () => {
 
   it("returns 200 when the owner marks their notification as read", async () => {
     const { requireAuth } = await import("@/lib/auth-utils")
-    const { notificationBus } = await import("@/lib/notification-bus")
+    const { markAsRead } = await import("@/lib/notification")
 
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth("u-1"))
-    ;(notificationBus.markAsRead as any).mockResolvedValue(undefined)
+    ;(markAsRead as any).mockResolvedValue(undefined)
 
     const { PATCH } = await import("./route")
     const response = await PATCH(mockRequest("n-1"), {
@@ -72,15 +66,15 @@ describe("PATCH /api/notifications/[id]", () => {
     expect(body).toEqual({ ok: true })
 
     // The thin caller delegates ownership + persistence to the seam
-    expect(notificationBus.markAsRead).toHaveBeenCalledWith("n-1", "u-1")
+    expect(markAsRead).toHaveBeenCalledWith("n-1", "u-1")
   })
 
   it("returns 404 driven by the seam when the notification does not exist", async () => {
     const { requireAuth } = await import("@/lib/auth-utils")
-    const { notificationBus } = await import("@/lib/notification-bus")
+    const { markAsRead } = await import("@/lib/notification")
 
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth("u-1"))
-    ;(notificationBus.markAsRead as ReturnType<typeof vi.fn>).mockRejectedValue(
+    ;(markAsRead as ReturnType<typeof vi.fn>).mockRejectedValue(
       new NotificationNotFoundError()
     )
 
@@ -96,10 +90,10 @@ describe("PATCH /api/notifications/[id]", () => {
 
   it("returns 403 driven by the seam when the requester is not the owner", async () => {
     const { requireAuth } = await import("@/lib/auth-utils")
-    const { notificationBus } = await import("@/lib/notification-bus")
+    const { markAsRead } = await import("@/lib/notification")
 
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth("u-2"))
-    ;(notificationBus.markAsRead as ReturnType<typeof vi.fn>).mockRejectedValue(
+    ;(markAsRead as ReturnType<typeof vi.fn>).mockRejectedValue(
       new UnauthorizedActionError("Non autorisé")
     )
 

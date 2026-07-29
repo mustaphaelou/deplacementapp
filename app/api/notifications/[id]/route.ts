@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth-utils"
-import { notificationBus } from "@/lib/notification-bus"
+import { markAsRead } from "@/lib/notification"
 import { handleServiceError } from "@/lib/errors"
 
 export async function PATCH(
@@ -12,7 +12,7 @@ export async function PATCH(
   if (!auth.ok) return auth.response
 
   try {
-    await notificationBus.markAsRead(id, auth.user.id)
+    await markAsRead(id, auth.user.id)
   } catch (e) {
     return handleServiceError(e)
   }

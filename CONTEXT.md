@@ -89,7 +89,7 @@ A Notification automatically sent to the MANAGER of an Employee's Departement wh
 
 
 **EmailSender**:
-The module that sends outgoing notification emails. Owns the transport seam (SMTP and SMTP-missing strategies) and resolves sender identity from the Societe's `NomExpediteurEmail` + `DomaineEmail` (env fallback `SMTP_FROM_NAME` / `SMTP_FROM` when unset). Single production caller: the AccuseLecture path inside `NotificationBus.markAsRead`.
+The module that sends outgoing notification emails. Owns the transport seam (SMTP and SMTP-missing strategies) and resolves sender identity from the Societe's `NomExpediteurEmail` + `DomaineEmail` (env fallback `SMTP_FROM_NAME` / `SMTP_FROM` when unset). Single production caller: the `markAsRead` function in `lib/notification`.
 _Avoid_: EmailService (the predecessor's name), mailer, email service
 
 **JournalAudit**:
