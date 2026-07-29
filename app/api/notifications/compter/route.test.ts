@@ -4,10 +4,8 @@ vi.mock("@/lib/auth-utils", () => ({
   requireAuth: vi.fn().mockResolvedValue({ ok: true, user: { id: "u-1" } }),
 }))
 
-vi.mock("@/lib/notification-queries", () => ({
-  notificationQueries: {
-    countUnread: vi.fn(),
-  },
+vi.mock("@/lib/notification/queries", () => ({
+  countUnread: vi.fn(),
 }))
 
 describe("GET /api/notifications/compter", () => {
@@ -16,8 +14,8 @@ describe("GET /api/notifications/compter", () => {
   })
 
   it("returns the count of unread notifications for the authenticated user", async () => {
-    const { notificationQueries } = await import("@/lib/notification-queries")
-    ;(notificationQueries.countUnread as ReturnType<typeof vi.fn>).mockResolvedValue(5)
+    const { countUnread } = await import("@/lib/notification/queries")
+    ;(countUnread as ReturnType<typeof vi.fn>).mockResolvedValue(5)
 
     const { GET } = await import("./route")
     const response = await GET()
@@ -28,8 +26,8 @@ describe("GET /api/notifications/compter", () => {
   })
 
   it("returns 0 when there are no unread notifications", async () => {
-    const { notificationQueries } = await import("@/lib/notification-queries")
-    ;(notificationQueries.countUnread as ReturnType<typeof vi.fn>).mockResolvedValue(0)
+    const { countUnread } = await import("@/lib/notification/queries")
+    ;(countUnread as ReturnType<typeof vi.fn>).mockResolvedValue(0)
 
     const { GET } = await import("./route")
     const response = await GET()
@@ -40,8 +38,8 @@ describe("GET /api/notifications/compter", () => {
   })
 
   it("returns 500 when the seam throws an unknown error", async () => {
-    const { notificationQueries } = await import("@/lib/notification-queries")
-    ;(notificationQueries.countUnread as ReturnType<typeof vi.fn>).mockRejectedValue(
+    const { countUnread } = await import("@/lib/notification/queries")
+    ;(countUnread as ReturnType<typeof vi.fn>).mockRejectedValue(
       new Error("DB down")
     )
 
