@@ -64,6 +64,14 @@ export class NoProfileUpdateDataError extends Error {
   }
 }
 
+export class AmorcageDejaConfigureError extends Error {
+  status = 409
+  constructor() {
+    super("L'instance est deja configuree")
+    this.name = "AmorcageDejaConfigureError"
+  }
+}
+
 export class AvatarError extends Error {
   status: number
   constructor(message: string, status: number) {
