@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server"
-import { count } from "drizzle-orm"
-import { db } from "@/db"
-import { societes } from "@/db/schema/societes"
 import { handleServiceError } from "@/lib/errors"
+import { estEnAmorcage } from "@/lib/amorcage"
 
 export async function GET() {
   try {
-    const [result] = await db.select({ value: count() }).from(societes)
-    if ((result?.value ?? 0) > 0) {
+    const needsSetup = await estEnAmorcage()
+
+    if (!needsSetup) {
       return NextResponse.json({ needsSetup: false })
     }
 

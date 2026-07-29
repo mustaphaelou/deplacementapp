@@ -1,26 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { NextRequest } from "next/server"
-
-let mockCount = 0
-const mockDb = {
-  select: vi.fn(() => ({
-    from: vi.fn(() => [{ value: mockCount }]),
-  })),
-  insert: vi.fn(() => ({
-    values: vi.fn(),
-  })),
-}
-
-vi.mock("@/db", () => ({
-  db: mockDb,
-}))
-
-vi.mock("bcryptjs", () => ({
-  hash: vi.fn().mockResolvedValue("$hashed$"),
-}))
+import { AmorcageDejaConfigureError } from "@/lib/errors"
 
 vi.mock("@/lib/auth-utils", () => ({
   requireAuth: vi.fn(),
+}))
+
+const mockQuitterAmorcage = vi.fn()
+
+vi.mock("@/lib/amorcage", () => ({
+  quitterAmorcage: mockQuitterAmorcage,
 }))
 
 function mockRequest(body: unknown): NextRequest {
@@ -46,22 +35,8 @@ const validPayload = {
 }
 
 describe("setup register route", () => {
-  beforeEach(async () => {
-    mockCount = 0
+  beforeEach(() => {
     vi.clearAllMocks()
-    const { hash } = await import("bcryptjs")
-    ;(hash as ReturnType<typeof vi.fn>).mockResolvedValue("$hashed$")
-  })
-
-  it("POST returns 409 when a Societe already exists", async () => {
-    mockCount = 1
-
-    const { POST } = await import("./route")
-    const response = await POST(mockRequest(validPayload))
-
-    expect(response.status).toBe(409)
-    const body = await response.json()
-    expect(body.error).toBe("Cette instance est déjà configurée.")
   })
 
   it("POST returns 400 on invalid email", async () => {
@@ -92,29 +67,27 @@ describe("setup register route", () => {
     expect(body.error).toBeDefined()
   })
 
-  it("POST creates Societe, departments and the first Utilisateur on valid input", async () => {
-    const { hash } = await import("bcryptjs")
+  it("POST returns 200 with user on successful quitterAmorcage", async () => {
+    const fakeUser = { id: "u1", email: "admin@exemple.ma", prenom: "Sara", nom: "Alaoui", role: "GENERAL_DIRECTION" }
+    mockQuitterAmorcage.mockResolvedValueOnce({ user: fakeUser })
 
     const { POST } = await import("./route")
     const response = await POST(mockRequest(validPayload))
 
     expect(response.status).toBe(200)
     const body = await response.json()
-    expect(body).toEqual({
-      user: expect.objectContaining({
-        email: "admin@exemple.ma",
-        prenom: "Sara",
-        nom: "Alaoui",
-        role: "GENERAL_DIRECTION",
-      }),
-    })
-    expect(hash).toHaveBeenCalledWith("motdepasse123", 12)
+    expect(body).toEqual({ user: fakeUser })
+    expect(mockQuitterAmorcage).toHaveBeenCalledTimes(1)
   })
 
-  it("POST creates departments for each departement name", async () => {
+  it("POST returns 409 when quitterAmorcage throws AmorcageDejaConfigureError", async () => {
+    mockQuitterAmorcage.mockRejectedValueOnce(new AmorcageDejaConfigureError())
+
     const { POST } = await import("./route")
     const response = await POST(mockRequest(validPayload))
 
-    expect(response.status).toBe(200)
+    expect(response.status).toBe(409)
+    const body = await response.json()
+    expect(body.error).toBe("Cette instance est déjà configurée")
   })
 })

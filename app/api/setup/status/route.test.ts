@@ -1,23 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
-let mockCount = 0
-const mockDb = {
-  select: vi.fn(() => ({
-    from: vi.fn(() => [{ value: mockCount }]),
-  })),
-}
+const mockEstEnAmorcage = vi.fn()
 
-vi.mock("@/db", () => ({
-  db: mockDb,
+vi.mock("@/lib/amorcage", () => ({
+  estEnAmorcage: mockEstEnAmorcage,
 }))
 
 describe("setup status route", () => {
   beforeEach(() => {
-    mockCount = 0
     vi.clearAllMocks()
   })
 
   it("GET returns needsSetup: true with no departements when no Societe exists", async () => {
+    mockEstEnAmorcage.mockResolvedValueOnce(true)
+
     const { GET } = await import("./route")
     const response = await GET()
 
@@ -28,7 +24,7 @@ describe("setup status route", () => {
   })
 
   it("GET returns needsSetup: false when at least one Societe exists", async () => {
-    mockCount = 1
+    mockEstEnAmorcage.mockResolvedValueOnce(false)
 
     const { GET } = await import("./route")
     const response = await GET()
