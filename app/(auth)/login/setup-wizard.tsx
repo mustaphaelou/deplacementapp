@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { signIn } from "next-auth/react"
@@ -22,7 +22,7 @@ import {
 } from "@/lib/password-strength"
 
 const STEP_FIELDS: Record<number, (keyof SetupWizardValues)[]> = {
-  1: ["societeNom"],
+  1: ["societeNom", "nomExpediteurEmail"],
   2: ["departements"],
   3: ["prenom", "nom", "email", "poste", "password", "confirmPassword", "departementNom"],
 }
@@ -50,7 +50,16 @@ export function SetupWizard() {
 
   const watchedPassword = useWatch({ control, name: "password" })
   const watchedDepartementNom = useWatch({ control, name: "departementNom" })
+  const watchedSocieteNom = useWatch({ control, name: "societeNom" })
   const passwordStrength = watchedPassword ? checkPasswordEntropy(watchedPassword) : null
+
+  const autoFilledExpediteur = useRef(false)
+  useEffect(() => {
+    if (watchedSocieteNom && !autoFilledExpediteur.current) {
+      setValue("nomExpediteurEmail", watchedSocieteNom)
+      autoFilledExpediteur.current = true
+    }
+  }, [watchedSocieteNom, setValue])
 
   function syncDepartements(deps: string[]) {
     setDepartements(deps)
@@ -96,6 +105,7 @@ export function SetupWizard() {
         societeNom: data.societeNom,
         societeEmailDomain: data.societeEmailDomain || undefined,
         departements: data.departements,
+        nomExpediteurEmail: data.nomExpediteurEmail,
         admin: {
           email: data.email,
           password: data.password,
@@ -168,6 +178,18 @@ export function SetupWizard() {
                 <p className="text-xs text-muted-foreground">
                   Exemple: masociete.ma → noreply@masociete.ma
                 </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="nom-expediteur-email">Nom d'expéditeur email</Label>
+                <Input
+                  id="nom-expediteur-email"
+                  placeholder={watchedSocieteNom || "Nom de l'expéditeur"}
+                  {...register("nomExpediteurEmail")}
+                  aria-invalid={!!errors.nomExpediteurEmail}
+                />
+                {errors.nomExpediteurEmail && (
+                  <p className="mt-1 text-xs text-destructive">{errors.nomExpediteurEmail.message}</p>
+                )}
               </div>
               <Button type="button" className="w-full" onClick={goToStep2}>
                 Continuer

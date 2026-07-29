@@ -34,6 +34,7 @@ function mockRequest(body: unknown): NextRequest {
 const validPayload = {
   societeNom: "Ma Société",
   departements: ["Direction Générale", "Technique"],
+  nomExpediteurEmail: "Ma Société",
   admin: {
     email: "admin@exemple.ma",
     password: "motdepasse123",

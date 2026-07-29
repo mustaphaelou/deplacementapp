@@ -125,6 +125,7 @@ export const setupWizardSchema = z.object({
   password: z.string().min(8, "8 caractères minimum"),
   confirmPassword: z.string().min(1, "Confirmez le mot de passe"),
   departementNom: z.string().min(1, "Sélectionnez un département"),
+  nomExpediteurEmail: z.string().min(1, "Nom d'expéditeur requis"),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Les mots de passe ne correspondent pas",
   path: ["confirmPassword"],
@@ -146,7 +147,11 @@ export const setupRegisterSchema = z.object({
     poste: z.string().min(1, "Poste requis"),
     departementNom: z.string().min(1, "Département requis"),
   }),
-})
+  nomExpediteurEmail: z.string().min(1, "Nom d'expéditeur requis"),
+}).refine(
+  (data) => data.departements.includes(data.admin.departementNom),
+  { message: "Le département de l'administrateur doit faire partie des départements déclarés", path: ["admin", "departementNom"] }
+)
 
 export const demandeQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
