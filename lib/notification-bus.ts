@@ -6,7 +6,7 @@ import { utilisateurs } from "../db/schema/utilisateurs"
 import { emailSender } from "./email-sender"
 import { NotificationNotFoundError, UnauthorizedActionError } from "./errors"
 import type { NotificationEventType, NotificationPayload, NotificationMessage } from "./notification-events"
-import { buildMessage, resolveRecipients } from "./demande/effets-transition"
+import { buildMessage, resolveRecipients } from "./notification/helpers"
 
 export { NotificationNotFoundError } from "./errors"
 export type { NotificationEventType, NotificationPayload, NotificationMessage } from "./notification-events"
