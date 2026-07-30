@@ -38,7 +38,7 @@ import {
 import { DemandeStatusBadge } from "@/components/demande-status-badge"
 import { formatCurrency, formatDate } from "@/lib/constants"
 import { cn } from "@/lib/utils"
-import type { NavItem } from "@/lib/roles"
+import type { NavItem } from "@/lib/auth"
 import type { DashboardConfig, TableColumnId, DashboardDemandeSummary } from "@/lib/dashboard"
 
 const iconMap: Record<string, LucideIcon> = {

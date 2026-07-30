@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { X, BarChart3, FileText, FilePlus, Users, Clock, DollarSign, Car, CheckCircle, Building, type LucideIcon } from "lucide-react"
-import type { NavItem } from "@/lib/roles"
+import type { NavItem } from "@/lib/auth"
 
 const iconMap: Record<string, LucideIcon> = {
   "bar-chart-3": BarChart3,

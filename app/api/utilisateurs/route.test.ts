@@ -2,8 +2,16 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { NextRequest } from "next/server"
 import { UtilisateurNotFoundError } from "@/lib/utilisateur-service"
 
-vi.mock("@/lib/auth-utils", () => ({
+const { mockRequireAnyRole } = vi.hoisted(() => ({
+  mockRequireAnyRole: (user: { role: string }, roles: readonly string[]) => {
+    if (roles.includes(user.role)) return { ok: true }
+    return { ok: false, response: new Response(JSON.stringify({ error: "Accès refusé" }), { status: 403 }) }
+  },
+}))
+
+vi.mock("@/lib/auth", () => ({
   requireAuth: vi.fn(),
+  requireAnyRole: mockRequireAnyRole,
 }))
 
 vi.mock("@/lib/utilisateur-service", async (importOriginal) => {
@@ -57,7 +65,7 @@ describe("utilisateurs route", () => {
   })
 
   it("GET returns the list of Utilisateur", async () => {
-    const { requireAuth } = await import("@/lib/auth-utils")
+    const { requireAuth } = await import("@/lib/auth")
     const { utilisateurService } = await import("@/lib/utilisateur-service")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
     ;(utilisateurService.list as ReturnType<typeof vi.fn>).mockResolvedValue([
@@ -73,7 +81,7 @@ describe("utilisateurs route", () => {
   })
 
   it("GET returns 404 when the service throws UtilisateurNotFoundError", async () => {
-    const { requireAuth } = await import("@/lib/auth-utils")
+    const { requireAuth } = await import("@/lib/auth")
     const { utilisateurService } = await import("@/lib/utilisateur-service")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
     ;(utilisateurService.list as ReturnType<typeof vi.fn>).mockRejectedValue(
@@ -89,7 +97,7 @@ describe("utilisateurs route", () => {
   })
 
   it("POST returns 404 when the service throws UtilisateurNotFoundError", async () => {
-    const { requireAuth } = await import("@/lib/auth-utils")
+    const { requireAuth } = await import("@/lib/auth")
     const { utilisateurService } = await import("@/lib/utilisateur-service")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
     ;(utilisateurService.create as ReturnType<typeof vi.fn>).mockRejectedValue(
@@ -107,7 +115,7 @@ describe("utilisateurs route", () => {
   })
 
   it("PUT returns 404 when the service throws UtilisateurNotFoundError", async () => {
-    const { requireAuth } = await import("@/lib/auth-utils")
+    const { requireAuth } = await import("@/lib/auth")
     const { utilisateurService } = await import("@/lib/utilisateur-service")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
     ;(utilisateurService.update as ReturnType<typeof vi.fn>).mockRejectedValue(

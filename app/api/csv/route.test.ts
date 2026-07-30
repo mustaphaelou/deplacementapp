@@ -1,8 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import type { DemandeExportRow } from "@/lib/demande"
 
-vi.mock("@/lib/auth-utils", () => ({
+const { mockRequireAnyRole } = vi.hoisted(() => ({
+  mockRequireAnyRole: (user: { role: string }, roles: readonly string[]) => {
+    if (roles.includes(user.role)) return { ok: true }
+    return { ok: false, response: new Response(JSON.stringify({ error: "Accès refusé" }), { status: 403 }) }
+  },
+}))
+
+vi.mock("@/lib/auth", () => ({
   requireAuth: vi.fn(),
+  requireAnyRole: mockRequireAnyRole,
 }))
 
 vi.mock("@/lib/demande", () => ({
@@ -57,7 +65,7 @@ describe("CSV export route", () => {
   })
 
   it("GET exports demandes through the queries port and returns CSV", async () => {
-    const { requireAuth } = await import("@/lib/auth-utils")
+    const { requireAuth } = await import("@/lib/auth")
     const { findAllForExport } = await import("@/lib/demande")
 
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
@@ -77,7 +85,7 @@ describe("CSV export route", () => {
   })
 
   it("GET returns 401 when auth fails", async () => {
-    const { requireAuth } = await import("@/lib/auth-utils")
+    const { requireAuth } = await import("@/lib/auth")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: false,
       response: new Response(JSON.stringify({ error: "Non autorisé" }), { status: 401 }),
@@ -90,7 +98,7 @@ describe("CSV export route", () => {
   })
 
   it("GET returns 403 when role is not authorised", async () => {
-    const { requireAuth } = await import("@/lib/auth-utils")
+    const { requireAuth } = await import("@/lib/auth")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth("EMPLOYEE"))
 
     const { GET } = await import("./route")
@@ -100,7 +108,7 @@ describe("CSV export route", () => {
   })
 
   it("GET returns 500 when the queries port throws", async () => {
-    const { requireAuth } = await import("@/lib/auth-utils")
+    const { requireAuth } = await import("@/lib/auth")
     const { findAllForExport } = await import("@/lib/demande")
 
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())

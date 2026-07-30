@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { NextRequest } from "next/server"
 import { NotificationNotFoundError, UnauthorizedActionError } from "@/lib/errors"
 
-vi.mock("@/lib/auth-utils", () => ({
+vi.mock("@/lib/auth", () => ({
   requireAuth: vi.fn(),
 }))
 
@@ -35,7 +35,7 @@ describe("PATCH /api/notifications/[id]", () => {
   })
 
   it("returns 401 when auth fails", async () => {
-    const { requireAuth } = await import("@/lib/auth-utils")
+    const { requireAuth } = await import("@/lib/auth")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: false,
       response: new Response(JSON.stringify({ error: "Non autorisé" }), { status: 401 }),
@@ -50,7 +50,7 @@ describe("PATCH /api/notifications/[id]", () => {
   })
 
   it("returns 200 when the owner marks their notification as read", async () => {
-    const { requireAuth } = await import("@/lib/auth-utils")
+    const { requireAuth } = await import("@/lib/auth")
     const { markAsRead } = await import("@/lib/notification")
 
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth("u-1"))
@@ -70,7 +70,7 @@ describe("PATCH /api/notifications/[id]", () => {
   })
 
   it("returns 404 driven by the seam when the notification does not exist", async () => {
-    const { requireAuth } = await import("@/lib/auth-utils")
+    const { requireAuth } = await import("@/lib/auth")
     const { markAsRead } = await import("@/lib/notification")
 
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth("u-1"))
@@ -89,7 +89,7 @@ describe("PATCH /api/notifications/[id]", () => {
   })
 
   it("returns 403 driven by the seam when the requester is not the owner", async () => {
-    const { requireAuth } = await import("@/lib/auth-utils")
+    const { requireAuth } = await import("@/lib/auth")
     const { markAsRead } = await import("@/lib/notification")
 
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth("u-2"))

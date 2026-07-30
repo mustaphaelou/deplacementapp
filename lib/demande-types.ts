@@ -1,4 +1,4 @@
-import type { Role } from "./roles"
+import type { Role } from "@/lib/auth"
 import type { CreateDemandeData } from "./demande-utils"
 
 export function parseMotif(motif: string): string[] {

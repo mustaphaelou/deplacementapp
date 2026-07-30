@@ -4,7 +4,7 @@ import type { DemandeWithRelations } from "@/lib/demande-types"
 import { TravelRequestPdfAdapter } from "@/components/pdf/travel-request-pdf-adapter"
 import { DemandeNotFoundError, PdfRenderError } from "@/lib/errors"
 
-vi.mock("@/lib/auth-utils", () => ({
+vi.mock("@/lib/auth", () => ({
   requireAuth: vi.fn(),
 }))
 
@@ -126,7 +126,7 @@ describe("PDF route integration", () => {
   })
 
   it("GET returns a PDF buffer when demande is found", async () => {
-    const { requireAuth } = await import("@/lib/auth-utils")
+    const { requireAuth } = await import("@/lib/auth")
     const { findById, recordDocument } = await import("@/lib/demande")
     const { pdfAdapter } = await import("@/components/pdf/travel-request-pdf-adapter")
 
@@ -147,7 +147,7 @@ describe("PDF route integration", () => {
   })
 
   it("GET returns 401 when auth fails", async () => {
-    const { requireAuth } = await import("@/lib/auth-utils")
+    const { requireAuth } = await import("@/lib/auth")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: false,
       response: new Response(JSON.stringify({ error: "Non autorisé" }), { status: 401 }),
@@ -160,7 +160,7 @@ describe("PDF route integration", () => {
   })
 
   it("GET returns 404 when demande is soft-deleted or missing", async () => {
-    const { requireAuth } = await import("@/lib/auth-utils")
+    const { requireAuth } = await import("@/lib/auth")
     const { findById } = await import("@/lib/demande")
 
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
@@ -175,7 +175,7 @@ describe("PDF route integration", () => {
   })
 
   it("GET returns 500 when PDF render fails and does not create a document", async () => {
-    const { requireAuth } = await import("@/lib/auth-utils")
+    const { requireAuth } = await import("@/lib/auth")
     const { findById, recordDocument } = await import("@/lib/demande")
     const { pdfAdapter } = await import("@/components/pdf/travel-request-pdf-adapter")
 

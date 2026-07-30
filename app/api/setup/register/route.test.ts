@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { NextRequest } from "next/server"
 import { AmorcageDejaConfigureError } from "@/lib/errors"
 
-vi.mock("@/lib/auth-utils", () => ({
+vi.mock("@/lib/auth", () => ({
   requireAuth: vi.fn(),
 }))
 

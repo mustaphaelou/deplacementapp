@@ -1,6 +1,6 @@
 import { formatCurrency } from "@/lib/constants"
 import { findByEtapes, countByEtape, findByEmployeeId, aggregateBudget } from "./demande"
-import type { Role } from "./roles"
+import type { Role } from "@/lib/auth"
 import { queueEtapes, committedEtapes, rollupEtapes, laneOrderByColumn, type Etape } from "./workflow"
 
 export interface DashboardDemandeSummary {

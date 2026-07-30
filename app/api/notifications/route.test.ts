@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
-vi.mock("@/lib/auth-utils", () => ({
+vi.mock("@/lib/auth", () => ({
   requireAuth: vi.fn().mockResolvedValue({ ok: true, user: { id: "u-1" } }),
 }))
 

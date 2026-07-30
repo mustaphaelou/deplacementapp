@@ -1,11 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { NextRequest, NextResponse } from "next/server"
 
-vi.mock("@/lib/auth-utils", () => ({
-  requireAuth: vi.fn(),
-}))
-
 vi.mock("@/lib/auth", () => ({
+  requireAuth: vi.fn(),
   auth: vi.fn(),
 }))
 
@@ -81,7 +78,7 @@ describe("withValidation", () => {
   })
 
   it("calls handler with validated data when auth succeeds and input is valid", async () => {
-    const { requireAuth } = await import("@/lib/auth-utils")
+    const { requireAuth } = await import("@/lib/auth")
     ;(requireAuth as any).mockResolvedValue({
       ok: true,
       user: {
@@ -114,7 +111,7 @@ describe("withValidation", () => {
   })
 
   it("returns 401 when auth fails", async () => {
-    const { requireAuth } = await import("@/lib/auth-utils")
+    const { requireAuth } = await import("@/lib/auth")
     ;(requireAuth as any).mockResolvedValue({
       ok: false,
       response: NextResponse.json({ error: "Non autorisé" }, { status: 401 }),
@@ -133,7 +130,7 @@ describe("withValidation", () => {
   })
 
   it("returns 400 when input is invalid", async () => {
-    const { requireAuth } = await import("@/lib/auth-utils")
+    const { requireAuth } = await import("@/lib/auth")
     ;(requireAuth as any).mockResolvedValue({
       ok: true,
       user: { id: "user-1", email: "test@test.com", name: "Test", role: "EMPLOYEE", departementId: "dep-1", departement: "IT", poste: "Dev" },
@@ -152,7 +149,7 @@ describe("withValidation", () => {
   })
 
   it("returns 400 when body is not valid JSON", async () => {
-    const { requireAuth } = await import("@/lib/auth-utils")
+    const { requireAuth } = await import("@/lib/auth")
     ;(requireAuth as any).mockResolvedValue({
       ok: true,
       user: { id: "user-1", email: "test@test.com", name: "Test", role: "EMPLOYEE", departementId: "dep-1", departement: "IT", poste: "Dev" },
@@ -183,7 +180,7 @@ describe("password route integration (withValidation + passwordChangeSchema)", (
   it("returns 200 when auth succeeds and body is valid", async () => {
     const { passwordChangeSchema } = await import("./schemas")
     const { withValidation } = await import("./api-utils")
-    const { requireAuth } = await import("@/lib/auth-utils")
+    const { requireAuth } = await import("@/lib/auth")
     ;(requireAuth as any).mockResolvedValue({
       ok: true,
       user: { id: "u-1", email: "a@b.com", name: "A", role: "EMPLOYEE", departementId: "d-1", departement: "IT", poste: "Dev" },
@@ -211,7 +208,7 @@ describe("password route integration (withValidation + passwordChangeSchema)", (
   it("returns 400 when newPassword is too short", async () => {
     const { passwordChangeSchema } = await import("./schemas")
     const { withValidation } = await import("./api-utils")
-    const { requireAuth } = await import("@/lib/auth-utils")
+    const { requireAuth } = await import("@/lib/auth")
     ;(requireAuth as any).mockResolvedValue({
       ok: true,
       user: { id: "u-1", email: "a@b.com", name: "A", role: "EMPLOYEE", departementId: "d-1", departement: "IT", poste: "Dev" },

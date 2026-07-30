@@ -1,4 +1,4 @@
-import type { Role } from "./roles"
+import type { Role } from "@/lib/auth"
 import type { NotificationEventType } from "./notification-events"
 
 export type Etape =

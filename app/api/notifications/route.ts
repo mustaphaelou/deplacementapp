@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { requireAuth } from "@/lib/auth-utils"
+import { requireAuth } from "@/lib/auth"
 import { db } from "@/db"
 import { listForUser } from "@/lib/notification/queries"
 import { handleServiceError } from "@/lib/errors"

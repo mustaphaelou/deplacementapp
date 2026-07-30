@@ -4,7 +4,7 @@ import { useSession, signOut } from "next-auth/react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { LogOut, Menu } from "lucide-react"
-import { ROLE_LABELS } from "@/lib/roles"
+import { ROLE_LABELS } from "@/lib/auth"
 import { NotificationBell } from "@/components/notification-bell"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 

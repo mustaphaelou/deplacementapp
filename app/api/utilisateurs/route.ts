@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server"
-import { requireAuth } from "@/lib/auth-utils"
-import { requireAnyRole } from "@/lib/authorization"
+import { requireAuth, requireAnyRole, type Role } from "@/lib/auth"
 import { utilisateurService } from "@/lib/utilisateur-service"
 import { utilisateurSchema, updateUtilisateurSchema } from "@/lib/schemas"
 import { withValidation } from "@/lib/api-utils"
 import { handleServiceError } from "@/lib/errors"
-import type { Role } from "@/lib/roles"
 
 const ADMIN_ROLES: Role[] = ["FINANCE_ADMIN", "GENERAL_DIRECTION"]
 

@@ -2,8 +2,7 @@ import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { getDashboardPayload } from "@/lib/dashboard"
 import { DashboardLayout } from "@/components/dashboard-layout"
-import { NAV_ITEMS } from "@/lib/roles"
-import type { Role } from "@/lib/roles"
+import { NAV_ITEMS, type Role } from "@/lib/auth"
 
 export default async function DashboardPage() {
   const session = await auth()

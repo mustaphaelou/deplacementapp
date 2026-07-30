@@ -6,7 +6,7 @@ import type { PgliteDb } from "./test/create-pglite-db"
 import * as schema from "../db/schema"
 import * as dbModule from "../db"
 import { createDraft, createAndSubmit, executeTransition } from "./demande/mutations"
-import type { Role } from "./roles"
+import type { Role } from "@/lib/auth"
 
 const TIMEOUT = 30_000
 

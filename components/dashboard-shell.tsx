@@ -5,7 +5,7 @@ import { Sidebar } from "@/components/sidebar"
 import { Navbar } from "@/components/navbar"
 import { NotificationProvider } from "@/components/notification-context"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
-import type { NavItem } from "@/lib/roles"
+import type { NavItem } from "@/lib/auth"
 
 interface DashboardShellProps {
   navItems: NavItem[]

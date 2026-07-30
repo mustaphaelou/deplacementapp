@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import { Plus, Loader2, Pencil, Search } from "lucide-react"
-import { ROLE_LABELS } from "@/lib/roles"
+import { ROLE_LABELS } from "@/lib/auth"
 
 interface Utilisateur {
   id: string

@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/auth-utils";
-import { requireAnyRole } from "@/lib/authorization";
+import { requireAuth, requireAnyRole, type Role } from "@/lib/auth";
 import { findAllForExport } from "@/lib/demande";
 import { handleServiceError } from "@/lib/errors";
-import type { Role } from "@/lib/roles";
 
 const EXPORT_ROLES: Role[] = ["FINANCE_ADMIN", "GENERAL_DIRECTION"];
 
