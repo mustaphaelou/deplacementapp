@@ -83,38 +83,44 @@ export class UtilisateurService {
   ) {
     const password = data.motDePasse || "password123"
     const hashedPassword = await hash(password, 12)
+    const userId = crypto.randomUUID()
 
-    const [user] = await this._db
-      .insert(utilisateurs)
-      .values({
-        id: crypto.randomUUID(),
-        email: data.email,
-        motDePasse: hashedPassword,
-        googleAuthEnabled: data.googleAuthEnabled ?? false,
-        nom: data.nom,
-        prenom: data.prenom,
-        poste: data.poste,
-        role: data.role as
-          "EMPLOYEE" | "MANAGER" | "FINANCE_ADMIN" | "GENERAL_DIRECTION",
-        societeId: data.societeId,
-        departementId: data.departementId,
-        telephone: data.telephone || null,
-        modifieLe: new Date(),
-      })
-      .returning()
+    return this._db.transaction(async (tx) => {
+      const [user] = await tx
+        .insert(utilisateurs)
+        .values({
+          id: userId,
+          email: data.email,
+          motDePasse: hashedPassword,
+          googleAuthEnabled: data.googleAuthEnabled ?? false,
+          nom: data.nom,
+          prenom: data.prenom,
+          poste: data.poste,
+          role: data.role as
+            | "EMPLOYEE"
+            | "MANAGER"
+            | "FINANCE_ADMIN"
+            | "GENERAL_DIRECTION",
+          societeId: data.societeId,
+          departementId: data.departementId,
+          telephone: data.telephone || null,
+          modifieLe: new Date(),
+        })
+        .returning()
 
-    await logAudit(
-      {
-        utilisateurId: actorId,
-        action: "CREATION_UTILISATEUR",
-        entite: "Utilisateur",
-        entiteId: user.id,
-        details: { email: user.email },
-      },
-      this._db
-    )
+      await logAudit(
+        {
+          utilisateurId: actorId,
+          action: "CREATION_UTILISATEUR",
+          entite: "Utilisateur",
+          entiteId: user.id,
+          details: { email: user.email },
+        },
+        tx as any
+      )
 
-    return user
+      return user
+    })
   }
 
   async update(
@@ -138,26 +144,28 @@ export class UtilisateurService {
       updateData.motDePasse = await hash(motDePasse, 12)
     }
 
-    const [user] = await this._db
-      .update(utilisateurs)
-      .set(updateData)
-      .where(eq(utilisateurs.id, id))
-      .returning()
+    return this._db.transaction(async (tx) => {
+      const [user] = await tx
+        .update(utilisateurs)
+        .set(updateData)
+        .where(eq(utilisateurs.id, id))
+        .returning()
 
-    if (!user) throw new UtilisateurNotFoundError()
+      if (!user) throw new UtilisateurNotFoundError()
 
-    await logAudit(
-      {
-        utilisateurId: actorId,
-        action: "MODIFICATION_UTILISATEUR",
-        entite: "Utilisateur",
-        entiteId: user.id,
-        details: { email: user.email },
-      },
-      this._db
-    )
+      await logAudit(
+        {
+          utilisateurId: actorId,
+          action: "MODIFICATION_UTILISATEUR",
+          entite: "Utilisateur",
+          entiteId: user.id,
+          details: { email: user.email },
+        },
+        tx as any
+      )
 
-    return user
+      return user
+    })
   }
 
   async changePassword(
@@ -178,20 +186,22 @@ export class UtilisateurService {
 
     const hashed = await hash(newPassword, 12)
 
-    await this._db
-      .update(utilisateurs)
-      .set({ motDePasse: hashed })
-      .where(eq(utilisateurs.id, userId))
+    await this._db.transaction(async (tx) => {
+      await tx
+        .update(utilisateurs)
+        .set({ motDePasse: hashed })
+        .where(eq(utilisateurs.id, userId))
 
-    await logAudit(
-      {
-        utilisateurId: userId,
-        action: "CHANGEMENT_MOT_DE_PASSE",
-        entite: "Utilisateur",
-        entiteId: userId,
-      },
-      this._db
-    )
+      await logAudit(
+        {
+          utilisateurId: userId,
+          action: "CHANGEMENT_MOT_DE_PASSE",
+          entite: "Utilisateur",
+          entiteId: userId,
+        },
+        tx as any
+      )
+    })
   }
 
   async updateProfile(
@@ -231,45 +241,66 @@ export class UtilisateurService {
       updateData.email = data.email
     }
 
+    let previousAvatarUrl: string | null = user.avatarUrl
+    let savedNewAvatar = false
+
     if (data.avatarData !== undefined) {
-      if (user.avatarUrl) {
-        await this.avatarStorage.delete(user.avatarUrl)
+      if (data.avatarData) {
+        updateData.avatarUrl = await this.avatarStorage.save(
+          data.avatarData,
+          userId
+        )
+        savedNewAvatar = true
+      } else {
+        updateData.avatarUrl = null
       }
-      updateData.avatarUrl = data.avatarData
-        ? await this.avatarStorage.save(data.avatarData, userId)
-        : null
     }
 
     if (Object.keys(updateData).length === 0) {
       throw new NoProfileUpdateDataError()
     }
 
-    const [updated] = await this._db
-      .update(utilisateurs)
-      .set(updateData)
-      .where(eq(utilisateurs.id, userId))
-      .returning({
-        id: utilisateurs.id,
-        email: utilisateurs.email,
-        telephone: utilisateurs.telephone,
-        poste: utilisateurs.poste,
-        avatarUrl: utilisateurs.avatarUrl,
+    try {
+      const result = await this._db.transaction(async (tx) => {
+        const [updated] = await tx
+          .update(utilisateurs)
+          .set(updateData)
+          .where(eq(utilisateurs.id, userId))
+          .returning({
+            id: utilisateurs.id,
+            email: utilisateurs.email,
+            telephone: utilisateurs.telephone,
+            poste: utilisateurs.poste,
+            avatarUrl: utilisateurs.avatarUrl,
+          })
+
+        if (!updated) throw new UtilisateurNotFoundError()
+
+        await logAudit(
+          {
+            utilisateurId: userId,
+            action: "MODIFICATION_PROFIL",
+            entite: "Utilisateur",
+            entiteId: updated.id,
+            details: { champs: Object.keys(updateData) },
+          },
+          tx as any
+        )
+
+        return updated
       })
 
-    if (!updated) throw new UtilisateurNotFoundError()
+      if (previousAvatarUrl && data.avatarData !== undefined) {
+        await this.avatarStorage.delete(previousAvatarUrl)
+      }
 
-    await logAudit(
-      {
-        utilisateurId: userId,
-        action: "MODIFICATION_PROFIL",
-        entite: "Utilisateur",
-        entiteId: updated.id,
-        details: { champs: Object.keys(updateData) },
-      },
-      this._db
-    )
-
-    return updated
+      return result
+    } catch (err) {
+      if (savedNewAvatar) {
+        await this.avatarStorage.delete(updateData.avatarUrl as string)
+      }
+      throw err
+    }
   }
 }
 
