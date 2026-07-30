@@ -6,7 +6,7 @@ import {
   EmailChangeRequiresPasswordError,
   NoProfileUpdateDataError,
 } from "./utilisateur-service"
-import type { AuditBus } from "./audit-bus"
+import { logAudit } from "./audit"
 import type { AvatarStorage } from "./avatar-storage"
 
 vi.mock("bcryptjs", () => ({
@@ -14,13 +14,11 @@ vi.mock("bcryptjs", () => ({
   compare: vi.fn(),
 }))
 
-import { hash, compare } from "bcryptjs"
+vi.mock("./audit", () => ({
+  logAudit: vi.fn().mockResolvedValue(undefined),
+}))
 
-function mockAudit(): AuditBus & { log: ReturnType<typeof vi.fn> } {
-  return {
-    log: vi.fn().mockResolvedValue(undefined),
-  } as unknown as AuditBus & { log: ReturnType<typeof vi.fn> }
-}
+import { hash, compare } from "bcryptjs"
 
 function mockDb() {
   const returningInsert = vi.fn()
@@ -94,7 +92,7 @@ describe("UtilisateurService", () => {
       const db = mockDb()
       db.query.utilisateurs.findMany.mockResolvedValue([makeUser()])
 
-      const svc = new UtilisateurService(db as any, mockAudit())
+      const svc = new UtilisateurService(db as any)
       const result = await svc.list()
 
       expect(result).toHaveLength(1)
@@ -104,14 +102,13 @@ describe("UtilisateurService", () => {
   describe("create", () => {
     it("hashes password and creates user with audit", async () => {
       const db = mockDb()
-      const audit = mockAudit()
       db.insert.mockReturnValue({
         values: vi.fn().mockReturnValue({
           returning: vi.fn().mockResolvedValue([makeUser({ email: "test@test.com" })]),
         }),
       })
 
-      const svc = new UtilisateurService(db as any, audit)
+      const svc = new UtilisateurService(db as any)
       const result = await svc.create(
         {
           email: "test@test.com",
@@ -128,12 +125,13 @@ describe("UtilisateurService", () => {
 
       expect(hash).toHaveBeenCalledWith("secret123", 12)
       expect(result.email).toBe("test@test.com")
-      expect(audit.log).toHaveBeenCalledWith(
+      expect(logAudit).toHaveBeenCalledWith(
         expect.objectContaining({
           utilisateurId: "u-1",
           action: "CREATION_UTILISATEUR",
           entite: "Utilisateur",
-        })
+        }),
+        expect.anything(),
       )
     })
 
@@ -145,7 +143,7 @@ describe("UtilisateurService", () => {
         }),
       })
 
-      const svc = new UtilisateurService(db as any, mockAudit())
+      const svc = new UtilisateurService(db as any)
       await svc.create(
         {
           email: "test@test.com",
@@ -167,7 +165,6 @@ describe("UtilisateurService", () => {
   describe("update", () => {
     it("updates user without changing password when not provided", async () => {
       const db = mockDb()
-      const audit = mockAudit()
       db.update.mockReturnValue({
         set: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
@@ -176,7 +173,7 @@ describe("UtilisateurService", () => {
         }),
       })
 
-      const svc = new UtilisateurService(db as any, audit)
+      const svc = new UtilisateurService(db as any)
       const result = await svc.update(
         "u-1",
         { email: "updated@test.com", nom: "Updated" },
@@ -185,10 +182,11 @@ describe("UtilisateurService", () => {
 
       expect(hash).not.toHaveBeenCalled()
       expect(result.email).toBe("updated@test.com")
-      expect(audit.log).toHaveBeenCalledWith(
+      expect(logAudit).toHaveBeenCalledWith(
         expect.objectContaining({
           action: "MODIFICATION_UTILISATEUR",
-        })
+        }),
+        expect.anything(),
       )
     })
 
@@ -202,7 +200,7 @@ describe("UtilisateurService", () => {
         }),
       })
 
-      const svc = new UtilisateurService(db as any, mockAudit())
+      const svc = new UtilisateurService(db as any)
       await svc.update(
         "u-1",
         { motDePasse: "newpass" },
@@ -222,7 +220,7 @@ describe("UtilisateurService", () => {
         }),
       })
 
-      const svc = new UtilisateurService(db as any, mockAudit())
+      const svc = new UtilisateurService(db as any)
       await expect(
         svc.update("u-missing", { nom: "Ghost" }, "u-1")
       ).rejects.toThrow(UtilisateurNotFoundError)
@@ -232,7 +230,6 @@ describe("UtilisateurService", () => {
   describe("changePassword", () => {
     it("changes password when current is correct", async () => {
       const db = mockDb()
-      const audit = mockAudit()
       db.select.mockReturnValue({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
@@ -250,17 +247,18 @@ describe("UtilisateurService", () => {
         }),
       })
 
-      const svc = new UtilisateurService(db as any, audit)
+      const svc = new UtilisateurService(db as any)
       await svc.changePassword("u-1", "oldpass", "newpass")
 
       expect(compare).toHaveBeenCalledWith("oldpass", "$oldhash$")
       expect(hash).toHaveBeenCalledWith("newpass", 12)
-      expect(audit.log).toHaveBeenCalledWith(
+      expect(logAudit).toHaveBeenCalledWith(
         expect.objectContaining({
           action: "CHANGEMENT_MOT_DE_PASSE",
           entite: "Utilisateur",
           entiteId: "u-1",
-        })
+        }),
+        expect.anything(),
       )
     })
 
@@ -274,7 +272,7 @@ describe("UtilisateurService", () => {
         }),
       })
 
-      const svc = new UtilisateurService(db as any, mockAudit())
+      const svc = new UtilisateurService(db as any)
       await expect(
         svc.changePassword("u-missing", "old", "new")
       ).rejects.toThrow(UtilisateurNotFoundError)
@@ -291,7 +289,7 @@ describe("UtilisateurService", () => {
       })
       ;(compare as ReturnType<typeof vi.fn>).mockResolvedValue(false)
 
-      const svc = new UtilisateurService(db as any, mockAudit())
+      const svc = new UtilisateurService(db as any)
       await expect(
         svc.changePassword("u-1", "wrongpass", "newpass")
       ).rejects.toThrow(MotDePasseIncorrectError)
@@ -306,7 +304,7 @@ describe("UtilisateurService", () => {
         departement: { nom: "IT" },
       })
 
-      const svc = new UtilisateurService(db as any, mockAudit())
+      const svc = new UtilisateurService(db as any)
       const result = await svc.findProfile("u-1")
 
       expect(result.id).toBe("u-1")
@@ -326,7 +324,7 @@ describe("UtilisateurService", () => {
       const db = mockDb()
       db.query.utilisateurs.findFirst.mockResolvedValue(null)
 
-      const svc = new UtilisateurService(db as any, mockAudit())
+      const svc = new UtilisateurService(db as any)
       await expect(svc.findProfile("u-missing")).rejects.toThrow(UtilisateurNotFoundError)
     })
   })
@@ -334,7 +332,6 @@ describe("UtilisateurService", () => {
   describe("updateProfile", () => {
     it("updates profile fields and audits", async () => {
       const db = mockDb()
-      const audit = mockAudit()
       db.select.mockReturnValue({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
@@ -352,7 +349,7 @@ describe("UtilisateurService", () => {
         }),
       })
 
-      const svc = new UtilisateurService(db as any, audit)
+      const svc = new UtilisateurService(db as any)
       const result = await svc.updateProfile("u-1", {
         telephone: "0612345678",
         poste: "Lead",
@@ -360,12 +357,13 @@ describe("UtilisateurService", () => {
 
       expect(result.telephone).toBe("0612345678")
       expect(result.poste).toBe("Lead")
-      expect(audit.log).toHaveBeenCalledWith(
+      expect(logAudit).toHaveBeenCalledWith(
         expect.objectContaining({
           action: "MODIFICATION_PROFIL",
           entite: "Utilisateur",
           entiteId: "u-1",
-        })
+        }),
+        expect.anything(),
       )
     })
 
@@ -388,7 +386,7 @@ describe("UtilisateurService", () => {
         }),
       })
 
-      const svc = new UtilisateurService(db as any, mockAudit())
+      const svc = new UtilisateurService(db as any)
       const result = await svc.updateProfile("u-1", { telephone: null })
 
       expect(result.telephone).toBeNull()
@@ -404,7 +402,7 @@ describe("UtilisateurService", () => {
         }),
       })
 
-      const svc = new UtilisateurService(db as any, mockAudit())
+      const svc = new UtilisateurService(db as any)
       await expect(
         svc.updateProfile("u-missing", { poste: "Ghost" })
       ).rejects.toThrow(UtilisateurNotFoundError)
@@ -412,7 +410,6 @@ describe("UtilisateurService", () => {
 
     it("verifies current password and updates email when correct", async () => {
       const db = mockDb()
-      const audit = mockAudit()
       db.select.mockReturnValue({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
@@ -431,7 +428,7 @@ describe("UtilisateurService", () => {
         }),
       })
 
-      const svc = new UtilisateurService(db as any, audit)
+      const svc = new UtilisateurService(db as any)
       const result = await svc.updateProfile("u-1", {
         email: "new@test.com",
         currentPassword: "oldpass",
@@ -452,7 +449,7 @@ describe("UtilisateurService", () => {
       })
       ;(compare as ReturnType<typeof vi.fn>).mockResolvedValue(false)
 
-      const svc = new UtilisateurService(db as any, mockAudit())
+      const svc = new UtilisateurService(db as any)
       await expect(
         svc.updateProfile("u-1", { email: "new@test.com", currentPassword: "wrongpass" })
       ).rejects.toThrow(MotDePasseIncorrectError)
@@ -468,7 +465,7 @@ describe("UtilisateurService", () => {
         }),
       })
 
-      const svc = new UtilisateurService(db as any, mockAudit())
+      const svc = new UtilisateurService(db as any)
       await expect(
         svc.updateProfile("u-1", { email: "new@test.com" })
       ).rejects.toThrow(EmailChangeRequiresPasswordError)
@@ -476,7 +473,6 @@ describe("UtilisateurService", () => {
 
     it("deletes old avatar and saves new avatar when avatarData is provided", async () => {
       const db = mockDb()
-      const audit = mockAudit()
       const avatarStorage = mockAvatarStorage()
       db.select.mockReturnValue({
         from: vi.fn().mockReturnValue({
@@ -499,7 +495,6 @@ describe("UtilisateurService", () => {
 
       const svc = new UtilisateurService(
         db as any,
-        audit,
         avatarStorage
       )
       const result = await svc.updateProfile("u-1", { avatarData: "data:image/png;base64,abc" })
@@ -533,7 +528,6 @@ describe("UtilisateurService", () => {
 
       const svc = new UtilisateurService(
         db as any,
-        mockAudit(),
         avatarStorage
       )
       const result = await svc.updateProfile("u-1", { avatarData: "" })
@@ -553,7 +547,7 @@ describe("UtilisateurService", () => {
         }),
       })
 
-      const svc = new UtilisateurService(db as any, mockAudit())
+      const svc = new UtilisateurService(db as any)
       await expect(svc.updateProfile("u-1", {})).rejects.toThrow(NoProfileUpdateDataError)
     })
   })
