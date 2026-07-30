@@ -1,172 +1,247 @@
-import { describe, it, expect, vi } from "vitest"
-import { logAudit } from "./audit"
+import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest"
+import { sql, eq } from "drizzle-orm"
+import * as schema from "../db/schema"
+import { createPgliteDb } from "./test/create-pglite-db"
+import type { PgliteDb } from "./test/create-pglite-db"
+import * as auditModule from "./audit"
+import { journalAudit } from "../db/schema/journal-audit"
+import { vehiculesEntreprise } from "../db/schema/vehicules-entreprise"
 import { VehiculeService, VehiculeNotFoundError } from "./vehicule-service"
 
-vi.mock("./audit", () => ({
-  logAudit: vi.fn().mockResolvedValue(undefined),
-}))
+const TIMEOUT = 30_000
 
-function mockDb() {
-  const returningCreate = vi.fn()
-  const returningUpdate = vi.fn()
-  const returningDelete = vi.fn()
+describe("VehiculeService", { timeout: TIMEOUT }, () => {
+  let pgliteDb: PgliteDb
+  let svc: VehiculeService
+  let actorId: string
+  let societeId: string
+  let departementId: string
 
-  return {
-    insert: vi.fn(() => ({
-      values: vi.fn(() => ({ returning: returningCreate })),
-    })),
-    update: vi.fn(() => ({
-      set: vi.fn(() => ({
-        where: vi.fn(() => ({ returning: returningUpdate })),
-      })),
-    })),
-    delete: vi.fn(() => ({
-      where: vi.fn(() => ({ returning: returningDelete })),
-    })),
-    query: {
-      vehiculesEntreprise: {
-        findMany: vi.fn(),
-      },
-    },
-  }
-}
+  beforeAll(async () => {
+    pgliteDb = await createPgliteDb()
+  })
 
-const makeVehicule = (overrides?: Record<string, unknown>) => ({
-  id: "v-1",
-  nom: "Renault Clio",
-  immatriculation: "AB-123-CD",
-  disponible: true,
-  creeLe: new Date("2025-01-01"),
-  ...overrides,
-})
+  beforeEach(async () => {
+    await pgliteDb.execute(sql`DELETE FROM journal_audit`)
+    await pgliteDb.execute(sql`DELETE FROM vehicules_entreprise`)
+    await pgliteDb.execute(sql`DELETE FROM utilisateurs`)
+    await pgliteDb.execute(sql`DELETE FROM departements`)
+    await pgliteDb.execute(sql`DELETE FROM societes`)
 
-describe("VehiculeService", () => {
-  it("lists all vehicules ordered by nom asc", async () => {
-    const db = mockDb()
-    const vehicules = [
-      makeVehicule({ nom: "Audi" }),
-      makeVehicule({ id: "v-2", nom: "BMW" }),
-    ]
-    db.query.vehiculesEntreprise.findMany.mockResolvedValue(vehicules)
+    actorId = crypto.randomUUID()
+    societeId = crypto.randomUUID()
+    departementId = crypto.randomUUID()
 
-    const svc = new VehiculeService(db as any)
-    const result = await svc.list()
+    await pgliteDb.insert(schema.societes).values({
+      id: societeId,
+      nom: "Test Societe",
+      modifieLe: new Date(),
+    })
 
-    expect(result).toHaveLength(2)
-    expect(result[0].nom).toBe("Audi")
-    expect(db.query.vehiculesEntreprise.findMany).toHaveBeenCalledWith({
-      orderBy: [expect.any(Object)],
+    await pgliteDb.insert(schema.departements).values({
+      id: departementId,
+      nom: "Test Departement",
+      societeId,
+    })
+
+    await pgliteDb.insert(schema.utilisateurs).values({
+      id: actorId,
+      email: "actor@test.com",
+      nom: "Test",
+      prenom: "User",
+      poste: "Test",
+      role: "FINANCE_ADMIN",
+      departementId,
+      societeId,
+      actif: true,
+      modifieLe: new Date(),
+    })
+
+    svc = new VehiculeService(pgliteDb as any)
+  })
+
+  describe("list", () => {
+    it("returns all vehicules ordered by nom asc", async () => {
+      await pgliteDb.insert(vehiculesEntreprise).values([
+        { id: "v-1", nom: "Renault Clio", immatriculation: "AB-123-CD", disponible: true },
+        { id: "v-2", nom: "Audi A3", immatriculation: "XY-456-ZZ", disponible: true },
+        { id: "v-3", nom: "BMW Serie 1", immatriculation: "CD-789-EF", disponible: false },
+      ])
+
+      const result = await svc.list()
+
+      expect(result).toHaveLength(3)
+      expect(result[0].nom).toBe("Audi A3")
+      expect(result[1].nom).toBe("BMW Serie 1")
+      expect(result[2].nom).toBe("Renault Clio")
     })
   })
 
-  it("creates a vehicule and audits", async () => {
-    const db = mockDb()
-    const returningCreate = db.insert().values().returning as ReturnType<
-      typeof vi.fn
-    >
-    returningCreate.mockResolvedValue([
-      makeVehicule({ nom: "Peugeot 208", immatriculation: "XY-456-ZZ" }),
-    ])
+  describe("create", () => {
+    it("inserts a vehicule row and writes journal_audit", async () => {
+      const vehicule = await svc.create(
+        { nom: "Peugeot 208", immatriculation: "XY-456-ZZ" },
+        actorId
+      )
 
-    const svc = new VehiculeService(db as any)
-    const result = await svc.create(
-      { nom: "Peugeot 208", immatriculation: "XY-456-ZZ" },
-      "u-1"
-    )
+      expect(vehicule.nom).toBe("Peugeot 208")
+      expect(vehicule.immatriculation).toBe("XY-456-ZZ")
+      expect(vehicule.disponible).toBe(true)
 
-    expect(result.nom).toBe("Peugeot 208")
-    expect(result.immatriculation).toBe("XY-456-ZZ")
-    expect(logAudit).toHaveBeenCalledWith(
-      expect.objectContaining({
-        utilisateurId: "u-1",
-        action: "CREATION_VEHICULE",
-        entite: "VehiculeEntreprise",
-      }),
-      expect.anything()
-    )
+      const [row] = await pgliteDb
+        .select()
+        .from(vehiculesEntreprise)
+        .where(eq(vehiculesEntreprise.id, vehicule.id))
+      expect(row).toBeDefined()
+      expect(row.nom).toBe("Peugeot 208")
+
+      const [auditRow] = await pgliteDb
+        .select()
+        .from(journalAudit)
+        .where(eq(journalAudit.entiteId, vehicule.id))
+      expect(auditRow).toBeDefined()
+      expect(auditRow.utilisateurId).toBe(actorId)
+      expect(auditRow.action).toBe("CREATION_VEHICULE")
+    })
+
+    it("defaults disponible to true", async () => {
+      const vehicule = await svc.create(
+        { nom: "Tesla", immatriculation: "ZZ-999-AA" },
+        actorId
+      )
+
+      expect(vehicule.disponible).toBe(true)
+    })
+
+    it("rolls back when logAudit fails (no rows inserted)", async () => {
+      const spy = vi.spyOn(auditModule, "logAudit").mockRejectedValueOnce(new Error("audit failure"))
+
+      await expect(
+        svc.create({ nom: "Rollback", immatriculation: "RB-000-XX" }, actorId)
+      ).rejects.toThrow("audit failure")
+
+      const rows = await pgliteDb.select().from(vehiculesEntreprise)
+      expect(rows).toHaveLength(0)
+
+      spy.mockRestore()
+    })
   })
 
-  it("creates a vehicule with disponible defaulting to true", async () => {
-    const db = mockDb()
-    const returningCreate = db.insert().values().returning as ReturnType<
-      typeof vi.fn
-    >
-    returningCreate.mockImplementation((data: any) =>
-      Promise.resolve([makeVehicule({ ...data })] as any)
-    )
+  describe("update", () => {
+    let vehiculeId: string
 
-    const svc = new VehiculeService(db as any)
-    const result = await svc.create(
-      { nom: "Tesla", immatriculation: "ZZ-999-AA" },
-      "u-1"
-    )
+    beforeEach(async () => {
+      vehiculeId = crypto.randomUUID()
+      await pgliteDb.insert(vehiculesEntreprise).values({
+        id: vehiculeId,
+        nom: "Renault Clio",
+        immatriculation: "AB-123-CD",
+        disponible: true,
+      })
+    })
 
-    expect(result.disponible).toBe(true)
+    it("updates a vehicule row and writes journal_audit", async () => {
+      const result = await svc.update(
+        vehiculeId,
+        { nom: "Renault Megane", immatriculation: "CD-789-EF" },
+        actorId
+      )
+
+      expect(result.nom).toBe("Renault Megane")
+      expect(result.immatriculation).toBe("CD-789-EF")
+
+      const [row] = await pgliteDb
+        .select()
+        .from(vehiculesEntreprise)
+        .where(eq(vehiculesEntreprise.id, vehiculeId))
+      expect(row.nom).toBe("Renault Megane")
+      expect(row.immatriculation).toBe("CD-789-EF")
+
+      const [auditRow] = await pgliteDb
+        .select()
+        .from(journalAudit)
+        .where(eq(journalAudit.entiteId, vehiculeId))
+      expect(auditRow).toBeDefined()
+      expect(auditRow.utilisateurId).toBe(actorId)
+      expect(auditRow.action).toBe("MODIFICATION_VEHICULE")
+    })
+
+    it("rolls back when logAudit fails (original values preserved)", async () => {
+      const spy = vi.spyOn(auditModule, "logAudit").mockRejectedValueOnce(new Error("audit failure"))
+
+      await expect(
+        svc.update(vehiculeId, { nom: "Should Not Stick" }, actorId)
+      ).rejects.toThrow("audit failure")
+
+      const [row] = await pgliteDb
+        .select()
+        .from(vehiculesEntreprise)
+        .where(eq(vehiculesEntreprise.id, vehiculeId))
+      expect(row.nom).toBe("Renault Clio")
+      expect(row.immatriculation).toBe("AB-123-CD")
+
+      spy.mockRestore()
+    })
+
+    it("throws VehiculeNotFoundError when vehicule does not exist", async () => {
+      await expect(
+        svc.update("v-missing", { nom: "Ghost" }, actorId)
+      ).rejects.toThrow(VehiculeNotFoundError)
+    })
   })
 
-  it("updates a vehicule and audits", async () => {
-    const db = mockDb()
-    db.update()
-      .set()
-      .where()
-      .returning.mockResolvedValue([
-        makeVehicule({ nom: "Renault Megane", immatriculation: "CD-789-EF" }),
-      ])
+  describe("delete", () => {
+    let vehiculeId: string
 
-    const svc = new VehiculeService(db as any)
-    const result = await svc.update(
-      "v-1",
-      { nom: "Renault Megane", immatriculation: "CD-789-EF" },
-      "u-1"
-    )
+    beforeEach(async () => {
+      vehiculeId = crypto.randomUUID()
+      await pgliteDb.insert(vehiculesEntreprise).values({
+        id: vehiculeId,
+        nom: "Renault Clio",
+        immatriculation: "AB-123-CD",
+        disponible: true,
+      })
+    })
 
-    expect(result.nom).toBe("Renault Megane")
-    expect(logAudit).toHaveBeenCalledWith(
-      expect.objectContaining({
-        utilisateurId: "u-1",
-        action: "MODIFICATION_VEHICULE",
-        entite: "VehiculeEntreprise",
-        entiteId: "v-1",
-      }),
-      expect.anything()
-    )
-  })
+    it("deletes a vehicule row and writes journal_audit", async () => {
+      await svc.delete(vehiculeId, actorId)
 
-  it("throws VehiculeNotFoundError when updating non-existent vehicule", async () => {
-    const db = mockDb()
-    db.update().set().where().returning.mockResolvedValue([])
+      const rows = await pgliteDb
+        .select()
+        .from(vehiculesEntreprise)
+        .where(eq(vehiculesEntreprise.id, vehiculeId))
+      expect(rows).toHaveLength(0)
 
-    const svc = new VehiculeService(db as any)
-    await expect(
-      svc.update("v-missing", { nom: "Ghost" }, "u-1")
-    ).rejects.toThrow(VehiculeNotFoundError)
-  })
+      const [auditRow] = await pgliteDb
+        .select()
+        .from(journalAudit)
+        .where(eq(journalAudit.entiteId, vehiculeId))
+      expect(auditRow).toBeDefined()
+      expect(auditRow.utilisateurId).toBe(actorId)
+      expect(auditRow.action).toBe("SUPPRESSION_VEHICULE")
+    })
 
-  it("deletes a vehicule and audits", async () => {
-    const db = mockDb()
-    db.delete().where().returning.mockResolvedValue([makeVehicule()])
+    it("rolls back when logAudit fails (row still present)", async () => {
+      const spy = vi.spyOn(auditModule, "logAudit").mockRejectedValueOnce(new Error("audit failure"))
 
-    const svc = new VehiculeService(db as any)
-    await svc.delete("v-1", "u-1")
+      await expect(
+        svc.delete(vehiculeId, actorId)
+      ).rejects.toThrow("audit failure")
 
-    expect(logAudit).toHaveBeenCalledWith(
-      expect.objectContaining({
-        utilisateurId: "u-1",
-        action: "SUPPRESSION_VEHICULE",
-        entite: "VehiculeEntreprise",
-        entiteId: "v-1",
-      }),
-      expect.anything()
-    )
-  })
+      const [row] = await pgliteDb
+        .select()
+        .from(vehiculesEntreprise)
+        .where(eq(vehiculesEntreprise.id, vehiculeId))
+      expect(row).toBeDefined()
+      expect(row.nom).toBe("Renault Clio")
 
-  it("throws VehiculeNotFoundError when deleting non-existent vehicule", async () => {
-    const db = mockDb()
-    db.delete().where().returning.mockResolvedValue([])
+      spy.mockRestore()
+    })
 
-    const svc = new VehiculeService(db as any)
-    await expect(svc.delete("v-missing", "u-1")).rejects.toThrow(
-      VehiculeNotFoundError
-    )
+    it("throws VehiculeNotFoundError when vehicule does not exist", async () => {
+      await expect(
+        svc.delete("v-missing", actorId)
+      ).rejects.toThrow(VehiculeNotFoundError)
+    })
   })
 })

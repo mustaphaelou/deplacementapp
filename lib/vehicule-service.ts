@@ -20,27 +20,31 @@ export class VehiculeService {
     data: { nom: string; immatriculation: string; disponible?: boolean },
     actorId: string
   ) {
-    const [vehicule] = await this._db
-      .insert(vehiculesEntreprise)
-      .values({
-        id: crypto.randomUUID(),
-        ...data,
-        disponible: data.disponible ?? true,
-      })
-      .returning()
+    const id = crypto.randomUUID()
 
-    await logAudit(
-      {
-        utilisateurId: actorId,
-        action: "CREATION_VEHICULE",
-        entite: "VehiculeEntreprise",
-        entiteId: vehicule.id,
-        details: { nom: vehicule.nom },
-      },
-      this._db
-    )
+    return this._db.transaction(async (tx) => {
+      const [vehicule] = await tx
+        .insert(vehiculesEntreprise)
+        .values({
+          id,
+          ...data,
+          disponible: data.disponible ?? true,
+        })
+        .returning()
 
-    return vehicule
+      await logAudit(
+        {
+          utilisateurId: actorId,
+          action: "CREATION_VEHICULE",
+          entite: "VehiculeEntreprise",
+          entiteId: vehicule.id,
+          details: { nom: vehicule.nom },
+        },
+        tx as any
+      )
+
+      return vehicule
+    })
   }
 
   async update(
@@ -48,45 +52,49 @@ export class VehiculeService {
     data: { nom?: string; immatriculation?: string; disponible?: boolean },
     actorId: string
   ) {
-    const [vehicule] = await this._db
-      .update(vehiculesEntreprise)
-      .set(data)
-      .where(eq(vehiculesEntreprise.id, id))
-      .returning()
+    return this._db.transaction(async (tx) => {
+      const [vehicule] = await tx
+        .update(vehiculesEntreprise)
+        .set(data)
+        .where(eq(vehiculesEntreprise.id, id))
+        .returning()
 
-    if (!vehicule) throw new VehiculeNotFoundError()
+      if (!vehicule) throw new VehiculeNotFoundError()
 
-    await logAudit(
-      {
-        utilisateurId: actorId,
-        action: "MODIFICATION_VEHICULE",
-        entite: "VehiculeEntreprise",
-        entiteId: vehicule.id,
-        details: { nom: vehicule.nom },
-      },
-      this._db
-    )
+      await logAudit(
+        {
+          utilisateurId: actorId,
+          action: "MODIFICATION_VEHICULE",
+          entite: "VehiculeEntreprise",
+          entiteId: vehicule.id,
+          details: { nom: vehicule.nom },
+        },
+        tx as any
+      )
 
-    return vehicule
+      return vehicule
+    })
   }
 
   async delete(id: string, actorId: string): Promise<void> {
-    const [vehicule] = await this._db
-      .delete(vehiculesEntreprise)
-      .where(eq(vehiculesEntreprise.id, id))
-      .returning()
+    await this._db.transaction(async (tx) => {
+      const [vehicule] = await tx
+        .delete(vehiculesEntreprise)
+        .where(eq(vehiculesEntreprise.id, id))
+        .returning()
 
-    if (!vehicule) throw new VehiculeNotFoundError()
+      if (!vehicule) throw new VehiculeNotFoundError()
 
-    await logAudit(
-      {
-        utilisateurId: actorId,
-        action: "SUPPRESSION_VEHICULE",
-        entite: "VehiculeEntreprise",
-        entiteId: id,
-      },
-      this._db
-    )
+      await logAudit(
+        {
+          utilisateurId: actorId,
+          action: "SUPPRESSION_VEHICULE",
+          entite: "VehiculeEntreprise",
+          entiteId: id,
+        },
+        tx as any
+      )
+    })
   }
 }
 
