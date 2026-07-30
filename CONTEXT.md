@@ -93,7 +93,7 @@ The module that sends outgoing notification emails. Owns the transport seam (SMT
 _Avoid_: EmailService (the predecessor's name), mailer, email service
 
 **JournalAudit**:
-A timestamped record of a *committed* state change: who performed what action on which entity. Only successful transitions are recorded — attempts that fail authorization or transition guards (wrong role, invalid action, missing record) throw before the audit dispatch and produce no JournalAudit entry.
+A timestamped record of a *committed* state change: who performed what action on which entity. Only successful transitions are recorded — attempts that fail authorization or transition guards (wrong role, invalid action, missing record) throw before the audit dispatch and produce no JournalAudit entry. The `logAudit(event, dbOrTx)` function in `lib/audit` is the single entry point for all audit writes — called by `UtilisateurService`, `VehiculeService`, `app/api/societe/route.ts`, and `appliquerEffets` (with the transaction `tx`).
 
 **EffetsTransition (Transition Effects)**:
 The side-effects executed immediately following a committed DemandeDeplacement transition, combining JournalAudit logging and Notification dispatches behind a single internal seam. The seam is **rows-only**: JournalAudit inserts and Notification row inserts run inside the caller's `db.transaction`. Email dispatch is explicitly out of scope — email belongs to the EmailSender module, fired by AccuseLecture, not by transitions.

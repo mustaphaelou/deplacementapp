@@ -1,5 +1,5 @@
 import type { PgDatabase } from "drizzle-orm/pg-core"
-import { journalAudit } from "../../db/schema/journal-audit"
+import { logAudit } from "../audit"
 import { notifications } from "../../db/schema/notifications"
 import type { NotificationEventType, NotificationPayload } from "../notification-events"
 import { buildMessage, resolveRecipients } from "../notification/helpers"
@@ -18,14 +18,16 @@ export async function appliquerEffets(
     } | null
   },
 ): Promise<void> {
-  await tx.insert(journalAudit).values({
-    id: crypto.randomUUID(),
-    utilisateurId: params.audit.utilisateurId,
-    action: params.audit.action,
-    entite: "DemandeDeplacement",
-    entiteId: params.audit.entiteId,
-    details: JSON.stringify({ numero: params.audit.numero }),
-  })
+  await logAudit(
+    {
+      utilisateurId: params.audit.utilisateurId,
+      action: params.audit.action,
+      entite: "DemandeDeplacement",
+      entiteId: params.audit.entiteId,
+      details: { numero: params.audit.numero },
+    },
+    tx,
+  )
 
   if (params.notification) {
     const { event, demandeId, numero, employe, assigneAId } = params.notification
