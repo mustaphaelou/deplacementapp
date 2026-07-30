@@ -2,16 +2,13 @@ import { eq, asc, desc } from "drizzle-orm"
 import type { DrizzleDb } from "../db"
 import { vehiculesEntreprise } from "../db/schema/vehicules-entreprise"
 import { db } from "../db"
-import { auditBus } from "./audit-bus"
+import { logAudit } from "./audit"
 import { VehiculeNotFoundError } from "./errors"
 
 export { VehiculeNotFoundError }
 
 export class VehiculeService {
-  constructor(
-    private _db: DrizzleDb,
-    private audit = auditBus
-  ) {}
+  constructor(private _db: DrizzleDb) {}
 
   async list() {
     return this._db.query.vehiculesEntreprise.findMany({
@@ -28,13 +25,16 @@ export class VehiculeService {
       .values({ id: crypto.randomUUID(), ...data, disponible: data.disponible ?? true })
       .returning()
 
-    await this.audit.log({
-      utilisateurId: actorId,
-      action: "CREATION_VEHICULE",
-      entite: "VehiculeEntreprise",
-      entiteId: vehicule.id,
-      details: { nom: vehicule.nom },
-    })
+    await logAudit(
+      {
+        utilisateurId: actorId,
+        action: "CREATION_VEHICULE",
+        entite: "VehiculeEntreprise",
+        entiteId: vehicule.id,
+        details: { nom: vehicule.nom },
+      },
+      this._db,
+    )
 
     return vehicule
   }
@@ -52,13 +52,16 @@ export class VehiculeService {
 
     if (!vehicule) throw new VehiculeNotFoundError()
 
-    await this.audit.log({
-      utilisateurId: actorId,
-      action: "MODIFICATION_VEHICULE",
-      entite: "VehiculeEntreprise",
-      entiteId: vehicule.id,
-      details: { nom: vehicule.nom },
-    })
+    await logAudit(
+      {
+        utilisateurId: actorId,
+        action: "MODIFICATION_VEHICULE",
+        entite: "VehiculeEntreprise",
+        entiteId: vehicule.id,
+        details: { nom: vehicule.nom },
+      },
+      this._db,
+    )
 
     return vehicule
   }
@@ -71,12 +74,15 @@ export class VehiculeService {
 
     if (!vehicule) throw new VehiculeNotFoundError()
 
-    await this.audit.log({
-      utilisateurId: actorId,
-      action: "SUPPRESSION_VEHICULE",
-      entite: "VehiculeEntreprise",
-      entiteId: id,
-    })
+    await logAudit(
+      {
+        utilisateurId: actorId,
+        action: "SUPPRESSION_VEHICULE",
+        entite: "VehiculeEntreprise",
+        entiteId: id,
+      },
+      this._db,
+    )
   }
 }
 

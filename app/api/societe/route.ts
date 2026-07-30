@@ -4,7 +4,7 @@ import { db } from "@/db"
 import { societes } from "@/db/schema/societes"
 import { requireAuth } from "@/lib/auth-utils"
 import { handleServiceError } from "@/lib/errors"
-import { auditBus } from "@/lib/audit-bus"
+import { logAudit } from "@/lib/audit"
 
 export async function GET() {
   try {
@@ -49,7 +49,7 @@ export async function PATCH(req: NextRequest) {
       .set(changes)
       .where(eq(societes.id, societe.id))
 
-    await auditBus.log({
+    await logAudit({
       utilisateurId: session.user.id,
       action: "MODIFIER_SOCIETE",
       entite: "Societe",

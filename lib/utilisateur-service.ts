@@ -3,7 +3,7 @@ import { hash, compare } from "bcryptjs"
 import type { DrizzleDb } from "../db"
 import { db } from "../db"
 import { utilisateurs } from "../db/schema/utilisateurs"
-import { auditBus } from "./audit-bus"
+import { logAudit } from "./audit"
 import {
   avatarStorage as defaultAvatarStorage,
   type AvatarStorage,
@@ -42,7 +42,6 @@ export {
 export class UtilisateurService {
   constructor(
     private _db: DrizzleDb,
-    private audit = auditBus,
     private avatarStorage: AvatarStorage = defaultAvatarStorage
   ) {}
 
@@ -103,13 +102,16 @@ export class UtilisateurService {
       })
       .returning()
 
-    await this.audit.log({
-      utilisateurId: actorId,
-      action: "CREATION_UTILISATEUR",
-      entite: "Utilisateur",
-      entiteId: user.id,
-      details: { email: user.email },
-    })
+    await logAudit(
+      {
+        utilisateurId: actorId,
+        action: "CREATION_UTILISATEUR",
+        entite: "Utilisateur",
+        entiteId: user.id,
+        details: { email: user.email },
+      },
+      this._db,
+    )
 
     return user
   }
@@ -143,13 +145,16 @@ export class UtilisateurService {
 
     if (!user) throw new UtilisateurNotFoundError()
 
-    await this.audit.log({
-      utilisateurId: actorId,
-      action: "MODIFICATION_UTILISATEUR",
-      entite: "Utilisateur",
-      entiteId: user.id,
-      details: { email: user.email },
-    })
+    await logAudit(
+      {
+        utilisateurId: actorId,
+        action: "MODIFICATION_UTILISATEUR",
+        entite: "Utilisateur",
+        entiteId: user.id,
+        details: { email: user.email },
+      },
+      this._db,
+    )
 
     return user
   }
@@ -177,12 +182,15 @@ export class UtilisateurService {
       .set({ motDePasse: hashed })
       .where(eq(utilisateurs.id, userId))
 
-    await this.audit.log({
-      utilisateurId: userId,
-      action: "CHANGEMENT_MOT_DE_PASSE",
-      entite: "Utilisateur",
-      entiteId: userId,
-    })
+    await logAudit(
+      {
+        utilisateurId: userId,
+        action: "CHANGEMENT_MOT_DE_PASSE",
+        entite: "Utilisateur",
+        entiteId: userId,
+      },
+      this._db,
+    )
   }
 
   async updateProfile(
@@ -249,13 +257,16 @@ export class UtilisateurService {
 
     if (!updated) throw new UtilisateurNotFoundError()
 
-    await this.audit.log({
-      utilisateurId: userId,
-      action: "MODIFICATION_PROFIL",
-      entite: "Utilisateur",
-      entiteId: updated.id,
-      details: { champs: Object.keys(updateData) },
-    })
+    await logAudit(
+      {
+        utilisateurId: userId,
+        action: "MODIFICATION_PROFIL",
+        entite: "Utilisateur",
+        entiteId: updated.id,
+        details: { champs: Object.keys(updateData) },
+      },
+      this._db,
+    )
 
     return updated
   }
