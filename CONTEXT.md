@@ -13,6 +13,7 @@ _Avoid_: Organisation, company, tenant
 
 **DemandeDeplacement**:
 A request submitted by an employee to travel for business purposes. Has a lifecycle through a multi-stage approval pipeline. Contains an intentional point-in-time snapshot of the employee's data (name, department, position) so historical requests are unaffected by future employee transfers or title changes.
+_AI propose_ — destination (Moroccan city from static list, horsMaroc=false), motif (single value from canonical list below), typeTransport (6-value enum), avanceRequise (boolean). All other fields are employee-entered.
 _Avoid_: Trip, request, travel form
 
 **Utilisateur**:
@@ -150,6 +151,11 @@ _Avoid_: Email suffix, mail domain
 > **Domain expert:** "No — REJECTED is terminal. The employee must create a new DemandeDeplacement if they want to pursue the trip. The original stays at MANAGER_REVIEW with Decision=REJECTED."
 > **Dev:** "Can we show 'pending at manager' and 'pending at finance' using the same word?"
 > **Domain expert:** "Not really. 'Pending' is too generic. One is waiting for the manager, the other for finance. Those are different places in the pipeline."
+
+### AI inference
+
+**InferencePosture**:
+The deployment choice for Nemotron model inference. Decided in ADR-0013: **hosted NIM**, targeting `nvidia/nemotron-3-nano-30b-a3b` on `integrate.api.nvidia.com/v1` via the OpenAI-compatible SDK. Employee past-demandes (snapshots of name, department, position, travel history) egress to NVIDIA's NIM endpoint during propose-from-history calls. This is accepted under the Societe's data-protection posture and is the gate for the data-residency/consent compliance. Self-host is available as a future escape hatch if requirements change.
 
 ## Flagged ambiguities
 
