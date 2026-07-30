@@ -6,7 +6,7 @@ import { createPgliteDb } from "./test/create-pglite-db"
 import type { PgliteDb } from "./test/create-pglite-db"
 import { estEnAmorcage, quitterAmorcage } from "./amorcage"
 import { AmorcageDejaConfigureError } from "./errors"
-import { loadSocieteIdentity, clearCache } from "./societe-identity"
+import { loadSocieteIdentity, clearSocieteCache } from "@/lib/societe"
 
 const TIMEOUT = 30_000
 
@@ -22,7 +22,7 @@ describe("Amorcage module", { timeout: TIMEOUT }, () => {
     await pgliteDb.execute(sql`DELETE FROM utilisateurs`)
     await pgliteDb.execute(sql`DELETE FROM departements`)
     await pgliteDb.execute(sql`DELETE FROM societes`)
-    clearCache()
+    clearSocieteCache()
   })
 
   it("estEnAmorcage returns true when no Societe exists", async () => {

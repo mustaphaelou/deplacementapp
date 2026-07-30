@@ -6,7 +6,7 @@ import { societes } from "../db/schema/societes"
 import { departements } from "../db/schema/departements"
 import { utilisateurs } from "../db/schema/utilisateurs"
 import { AmorcageDejaConfigureError } from "./errors"
-import { clearCache } from "./societe-identity"
+import { clearSocieteCache } from "@/lib/societe"
 
 async function countSocietes(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -91,6 +91,6 @@ export async function quitterAmorcage(input: {
     }
   })
 
-  clearCache()
+  clearSocieteCache()
   return result
 }

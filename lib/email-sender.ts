@@ -1,4 +1,4 @@
-import { loadSocieteIdentity } from "./societe-identity"
+import { loadSocieteIdentity } from "@/lib/societe"
 import { SmtpTransporter, NullTransporter } from "./email-transporter"
 
 export interface EmailOptions {

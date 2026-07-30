@@ -6,7 +6,7 @@ import { createPgliteDb } from "./test/create-pglite-db"
 import type { PgliteDb } from "./test/create-pglite-db"
 import { EmailSender } from "./email-sender"
 import type { EmailTransporter } from "./email-sender"
-import { clearCache } from "./societe-identity"
+import { clearSocieteCache } from "@/lib/societe"
 
 const TIMEOUT = 30_000
 
@@ -25,7 +25,7 @@ describe("EmailSender", { timeout: TIMEOUT }, () => {
 
   beforeEach(async () => {
     await pgliteDb.execute(sql`DELETE FROM societes`)
-    clearCache()
+    clearSocieteCache()
     transporter = fakeTransporter()
   })
 
