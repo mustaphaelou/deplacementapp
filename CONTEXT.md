@@ -14,6 +14,7 @@ _Avoid_: Organisation, company, tenant
 **DemandeDeplacement**:
 A request submitted by an employee to travel for business purposes. Has a lifecycle through a multi-stage approval pipeline. Contains an intentional point-in-time snapshot of the employee's data (name, department, position) so historical requests are unaffected by future employee transfers or title changes.
 _AI propose_ — destination (Moroccan city from static list, horsMaroc=false), motif (single value from canonical list below), typeTransport (6-value enum), avanceRequise (boolean). All other fields are employee-entered.
+_Provenance_ — each AI-proposable field carries a per-field `provenance` companion (`ai_proposed` or `employee_entered`) recording how the value was sourced. Written to JournalAudit on acceptance (one event per field). Provenance is returned by the API for all roles and may be displayed in the UI at every stage. Accountability for accepted AI proposals rests with the employee — downstream rejections are audited silently, without flagging AI origin.
 _Avoid_: Trip, request, travel form
 
 **Utilisateur**:
@@ -157,7 +158,9 @@ _Avoid_: Email suffix, mail domain
 **InferencePosture**:
 The deployment choice for Nemotron model inference. Decided in ADR-0013: **hosted NIM**, targeting `nvidia/nemotron-3-nano-30b-a3b` on `integrate.api.nvidia.com/v1` via the OpenAI-compatible SDK. Employee past-demandes (snapshots of name, department, position, travel history) egress to NVIDIA's NIM endpoint during propose-from-history calls. This is accepted under the Societe's data-protection posture and is the gate for the data-residency/consent compliance. Self-host is available as a future escape hatch if requirements change.
 
-## Flagged ambiguities
+**Provenance**:
+Per-field metadata on a DemandeDeplacement indicating how a value was sourced. One of `ai_proposed` (value came from an AI proposal, accepted by the employee) or `employee_entered` (value typed directly by the employee). Applies to each AI-proposable field: Ville, Motif, TypeTransport, avanceRequise. Written to JournalAudit at acceptance time as a single event per field (`field X set to value Y (provenance: ai_proposed, accepted by employee Z)`). Provenance is returned by the API for all roles (EMPLOYEE, MANAGER, FINANCE_ADMIN, GENERAL_DIRECTION) and may be displayed in the UI at every pipeline stage. Downstream rejection audit entries are silent on AI involvement — accountability rests with the employee per the `employee stays accountable` principle.
+_Avoid_: Source, origin, AI flag, assisted
 
 - "approved" was used to mean both a stage-level outcome (manager said yes) and a terminal outcome (whole pipeline complete). Resolved by splitting into **Etape** (where we are) and **Decision** (what happened there). Terminal approval is `Etape: FINAL, Decision: APPROVED`.
 - "status" / "statut" was previously a single-column legacy enum resolved to **StatutDemande**. As of ADR-0005, the column is split into two persisted columns: **Etape + Decision**. The old `fromLegacyStatus`/`toLegacyStatus` bridging layer is removed.
