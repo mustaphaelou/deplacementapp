@@ -188,7 +188,8 @@ export function TravelRequestPdf({ data }: { data: PdfRenderData }) {
   const isDraft = data.etape === "DRAFT"
   const statusLabel = data.etape
   const statusColor = getStatusColor(data.etape, data.decision)
-  const transportLabel = TRANSPORT_LABELS[data.typeTransport] || data.typeTransport
+  const transportLabel =
+    TRANSPORT_LABELS[data.typeTransport] || data.typeTransport
 
   return (
     <Document
@@ -224,7 +225,9 @@ export function TravelRequestPdf({ data }: { data: PdfRenderData }) {
                 backgroundColor: statusColor,
               }}
             >
-              <Text style={{ color: "#FFFFFF", fontSize: 9, fontWeight: "bold" }}>
+              <Text
+                style={{ color: "#FFFFFF", fontSize: 9, fontWeight: "bold" }}
+              >
                 {statusLabel}
               </Text>
             </View>
@@ -289,23 +292,33 @@ export function TravelRequestPdf({ data }: { data: PdfRenderData }) {
           </View>
           <View style={styles.tableRow}>
             <Text style={styles.tableCell}>Transport</Text>
-            <Text style={styles.tableCell}>{data.couts.transport.toLocaleString("fr-FR")} EUR</Text>
+            <Text style={styles.tableCell}>
+              {data.couts.transport.toLocaleString("fr-FR")} EUR
+            </Text>
           </View>
           <View style={styles.tableRow}>
             <Text style={styles.tableCell}>Hebergement</Text>
-            <Text style={styles.tableCell}>{data.couts.hebergement.toLocaleString("fr-FR")} EUR</Text>
+            <Text style={styles.tableCell}>
+              {data.couts.hebergement.toLocaleString("fr-FR")} EUR
+            </Text>
           </View>
           <View style={styles.tableRow}>
             <Text style={styles.tableCell}>Repas</Text>
-            <Text style={styles.tableCell}>{data.couts.repas.toLocaleString("fr-FR")} EUR</Text>
+            <Text style={styles.tableCell}>
+              {data.couts.repas.toLocaleString("fr-FR")} EUR
+            </Text>
           </View>
           <View style={styles.tableRow}>
             <Text style={styles.tableCell}>Divers</Text>
-            <Text style={styles.tableCell}>{data.couts.divers.toLocaleString("fr-FR")} EUR</Text>
+            <Text style={styles.tableCell}>
+              {data.couts.divers.toLocaleString("fr-FR")} EUR
+            </Text>
           </View>
           <View style={[styles.tableRow, { fontWeight: "bold" }]}>
             <Text style={styles.tableCell}>Total estime</Text>
-            <Text style={styles.tableCell}>{data.couts.total.toLocaleString("fr-FR")} EUR</Text>
+            <Text style={styles.tableCell}>
+              {data.couts.total.toLocaleString("fr-FR")} EUR
+            </Text>
           </View>
         </View>
 
@@ -314,7 +327,9 @@ export function TravelRequestPdf({ data }: { data: PdfRenderData }) {
         <View style={styles.detailsGrid}>
           <View style={styles.field}>
             <Text style={styles.fieldLabel}>Nom complet</Text>
-            <Text style={styles.fieldValue}>{data.employePrenom} {data.employeNom}</Text>
+            <Text style={styles.fieldValue}>
+              {data.employePrenom} {data.employeNom}
+            </Text>
           </View>
           <View style={styles.field}>
             <Text style={styles.fieldLabel}>Poste</Text>
@@ -327,7 +342,9 @@ export function TravelRequestPdf({ data }: { data: PdfRenderData }) {
           {data.assigneA && (
             <View style={styles.field}>
               <Text style={styles.fieldLabel}>Traite par</Text>
-              <Text style={styles.fieldValue}>{data.assigneA.prenom} {data.assigneA.nom}</Text>
+              <Text style={styles.fieldValue}>
+                {data.assigneA.prenom} {data.assigneA.nom}
+              </Text>
             </View>
           )}
         </View>
@@ -355,7 +372,8 @@ export function TravelRequestPdf({ data }: { data: PdfRenderData }) {
           <>
             <Text style={styles.sectionTitle}>ATTENTION</Text>
             <Text style={styles.noData}>
-              Ce document est un BROUILLON. Il n{"\u2019"}a pas encore ete soumis pour validation.
+              Ce document est un BROUILLON. Il n{"\u2019"}a pas encore ete
+              soumis pour validation.
             </Text>
           </>
         )}

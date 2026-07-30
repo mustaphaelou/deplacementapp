@@ -4,7 +4,12 @@ import type { DemandeExportRow } from "@/lib/demande"
 const { mockRequireAnyRole } = vi.hoisted(() => ({
   mockRequireAnyRole: (user: { role: string }, roles: readonly string[]) => {
     if (roles.includes(user.role)) return { ok: true }
-    return { ok: false, response: new Response(JSON.stringify({ error: "Accès refusé" }), { status: 403 }) }
+    return {
+      ok: false,
+      response: new Response(JSON.stringify({ error: "Accès refusé" }), {
+        status: 403,
+      }),
+    }
   },
 }))
 
@@ -69,7 +74,9 @@ describe("CSV export route", () => {
     const { findAllForExport } = await import("@/lib/demande")
 
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
-    ;(findAllForExport as ReturnType<typeof vi.fn>).mockResolvedValue(mockExportRows)
+    ;(findAllForExport as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockExportRows
+    )
 
     const { GET } = await import("./route")
     const response = await GET()
@@ -79,16 +86,24 @@ describe("CSV export route", () => {
     expect(response.headers.get("Content-Type")).toBe("text/csv; charset=utf-8")
 
     const csv = await response.text()
-    expect(csv).toContain("Numero,Employe,Destination,DateDepart,DateRetour,Transport,Total,Statut,CreeLe")
-    expect(csv).toContain('"DD-2025-0001","Jean Dupont","Casablanca","2025-06-01","2025-06-05","AVION","380","FINAL"')
-    expect(csv).toContain('"DD-2025-0002","","Rabat","2025-07-10","2025-07-12","BUS","0","MANAGER_REVIEW"')
+    expect(csv).toContain(
+      "Numero,Employe,Destination,DateDepart,DateRetour,Transport,Total,Statut,CreeLe"
+    )
+    expect(csv).toContain(
+      '"DD-2025-0001","Jean Dupont","Casablanca","2025-06-01","2025-06-05","AVION","380","FINAL"'
+    )
+    expect(csv).toContain(
+      '"DD-2025-0002","","Rabat","2025-07-10","2025-07-12","BUS","0","MANAGER_REVIEW"'
+    )
   })
 
   it("GET returns 401 when auth fails", async () => {
     const { requireAuth } = await import("@/lib/auth")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: false,
-      response: new Response(JSON.stringify({ error: "Non autorisé" }), { status: 401 }),
+      response: new Response(JSON.stringify({ error: "Non autorisé" }), {
+        status: 401,
+      }),
     })
 
     const { GET } = await import("./route")
@@ -99,7 +114,9 @@ describe("CSV export route", () => {
 
   it("GET returns 403 when role is not authorised", async () => {
     const { requireAuth } = await import("@/lib/auth")
-    ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth("EMPLOYEE"))
+    ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockAuth("EMPLOYEE")
+    )
 
     const { GET } = await import("./route")
     const response = await GET()
@@ -112,7 +129,9 @@ describe("CSV export route", () => {
     const { findAllForExport } = await import("@/lib/demande")
 
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
-    ;(findAllForExport as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("DB down"))
+    ;(findAllForExport as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error("DB down")
+    )
 
     const { GET } = await import("./route")
     const response = await GET()

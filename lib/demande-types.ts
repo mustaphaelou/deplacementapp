@@ -52,7 +52,13 @@ export type DemandeDeplacement = {
 }
 
 export type DemandeWithRelations = DemandeDeplacement & {
-  employe: { id: string; prenom: string; nom: string; email: string; poste: string }
+  employe: {
+    id: string
+    prenom: string
+    nom: string
+    email: string
+    poste: string
+  }
   vehicule: { nom: string; immatriculation: string } | null
   assigneA: { id: string; prenom: string; nom: string } | null
 }
@@ -91,14 +97,25 @@ export interface DemandeDetail {
   approuveeDirectionLe: string | null
   rejeteeLe: string | null
   retireeLe: string | null
-  employe: { id: string; prenom: string; nom: string; email: string; poste: string }
+  employe: {
+    id: string
+    prenom: string
+    nom: string
+    email: string
+    poste: string
+  }
   assigneA: { id: string; prenom: string; nom: string } | null
   documents: { id: string; type: string; creeLe: string }[]
   creeLe: string
   modifieLe: string
 }
 
-export type Vehicule = { id: string; nom: string; immatriculation: string; disponible: boolean }
+export type Vehicule = {
+  id: string
+  nom: string
+  immatriculation: string
+  disponible: boolean
+}
 
 export interface Actor {
   id: string

@@ -19,12 +19,10 @@ export interface AuthUser {
 }
 
 export type AuthResult =
-  | { ok: true; user: AuthUser }
-  | { ok: false; response: NextResponse }
+  { ok: true; user: AuthUser } | { ok: false; response: NextResponse }
 
 export type AuthorizationResult =
-  | { ok: true }
-  | { ok: false; response: NextResponse }
+  { ok: true } | { ok: false; response: NextResponse }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
@@ -91,7 +89,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 export const GET = handlers.GET
 export const POST = handlers.POST
 
-function getSessionUser(user: { id?: string; email?: string | null; name?: string | null; role?: string; departementId?: string; departement?: string; poste?: string }): AuthUser {
+function getSessionUser(user: {
+  id?: string
+  email?: string | null
+  name?: string | null
+  role?: string
+  departementId?: string
+  departement?: string
+  poste?: string
+}): AuthUser {
   return {
     id: user.id ?? user.email ?? "",
     email: user.email ?? "",
@@ -124,7 +130,10 @@ export function hasAnyRole(role: string, allowed: readonly Role[]): boolean {
   return allowed.includes(role as Role)
 }
 
-export function requireRole(user: AuthUser, requiredRole: Role): AuthorizationResult {
+export function requireRole(
+  user: AuthUser,
+  requiredRole: Role
+): AuthorizationResult {
   if (!hasAnyRole(user.role, [requiredRole])) {
     return {
       ok: false,
@@ -134,7 +143,10 @@ export function requireRole(user: AuthUser, requiredRole: Role): AuthorizationRe
   return { ok: true }
 }
 
-export function requireAnyRole(user: AuthUser, requiredRoles: readonly Role[]): AuthorizationResult {
+export function requireAnyRole(
+  user: AuthUser,
+  requiredRoles: readonly Role[]
+): AuthorizationResult {
   if (!hasAnyRole(user.role, requiredRoles)) {
     return {
       ok: false,

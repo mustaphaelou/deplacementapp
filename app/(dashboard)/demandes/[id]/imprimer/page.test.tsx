@@ -99,10 +99,14 @@ describe("Imprimer page", () => {
     ;(mockFindById as ReturnType<typeof vi.fn>).mockResolvedValue(mockDemande)
 
     const { default: ImprimerPage } = await import("./page")
-    const element = await ImprimerPage({ params: Promise.resolve({ id: "d-1" }) })
+    const element = await ImprimerPage({
+      params: Promise.resolve({ id: "d-1" }),
+    })
 
     expect(mockFindById).toHaveBeenCalledWith("d-1")
-    expect(element.props.children[0].props.children[1].props.children).toBe("Formulaire de Demande de Déplacement")
+    expect(element.props.children[0].props.children[1].props.children).toBe(
+      "Formulaire de Demande de Déplacement"
+    )
   })
 
   it("redirects when the demande is soft-deleted or missing", async () => {
@@ -111,10 +115,14 @@ describe("Imprimer page", () => {
     const { redirect } = await import("next/navigation")
 
     ;(auth as ReturnType<typeof vi.fn>).mockResolvedValue(mockSession())
-    ;(mockFindById as ReturnType<typeof vi.fn>).mockRejectedValue(new DemandeNotFoundError())
+    ;(mockFindById as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new DemandeNotFoundError()
+    )
 
     const { default: ImprimerPage } = await import("./page")
-    await expect(ImprimerPage({ params: Promise.resolve({ id: "d-1" }) })).rejects.toThrow("NEXT_REDIRECT: /demandes")
+    await expect(
+      ImprimerPage({ params: Promise.resolve({ id: "d-1" }) })
+    ).rejects.toThrow("NEXT_REDIRECT: /demandes")
 
     expect(redirect).toHaveBeenCalledWith("/demandes")
   })
@@ -126,7 +134,9 @@ describe("Imprimer page", () => {
     ;(auth as ReturnType<typeof vi.fn>).mockResolvedValue(null)
 
     const { default: ImprimerPage } = await import("./page")
-    await expect(ImprimerPage({ params: Promise.resolve({ id: "d-1" }) })).rejects.toThrow("NEXT_REDIRECT: /login")
+    await expect(
+      ImprimerPage({ params: Promise.resolve({ id: "d-1" }) })
+    ).rejects.toThrow("NEXT_REDIRECT: /login")
 
     expect(redirect).toHaveBeenCalledWith("/login")
   })

@@ -39,7 +39,11 @@ import { DemandeStatusBadge } from "@/components/demande-status-badge"
 import { formatCurrency, formatDate } from "@/lib/constants"
 import { cn } from "@/lib/utils"
 import type { NavItem } from "@/lib/auth"
-import type { DashboardConfig, TableColumnId, DashboardDemandeSummary } from "@/lib/dashboard"
+import type {
+  DashboardConfig,
+  TableColumnId,
+  DashboardDemandeSummary,
+} from "@/lib/dashboard"
 
 const iconMap: Record<string, LucideIcon> = {
   "bar-chart-3": BarChart3,
@@ -63,13 +67,24 @@ interface DashboardLayoutProps {
 
 function hideClassFor(col: { hideAt?: "sm" | "md" | "lg" }) {
   if (!col.hideAt) return undefined
-  const showAt = col.hideAt === "sm" ? "sm:table-cell" : col.hideAt === "md" ? "md:table-cell" : "lg:table-cell"
+  const showAt =
+    col.hideAt === "sm"
+      ? "sm:table-cell"
+      : col.hideAt === "md"
+        ? "md:table-cell"
+        : "lg:table-cell"
   return `hidden ${showAt}`
 }
 
-const cellRenderers: Record<TableColumnId, (d: DashboardDemandeSummary) => React.ReactNode> = {
+const cellRenderers: Record<
+  TableColumnId,
+  (d: DashboardDemandeSummary) => React.ReactNode
+> = {
   numero: (d) => (
-    <Link href={`/demandes/${d.id}`} className="font-medium text-primary hover:underline">
+    <Link
+      href={`/demandes/${d.id}`}
+      className="font-medium text-primary hover:underline"
+    >
       {d.numero}
     </Link>
   ),
@@ -92,20 +107,36 @@ const cellRenderers: Record<TableColumnId, (d: DashboardDemandeSummary) => React
       {formatDate(d.dateDepart)} – {formatDate(d.dateRetour)}
     </span>
   ),
-  date: (d) => <span className="text-xs text-muted-foreground">{formatDate(d.dateDepart)}</span>,
-  total: (d) => <span className="tabular-nums">{formatCurrency(Number(d.totalEstime ?? 0))}</span>,
+  date: (d) => (
+    <span className="text-xs text-muted-foreground">
+      {formatDate(d.dateDepart)}
+    </span>
+  ),
+  total: (d) => (
+    <span className="tabular-nums">
+      {formatCurrency(Number(d.totalEstime ?? 0))}
+    </span>
+  ),
   etape: (d) => <DemandeStatusBadge etape={d.etape} />,
 }
 
-export function DashboardLayout({ config, navItems, demandes }: DashboardLayoutProps) {
+export function DashboardLayout({
+  config,
+  navItems,
+  demandes,
+}: DashboardLayoutProps) {
   const CtaIcon = config.cta ? iconMap[config.cta.icon] || FilePlus : null
 
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Tableau de bord</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{config.subtitle}</p>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Tableau de bord
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {config.subtitle}
+          </p>
         </div>
         {config.cta && CtaIcon && (
           <Button render={<Link href={config.cta.href} />} nativeButton={false}>
@@ -118,12 +149,21 @@ export function DashboardLayout({ config, navItems, demandes }: DashboardLayoutP
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {config.statPills.map((pill, i) => {
           const Icon = iconMap[pill.icon] || FileText
-          return <DashboardCard key={i} icon={Icon} label={pill.label} value={pill.value} />
+          return (
+            <DashboardCard
+              key={i}
+              icon={Icon}
+              label={pill.label}
+              value={pill.value}
+            />
+          )
         })}
       </div>
 
       <section>
-        <h2 className="mb-4 text-base font-semibold tracking-tight">Accès rapide</h2>
+        <h2 className="mb-4 text-base font-semibold tracking-tight">
+          Accès rapide
+        </h2>
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4">
           {navItems
             .filter((i) => i.href !== "/")
@@ -139,11 +179,13 @@ export function DashboardLayout({ config, navItems, demandes }: DashboardLayoutP
                     <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground [&_svg]:size-5">
                       <Icon />
                     </div>
-                    <ArrowUpRight className="size-4 text-muted-foreground/40 transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-primary" />
+                    <ArrowUpRight className="size-4 text-muted-foreground/40 transition-all group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-primary" />
                   </div>
                   <div className="mt-auto">
                     <p className="text-sm font-medium">{item.label}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{item.description}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {item.description}
+                    </p>
                   </div>
                 </Link>
               )
@@ -190,7 +232,10 @@ export function DashboardLayout({ config, navItems, demandes }: DashboardLayoutP
                 {demandes.map((d) => (
                   <TableRow key={d.id}>
                     {config.table.columns.map((col) => (
-                      <TableCell key={col.id} className={cn(hideClassFor(col), "py-3")}>
+                      <TableCell
+                        key={col.id}
+                        className={cn(hideClassFor(col), "py-3")}
+                      >
                         {cellRenderers[col.id](d)}
                       </TableCell>
                     ))}

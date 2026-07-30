@@ -3,7 +3,19 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { X, BarChart3, FileText, FilePlus, Users, Clock, DollarSign, Car, CheckCircle, Building, type LucideIcon } from "lucide-react"
+import {
+  X,
+  BarChart3,
+  FileText,
+  FilePlus,
+  Users,
+  Clock,
+  DollarSign,
+  Car,
+  CheckCircle,
+  Building,
+  type LucideIcon,
+} from "lucide-react"
 import type { NavItem } from "@/lib/auth"
 
 const iconMap: Record<string, LucideIcon> = {
@@ -25,12 +37,17 @@ interface SidebarProps {
   closeNav?: () => void
 }
 
-export function Sidebar({ items, societeNom, societeLogoUrl, closeNav }: SidebarProps) {
+export function Sidebar({
+  items,
+  societeNom,
+  societeLogoUrl,
+  closeNav,
+}: SidebarProps) {
   const pathname = usePathname()
   const initial = societeNom?.charAt(0)?.toUpperCase() ?? "?"
 
   return (
-    <aside className="bg-sidebar text-sidebar-foreground flex h-full w-60 flex-col border-r">
+    <aside className="flex h-full w-60 flex-col border-r bg-sidebar text-sidebar-foreground">
       <div className="flex h-14 items-center gap-2 border-b px-5">
         {societeLogoUrl ? (
           <img
@@ -39,11 +56,13 @@ export function Sidebar({ items, societeNom, societeLogoUrl, closeNav }: Sidebar
             className="size-8 rounded-lg object-contain"
           />
         ) : (
-          <div className="bg-primary flex size-8 items-center justify-center rounded-lg text-primary-foreground text-sm font-bold">
+          <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
             {initial}
           </div>
         )}
-        <span className="text-sm font-semibold flex-1 truncate">{societeNom}</span>
+        <span className="flex-1 truncate text-sm font-semibold">
+          {societeNom}
+        </span>
         {closeNav && (
           <button
             onClick={closeNav}
@@ -57,7 +76,9 @@ export function Sidebar({ items, societeNom, societeLogoUrl, closeNav }: Sidebar
       <nav className="flex-1 space-y-1 p-3">
         {items.map((item) => {
           const Icon = iconMap[item.icon]
-          const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))
+          const isActive =
+            pathname === item.href ||
+            (item.href !== "/" && pathname.startsWith(item.href))
           return (
             <Link
               key={item.href}
@@ -66,7 +87,7 @@ export function Sidebar({ items, societeNom, societeLogoUrl, closeNav }: Sidebar
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors max-md:min-h-[44px]",
                 isActive
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                  ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
                   : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
               )}
             >

@@ -6,9 +6,18 @@ import { Label } from "./label"
 import { Check, ChevronDown, Search, X } from "lucide-react"
 import { MOROCCAN_CITIES } from "@/lib/cities-morocco"
 
-const POPULAR_CITIES = ["Casablanca", "Rabat", "Tanger", "Marrakech", "Agadir", "Fès"]
+const POPULAR_CITIES = [
+  "Casablanca",
+  "Rabat",
+  "Tanger",
+  "Marrakech",
+  "Agadir",
+  "Fès",
+]
 
-const sortedCities = [...MOROCCAN_CITIES].sort((a, b) => a.name.localeCompare(b.name, "fr"))
+const sortedCities = [...MOROCCAN_CITIES].sort((a, b) =>
+  a.name.localeCompare(b.name, "fr")
+)
 
 interface CityComboboxProps {
   value?: string
@@ -32,7 +41,7 @@ export function CityCombobox({
       {label && <Label htmlFor={id}>{label}</Label>}
 
       {/* Popular cities quick-select chips */}
-      <div className="flex flex-wrap gap-1.5 mb-1">
+      <div className="mb-1 flex flex-wrap gap-1.5">
         {POPULAR_CITIES.map((cityName) => {
           const isActive = value === cityName
           return (
@@ -41,10 +50,10 @@ export function CityCombobox({
               type="button"
               onClick={() => onValueChange?.(isActive ? null : cityName)}
               className={cn(
-                "px-3 py-1 text-xs rounded-full border transition-all duration-200 font-medium select-none cursor-pointer",
+                "cursor-pointer rounded-full border px-3 py-1 text-xs font-medium transition-all duration-200 select-none",
                 isActive
-                  ? "bg-primary border-primary text-primary-foreground shadow-xs font-semibold"
-                  : "bg-background border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-900"
+                  ? "border-primary bg-primary font-semibold text-primary-foreground shadow-xs"
+                  : "border-zinc-200 bg-background text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-700 dark:hover:bg-zinc-900"
               )}
             >
               {cityName}
@@ -62,7 +71,7 @@ export function CityCombobox({
         <div className="relative flex items-center">
           <ComboboxPrimitive.Trigger
             className={cn(
-              "border-input flex h-9 w-full items-center justify-between rounded-lg border bg-transparent px-3 py-1.5 text-sm shadow-xs transition-[color,box-shadow] outline-none",
+              "flex h-9 w-full items-center justify-between rounded-lg border border-input bg-transparent px-3 py-1.5 text-sm shadow-xs transition-[color,box-shadow] outline-none",
               "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
               "aria-invalid:border-destructive aria-invalid:ring-destructive/20",
               "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
@@ -81,7 +90,7 @@ export function CityCombobox({
             <button
               type="button"
               onClick={() => onValueChange(null)}
-              className="absolute right-9 text-muted-foreground hover:text-foreground flex size-4 items-center justify-center"
+              className="absolute right-9 flex size-4 items-center justify-center text-muted-foreground hover:text-foreground"
               tabIndex={-1}
             >
               <X className="size-3" />
@@ -93,7 +102,7 @@ export function CityCombobox({
           <ComboboxPrimitive.Positioner align="start" sideOffset={4}>
             <ComboboxPrimitive.Popup
               className={cn(
-                "bg-popover text-popover-foreground z-50 min-w-[var(--anchor-width)] max-h-72 overflow-hidden rounded-lg border shadow-md",
+                "z-50 max-h-72 min-w-[var(--anchor-width)] overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-md",
                 "origin-[var(--anchor-transform-origin)] transition-[transform,scale,opacity]",
                 "data-[ending-style]:scale-95 data-[ending-style]:opacity-0",
                 "data-[starting-style]:scale-95 data-[starting-style]:opacity-0"
@@ -103,7 +112,7 @@ export function CityCombobox({
               <div className="border-b p-2">
                 <ComboboxPrimitive.Input
                   placeholder="Rechercher une ville..."
-                  className="border-input flex h-8 w-full rounded-lg border bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                  className="flex h-8 w-full rounded-lg border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                 />
               </div>
               <ComboboxPrimitive.List className="max-h-56 overflow-y-auto p-1">
@@ -114,16 +123,16 @@ export function CityCombobox({
                   <ComboboxPrimitive.Item
                     key={city.name}
                     value={city.name}
-                    className="group relative flex w-full cursor-default items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                    className="group relative flex w-full cursor-default items-center rounded-sm py-1.5 pr-2 pl-8 text-sm outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
                   >
                     <span className="absolute left-2 flex size-3.5 items-center justify-center">
                       <ComboboxPrimitive.ItemIndicator>
                         <Check className="size-4" />
                       </ComboboxPrimitive.ItemIndicator>
                     </span>
-                    <span className="flex items-center justify-between w-full gap-2">
+                    <span className="flex w-full items-center justify-between gap-2">
                       <span className="font-medium">{city.name}</span>
-                      <span className="text-[10px] text-muted-foreground/75 font-normal group-data-[highlighted]:text-accent-foreground/75 truncate">
+                      <span className="truncate text-[10px] font-normal text-muted-foreground/75 group-data-[highlighted]:text-accent-foreground/75">
                         {city.region}
                       </span>
                     </span>
@@ -134,7 +143,7 @@ export function CityCombobox({
           </ComboboxPrimitive.Positioner>
         </ComboboxPrimitive.Portal>
       </ComboboxPrimitive.Root>
-      {error && <p className="text-destructive text-xs">{error}</p>}
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   )
 }

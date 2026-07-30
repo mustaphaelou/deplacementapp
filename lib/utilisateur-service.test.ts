@@ -104,7 +104,9 @@ describe("UtilisateurService", () => {
       const db = mockDb()
       db.insert.mockReturnValue({
         values: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([makeUser({ email: "test@test.com" })]),
+          returning: vi
+            .fn()
+            .mockResolvedValue([makeUser({ email: "test@test.com" })]),
         }),
       })
 
@@ -131,7 +133,7 @@ describe("UtilisateurService", () => {
           action: "CREATION_UTILISATEUR",
           entite: "Utilisateur",
         }),
-        expect.anything(),
+        expect.anything()
       )
     })
 
@@ -168,7 +170,9 @@ describe("UtilisateurService", () => {
       db.update.mockReturnValue({
         set: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
-            returning: vi.fn().mockResolvedValue([makeUser({ email: "updated@test.com" })]),
+            returning: vi
+              .fn()
+              .mockResolvedValue([makeUser({ email: "updated@test.com" })]),
           }),
         }),
       })
@@ -186,7 +190,7 @@ describe("UtilisateurService", () => {
         expect.objectContaining({
           action: "MODIFICATION_UTILISATEUR",
         }),
-        expect.anything(),
+        expect.anything()
       )
     })
 
@@ -201,11 +205,7 @@ describe("UtilisateurService", () => {
       })
 
       const svc = new UtilisateurService(db as any)
-      await svc.update(
-        "u-1",
-        { motDePasse: "newpass" },
-        "u-1"
-      )
+      await svc.update("u-1", { motDePasse: "newpass" }, "u-1")
 
       expect(hash).toHaveBeenCalledWith("newpass", 12)
     })
@@ -233,12 +233,16 @@ describe("UtilisateurService", () => {
       db.select.mockReturnValue({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([makeUser({ id: "u-1", motDePasse: "$oldhash$" })]),
+            limit: vi
+              .fn()
+              .mockResolvedValue([
+                makeUser({ id: "u-1", motDePasse: "$oldhash$" }),
+              ]),
           }),
         }),
       })
-      ;(compare as ReturnType<typeof vi.fn>).mockResolvedValue(true);
-      (hash as ReturnType<typeof vi.fn>).mockResolvedValue("$newhash$")
+      ;(compare as ReturnType<typeof vi.fn>).mockResolvedValue(true)
+      ;(hash as ReturnType<typeof vi.fn>).mockResolvedValue("$newhash$")
       db.update.mockReturnValue({
         set: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
@@ -258,7 +262,7 @@ describe("UtilisateurService", () => {
           entite: "Utilisateur",
           entiteId: "u-1",
         }),
-        expect.anything(),
+        expect.anything()
       )
     })
 
@@ -283,7 +287,11 @@ describe("UtilisateurService", () => {
       db.select.mockReturnValue({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([makeUser({ id: "u-1", motDePasse: "$oldhash$" })]),
+            limit: vi
+              .fn()
+              .mockResolvedValue([
+                makeUser({ id: "u-1", motDePasse: "$oldhash$" }),
+              ]),
           }),
         }),
       })
@@ -325,7 +333,9 @@ describe("UtilisateurService", () => {
       db.query.utilisateurs.findFirst.mockResolvedValue(null)
 
       const svc = new UtilisateurService(db as any)
-      await expect(svc.findProfile("u-missing")).rejects.toThrow(UtilisateurNotFoundError)
+      await expect(svc.findProfile("u-missing")).rejects.toThrow(
+        UtilisateurNotFoundError
+      )
     })
   })
 
@@ -342,9 +352,17 @@ describe("UtilisateurService", () => {
       db.update.mockReturnValue({
         set: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
-            returning: vi.fn().mockResolvedValue([
-              { id: "u-1", email: "jean@example.com", telephone: "0612345678", poste: "Lead", avatarUrl: null },
-            ]),
+            returning: vi
+              .fn()
+              .mockResolvedValue([
+                {
+                  id: "u-1",
+                  email: "jean@example.com",
+                  telephone: "0612345678",
+                  poste: "Lead",
+                  avatarUrl: null,
+                },
+              ]),
           }),
         }),
       })
@@ -363,7 +381,7 @@ describe("UtilisateurService", () => {
           entite: "Utilisateur",
           entiteId: "u-1",
         }),
-        expect.anything(),
+        expect.anything()
       )
     })
 
@@ -379,9 +397,19 @@ describe("UtilisateurService", () => {
       db.update.mockReturnValue({
         set: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
-            returning: vi.fn().mockImplementation((data: any) =>
-              Promise.resolve([{ id: "u-1", email: "jean@example.com", telephone: null, poste: "Dev", avatarUrl: null }])
-            ),
+            returning: vi
+              .fn()
+              .mockImplementation((data: any) =>
+                Promise.resolve([
+                  {
+                    id: "u-1",
+                    email: "jean@example.com",
+                    telephone: null,
+                    poste: "Dev",
+                    avatarUrl: null,
+                  },
+                ])
+              ),
           }),
         }),
       })
@@ -413,7 +441,9 @@ describe("UtilisateurService", () => {
       db.select.mockReturnValue({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([makeUser({ motDePasse: "$oldhash$" })]),
+            limit: vi
+              .fn()
+              .mockResolvedValue([makeUser({ motDePasse: "$oldhash$" })]),
           }),
         }),
       })
@@ -421,9 +451,17 @@ describe("UtilisateurService", () => {
       db.update.mockReturnValue({
         set: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
-            returning: vi.fn().mockResolvedValue([
-              { id: "u-1", email: "new@test.com", telephone: null, poste: "Dev", avatarUrl: null },
-            ]),
+            returning: vi
+              .fn()
+              .mockResolvedValue([
+                {
+                  id: "u-1",
+                  email: "new@test.com",
+                  telephone: null,
+                  poste: "Dev",
+                  avatarUrl: null,
+                },
+              ]),
           }),
         }),
       })
@@ -443,7 +481,9 @@ describe("UtilisateurService", () => {
       db.select.mockReturnValue({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([makeUser({ motDePasse: "$oldhash$" })]),
+            limit: vi
+              .fn()
+              .mockResolvedValue([makeUser({ motDePasse: "$oldhash$" })]),
           }),
         }),
       })
@@ -451,7 +491,10 @@ describe("UtilisateurService", () => {
 
       const svc = new UtilisateurService(db as any)
       await expect(
-        svc.updateProfile("u-1", { email: "new@test.com", currentPassword: "wrongpass" })
+        svc.updateProfile("u-1", {
+          email: "new@test.com",
+          currentPassword: "wrongpass",
+        })
       ).rejects.toThrow(MotDePasseIncorrectError)
     })
 
@@ -477,30 +520,44 @@ describe("UtilisateurService", () => {
       db.select.mockReturnValue({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([
-              makeUser({ avatarUrl: "/uploads/avatars/old.png" }),
-            ]),
+            limit: vi
+              .fn()
+              .mockResolvedValue([
+                makeUser({ avatarUrl: "/uploads/avatars/old.png" }),
+              ]),
           }),
         }),
       })
       db.update.mockReturnValue({
         set: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
-            returning: vi.fn().mockResolvedValue([
-              { id: "u-1", email: "jean@example.com", telephone: null, poste: "Dev", avatarUrl: "/uploads/avatars/new.png" },
-            ]),
+            returning: vi
+              .fn()
+              .mockResolvedValue([
+                {
+                  id: "u-1",
+                  email: "jean@example.com",
+                  telephone: null,
+                  poste: "Dev",
+                  avatarUrl: "/uploads/avatars/new.png",
+                },
+              ]),
           }),
         }),
       })
 
-      const svc = new UtilisateurService(
-        db as any,
-        avatarStorage
-      )
-      const result = await svc.updateProfile("u-1", { avatarData: "data:image/png;base64,abc" })
+      const svc = new UtilisateurService(db as any, avatarStorage)
+      const result = await svc.updateProfile("u-1", {
+        avatarData: "data:image/png;base64,abc",
+      })
 
-      expect(avatarStorage.delete).toHaveBeenCalledWith("/uploads/avatars/old.png")
-      expect(avatarStorage.save).toHaveBeenCalledWith("data:image/png;base64,abc", "u-1")
+      expect(avatarStorage.delete).toHaveBeenCalledWith(
+        "/uploads/avatars/old.png"
+      )
+      expect(avatarStorage.save).toHaveBeenCalledWith(
+        "data:image/png;base64,abc",
+        "u-1"
+      )
       expect(result.avatarUrl).toBe("/uploads/avatars/new.png")
     })
 
@@ -510,29 +567,40 @@ describe("UtilisateurService", () => {
       db.select.mockReturnValue({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([
-              makeUser({ avatarUrl: "/uploads/avatars/old.png" }),
-            ]),
+            limit: vi
+              .fn()
+              .mockResolvedValue([
+                makeUser({ avatarUrl: "/uploads/avatars/old.png" }),
+              ]),
           }),
         }),
       })
       db.update.mockReturnValue({
         set: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
-            returning: vi.fn().mockImplementation(() =>
-              Promise.resolve([{ id: "u-1", email: "jean@example.com", telephone: null, poste: "Dev", avatarUrl: null }])
-            ),
+            returning: vi
+              .fn()
+              .mockImplementation(() =>
+                Promise.resolve([
+                  {
+                    id: "u-1",
+                    email: "jean@example.com",
+                    telephone: null,
+                    poste: "Dev",
+                    avatarUrl: null,
+                  },
+                ])
+              ),
           }),
         }),
       })
 
-      const svc = new UtilisateurService(
-        db as any,
-        avatarStorage
-      )
+      const svc = new UtilisateurService(db as any, avatarStorage)
       const result = await svc.updateProfile("u-1", { avatarData: "" })
 
-      expect(avatarStorage.delete).toHaveBeenCalledWith("/uploads/avatars/old.png")
+      expect(avatarStorage.delete).toHaveBeenCalledWith(
+        "/uploads/avatars/old.png"
+      )
       expect(avatarStorage.save).not.toHaveBeenCalled()
       expect(result.avatarUrl).toBeNull()
     })
@@ -548,7 +616,9 @@ describe("UtilisateurService", () => {
       })
 
       const svc = new UtilisateurService(db as any)
-      await expect(svc.updateProfile("u-1", {})).rejects.toThrow(NoProfileUpdateDataError)
+      await expect(svc.updateProfile("u-1", {})).rejects.toThrow(
+        NoProfileUpdateDataError
+      )
     })
   })
 })

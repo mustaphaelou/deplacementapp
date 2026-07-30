@@ -10,10 +10,15 @@ export async function listForUser(userId: string, db: DrizzleDb) {
   })
 }
 
-export async function countUnread(userId: string, db: DrizzleDb): Promise<number> {
+export async function countUnread(
+  userId: string,
+  db: DrizzleDb
+): Promise<number> {
   const result = await db
     .select({ value: count() })
     .from(notifications)
-    .where(and(eq(notifications.utilisateurId, userId), eq(notifications.lu, false)))
+    .where(
+      and(eq(notifications.utilisateurId, userId), eq(notifications.lu, false))
+    )
   return result[0]?.value ?? 0
 }

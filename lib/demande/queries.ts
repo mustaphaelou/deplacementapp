@@ -1,4 +1,16 @@
-import { eq, and, isNull, ilike, or, desc, asc, inArray, count, sum, type SQL } from "drizzle-orm"
+import {
+  eq,
+  and,
+  isNull,
+  ilike,
+  or,
+  desc,
+  asc,
+  inArray,
+  count,
+  sum,
+  type SQL,
+} from "drizzle-orm"
 import { db } from "../../db"
 import { demandesDeplacement } from "../../db/schema/demandes-deplacement"
 import type { DemandeWithRelations } from "../demande-types"
@@ -28,9 +40,11 @@ type DemandeFindByIdIncludableRelations = {
 }
 
 export type DemandeFindByIdExtra<I extends DemandeFindByIdInclude> = {
-  [K in keyof I & keyof DemandeFindByIdIncludableRelations as I[K] extends true
-    ? K
-    : never]: DemandeFindByIdIncludableRelations[K][]
+  [
+    K in keyof I & keyof DemandeFindByIdIncludableRelations as I[K] extends true
+      ? K
+      : never
+  ]: DemandeFindByIdIncludableRelations[K][]
 }
 
 export interface DemandeExportRow {
@@ -100,21 +114,19 @@ function buildWithClause(options?: { include?: DemandeFindByIdInclude }) {
   return withClause
 }
 
-export async function findById(
-  id: string,
-): Promise<DemandeWithRelations>
+export async function findById(id: string): Promise<DemandeWithRelations>
 export async function findById<I extends DemandeFindByIdInclude>(
   id: string,
-  options: { include: I },
+  options: { include: I }
 ): Promise<DemandeWithRelations & DemandeFindByIdExtra<I>>
 export async function findById(
   id: string,
-  options?: { include?: DemandeFindByIdInclude },
+  options?: { include?: DemandeFindByIdInclude }
 ): Promise<DemandeWithRelations> {
   const demande = await db.query.demandesDeplacement.findFirst({
     where: and(
       eq(demandesDeplacement.id, id),
-      isNull(demandesDeplacement.deletedAt),
+      isNull(demandesDeplacement.deletedAt)
     ),
     with: buildWithClause(options),
   })
@@ -125,7 +137,7 @@ export async function findById(
 export async function findMany(
   role: string,
   userId: string,
-  params: DemandeQueryParams,
+  params: DemandeQueryParams
 ): Promise<{ demandes: DashboardDemandeSummary[]; total: number }> {
   const { page, limit, etape, recherche } = params
   const conditions: (SQL | undefined)[] = [
@@ -144,8 +156,8 @@ export async function findMany(
     conditions.push(
       or(
         ilike(demandesDeplacement.destination, `%${recherche}%`),
-        ilike(demandesDeplacement.numero, `%${recherche}%`),
-      ),
+        ilike(demandesDeplacement.numero, `%${recherche}%`)
+      )
     )
   }
 
@@ -174,12 +186,12 @@ export async function findMany(
 
 export async function findByEmployeeId(
   userId: string,
-  limit = 5,
+  limit = 5
 ): Promise<DashboardDemandeSummary[]> {
   const demandes = await db.query.demandesDeplacement.findMany({
     where: and(
       eq(demandesDeplacement.employeId, userId),
-      isNull(demandesDeplacement.deletedAt),
+      isNull(demandesDeplacement.deletedAt)
     ),
     orderBy: [desc(demandesDeplacement.creeLe)],
     limit,
@@ -194,21 +206,19 @@ export async function findByEtapes(
     limit?: number
     includeEmployee?: boolean
     orderBy?: OrderByTimestamp
-  } = {},
+  } = {}
 ): Promise<DashboardDemandeSummary[]> {
   const {
     limit: take = 10,
     orderBy = { column: "creeLe" as const, direction: "desc" as const },
   } = opts
   const col =
-    demandesDeplacement[
-      orderBy.column as keyof typeof demandesDeplacement
-    ]
+    demandesDeplacement[orderBy.column as keyof typeof demandesDeplacement]
   const orderFn = orderBy.direction === "desc" ? desc : asc
   const demandes = await db.query.demandesDeplacement.findMany({
     where: and(
       inArray(demandesDeplacement.etape, etapes),
-      isNull(demandesDeplacement.deletedAt),
+      isNull(demandesDeplacement.deletedAt)
     ),
     orderBy: [orderFn(col as typeof demandesDeplacement.creeLe)],
     limit: take,
@@ -219,7 +229,7 @@ export async function findByEtapes(
 
 export async function countByEtape(
   etape: Etape,
-  userId?: string,
+  userId?: string
 ): Promise<number> {
   const conditions: (SQL | undefined)[] = [
     eq(demandesDeplacement.etape, etape),
@@ -240,8 +250,8 @@ export async function aggregateBudget(etapes: Etape[]): Promise<number> {
     .where(
       and(
         inArray(demandesDeplacement.etape, etapes),
-        isNull(demandesDeplacement.deletedAt),
-      ),
+        isNull(demandesDeplacement.deletedAt)
+      )
     )
   return Number(result[0]?.total ?? 0)
 }

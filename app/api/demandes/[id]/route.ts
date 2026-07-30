@@ -1,19 +1,19 @@
-import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/auth";
-import { findById } from "@/lib/demande";
-import { handleServiceError } from "@/lib/errors";
+import { NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/auth"
+import { findById } from "@/lib/demande"
+import { handleServiceError } from "@/lib/errors"
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-  const auth = await requireAuth();
-  if (!auth.ok) return auth.response;
+  const { id } = await params
+  const auth = await requireAuth()
+  if (!auth.ok) return auth.response
   try {
-    const demande = await findById(id);
-    return NextResponse.json({ demande });
+    const demande = await findById(id)
+    return NextResponse.json({ demande })
   } catch (e) {
-    return handleServiceError(e);
+    return handleServiceError(e)
   }
 }

@@ -15,7 +15,9 @@ const dbAvailable = await isDbAvailable()
 
 describe.skipIf(!dbAvailable)("Drizzle reads", () => {
   it("reads societes", async () => {
-    const rows = await db.query.societes.findMany({ orderBy: (s, { asc }) => [asc(s.id)] })
+    const rows = await db.query.societes.findMany({
+      orderBy: (s, { asc }) => [asc(s.id)],
+    })
     expect(Array.isArray(rows)).toBe(true)
   })
 

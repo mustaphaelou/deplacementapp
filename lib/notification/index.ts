@@ -6,12 +6,20 @@ import type { NotificationAdapter, AdapterResult } from "./adapter"
 import { sendEmail } from "./adapter"
 import { buildMessage, resolveRecipients } from "./helpers"
 import { listForUser, countUnread } from "./queries"
-import type { NotificationEventType, NotificationPayload, NotificationMessage } from "../notification-events"
+import type {
+  NotificationEventType,
+  NotificationPayload,
+  NotificationMessage,
+} from "../notification-events"
 import { NotificationNotFoundError, UnauthorizedActionError } from "../errors"
 import { notifications } from "../../db/schema/notifications"
 
 export { NotificationNotFoundError, UnauthorizedActionError } from "../errors"
-export type { NotificationEventType, NotificationPayload, NotificationMessage } from "../notification-events"
+export type {
+  NotificationEventType,
+  NotificationPayload,
+  NotificationMessage,
+} from "../notification-events"
 export type { NotificationAdapter, AdapterResult } from "./adapter"
 export { EVENT_ROLE_MAP } from "../notification-events"
 export { listForUser, countUnread } from "./queries"
@@ -29,16 +37,32 @@ export interface DispatchResult {
 }
 
 export class NotificationModule {
-  constructor(private adapter: NotificationAdapter, private _db: DrizzleDb) {}
+  constructor(
+    private adapter: NotificationAdapter,
+    private _db: DrizzleDb
+  ) {}
 
-  async dispatch(event: NotificationEventType, payload: NotificationPayload): Promise<DispatchResult> {
+  async dispatch(
+    event: NotificationEventType,
+    payload: NotificationPayload
+  ): Promise<DispatchResult> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const recipients = await resolveRecipients(event, payload, this._db as any)
-    const { titre, message } = buildMessage(event, payload.numero, payload.employe.prenom, payload.employe.nom)
+    const { titre, message } = buildMessage(
+      event,
+      payload.numero,
+      payload.employe.prenom,
+      payload.employe.nom
+    )
 
     const results = await Promise.allSettled(
       recipients.map(async (utilisateurId) => {
-        const msg: NotificationMessage = { titre, message, utilisateurId, demandeId: payload.demandeId }
+        const msg: NotificationMessage = {
+          titre,
+          message,
+          utilisateurId,
+          demandeId: payload.demandeId,
+        }
         const adapterResult = await this.adapter.send(msg)
         if (adapterResult.success) {
           await sendEmail(msg, this._db)
@@ -72,7 +96,15 @@ export class NotificationModule {
     const notification = await this._db.query.notifications.findFirst({
       where: eq(notifications.id, notificationId),
       with: {
-        utilisateur: { columns: { id: true, prenom: true, nom: true, role: true, departementId: true } },
+        utilisateur: {
+          columns: {
+            id: true,
+            prenom: true,
+            nom: true,
+            role: true,
+            departementId: true,
+          },
+        },
         demande: { columns: { id: true, numero: true } },
       },
     })

@@ -1,14 +1,17 @@
 import { eq, and } from "drizzle-orm"
 import type { PgDatabase } from "drizzle-orm/pg-core"
 import { utilisateurs } from "../../db/schema/utilisateurs"
-import type { NotificationEventType, NotificationPayload } from "../notification-events"
+import type {
+  NotificationEventType,
+  NotificationPayload,
+} from "../notification-events"
 import { EVENT_ROLE_MAP } from "../notification-events"
 
 export function buildMessage(
   event: NotificationEventType,
   numero: string,
   prenom: string,
-  nom: string,
+  nom: string
 ): { titre: string; message: string } {
   const fullName = `${prenom} ${nom}`
   switch (event) {
@@ -66,16 +69,21 @@ export async function resolveRecipients(
   event: NotificationEventType,
   payload: NotificationPayload,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  tx: PgDatabase<any, any, any>,
+  tx: PgDatabase<any, any, any>
 ): Promise<string[]> {
   const ids = new Set<string>()
 
   const roleTargets = EVENT_ROLE_MAP[event]
   for (const target of roleTargets) {
-    const conditions = [eq(utilisateurs.role, target.role), eq(utilisateurs.actif, true)]
+    const conditions = [
+      eq(utilisateurs.role, target.role),
+      eq(utilisateurs.actif, true),
+    ]
     if (target.departmentScoped) {
       if (!payload.employe.departementId) continue
-      conditions.push(eq(utilisateurs.departementId, payload.employe.departementId))
+      conditions.push(
+        eq(utilisateurs.departementId, payload.employe.departementId)
+      )
     }
 
     const users = await tx

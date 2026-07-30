@@ -8,8 +8,11 @@ export const departements = pgTable(
     nom: text("nom").notNull(),
     societeId: text("societeId")
       .notNull()
-      .references(() => societes.id, { onDelete: "restrict", onUpdate: "cascade" }),
+      .references(() => societes.id, {
+        onDelete: "restrict",
+        onUpdate: "cascade",
+      }),
     creeLe: timestamp("creeLe", { precision: 3 }).notNull().defaultNow(),
   },
-  (table) => [unique().on(table.nom, table.societeId)],
+  (table) => [unique().on(table.nom, table.societeId)]
 )

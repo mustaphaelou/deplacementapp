@@ -20,7 +20,9 @@ describe("SmtpTransporter", () => {
   })
 
   it("reads env vars in constructor, not in sendMail", () => {
-    const createTransportSpy = vi.spyOn(nodemailer, "createTransport").mockReturnValue(fakeTransporter as any)
+    const createTransportSpy = vi
+      .spyOn(nodemailer, "createTransport")
+      .mockReturnValue(fakeTransporter as any)
     vi.stubEnv("SMTP_HOST", "smtp.example.com")
     vi.stubEnv("SMTP_PORT", "465")
 
@@ -38,7 +40,9 @@ describe("SmtpTransporter", () => {
   })
 
   it("forwards sendMail args preserving the shape", async () => {
-    vi.spyOn(nodemailer, "createTransport").mockReturnValue(fakeTransporter as any)
+    vi.spyOn(nodemailer, "createTransport").mockReturnValue(
+      fakeTransporter as any
+    )
 
     const transporter = new SmtpTransporter()
     await transporter.sendMail({
@@ -63,7 +67,9 @@ describe("SmtpTransporter", () => {
     vi.stubEnv("SMTP_USER", "")
     vi.stubEnv("SMTP_PASS", "")
 
-    const createTransportSpy = vi.spyOn(nodemailer, "createTransport").mockReturnValue(fakeTransporter as any)
+    const createTransportSpy = vi
+      .spyOn(nodemailer, "createTransport")
+      .mockReturnValue(fakeTransporter as any)
 
     new SmtpTransporter()
 
@@ -91,7 +97,9 @@ describe("NullTransporter", () => {
     })
 
     expect(warnSpy).toHaveBeenCalledTimes(1)
-    expect(warnSpy).toHaveBeenCalledWith("[NullTransporter] SMTP not configured — email skipped")
+    expect(warnSpy).toHaveBeenCalledWith(
+      "[NullTransporter] SMTP not configured — email skipped"
+    )
 
     warnSpy.mockRestore()
   })
@@ -100,9 +108,24 @@ describe("NullTransporter", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
 
     const transporter = new NullTransporter()
-    await transporter.sendMail({ from: "a@b.com", to: "c@d.com", subject: "S1", text: "T1" })
-    await transporter.sendMail({ from: "a@b.com", to: "c@d.com", subject: "S2", text: "T2" })
-    await transporter.sendMail({ from: "a@b.com", to: "c@d.com", subject: "S3", text: "T3" })
+    await transporter.sendMail({
+      from: "a@b.com",
+      to: "c@d.com",
+      subject: "S1",
+      text: "T1",
+    })
+    await transporter.sendMail({
+      from: "a@b.com",
+      to: "c@d.com",
+      subject: "S2",
+      text: "T2",
+    })
+    await transporter.sendMail({
+      from: "a@b.com",
+      to: "c@d.com",
+      subject: "S3",
+      text: "T3",
+    })
 
     expect(warnSpy).toHaveBeenCalledTimes(1)
 
@@ -125,10 +148,20 @@ describe("NullTransporter", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
 
     const t1 = new NullTransporter()
-    await t1.sendMail({ from: "a@b.com", to: "c@d.com", subject: "S1", text: "T1" })
+    await t1.sendMail({
+      from: "a@b.com",
+      to: "c@d.com",
+      subject: "S1",
+      text: "T1",
+    })
 
     const t2 = new NullTransporter()
-    await t2.sendMail({ from: "a@b.com", to: "c@d.com", subject: "S2", text: "T2" })
+    await t2.sendMail({
+      from: "a@b.com",
+      to: "c@d.com",
+      subject: "S2",
+      text: "T2",
+    })
 
     expect(warnSpy).toHaveBeenCalledTimes(2)
 

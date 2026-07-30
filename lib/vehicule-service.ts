@@ -22,7 +22,11 @@ export class VehiculeService {
   ) {
     const [vehicule] = await this._db
       .insert(vehiculesEntreprise)
-      .values({ id: crypto.randomUUID(), ...data, disponible: data.disponible ?? true })
+      .values({
+        id: crypto.randomUUID(),
+        ...data,
+        disponible: data.disponible ?? true,
+      })
       .returning()
 
     await logAudit(
@@ -33,7 +37,7 @@ export class VehiculeService {
         entiteId: vehicule.id,
         details: { nom: vehicule.nom },
       },
-      this._db,
+      this._db
     )
 
     return vehicule
@@ -60,7 +64,7 @@ export class VehiculeService {
         entiteId: vehicule.id,
         details: { nom: vehicule.nom },
       },
-      this._db,
+      this._db
     )
 
     return vehicule
@@ -81,7 +85,7 @@ export class VehiculeService {
         entite: "VehiculeEntreprise",
         entiteId: id,
       },
-      this._db,
+      this._db
     )
   }
 }

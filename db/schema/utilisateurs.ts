@@ -1,4 +1,10 @@
-import { pgTable, text, timestamp, boolean, uniqueIndex } from "drizzle-orm/pg-core"
+import {
+  pgTable,
+  text,
+  timestamp,
+  boolean,
+  uniqueIndex,
+} from "drizzle-orm/pg-core"
 import { roleEnum } from "./enums"
 import { departements } from "./departements"
 import { societes } from "./societes"
@@ -16,10 +22,16 @@ export const utilisateurs = pgTable(
     role: roleEnum("role").notNull().default("EMPLOYEE"),
     departementId: text("departementId")
       .notNull()
-      .references(() => departements.id, { onDelete: "restrict", onUpdate: "cascade" }),
+      .references(() => departements.id, {
+        onDelete: "restrict",
+        onUpdate: "cascade",
+      }),
     societeId: text("societeId")
       .notNull()
-      .references(() => societes.id, { onDelete: "restrict", onUpdate: "cascade" }),
+      .references(() => societes.id, {
+        onDelete: "restrict",
+        onUpdate: "cascade",
+      }),
     avatarUrl: text("avatarUrl"),
     telephone: text("telephone"),
     dateEmbauche: timestamp("dateEmbauche", { precision: 3 }),
@@ -27,5 +39,5 @@ export const utilisateurs = pgTable(
     creeLe: timestamp("creeLe", { precision: 3 }).notNull().defaultNow(),
     modifieLe: timestamp("modifieLe", { precision: 3 }).notNull(),
   },
-  (table) => [uniqueIndex().on(table.email)],
+  (table) => [uniqueIndex().on(table.email)]
 )

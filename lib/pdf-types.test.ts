@@ -90,7 +90,11 @@ describe("PdfRenderData contract", () => {
       assigneA: { id: "u-1", nom: "Bernard", prenom: "Pierre" },
     }
 
-    expect(data.assigneA).toEqual({ id: "u-1", nom: "Bernard", prenom: "Pierre" })
+    expect(data.assigneA).toEqual({
+      id: "u-1",
+      nom: "Bernard",
+      prenom: "Pierre",
+    })
     expect(data.montantAvance).toBe(500)
     expect(data.description).toBe("Formation interne")
   })
@@ -127,7 +131,10 @@ describe("PdfRenderData contract", () => {
       assigneA: null,
     }
 
-    expect(data.vehicule).toEqual({ nom: "Peugeot 3008", immatriculation: "AB-123-CD" })
+    expect(data.vehicule).toEqual({
+      nom: "Peugeot 3008",
+      immatriculation: "AB-123-CD",
+    })
   })
 })
 

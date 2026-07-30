@@ -1,4 +1,11 @@
-import { pgTable, text, timestamp, boolean, decimal, uniqueIndex } from "drizzle-orm/pg-core"
+import {
+  pgTable,
+  text,
+  timestamp,
+  boolean,
+  decimal,
+  uniqueIndex,
+} from "drizzle-orm/pg-core"
 import { typeTransportEnum, etapeEnum, decisionEnum } from "./enums"
 import { utilisateurs } from "./utilisateurs"
 import { vehiculesEntreprise } from "./vehicules-entreprise"
@@ -10,7 +17,10 @@ export const demandesDeplacement = pgTable(
     numero: text("numero").notNull(),
     employeId: text("employeId")
       .notNull()
-      .references(() => utilisateurs.id, { onDelete: "restrict", onUpdate: "cascade" }),
+      .references(() => utilisateurs.id, {
+        onDelete: "restrict",
+        onUpdate: "cascade",
+      }),
     assigneAId: text("assigneAId").references(() => utilisateurs.id, {
       onDelete: "set null",
       onUpdate: "cascade",
@@ -34,11 +44,21 @@ export const demandesDeplacement = pgTable(
       onUpdate: "cascade",
     }),
 
-    fraisTransport: decimal("fraisTransport", { precision: 10, scale: 2 }).default("0"),
-    fraisHebergement: decimal("fraisHebergement", { precision: 10, scale: 2 }).default("0"),
+    fraisTransport: decimal("fraisTransport", {
+      precision: 10,
+      scale: 2,
+    }).default("0"),
+    fraisHebergement: decimal("fraisHebergement", {
+      precision: 10,
+      scale: 2,
+    }).default("0"),
     fraisRepas: decimal("fraisRepas", { precision: 10, scale: 2 }).default("0"),
-    fraisDivers: decimal("fraisDivers", { precision: 10, scale: 2 }).default("0"),
-    totalEstime: decimal("totalEstime", { precision: 10, scale: 2 }).default("0"),
+    fraisDivers: decimal("fraisDivers", { precision: 10, scale: 2 }).default(
+      "0"
+    ),
+    totalEstime: decimal("totalEstime", { precision: 10, scale: 2 }).default(
+      "0"
+    ),
 
     avanceRequise: boolean("avanceRequise").notNull().default(false),
     montantAvance: decimal("montantAvance", { precision: 10, scale: 2 }),
@@ -60,5 +80,5 @@ export const demandesDeplacement = pgTable(
     creeLe: timestamp("creeLe", { precision: 3 }).notNull().defaultNow(),
     modifieLe: timestamp("modifieLe", { precision: 3 }).notNull(),
   },
-  (table) => [uniqueIndex().on(table.numero)],
+  (table) => [uniqueIndex().on(table.numero)]
 )

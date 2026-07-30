@@ -114,11 +114,11 @@ describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT }, () => {
 
   async function createDraftDemande(
     actorId = employeeId,
-    overrides: Record<string, unknown> = {},
+    overrides: Record<string, unknown> = {}
   ) {
     return createDraft(
       { ...sampleData, ...overrides },
-      { id: actorId, role: "EMPLOYEE" },
+      { id: actorId, role: "EMPLOYEE" }
     )
   }
 
@@ -314,7 +314,7 @@ describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT }, () => {
           demandeId: demande.id,
           action: "submit",
           actor: { id: managerId, role: "EMPLOYEE" },
-        }),
+        })
       ).rejects.toThrow("Seul le proprietaire peut soumettre")
     })
 
@@ -335,7 +335,7 @@ describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT }, () => {
           demandeId: demande.id,
           action: "retirer",
           actor: { id: managerId, role: "MANAGER" },
-        }),
+        })
       ).rejects.toThrow("Seul le proprietaire peut retirer")
     })
 
@@ -384,7 +384,7 @@ describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT }, () => {
           demandeId: demande.id,
           action: "approuver",
           actor: { id: employeeId, role: "EMPLOYEE" },
-        }),
+        })
       ).rejects.toThrow("Action non autorisee")
     })
 
@@ -468,7 +468,7 @@ describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT }, () => {
           demandeId: demande.id,
           action: "submit",
           actor: { id: employeeId, role: "EMPLOYEE" },
-        }),
+        })
       ).rejects.toThrow("Action non autorisee")
     })
 
@@ -499,7 +499,7 @@ describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT }, () => {
           demandeId: demande.id,
           action: "approuver",
           actor: { id: directionId, role: "GENERAL_DIRECTION" },
-        }),
+        })
       ).rejects.toThrow("Action non autorisee")
     })
 
@@ -582,7 +582,7 @@ describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT }, () => {
           demandeId: demande.id,
           action: "submit",
           actor: { id: managerId, role: "MANAGER" },
-        }),
+        })
       ).rejects.toThrow()
 
       const auditRows = await pgliteDb
@@ -644,14 +644,14 @@ describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT }, () => {
             demandeId: demande.id,
             action: "submit",
             actor: { id: employeeId, role: "EMPLOYEE" },
-          }),
+          })
         ).rejects.toThrow()
       } finally {
         await pgliteDb.execute(
-          sql`DROP TRIGGER IF EXISTS trg_fail_notification ON notifications`,
+          sql`DROP TRIGGER IF EXISTS trg_fail_notification ON notifications`
         )
         await pgliteDb.execute(
-          sql`DROP FUNCTION IF EXISTS fail_notification_insert()`,
+          sql`DROP FUNCTION IF EXISTS fail_notification_insert()`
         )
       }
 

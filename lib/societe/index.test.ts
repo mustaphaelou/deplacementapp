@@ -62,7 +62,10 @@ describe("Societe module", { timeout: TIMEOUT }, () => {
 
       await pgliteDb
         .update(schema.societes)
-        .set({ nomExpediteurEmail: "Mutated Sender", domaineEmail: "mutated.ma" })
+        .set({
+          nomExpediteurEmail: "Mutated Sender",
+          domaineEmail: "mutated.ma",
+        })
         .where(eq(schema.societes.id, "s2"))
 
       const second = await loadSocieteIdentity()
@@ -106,7 +109,10 @@ describe("Societe module", { timeout: TIMEOUT }, () => {
 
       await pgliteDb
         .update(schema.societes)
-        .set({ nomExpediteurEmail: "Updated Sender", domaineEmail: "updated.ma" })
+        .set({
+          nomExpediteurEmail: "Updated Sender",
+          domaineEmail: "updated.ma",
+        })
         .where(eq(schema.societes.id, "s4"))
 
       clearSocieteCache()
@@ -210,10 +216,13 @@ describe("Societe module", { timeout: TIMEOUT }, () => {
     it("updates database row and returns changed fields", async () => {
       const result = await updateSociete(
         { nom: "New Name", nomExpediteurEmail: "New Sender" },
-        actorId,
+        actorId
       )
 
-      expect(result).toEqual({ nom: "New Name", nomExpediteurEmail: "New Sender" })
+      expect(result).toEqual({
+        nom: "New Name",
+        nomExpediteurEmail: "New Sender",
+      })
 
       const [row] = await pgliteDb
         .select()
@@ -225,7 +234,10 @@ describe("Societe module", { timeout: TIMEOUT }, () => {
 
     it("invalidates cached identity after update", async () => {
       await loadSocieteIdentity()
-      await updateSociete({ nomExpediteurEmail: "New Sender", domaineEmail: "new.ma" }, actorId)
+      await updateSociete(
+        { nomExpediteurEmail: "New Sender", domaineEmail: "new.ma" },
+        actorId
+      )
 
       const identity = await loadSocieteIdentity()
       expect(identity).toEqual<SocieteIdentity>({
@@ -245,28 +257,34 @@ describe("Societe module", { timeout: TIMEOUT }, () => {
       expect(auditRow.utilisateurId).toBe(actorId)
       expect(auditRow.action).toBe("MODIFIER_SOCIETE")
       expect(auditRow.entiteId).toBe(societeId)
-      expect(JSON.parse(auditRow.details as string)).toEqual({ changes: ["nom"] })
+      expect(JSON.parse(auditRow.details as string)).toEqual({
+        changes: ["nom"],
+      })
     })
 
     it("throws when no Societe row exists", async () => {
-      await pgliteDb.execute(sql`DELETE FROM utilisateurs WHERE id = ${actorId}`)
-      await pgliteDb.execute(sql`DELETE FROM departements WHERE id = ${departementId}`)
+      await pgliteDb.execute(
+        sql`DELETE FROM utilisateurs WHERE id = ${actorId}`
+      )
+      await pgliteDb.execute(
+        sql`DELETE FROM departements WHERE id = ${departementId}`
+      )
       await pgliteDb.execute(sql`DELETE FROM societes`)
       await expect(
-        updateSociete({ nom: "Should Fail" }, actorId),
+        updateSociete({ nom: "Should Fail" }, actorId)
       ).rejects.toThrow("Aucune société configurée")
     })
 
     it("throws when no allowed fields are provided", async () => {
       await expect(
-        updateSociete({ unknownField: "value" }, actorId),
+        updateSociete({ unknownField: "value" }, actorId)
       ).rejects.toThrow("Aucune donnée à mettre à jour")
     })
 
     it("only updates allowed fields", async () => {
       await updateSociete(
         { nom: "Updated", unknownField: "should be ignored" } as any,
-        actorId,
+        actorId
       )
 
       const [row] = await pgliteDb

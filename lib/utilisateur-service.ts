@@ -94,7 +94,8 @@ export class UtilisateurService {
         nom: data.nom,
         prenom: data.prenom,
         poste: data.poste,
-        role: data.role as "EMPLOYEE" | "MANAGER" | "FINANCE_ADMIN" | "GENERAL_DIRECTION",
+        role: data.role as
+          "EMPLOYEE" | "MANAGER" | "FINANCE_ADMIN" | "GENERAL_DIRECTION",
         societeId: data.societeId,
         departementId: data.departementId,
         telephone: data.telephone || null,
@@ -110,7 +111,7 @@ export class UtilisateurService {
         entiteId: user.id,
         details: { email: user.email },
       },
-      this._db,
+      this._db
     )
 
     return user
@@ -153,7 +154,7 @@ export class UtilisateurService {
         entiteId: user.id,
         details: { email: user.email },
       },
-      this._db,
+      this._db
     )
 
     return user
@@ -189,7 +190,7 @@ export class UtilisateurService {
         entite: "Utilisateur",
         entiteId: userId,
       },
-      this._db,
+      this._db
     )
   }
 
@@ -265,7 +266,7 @@ export class UtilisateurService {
         entiteId: updated.id,
         details: { champs: Object.keys(updateData) },
       },
-      this._db,
+      this._db
     )
 
     return updated

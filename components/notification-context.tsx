@@ -1,6 +1,12 @@
 "use client"
 
-import { createContext, useContext, useCallback, useRef, type ReactNode } from "react"
+import {
+  createContext,
+  useContext,
+  useCallback,
+  useRef,
+  type ReactNode,
+} from "react"
 
 type NotificationContextValue = {
   refreshBell: () => void
@@ -32,6 +38,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
 export function useNotificationContext() {
   const ctx = useContext(NotificationContext)
-  if (!ctx) throw new Error("useNotificationContext must be used within NotificationProvider")
+  if (!ctx)
+    throw new Error(
+      "useNotificationContext must be used within NotificationProvider"
+    )
   return ctx
 }

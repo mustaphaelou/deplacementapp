@@ -19,7 +19,13 @@ export class SmtpTransporter implements EmailTransporter {
     })
   }
 
-  async sendMail(opts: { from: string; to: string; subject: string; text: string; html?: string }): Promise<unknown> {
+  async sendMail(opts: {
+    from: string
+    to: string
+    subject: string
+    text: string
+    html?: string
+  }): Promise<unknown> {
     return this.transporter.sendMail(opts)
   }
 }
@@ -27,7 +33,13 @@ export class SmtpTransporter implements EmailTransporter {
 export class NullTransporter implements EmailTransporter {
   private warned = false
 
-  async sendMail(_opts: { from: string; to: string; subject: string; text: string; html?: string }): Promise<unknown> {
+  async sendMail(_opts: {
+    from: string
+    to: string
+    subject: string
+    text: string
+    html?: string
+  }): Promise<unknown> {
     if (!this.warned) {
       console.warn("[NullTransporter] SMTP not configured — email skipped")
       this.warned = true

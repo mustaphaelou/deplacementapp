@@ -6,10 +6,26 @@ import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 
-import { formatCurrency, formatDate, formatDateTime, TRANSPORT_LABELS, ETAPE_LABELS, DECISION_LABELS } from "@/lib/constants"
+import {
+  formatCurrency,
+  formatDate,
+  formatDateTime,
+  TRANSPORT_LABELS,
+  ETAPE_LABELS,
+  DECISION_LABELS,
+} from "@/lib/constants"
 import { parseMotif } from "@/lib/demande-types"
 import type { DemandeDetail } from "@/lib/demande-types"
-import { CheckCircle, XCircle, ArrowLeft, Download, Printer, Ban, ChevronRight, Loader2 } from "lucide-react"
+import {
+  CheckCircle,
+  XCircle,
+  ArrowLeft,
+  Download,
+  Printer,
+  Ban,
+  ChevronRight,
+  Loader2,
+} from "lucide-react"
 import Link from "next/link"
 import { useDemandeActions } from "@/hooks/use-demande-actions"
 
@@ -22,9 +38,20 @@ interface DemandeDetailProps {
   userRole: string
 }
 
-const stepOrder = ["DRAFT", "MANAGER_REVIEW", "FINANCE_REVIEW", "DIRECTION_REVIEW", "FINAL"]
+const stepOrder = [
+  "DRAFT",
+  "MANAGER_REVIEW",
+  "FINANCE_REVIEW",
+  "DIRECTION_REVIEW",
+  "FINAL",
+]
 
-export function DemandeDetail({ demande, canApprove, canReject, canWithdraw }: DemandeDetailProps) {
+export function DemandeDetail({
+  demande,
+  canApprove,
+  canReject,
+  canWithdraw,
+}: DemandeDetailProps) {
   const {
     commentaire,
     setCommentaire,
@@ -53,7 +80,8 @@ export function DemandeDetail({ demande, canApprove, canReject, canWithdraw }: D
           <div>
             <h1 className="text-2xl font-bold">Demande {demande.numero}</h1>
             <p className="text-sm text-muted-foreground">
-              Créée le {formatDateTime(demande.creeLe)} par {demande.employePrenom} {demande.employeNom}
+              Créée le {formatDateTime(demande.creeLe)} par{" "}
+              {demande.employePrenom} {demande.employeNom}
             </p>
           </div>
         </div>
@@ -80,14 +108,24 @@ export function DemandeDetail({ demande, canApprove, canReject, canWithdraw }: D
               const isCurrent = i === currentStepIndex
               return (
                 <div key={step} className="flex items-center">
-                  <div className={`flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${
-                    isDone ? (isCurrent ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary") : "bg-muted text-muted-foreground"
-                  }`}>
-                    {i < currentStepIndex ? <CheckCircle className="size-3" /> : null}
+                  <div
+                    className={`flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${
+                      isDone
+                        ? isCurrent
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-primary/10 text-primary"
+                        : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {i < currentStepIndex ? (
+                      <CheckCircle className="size-3" />
+                    ) : null}
                     {ETAPE_LABELS[step]}
                   </div>
                   {i < stepOrder.length - 1 && (
-                    <ChevronRight className={`mx-1 size-4 ${i < currentStepIndex ? "text-primary" : "text-muted-foreground/30"}`} />
+                    <ChevronRight
+                      className={`mx-1 size-4 ${i < currentStepIndex ? "text-primary" : "text-muted-foreground/30"}`}
+                    />
                   )}
                 </div>
               )
@@ -114,7 +152,9 @@ export function DemandeDetail({ demande, canApprove, canReject, canWithdraw }: D
         <CardContent className="grid gap-3 sm:grid-cols-2">
           <div>
             <p className="text-xs text-muted-foreground">Nom complet</p>
-            <p className="text-sm font-medium">{demande.employePrenom} {demande.employeNom}</p>
+            <p className="text-sm font-medium">
+              {demande.employePrenom} {demande.employeNom}
+            </p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Poste</p>
@@ -143,15 +183,21 @@ export function DemandeDetail({ demande, canApprove, canReject, canWithdraw }: D
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Transport</p>
-            <p className="text-sm font-medium">{TRANSPORT_LABELS[demande.typeTransport]}</p>
+            <p className="text-sm font-medium">
+              {TRANSPORT_LABELS[demande.typeTransport]}
+            </p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Date de départ</p>
-            <p className="text-sm font-medium">{formatDate(demande.dateDepart)}</p>
+            <p className="text-sm font-medium">
+              {formatDate(demande.dateDepart)}
+            </p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Date de retour</p>
-            <p className="text-sm font-medium">{formatDate(demande.dateRetour)}</p>
+            <p className="text-sm font-medium">
+              {formatDate(demande.dateRetour)}
+            </p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Destination</p>
@@ -160,7 +206,9 @@ export function DemandeDetail({ demande, canApprove, canReject, canWithdraw }: D
           {demande.vehicule && (
             <div>
               <p className="text-xs text-muted-foreground">Véhicule</p>
-              <p className="text-sm font-medium">{demande.vehicule.nom} ({demande.vehicule.immatriculation})</p>
+              <p className="text-sm font-medium">
+                {demande.vehicule.nom} ({demande.vehicule.immatriculation})
+              </p>
             </div>
           )}
           {demande.autreTransport && (
@@ -185,7 +233,9 @@ export function DemandeDetail({ demande, canApprove, canReject, canWithdraw }: D
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Hébergement</span>
-              <span>{formatCurrency(Number(demande.fraisHebergement ?? 0))}</span>
+              <span>
+                {formatCurrency(Number(demande.fraisHebergement ?? 0))}
+              </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Repas</span>
@@ -204,7 +254,9 @@ export function DemandeDetail({ demande, canApprove, canReject, canWithdraw }: D
           {demande.avanceRequise && (
             <div className="mt-3">
               <p className="text-xs text-muted-foreground">Avance demandée</p>
-              <p className="text-sm font-medium">{formatCurrency(Number(demande.montantAvance ?? 0))}</p>
+              <p className="text-sm font-medium">
+                {formatCurrency(Number(demande.montantAvance ?? 0))}
+              </p>
             </div>
           )}
         </CardContent>
@@ -223,7 +275,9 @@ export function DemandeDetail({ demande, canApprove, canReject, canWithdraw }: D
       )}
 
       {/* Comments timeline */}
-      {(demande.commentaireManager || demande.commentaireFinance || demande.commentaireDirection) && (
+      {(demande.commentaireManager ||
+        demande.commentaireFinance ||
+        demande.commentaireDirection) && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Commentaires</CardTitle>
@@ -231,19 +285,25 @@ export function DemandeDetail({ demande, canApprove, canReject, canWithdraw }: D
           <CardContent className="space-y-3">
             {demande.commentaireManager && (
               <div className="rounded-lg bg-muted/50 p-3">
-                <p className="text-xs font-medium text-muted-foreground">Manager</p>
+                <p className="text-xs font-medium text-muted-foreground">
+                  Manager
+                </p>
                 <p className="text-sm">{demande.commentaireManager}</p>
               </div>
             )}
             {demande.commentaireFinance && (
               <div className="rounded-lg bg-muted/50 p-3">
-                <p className="text-xs font-medium text-muted-foreground">Finance</p>
+                <p className="text-xs font-medium text-muted-foreground">
+                  Finance
+                </p>
                 <p className="text-sm">{demande.commentaireFinance}</p>
               </div>
             )}
             {demande.commentaireDirection && (
               <div className="rounded-lg bg-muted/50 p-3">
-                <p className="text-xs font-medium text-muted-foreground">Direction</p>
+                <p className="text-xs font-medium text-muted-foreground">
+                  Direction
+                </p>
                 <p className="text-sm">{demande.commentaireDirection}</p>
               </div>
             )}
@@ -260,7 +320,9 @@ export function DemandeDetail({ demande, canApprove, canReject, canWithdraw }: D
           <CardContent className="space-y-4">
             {showRejectForm && (
               <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Commentaire de rejet (obligatoire) :</p>
+                <p className="text-sm text-muted-foreground">
+                  Commentaire de rejet (obligatoire) :
+                </p>
                 <Textarea
                   placeholder="Expliquez la raison du rejet..."
                   value={commentaire}
@@ -272,31 +334,55 @@ export function DemandeDetail({ demande, canApprove, canReject, canWithdraw }: D
 
             <div className="flex gap-3">
               {canApprove && (
-                <Button onClick={() => handleAction("approuver")} disabled={actionLoading !== null}>
-                  {actionLoading === "approuver" && <Loader2 className="mr-2 size-4 animate-spin" />}
+                <Button
+                  onClick={() => handleAction("approuver")}
+                  disabled={actionLoading !== null}
+                >
+                  {actionLoading === "approuver" && (
+                    <Loader2 className="mr-2 size-4 animate-spin" />
+                  )}
                   <CheckCircle className="mr-2 size-4" />
                   Approuver
                 </Button>
               )}
               {canReject && !showRejectForm && (
-                <Button variant="destructive" onClick={() => setShowRejectForm(true)}>
+                <Button
+                  variant="destructive"
+                  onClick={() => setShowRejectForm(true)}
+                >
                   <XCircle className="mr-2 size-4" />
                   Rejeter
                 </Button>
               )}
               {canReject && showRejectForm && (
                 <>
-                  <Button variant="destructive" onClick={() => handleAction("rejeter")} disabled={actionLoading !== null || !commentaire.trim()}>
-                    {actionLoading === "rejeter" && <Loader2 className="mr-2 size-4 animate-spin" />}
+                  <Button
+                    variant="destructive"
+                    onClick={() => handleAction("rejeter")}
+                    disabled={actionLoading !== null || !commentaire.trim()}
+                  >
+                    {actionLoading === "rejeter" && (
+                      <Loader2 className="mr-2 size-4 animate-spin" />
+                    )}
                     Confirmer le rejet
                   </Button>
-                  <Button variant="outline" onClick={() => { setShowRejectForm(false); setCommentaire("") }}>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowRejectForm(false)
+                      setCommentaire("")
+                    }}
+                  >
                     Annuler
                   </Button>
                 </>
               )}
               {canWithdraw && (
-                <Button variant="outline" onClick={() => handleAction("retirer")} disabled={actionLoading !== null}>
+                <Button
+                  variant="outline"
+                  onClick={() => handleAction("retirer")}
+                  disabled={actionLoading !== null}
+                >
                   <Ban className="mr-2 size-4" />
                   Retirer la demande
                 </Button>
@@ -320,19 +406,25 @@ export function DemandeDetail({ demande, canApprove, canReject, canWithdraw }: D
           )}
           {demande.approuveeManagerLe && (
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Approuvée par le manager</span>
+              <span className="text-muted-foreground">
+                Approuvée par le manager
+              </span>
               <span>{formatDateTime(demande.approuveeManagerLe)}</span>
             </div>
           )}
           {demande.approuveeFinanceLe && (
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Approuvée par la finance</span>
+              <span className="text-muted-foreground">
+                Approuvée par la finance
+              </span>
               <span>{formatDateTime(demande.approuveeFinanceLe)}</span>
             </div>
           )}
           {demande.approuveeDirectionLe && (
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Approuvée par la direction</span>
+              <span className="text-muted-foreground">
+                Approuvée par la direction
+              </span>
               <span>{formatDateTime(demande.approuveeDirectionLe)}</span>
             </div>
           )}

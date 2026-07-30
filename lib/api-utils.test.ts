@@ -18,7 +18,10 @@ describe("validateRequest", () => {
   it("returns ok:true with parsed data for valid input", async () => {
     const { validateRequest } = await import("./api-utils")
     const { loginSchema } = await import("./schemas")
-    const result = validateRequest(loginSchema, { email: "a@b.com", password: "secret" })
+    const result = validateRequest(loginSchema, {
+      email: "a@b.com",
+      password: "secret",
+    })
 
     expect(result.ok).toBe(true)
     if (result.ok) {
@@ -30,7 +33,10 @@ describe("validateRequest", () => {
   it("returns ok:false with 400 response for invalid input", async () => {
     const { validateRequest } = await import("./api-utils")
     const { loginSchema } = await import("./schemas")
-    const result = validateRequest(loginSchema, { email: "not-an-email", password: "" })
+    const result = validateRequest(loginSchema, {
+      email: "not-an-email",
+      password: "",
+    })
 
     expect(result.ok).toBe(false)
     if (!result.ok) {
@@ -133,7 +139,15 @@ describe("withValidation", () => {
     const { requireAuth } = await import("@/lib/auth")
     ;(requireAuth as any).mockResolvedValue({
       ok: true,
-      user: { id: "user-1", email: "test@test.com", name: "Test", role: "EMPLOYEE", departementId: "dep-1", departement: "IT", poste: "Dev" },
+      user: {
+        id: "user-1",
+        email: "test@test.com",
+        name: "Test",
+        role: "EMPLOYEE",
+        departementId: "dep-1",
+        departement: "IT",
+        poste: "Dev",
+      },
     })
 
     const { withValidation } = await import("./api-utils")
@@ -152,7 +166,15 @@ describe("withValidation", () => {
     const { requireAuth } = await import("@/lib/auth")
     ;(requireAuth as any).mockResolvedValue({
       ok: true,
-      user: { id: "user-1", email: "test@test.com", name: "Test", role: "EMPLOYEE", departementId: "dep-1", departement: "IT", poste: "Dev" },
+      user: {
+        id: "user-1",
+        email: "test@test.com",
+        name: "Test",
+        role: "EMPLOYEE",
+        departementId: "dep-1",
+        departement: "IT",
+        poste: "Dev",
+      },
     })
 
     const { withValidation } = await import("./api-utils")
@@ -183,14 +205,27 @@ describe("password route integration (withValidation + passwordChangeSchema)", (
     const { requireAuth } = await import("@/lib/auth")
     ;(requireAuth as any).mockResolvedValue({
       ok: true,
-      user: { id: "u-1", email: "a@b.com", name: "A", role: "EMPLOYEE", departementId: "d-1", departement: "IT", poste: "Dev" },
+      user: {
+        id: "u-1",
+        email: "a@b.com",
+        name: "A",
+        role: "EMPLOYEE",
+        departementId: "d-1",
+        departement: "IT",
+        poste: "Dev",
+      },
     })
 
-    const handler = vi.fn().mockResolvedValue(NextResponse.json({ success: true }))
+    const handler = vi
+      .fn()
+      .mockResolvedValue(NextResponse.json({ success: true }))
     const wrapped = withValidation(passwordChangeSchema, handler)
     const req = new NextRequest("http://localhost", {
       method: "PUT",
-      body: JSON.stringify({ currentPassword: "old", newPassword: "newpass123" }),
+      body: JSON.stringify({
+        currentPassword: "old",
+        newPassword: "newpass123",
+      }),
       headers: { "content-type": "application/json" },
     })
 
@@ -211,7 +246,15 @@ describe("password route integration (withValidation + passwordChangeSchema)", (
     const { requireAuth } = await import("@/lib/auth")
     ;(requireAuth as any).mockResolvedValue({
       ok: true,
-      user: { id: "u-1", email: "a@b.com", name: "A", role: "EMPLOYEE", departementId: "d-1", departement: "IT", poste: "Dev" },
+      user: {
+        id: "u-1",
+        email: "a@b.com",
+        name: "A",
+        role: "EMPLOYEE",
+        departementId: "d-1",
+        departement: "IT",
+        poste: "Dev",
+      },
     })
 
     const handler = vi.fn()

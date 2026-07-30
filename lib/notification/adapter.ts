@@ -33,9 +33,16 @@ export class DrizzleNotificationAdapter implements NotificationAdapter {
   }
 }
 
-export async function sendEmail(notification: NotificationMessage, db: DrizzleDb): Promise<void> {
+export async function sendEmail(
+  notification: NotificationMessage,
+  db: DrizzleDb
+): Promise<void> {
   const [recipient] = await db
-    .select({ email: utilisateurs.email, prenom: utilisateurs.prenom, nom: utilisateurs.nom })
+    .select({
+      email: utilisateurs.email,
+      prenom: utilisateurs.prenom,
+      nom: utilisateurs.nom,
+    })
     .from(utilisateurs)
     .where(eq(utilisateurs.id, notification.utilisateurId))
     .limit(1)

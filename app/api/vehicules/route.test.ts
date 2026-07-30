@@ -5,7 +5,12 @@ import { VehiculeNotFoundError } from "@/lib/vehicule-service"
 const { mockRequireRole } = vi.hoisted(() => ({
   mockRequireRole: (user: { role: string }, role: string) => {
     if (user.role === role) return { ok: true }
-    return { ok: false, response: new Response(JSON.stringify({ error: "Accès refusé" }), { status: 403 }) }
+    return {
+      ok: false,
+      response: new Response(JSON.stringify({ error: "Accès refusé" }), {
+        status: 403,
+      }),
+    }
   },
 }))
 

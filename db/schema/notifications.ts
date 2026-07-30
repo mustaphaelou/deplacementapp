@@ -6,7 +6,10 @@ export const notifications = pgTable("notifications", {
   id: text("id").primaryKey(),
   utilisateurId: text("utilisateurId")
     .notNull()
-    .references(() => utilisateurs.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    .references(() => utilisateurs.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
   demandeId: text("demandeId").references(() => demandesDeplacement.id, {
     onDelete: "set null",
     onUpdate: "cascade",

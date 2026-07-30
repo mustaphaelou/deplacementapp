@@ -14,13 +14,24 @@ export interface EmailResult {
 }
 
 export interface EmailTransporter {
-  sendMail(opts: { from: string; to: string; subject: string; text: string; html?: string }): Promise<unknown>
+  sendMail(opts: {
+    from: string
+    to: string
+    subject: string
+    text: string
+    html?: string
+  }): Promise<unknown>
 }
 
 export class EmailSender {
   constructor(private transporter: EmailTransporter) {}
 
-  async send(opts: { to: string; subject: string; text: string; html?: string }): Promise<EmailResult> {
+  async send(opts: {
+    to: string
+    subject: string
+    text: string
+    html?: string
+  }): Promise<EmailResult> {
     try {
       let fromName = process.env.SMTP_FROM_NAME ?? "Notification"
       let fromEmail = process.env.SMTP_FROM ?? "noreply@exemple.ma"
@@ -44,5 +55,7 @@ export class EmailSender {
   }
 }
 
-const transporter = process.env.SMTP_HOST ? new SmtpTransporter() : new NullTransporter()
+const transporter = process.env.SMTP_HOST
+  ? new SmtpTransporter()
+  : new NullTransporter()
 export const emailSender = new EmailSender(transporter)

@@ -54,9 +54,7 @@ function computeTotalEstime(data: CreateDemandeData): number {
 }
 
 async function generateNumero(): Promise<string> {
-  const [result] = await db
-    .select({ value: count() })
-    .from(demandesDeplacement)
+  const [result] = await db.select({ value: count() }).from(demandesDeplacement)
   const nextNum = (result?.value ?? 0) + 1
   return `DD-${new Date().getFullYear()}-${String(nextNum).padStart(4, "0")}`
 }
@@ -64,7 +62,7 @@ async function generateNumero(): Promise<string> {
 async function createDemande(
   data: CreateDemandeData,
   actor: Actor,
-  submit: boolean,
+  submit: boolean
 ): Promise<DemandeDeplacementRow> {
   const [userRow] = await db
     .select({
@@ -165,20 +163,20 @@ async function createDemande(
 
 export async function createDraft(
   data: CreateDemandeData,
-  actor: Actor,
+  actor: Actor
 ): Promise<DemandeDeplacementRow> {
   return createDemande(data, actor, false)
 }
 
 export async function createAndSubmit(
   data: CreateDemandeData,
-  actor: Actor,
+  actor: Actor
 ): Promise<DemandeDeplacementRow> {
   return createDemande(data, actor, true)
 }
 
 export async function executeTransition(
-  params: ExecuteTransitionParams,
+  params: ExecuteTransitionParams
 ): Promise<DemandeDeplacementRow> {
   const { demandeId, action, actor } = params
 
@@ -202,7 +200,7 @@ export async function executeTransition(
     throw new UnauthorizedActionError(
       "Seul le proprietaire peut " +
         (action === "submit" ? "soumettre" : "retirer") +
-        " la demande",
+        " la demande"
     )
   }
 
@@ -227,7 +225,7 @@ export async function executeTransition(
     actor.role,
     etape,
     action,
-    transitionParams,
+    transitionParams
   )
   if (!transition) throw new InvalidTransitionError()
 
@@ -270,7 +268,7 @@ export async function executeTransition(
 
 export async function recordDocument(
   demandeId: string,
-  params: { type: string; chemin: string },
+  params: { type: string; chemin: string }
 ): Promise<DocumentRow> {
   const [doc] = await db
     .insert(documents)

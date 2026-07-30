@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server"
 import { requireAuth, requireRole } from "@/lib/auth"
 import { vehiculeService } from "@/lib/vehicule-service"
-import { vehiculeSchema, updateVehiculeSchema, deleteVehiculeSchema } from "@/lib/schemas"
+import {
+  vehiculeSchema,
+  updateVehiculeSchema,
+  deleteVehiculeSchema,
+} from "@/lib/schemas"
 import { withValidation } from "@/lib/api-utils"
 import { handleServiceError } from "@/lib/errors"
 
@@ -29,27 +33,33 @@ export const POST = withValidation(vehiculeSchema, async (_req, auth, data) => {
   }
 })
 
-export const PUT = withValidation(updateVehiculeSchema, async (_req, auth, data) => {
-  const authorized = requireRole(auth, "FINANCE_ADMIN")
-  if (!authorized.ok) return authorized.response
+export const PUT = withValidation(
+  updateVehiculeSchema,
+  async (_req, auth, data) => {
+    const authorized = requireRole(auth, "FINANCE_ADMIN")
+    if (!authorized.ok) return authorized.response
 
-  const { id, ...updateData } = data
-  try {
-    const vehicule = await vehiculeService.update(id, updateData, auth.id)
-    return NextResponse.json({ vehicule })
-  } catch (e) {
-    return handleServiceError(e)
+    const { id, ...updateData } = data
+    try {
+      const vehicule = await vehiculeService.update(id, updateData, auth.id)
+      return NextResponse.json({ vehicule })
+    } catch (e) {
+      return handleServiceError(e)
+    }
   }
-})
+)
 
-export const DELETE = withValidation(deleteVehiculeSchema, async (_req, auth, data) => {
-  const authorized = requireRole(auth, "FINANCE_ADMIN")
-  if (!authorized.ok) return authorized.response
+export const DELETE = withValidation(
+  deleteVehiculeSchema,
+  async (_req, auth, data) => {
+    const authorized = requireRole(auth, "FINANCE_ADMIN")
+    if (!authorized.ok) return authorized.response
 
-  try {
-    await vehiculeService.delete(data.id, auth.id)
-    return NextResponse.json({ success: true })
-  } catch (e) {
-    return handleServiceError(e)
+    try {
+      await vehiculeService.delete(data.id, auth.id)
+      return NextResponse.json({ success: true })
+    } catch (e) {
+      return handleServiceError(e)
+    }
   }
-})
+)

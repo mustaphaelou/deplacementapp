@@ -67,10 +67,7 @@ describe("Amorcage module", { timeout: TIMEOUT }, () => {
     })
     expect(result.user.id).toBeDefined()
 
-    const [societeRow] = await pgliteDb
-      .select()
-      .from(schema.societes)
-      .limit(1)
+    const [societeRow] = await pgliteDb.select().from(schema.societes).limit(1)
     expect(societeRow).toMatchObject({
       nom: "Ma Societe",
       nomExpediteurEmail: "Ma Societe",
@@ -82,10 +79,7 @@ describe("Amorcage module", { timeout: TIMEOUT }, () => {
     const deptNoms = deptRows.map((d) => d.nom).sort()
     expect(deptNoms).toEqual(["Finance", "RH", "Technique"])
 
-    const [userRow] = await pgliteDb
-      .select()
-      .from(schema.utilisateurs)
-      .limit(1)
+    const [userRow] = await pgliteDb.select().from(schema.utilisateurs).limit(1)
     expect(userRow).toMatchObject({
       email: "admin@ma-societe.ma",
       nom: "Dupont",
@@ -127,7 +121,7 @@ describe("Amorcage module", { timeout: TIMEOUT }, () => {
           poste: "Admin",
           departementNom: "RH",
         },
-      }),
+      })
     ).rejects.toThrow(AmorcageDejaConfigureError)
   })
 
@@ -148,7 +142,7 @@ describe("Amorcage module", { timeout: TIMEOUT }, () => {
           poste: "Admin",
           departementNom: "RH",
         },
-      }),
+      })
     ).rejects.toThrow()
 
     const societeRows = await pgliteDb.select().from(schema.societes)

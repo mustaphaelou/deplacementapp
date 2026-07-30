@@ -1,4 +1,10 @@
-import { pgTable, text, boolean, timestamp, uniqueIndex } from "drizzle-orm/pg-core"
+import {
+  pgTable,
+  text,
+  boolean,
+  timestamp,
+  uniqueIndex,
+} from "drizzle-orm/pg-core"
 
 export const vehiculesEntreprise = pgTable(
   "vehicules_entreprise",
@@ -9,5 +15,5 @@ export const vehiculesEntreprise = pgTable(
     disponible: boolean("disponible").notNull().default(true),
     creeLe: timestamp("creeLe", { precision: 3 }).notNull().defaultNow(),
   },
-  (table) => [uniqueIndex().on(table.immatriculation)],
+  (table) => [uniqueIndex().on(table.immatriculation)]
 )

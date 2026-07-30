@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { NextRequest } from "next/server"
-import { NotificationNotFoundError, UnauthorizedActionError } from "@/lib/errors"
+import {
+  NotificationNotFoundError,
+  UnauthorizedActionError,
+} from "@/lib/errors"
 
 vi.mock("@/lib/auth", () => ({
   requireAuth: vi.fn(),
@@ -38,7 +41,9 @@ describe("PATCH /api/notifications/[id]", () => {
     const { requireAuth } = await import("@/lib/auth")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: false,
-      response: new Response(JSON.stringify({ error: "Non autorisé" }), { status: 401 }),
+      response: new Response(JSON.stringify({ error: "Non autorisé" }), {
+        status: 401,
+      }),
     })
 
     const { PATCH } = await import("./route")
@@ -53,7 +58,9 @@ describe("PATCH /api/notifications/[id]", () => {
     const { requireAuth } = await import("@/lib/auth")
     const { markAsRead } = await import("@/lib/notification")
 
-    ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth("u-1"))
+    ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockAuth("u-1")
+    )
     ;(markAsRead as any).mockResolvedValue(undefined)
 
     const { PATCH } = await import("./route")
@@ -73,7 +80,9 @@ describe("PATCH /api/notifications/[id]", () => {
     const { requireAuth } = await import("@/lib/auth")
     const { markAsRead } = await import("@/lib/notification")
 
-    ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth("u-1"))
+    ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockAuth("u-1")
+    )
     ;(markAsRead as ReturnType<typeof vi.fn>).mockRejectedValue(
       new NotificationNotFoundError()
     )
@@ -92,7 +101,9 @@ describe("PATCH /api/notifications/[id]", () => {
     const { requireAuth } = await import("@/lib/auth")
     const { markAsRead } = await import("@/lib/notification")
 
-    ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth("u-2"))
+    ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockAuth("u-2")
+    )
     ;(markAsRead as ReturnType<typeof vi.fn>).mockRejectedValue(
       new UnauthorizedActionError("Non autorisé")
     )

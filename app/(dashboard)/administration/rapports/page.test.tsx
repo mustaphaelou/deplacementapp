@@ -3,7 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { ETAPE_LABELS, formatCurrency } from "@/lib/constants"
 
 const { mockHasAnyRole } = vi.hoisted(() => ({
-  mockHasAnyRole: (role: string, allowed: readonly string[]) => allowed.includes(role),
+  mockHasAnyRole: (role: string, allowed: readonly string[]) =>
+    allowed.includes(role),
 }))
 
 vi.mock("@/lib/auth", () => ({
@@ -51,11 +52,14 @@ describe("Rapports page", () => {
 
   it("reads counts and budget through the queries port and renders them", async () => {
     const { auth } = await import("@/lib/auth")
-    const { countByEtape: mockCountByEtape, aggregateBudget: mockAggregateBudget } = await import("@/lib/demande")
+    const {
+      countByEtape: mockCountByEtape,
+      aggregateBudget: mockAggregateBudget,
+    } = await import("@/lib/demande")
 
     ;(auth as ReturnType<typeof vi.fn>).mockResolvedValue(mockSession())
-    ;(mockCountByEtape as ReturnType<typeof vi.fn>).mockImplementation((etape: string) =>
-      Promise.resolve(ETAPE_COUNTS[etape] ?? 0)
+    ;(mockCountByEtape as ReturnType<typeof vi.fn>).mockImplementation(
+      (etape: string) => Promise.resolve(ETAPE_COUNTS[etape] ?? 0)
     )
     ;(mockAggregateBudget as ReturnType<typeof vi.fn>).mockResolvedValue(45000)
 
@@ -82,7 +86,9 @@ describe("Rapports page", () => {
     const { auth } = await import("@/lib/auth")
     const { redirect } = await import("next/navigation")
 
-    ;(auth as ReturnType<typeof vi.fn>).mockResolvedValue(mockSession("EMPLOYEE"))
+    ;(auth as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockSession("EMPLOYEE")
+    )
 
     const { default: RapportsPage } = await import("./page")
     await expect(RapportsPage()).rejects.toThrow("NEXT_REDIRECT: /")

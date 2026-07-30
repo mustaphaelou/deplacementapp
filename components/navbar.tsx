@@ -32,25 +32,30 @@ export function Navbar({ onOpenMobileNav }: NavbarProps) {
             variant="ghost"
             size="icon"
             onClick={onOpenMobileNav}
-            className="md:hidden max-md:min-h-[44px] max-md:min-w-[44px]"
+            className="max-md:min-h-[44px] max-md:min-w-[44px] md:hidden"
             aria-label="Menu"
           >
             <Menu className="size-5" />
           </Button>
         )}
-        <span className="text-sm text-muted-foreground hidden sm:inline">
+        <span className="hidden text-sm text-muted-foreground sm:inline">
           {session?.user?.name}
         </span>
-        <span className="text-muted-foreground/50 text-xs hidden sm:inline">•</span>
-        <span className="text-muted-foreground text-xs hidden sm:inline">
+        <span className="hidden text-xs text-muted-foreground/50 sm:inline">
+          •
+        </span>
+        <span className="hidden text-xs text-muted-foreground sm:inline">
           {ROLE_LABELS[session?.user?.role ?? ""] ?? session?.user?.role}
         </span>
       </div>
       <div className="flex items-center gap-3">
         <Link href="/profil" title="Mon Profil">
-          <Avatar className="size-8 cursor-pointer ring-1 ring-border hover:ring-primary transition-all">
+          <Avatar className="size-8 cursor-pointer ring-1 ring-border transition-all hover:ring-primary">
             {session?.user?.avatarUrl ? (
-              <AvatarImage src={session.user.avatarUrl} alt={session.user.name} />
+              <AvatarImage
+                src={session.user.avatarUrl}
+                alt={session.user.name}
+              />
             ) : null}
             <AvatarFallback className="text-xs font-medium">
               {session?.user?.name ? getInitials(session.user.name) : "?"}

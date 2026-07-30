@@ -1,22 +1,35 @@
 import type { PgDatabase } from "drizzle-orm/pg-core"
 import { logAudit } from "../audit"
 import { notifications } from "../../db/schema/notifications"
-import type { NotificationEventType, NotificationPayload } from "../notification-events"
+import type {
+  NotificationEventType,
+  NotificationPayload,
+} from "../notification-events"
 import { buildMessage, resolveRecipients } from "../notification/helpers"
 
 export async function appliquerEffets(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tx: PgDatabase<any, any, any>,
   params: {
-    audit: { utilisateurId: string; action: string; entiteId: string; numero: string }
+    audit: {
+      utilisateurId: string
+      action: string
+      entiteId: string
+      numero: string
+    }
     notification: {
       event: NotificationEventType
       demandeId: string
       numero: string
-      employe: { id: string; prenom: string; nom: string; departementId: string }
+      employe: {
+        id: string
+        prenom: string
+        nom: string
+        departementId: string
+      }
       assigneAId?: string | null
     } | null
-  },
+  }
 ): Promise<void> {
   await logAudit(
     {
@@ -26,14 +39,25 @@ export async function appliquerEffets(
       entiteId: params.audit.entiteId,
       details: { numero: params.audit.numero },
     },
-    tx,
+    tx
   )
 
   if (params.notification) {
-    const { event, demandeId, numero, employe, assigneAId } = params.notification
-    const { titre, message } = buildMessage(event, numero, employe.prenom, employe.nom)
+    const { event, demandeId, numero, employe, assigneAId } =
+      params.notification
+    const { titre, message } = buildMessage(
+      event,
+      numero,
+      employe.prenom,
+      employe.nom
+    )
 
-    const payload: NotificationPayload = { demandeId, numero, employe, assigneAId }
+    const payload: NotificationPayload = {
+      demandeId,
+      numero,
+      employe,
+      assigneAId,
+    }
     const recipientIds = await resolveRecipients(event, payload, tx)
 
     if (recipientIds.length > 0) {
@@ -44,7 +68,7 @@ export async function appliquerEffets(
           demandeId,
           titre,
           message,
-        })),
+        }))
       )
     }
   }

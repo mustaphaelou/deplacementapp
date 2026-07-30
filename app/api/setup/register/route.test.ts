@@ -68,7 +68,13 @@ describe("setup register route", () => {
   })
 
   it("POST returns 200 with user on successful quitterAmorcage", async () => {
-    const fakeUser = { id: "u1", email: "admin@exemple.ma", prenom: "Sara", nom: "Alaoui", role: "GENERAL_DIRECTION" }
+    const fakeUser = {
+      id: "u1",
+      email: "admin@exemple.ma",
+      prenom: "Sara",
+      nom: "Alaoui",
+      role: "GENERAL_DIRECTION",
+    }
     mockQuitterAmorcage.mockResolvedValueOnce({ user: fakeUser })
 
     const { POST } = await import("./route")

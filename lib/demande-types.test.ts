@@ -3,7 +3,10 @@ import { parseMotif } from "./demande-types"
 
 describe("parseMotif", () => {
   it("parses a valid JSON array string", () => {
-    expect(parseMotif('["Réunion client","Formation"]')).toEqual(["Réunion client", "Formation"])
+    expect(parseMotif('["Réunion client","Formation"]')).toEqual([
+      "Réunion client",
+      "Formation",
+    ])
   })
 
   it("parses a single-element array", () => {

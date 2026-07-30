@@ -94,7 +94,10 @@ describe("logAudit", { timeout: TIMEOUT }, () => {
       action: "MODIFICATION_COMPLEXE",
       entite: "DemandeDeplacement",
       entiteId: "demande-1",
-      details: { champs: ["nom", "dateDepart"], ancienneValeur: { nom: "Ancien" } },
+      details: {
+        champs: ["nom", "dateDepart"],
+        ancienneValeur: { nom: "Ancien" },
+      },
     }
 
     await logAudit(event, pgliteDb as any)

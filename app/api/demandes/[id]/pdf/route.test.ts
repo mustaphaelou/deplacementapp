@@ -13,15 +13,21 @@ vi.mock("@/lib/demande", () => ({
   recordDocument: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock("@/components/pdf/travel-request-pdf-adapter", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/components/pdf/travel-request-pdf-adapter")>()
-  return {
-    ...actual,
-    pdfAdapter: {
-      render: vi.fn().mockResolvedValue(Buffer.from("%PDF-1.4")),
-    },
+vi.mock(
+  "@/components/pdf/travel-request-pdf-adapter",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("@/components/pdf/travel-request-pdf-adapter")
+      >()
+    return {
+      ...actual,
+      pdfAdapter: {
+        render: vi.fn().mockResolvedValue(Buffer.from("%PDF-1.4")),
+      },
+    }
   }
-})
+)
 
 const mockDemande: DemandeWithRelations = {
   id: "d-1",
@@ -110,8 +116,15 @@ describe("PDF route integration", () => {
 
     expect(data.numero).toBe("DD-2025-0001")
     expect(data.etape).toBe("FINANCE_REVIEW")
-    expect(data.assigneA).toEqual({ id: "u-2", nom: "Bernard", prenom: "Pierre" })
-    expect(data.vehicule).toEqual({ nom: "Peugeot 3008", immatriculation: "AB-123-CD" })
+    expect(data.assigneA).toEqual({
+      id: "u-2",
+      nom: "Bernard",
+      prenom: "Pierre",
+    })
+    expect(data.vehicule).toEqual({
+      nom: "Peugeot 3008",
+      immatriculation: "AB-123-CD",
+    })
   })
 
   it("TravelRequestPdfAdapter renders a non-empty buffer from mapped data", async () => {
@@ -128,13 +141,16 @@ describe("PDF route integration", () => {
   it("GET returns a PDF buffer when demande is found", async () => {
     const { requireAuth } = await import("@/lib/auth")
     const { findById, recordDocument } = await import("@/lib/demande")
-    const { pdfAdapter } = await import("@/components/pdf/travel-request-pdf-adapter")
+    const { pdfAdapter } =
+      await import("@/components/pdf/travel-request-pdf-adapter")
 
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
     ;(findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockDemande)
 
     const { GET } = await import("./route")
-    const response = await GET(mockRequest("d-1"), { params: Promise.resolve({ id: "d-1" }) })
+    const response = await GET(mockRequest("d-1"), {
+      params: Promise.resolve({ id: "d-1" }),
+    })
 
     expect(response.status).toBe(200)
     expect(response.headers.get("Content-Type")).toBe("application/pdf")
@@ -150,11 +166,15 @@ describe("PDF route integration", () => {
     const { requireAuth } = await import("@/lib/auth")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: false,
-      response: new Response(JSON.stringify({ error: "Non autorisé" }), { status: 401 }),
+      response: new Response(JSON.stringify({ error: "Non autorisé" }), {
+        status: 401,
+      }),
     })
 
     const { GET } = await import("./route")
-    const response = await GET(mockRequest("d-1"), { params: Promise.resolve({ id: "d-1" }) })
+    const response = await GET(mockRequest("d-1"), {
+      params: Promise.resolve({ id: "d-1" }),
+    })
 
     expect(response.status).toBe(401)
   })
@@ -164,10 +184,14 @@ describe("PDF route integration", () => {
     const { findById } = await import("@/lib/demande")
 
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
-    ;(findById as ReturnType<typeof vi.fn>).mockRejectedValue(new DemandeNotFoundError())
+    ;(findById as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new DemandeNotFoundError()
+    )
 
     const { GET } = await import("./route")
-    const response = await GET(mockRequest("d-1"), { params: Promise.resolve({ id: "d-1" }) })
+    const response = await GET(mockRequest("d-1"), {
+      params: Promise.resolve({ id: "d-1" }),
+    })
 
     expect(response.status).toBe(404)
     const body = await response.json()
@@ -177,14 +201,19 @@ describe("PDF route integration", () => {
   it("GET returns 500 when PDF render fails and does not create a document", async () => {
     const { requireAuth } = await import("@/lib/auth")
     const { findById, recordDocument } = await import("@/lib/demande")
-    const { pdfAdapter } = await import("@/components/pdf/travel-request-pdf-adapter")
+    const { pdfAdapter } =
+      await import("@/components/pdf/travel-request-pdf-adapter")
 
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
     ;(findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockDemande)
-    ;(pdfAdapter.render as ReturnType<typeof vi.fn>).mockRejectedValue(new PdfRenderError())
+    ;(pdfAdapter.render as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new PdfRenderError()
+    )
 
     const { GET } = await import("./route")
-    const response = await GET(mockRequest("d-1"), { params: Promise.resolve({ id: "d-1" }) })
+    const response = await GET(mockRequest("d-1"), {
+      params: Promise.resolve({ id: "d-1" }),
+    })
 
     expect(response.status).toBe(500)
     const body = await response.json()

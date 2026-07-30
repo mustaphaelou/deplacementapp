@@ -2,7 +2,9 @@ import { expect, describe, it } from "vitest"
 import { type DemandeWithRelations } from "./demande-types"
 import { toPdfRenderData } from "./pdf-mapper"
 
-function makeDemande(overrides?: Record<string, unknown>): DemandeWithRelations {
+function makeDemande(
+  overrides?: Record<string, unknown>
+): DemandeWithRelations {
   return {
     id: "d-1",
     numero: "DD-2025-0001",
@@ -42,7 +44,13 @@ function makeDemande(overrides?: Record<string, unknown>): DemandeWithRelations 
     deletedAt: null,
     creeLe: new Date("2025-05-24"),
     modifieLe: new Date("2025-05-24"),
-    employe: { id: "u-1", prenom: "Jean", nom: "Dupont", email: "jean.dupont@example.com", poste: "Développeur" },
+    employe: {
+      id: "u-1",
+      prenom: "Jean",
+      nom: "Dupont",
+      email: "jean.dupont@example.com",
+      poste: "Développeur",
+    },
     vehicule: null,
     assigneA: null,
     ...overrides,
@@ -56,8 +64,25 @@ function makeDemandeWithRelations(overrides?: {
 }): DemandeWithRelations {
   return {
     ...makeDemande(overrides?.demande),
-    vehicule: overrides?.vehicule === null ? null : overrides?.vehicule ? { nom: overrides.vehicule.nom as string, immatriculation: overrides.vehicule.immatriculation as string } : null,
-    assigneA: overrides?.assigneA === null ? null : overrides?.assigneA ? { id: overrides.assigneA.id as string, nom: overrides.assigneA.nom as string, prenom: overrides.assigneA.prenom as string } : null,
+    vehicule:
+      overrides?.vehicule === null
+        ? null
+        : overrides?.vehicule
+          ? {
+              nom: overrides.vehicule.nom as string,
+              immatriculation: overrides.vehicule.immatriculation as string,
+            }
+          : null,
+    assigneA:
+      overrides?.assigneA === null
+        ? null
+        : overrides?.assigneA
+          ? {
+              id: overrides.assigneA.id as string,
+              nom: overrides.assigneA.nom as string,
+              prenom: overrides.assigneA.prenom as string,
+            }
+          : null,
   }
 }
 
@@ -89,13 +114,26 @@ describe("toPdfRenderData", () => {
     expect(result.destination).toBe("Casablanca")
     expect(result.typeTransport).toBe("AVION")
     expect(result.autreTransport).toBe("Taxi")
-    expect(result.vehicule).toEqual({ nom: "Renault Clio", immatriculation: "XY-999-ZZ" })
-    expect(result.couts).toEqual({ transport: 100, hebergement: 200, repas: 50, divers: 30, total: 380 })
+    expect(result.vehicule).toEqual({
+      nom: "Renault Clio",
+      immatriculation: "XY-999-ZZ",
+    })
+    expect(result.couts).toEqual({
+      transport: 100,
+      hebergement: 200,
+      repas: 50,
+      divers: 30,
+      total: 380,
+    })
     expect(result.avanceRequise).toBe(true)
     expect(result.montantAvance).toBe(500)
     expect(result.description).toBe("Description test")
     expect(result.creeLe).toEqual(new Date("2025-05-24"))
-    expect(result.assigneA).toEqual({ id: "u-2", nom: "Bernard", prenom: "Pierre" })
+    expect(result.assigneA).toEqual({
+      id: "u-2",
+      nom: "Bernard",
+      prenom: "Pierre",
+    })
   })
 
   it("handles null vehicule and assigneA", () => {

@@ -43,7 +43,10 @@ const makeVehicule = (overrides?: Record<string, unknown>) => ({
 describe("VehiculeService", () => {
   it("lists all vehicules ordered by nom asc", async () => {
     const db = mockDb()
-    const vehicules = [makeVehicule({ nom: "Audi" }), makeVehicule({ id: "v-2", nom: "BMW" })]
+    const vehicules = [
+      makeVehicule({ nom: "Audi" }),
+      makeVehicule({ id: "v-2", nom: "BMW" }),
+    ]
     db.query.vehiculesEntreprise.findMany.mockResolvedValue(vehicules)
 
     const svc = new VehiculeService(db as any)
@@ -58,8 +61,12 @@ describe("VehiculeService", () => {
 
   it("creates a vehicule and audits", async () => {
     const db = mockDb()
-    const returningCreate = db.insert().values().returning as ReturnType<typeof vi.fn>
-    returningCreate.mockResolvedValue([makeVehicule({ nom: "Peugeot 208", immatriculation: "XY-456-ZZ" })])
+    const returningCreate = db.insert().values().returning as ReturnType<
+      typeof vi.fn
+    >
+    returningCreate.mockResolvedValue([
+      makeVehicule({ nom: "Peugeot 208", immatriculation: "XY-456-ZZ" }),
+    ])
 
     const svc = new VehiculeService(db as any)
     const result = await svc.create(
@@ -75,13 +82,15 @@ describe("VehiculeService", () => {
         action: "CREATION_VEHICULE",
         entite: "VehiculeEntreprise",
       }),
-      expect.anything(),
+      expect.anything()
     )
   })
 
   it("creates a vehicule with disponible defaulting to true", async () => {
     const db = mockDb()
-    const returningCreate = db.insert().values().returning as ReturnType<typeof vi.fn>
+    const returningCreate = db.insert().values().returning as ReturnType<
+      typeof vi.fn
+    >
     returningCreate.mockImplementation((data: any) =>
       Promise.resolve([makeVehicule({ ...data })] as any)
     )
@@ -97,7 +106,12 @@ describe("VehiculeService", () => {
 
   it("updates a vehicule and audits", async () => {
     const db = mockDb()
-    db.update().set().where().returning.mockResolvedValue([makeVehicule({ nom: "Renault Megane", immatriculation: "CD-789-EF" })])
+    db.update()
+      .set()
+      .where()
+      .returning.mockResolvedValue([
+        makeVehicule({ nom: "Renault Megane", immatriculation: "CD-789-EF" }),
+      ])
 
     const svc = new VehiculeService(db as any)
     const result = await svc.update(
@@ -114,7 +128,7 @@ describe("VehiculeService", () => {
         entite: "VehiculeEntreprise",
         entiteId: "v-1",
       }),
-      expect.anything(),
+      expect.anything()
     )
   })
 
@@ -142,7 +156,7 @@ describe("VehiculeService", () => {
         entite: "VehiculeEntreprise",
         entiteId: "v-1",
       }),
-      expect.anything(),
+      expect.anything()
     )
   })
 
@@ -151,8 +165,8 @@ describe("VehiculeService", () => {
     db.delete().where().returning.mockResolvedValue([])
 
     const svc = new VehiculeService(db as any)
-    await expect(
-      svc.delete("v-missing", "u-1")
-    ).rejects.toThrow(VehiculeNotFoundError)
+    await expect(svc.delete("v-missing", "u-1")).rejects.toThrow(
+      VehiculeNotFoundError
+    )
   })
 })

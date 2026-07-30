@@ -18,11 +18,9 @@ interface JournalEntry {
 function migrationTags(): string[] {
   const journalPath = path.join(DRIZZLE_DIR, "meta/_journal.json")
   const journal: { entries: JournalEntry[] } = JSON.parse(
-    fs.readFileSync(journalPath, "utf-8"),
+    fs.readFileSync(journalPath, "utf-8")
   )
-  return journal.entries
-    .sort((a, b) => a.idx - b.idx)
-    .map((e) => e.tag)
+  return journal.entries.sort((a, b) => a.idx - b.idx).map((e) => e.tag)
 }
 
 function loadAndCleanSql(tag: string): string[] {

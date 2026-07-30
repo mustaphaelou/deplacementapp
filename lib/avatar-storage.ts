@@ -20,7 +20,10 @@ export class LocalFilesystemAvatarStorage implements AvatarStorage {
     }
     const mime = matches[1]
     if (!ALLOWED_TYPES.includes(mime)) {
-      throw new AvatarError("Type d'image non autorisé (JPG, PNG, WebP uniquement)", 400)
+      throw new AvatarError(
+        "Type d'image non autorisé (JPG, PNG, WebP uniquement)",
+        400
+      )
     }
     const buffer = Buffer.from(matches[2], "base64")
     if (buffer.length > MAX_SIZE) {
@@ -28,14 +31,22 @@ export class LocalFilesystemAvatarStorage implements AvatarStorage {
     }
     const ext = mime.split("/")[1]
     const filename = `avatar-${userId}-${Date.now()}.${ext}`
-    const filepath = join(process.cwd(), "public", "uploads", "avatars", filename)
+    const filepath = join(
+      process.cwd(),
+      "public",
+      "uploads",
+      "avatars",
+      filename
+    )
     await writeFile(filepath, buffer)
     return `/uploads/avatars/${filename}`
   }
 
   async delete(urlPath: string): Promise<void> {
     const fullPath = join(process.cwd(), "public", urlPath)
-    try { await unlink(fullPath) } catch {}
+    try {
+      await unlink(fullPath)
+    } catch {}
   }
 }
 

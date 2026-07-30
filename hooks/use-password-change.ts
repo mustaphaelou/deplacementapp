@@ -32,7 +32,10 @@ export function usePasswordChange() {
       const res = await fetch("/api/utilisateurs/password", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ currentPassword: pwCurrent, newPassword: pwNew }),
+        body: JSON.stringify({
+          currentPassword: pwCurrent,
+          newPassword: pwNew,
+        }),
       })
 
       if (!res.ok) {

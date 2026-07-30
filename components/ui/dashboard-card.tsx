@@ -7,7 +7,11 @@ interface DashboardCardProps {
   value: string | number
 }
 
-export function DashboardCard({ icon: Icon, label, value }: DashboardCardProps) {
+export function DashboardCard({
+  icon: Icon,
+  label,
+  value,
+}: DashboardCardProps) {
   return (
     <Card className="transition-shadow hover:shadow-md">
       <CardContent className="flex items-center gap-4 p-5">
@@ -15,7 +19,9 @@ export function DashboardCard({ icon: Icon, label, value }: DashboardCardProps) 
           <Icon />
         </div>
         <div className="min-w-0">
-          <p className="truncate text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
+          <p className="truncate text-2xl font-semibold tracking-tight tabular-nums">
+            {value}
+          </p>
           <p className="truncate text-xs text-muted-foreground">{label}</p>
         </div>
       </CardContent>

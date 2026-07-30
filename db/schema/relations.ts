@@ -13,32 +13,43 @@ export const societesRelations = relations(societes, ({ many }) => ({
   departements: many(departements),
 }))
 
-export const departementsRelations = relations(departements, ({ one, many }) => ({
-  societe: one(societes, {
-    fields: [departements.societeId],
-    references: [societes.id],
-  }),
-  utilisateurs: many(utilisateurs),
-}))
+export const departementsRelations = relations(
+  departements,
+  ({ one, many }) => ({
+    societe: one(societes, {
+      fields: [departements.societeId],
+      references: [societes.id],
+    }),
+    utilisateurs: many(utilisateurs),
+  })
+)
 
-export const utilisateursRelations = relations(utilisateurs, ({ one, many }) => ({
-  departement: one(departements, {
-    fields: [utilisateurs.departementId],
-    references: [departements.id],
-  }),
-  societe: one(societes, {
-    fields: [utilisateurs.societeId],
-    references: [societes.id],
-  }),
-  demandes: many(demandesDeplacement, { relationName: "DemandeEmploye" }),
-  demandesAssignees: many(demandesDeplacement, { relationName: "DemandeAssignee" }),
-  notifications: many(notifications),
-  journalAudits: many(journalAudit),
-}))
+export const utilisateursRelations = relations(
+  utilisateurs,
+  ({ one, many }) => ({
+    departement: one(departements, {
+      fields: [utilisateurs.departementId],
+      references: [departements.id],
+    }),
+    societe: one(societes, {
+      fields: [utilisateurs.societeId],
+      references: [societes.id],
+    }),
+    demandes: many(demandesDeplacement, { relationName: "DemandeEmploye" }),
+    demandesAssignees: many(demandesDeplacement, {
+      relationName: "DemandeAssignee",
+    }),
+    notifications: many(notifications),
+    journalAudits: many(journalAudit),
+  })
+)
 
-export const vehiculesEntrepriseRelations = relations(vehiculesEntreprise, ({ many }) => ({
-  demandes: many(demandesDeplacement),
-}))
+export const vehiculesEntrepriseRelations = relations(
+  vehiculesEntreprise,
+  ({ many }) => ({
+    demandes: many(demandesDeplacement),
+  })
+)
 
 export const demandesDeplacementRelations = relations(
   demandesDeplacement,
@@ -59,7 +70,7 @@ export const demandesDeplacementRelations = relations(
     }),
     notifications: many(notifications),
     documents: many(documents),
-  }),
+  })
 )
 
 export const notificationsRelations = relations(notifications, ({ one }) => ({

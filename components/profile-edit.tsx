@@ -7,7 +7,21 @@ import { Label } from "@/components/ui/label"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, Pencil, X, Save, Camera, Mail, Phone, Briefcase, Building2, Calendar, Clock, Eye, EyeOff } from "lucide-react"
+import {
+  Loader2,
+  Pencil,
+  X,
+  Save,
+  Camera,
+  Mail,
+  Phone,
+  Briefcase,
+  Building2,
+  Calendar,
+  Clock,
+  Eye,
+  EyeOff,
+} from "lucide-react"
 import { formatDate } from "@/lib/constants"
 import { useProfileForm } from "@/hooks/use-profile-form"
 import { usePasswordChange } from "@/hooks/use-password-change"
@@ -48,13 +62,16 @@ export default function ProfileEdit({ user }: { user: UserData }) {
     <div className="mx-auto max-w-3xl space-y-8">
       {/* Hero */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary/80 to-primary/40 p-8 text-primary-foreground">
-        <div className="absolute right-0 top-0 size-64 translate-x-1/4 -translate-y-1/4 rounded-full bg-white/10" />
+        <div className="absolute top-0 right-0 size-64 translate-x-1/4 -translate-y-1/4 rounded-full bg-white/10" />
         <div className="absolute bottom-0 left-1/3 size-48 rounded-full bg-white/5" />
         <div className="relative flex items-center gap-6">
-          <div className="relative group">
+          <div className="group relative">
             <Avatar className="size-20 ring-4 ring-white/30">
               {avatarSrc ? (
-                <AvatarImage src={avatarSrc} alt={`${user.prenom} ${user.nom}`} />
+                <AvatarImage
+                  src={avatarSrc}
+                  alt={`${user.prenom} ${user.nom}`}
+                />
               ) : null}
               <AvatarFallback className="bg-white/20 text-3xl font-bold text-primary-foreground">
                 {getInitials(user.prenom, user.nom)}
@@ -65,7 +82,7 @@ export default function ProfileEdit({ user }: { user: UserData }) {
                 <button
                   type="button"
                   onClick={() => fileRef.current?.click()}
-                  className="flex size-full items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity hover:opacity-100 cursor-pointer"
+                  className="flex size-full cursor-pointer items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity hover:opacity-100"
                 >
                   <Camera className="size-6 text-white" />
                 </button>
@@ -88,7 +105,7 @@ export default function ProfileEdit({ user }: { user: UserData }) {
                 <Input
                   value={profile.poste}
                   onChange={(e) => profile.setPoste(e.target.value)}
-                  className="h-7 w-64 border-white/30 bg-white/10 text-primary-foreground placeholder:text-white/50 text-sm"
+                  className="h-7 w-64 border-white/30 bg-white/10 text-sm text-primary-foreground placeholder:text-white/50"
                   placeholder="Poste"
                 />
               </div>
@@ -105,15 +122,34 @@ export default function ProfileEdit({ user }: { user: UserData }) {
           <div>
             {profile.editing ? (
               <div className="flex gap-2">
-                <Button variant="ghost" size="sm" onClick={profile.cancelEdit} className="text-white hover:bg-white/20">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={profile.cancelEdit}
+                  className="text-white hover:bg-white/20"
+                >
                   <X className="size-4" />
                 </Button>
-                <Button size="sm" onClick={profile.handleSave} disabled={profile.saving} className="bg-white text-primary hover:bg-white/90">
-                  {profile.saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                <Button
+                  size="sm"
+                  onClick={profile.handleSave}
+                  disabled={profile.saving}
+                  className="bg-white text-primary hover:bg-white/90"
+                >
+                  {profile.saving ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Save className="size-4" />
+                  )}
                 </Button>
               </div>
             ) : (
-              <Button variant="ghost" size="sm" onClick={() => profile.setEditing(true)} className="text-white hover:bg-white/20">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => profile.setEditing(true)}
+                className="text-white hover:bg-white/20"
+              >
                 <Pencil className="size-4" />
               </Button>
             )}
@@ -125,7 +161,7 @@ export default function ProfileEdit({ user }: { user: UserData }) {
               variant="ghost"
               size="xs"
               onClick={profile.handleRemoveAvatar}
-              className="text-white/70 hover:text-white hover:bg-white/20 text-xs"
+              className="text-xs text-white/70 hover:bg-white/20 hover:text-white"
             >
               Supprimer la photo
             </Button>
@@ -137,8 +173,8 @@ export default function ProfileEdit({ user }: { user: UserData }) {
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>
           <CardContent className="flex items-center gap-4 p-5">
-            <div className="bg-primary/10 flex size-10 items-center justify-center rounded-lg">
-              <Briefcase className="text-primary size-5" />
+            <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
+              <Briefcase className="size-5 text-primary" />
             </div>
             <div>
               <p className="text-2xl font-bold">{user._count.demandes}</p>
@@ -148,21 +184,23 @@ export default function ProfileEdit({ user }: { user: UserData }) {
         </Card>
         <Card>
           <CardContent className="flex items-center gap-4 p-5">
-            <div className="bg-primary/10 flex size-10 items-center justify-center rounded-lg">
-              <Calendar className="text-primary size-5" />
+            <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
+              <Calendar className="size-5 text-primary" />
             </div>
             <div>
               <p className="text-lg font-bold">
                 {user.dateEmbauche ? formatDate(user.dateEmbauche) : "—"}
               </p>
-              <p className="text-xs text-muted-foreground">Date d&apos;embauche</p>
+              <p className="text-xs text-muted-foreground">
+                Date d&apos;embauche
+              </p>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="flex items-center gap-4 p-5">
-            <div className="bg-primary/10 flex size-10 items-center justify-center rounded-lg">
-              <Clock className="text-primary size-5" />
+            <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
+              <Clock className="size-5 text-primary" />
             </div>
             <div>
               <p className="text-lg font-bold">{formatDate(user.creeLe)}</p>
@@ -191,7 +229,9 @@ export default function ProfileEdit({ user }: { user: UserData }) {
               </div>
               {profile.email !== user.email && (
                 <div className="space-y-2">
-                  <Label htmlFor="edit-password">Mot de passe actuel (requis pour modifier l&apos;email)</Label>
+                  <Label htmlFor="edit-password">
+                    Mot de passe actuel (requis pour modifier l&apos;email)
+                  </Label>
                   <Input
                     id="edit-password"
                     type="password"
@@ -224,10 +264,10 @@ export default function ProfileEdit({ user }: { user: UserData }) {
               </div>
             </div>
           ) : (
-            <div className="grid gap-4 sm:gap-2 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2 sm:gap-2">
               <div className="flex items-start gap-3">
-                <div className="bg-muted mt-0.5 flex size-8 items-center justify-center rounded-lg">
-                  <Mail className="text-muted-foreground size-4" />
+                <div className="mt-0.5 flex size-8 items-center justify-center rounded-lg bg-muted">
+                  <Mail className="size-4 text-muted-foreground" />
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Email</p>
@@ -235,8 +275,8 @@ export default function ProfileEdit({ user }: { user: UserData }) {
                 </div>
               </div>
               <div className="flex items-start gap-3">
-                <div className="bg-muted mt-0.5 flex size-8 items-center justify-center rounded-lg">
-                  <Phone className="text-muted-foreground size-4" />
+                <div className="mt-0.5 flex size-8 items-center justify-center rounded-lg bg-muted">
+                  <Phone className="size-4 text-muted-foreground" />
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Téléphone</p>
@@ -244,8 +284,8 @@ export default function ProfileEdit({ user }: { user: UserData }) {
                 </div>
               </div>
               <div className="flex items-start gap-3">
-                <div className="bg-muted mt-0.5 flex size-8 items-center justify-center rounded-lg">
-                  <Briefcase className="text-muted-foreground size-4" />
+                <div className="mt-0.5 flex size-8 items-center justify-center rounded-lg bg-muted">
+                  <Briefcase className="size-4 text-muted-foreground" />
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Poste</p>
@@ -253,8 +293,8 @@ export default function ProfileEdit({ user }: { user: UserData }) {
                 </div>
               </div>
               <div className="flex items-start gap-3">
-                <div className="bg-muted mt-0.5 flex size-8 items-center justify-center rounded-lg">
-                  <Building2 className="text-muted-foreground size-4" />
+                <div className="mt-0.5 flex size-8 items-center justify-center rounded-lg bg-muted">
+                  <Building2 className="size-4 text-muted-foreground" />
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Département</p>
@@ -273,7 +313,10 @@ export default function ProfileEdit({ user }: { user: UserData }) {
         </CardHeader>
         <CardContent>
           <form
-            onSubmit={(e) => { e.preventDefault(); pw.handleChangePassword() }}
+            onSubmit={(e) => {
+              e.preventDefault()
+              pw.handleChangePassword()
+            }}
             className="space-y-4"
           >
             <div className="space-y-2">
@@ -289,9 +332,13 @@ export default function ProfileEdit({ user }: { user: UserData }) {
                 <button
                   type="button"
                   onClick={() => pw.setShowPwCurrent(!pw.showPwCurrent)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
-                  {pw.showPwCurrent ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  {pw.showPwCurrent ? (
+                    <EyeOff className="size-4" />
+                  ) : (
+                    <Eye className="size-4" />
+                  )}
                 </button>
               </div>
             </div>
@@ -309,14 +356,20 @@ export default function ProfileEdit({ user }: { user: UserData }) {
                 <button
                   type="button"
                   onClick={() => pw.setShowPwNew(!pw.showPwNew)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
-                  {pw.showPwNew ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  {pw.showPwNew ? (
+                    <EyeOff className="size-4" />
+                  ) : (
+                    <Eye className="size-4" />
+                  )}
                 </button>
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="pw-confirm">Confirmer le nouveau mot de passe</Label>
+              <Label htmlFor="pw-confirm">
+                Confirmer le nouveau mot de passe
+              </Label>
               <div className="relative">
                 <Input
                   id="pw-confirm"
@@ -329,14 +382,20 @@ export default function ProfileEdit({ user }: { user: UserData }) {
                 <button
                   type="button"
                   onClick={() => pw.setShowPwConfirm(!pw.showPwConfirm)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
-                  {pw.showPwConfirm ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  {pw.showPwConfirm ? (
+                    <EyeOff className="size-4" />
+                  ) : (
+                    <Eye className="size-4" />
+                  )}
                 </button>
               </div>
             </div>
             <Button type="submit" disabled={pw.savingPassword}>
-              {pw.savingPassword && <Loader2 className="mr-2 size-4 animate-spin" />}
+              {pw.savingPassword && (
+                <Loader2 className="mr-2 size-4 animate-spin" />
+              )}
               Changer le mot de passe
             </Button>
           </form>

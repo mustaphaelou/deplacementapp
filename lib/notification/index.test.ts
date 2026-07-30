@@ -1,6 +1,10 @@
 import { describe, it, expect, vi } from "vitest"
 import { NotificationModule } from "./index"
-import type { NotificationAdapter, NotificationMessage, NotificationPayload } from "./index"
+import type {
+  NotificationAdapter,
+  NotificationMessage,
+  NotificationPayload,
+} from "./index"
 import { NotificationNotFoundError, UnauthorizedActionError } from "../errors"
 
 vi.mock("./adapter", () => ({
@@ -8,7 +12,9 @@ vi.mock("./adapter", () => ({
   sendEmail: vi.fn(),
 }))
 
-function mockAdapter(): NotificationAdapter & { send: ReturnType<typeof vi.fn> } {
+function mockAdapter(): NotificationAdapter & {
+  send: ReturnType<typeof vi.fn>
+} {
   return { send: vi.fn().mockResolvedValue({ success: true }) }
 }
 
@@ -38,10 +44,17 @@ function mockDb() {
   }
 }
 
-const makePayload = (overrides?: Partial<NotificationPayload>): NotificationPayload => ({
+const makePayload = (
+  overrides?: Partial<NotificationPayload>
+): NotificationPayload => ({
   demandeId: "d-1",
   numero: "DD-2025-0001",
-  employe: { id: "emp-1", prenom: "Jean", nom: "Dupont", departementId: "dept-hr" },
+  employe: {
+    id: "emp-1",
+    prenom: "Jean",
+    nom: "Dupont",
+    departementId: "dept-hr",
+  },
   ...overrides,
 })
 
@@ -64,7 +77,10 @@ describe("NotificationModule", () => {
 
   it("dispatch reports per-recipient failures when adapter fails", async () => {
     const adapter = mockAdapter()
-    adapter.send.mockResolvedValueOnce({ success: false, error: new Error("DB write error") })
+    adapter.send.mockResolvedValueOnce({
+      success: false,
+      error: new Error("DB write error"),
+    })
     const db = mockDb()
     db.select = mockSelectResult([{ id: "mgr-hr" }])
 
@@ -74,14 +90,20 @@ describe("NotificationModule", () => {
     expect(result.total).toBe(1)
     expect(result.succeeded).toBe(0)
     expect(result.failed).toBe(1)
-    expect(result.failures[0]).toMatchObject({ utilisateurId: "mgr-hr", error: "DB write error" })
+    expect(result.failures[0]).toMatchObject({
+      utilisateurId: "mgr-hr",
+      error: "DB write error",
+    })
   })
 
   it("dispatch aggregates mixed success/failure across multiple department recipients", async () => {
     const adapter = mockAdapter()
     adapter.send
       .mockResolvedValueOnce({ success: true })
-      .mockResolvedValueOnce({ success: false, error: new Error("Network timeout") })
+      .mockResolvedValueOnce({
+        success: false,
+        error: new Error("Network timeout"),
+      })
     const db = mockDb()
     db.select = mockSelectResult([{ id: "mgr-hr-1" }, { id: "mgr-hr-2" }])
 
@@ -101,7 +123,10 @@ describe("NotificationModule", () => {
     db.select = mockSelectResult([])
 
     const bus = new NotificationModule(adapter, db as any)
-    const result = await bus.dispatch("DEMANDE_APPROBATION_FINALE", makePayload())
+    const result = await bus.dispatch(
+      "DEMANDE_APPROBATION_FINALE",
+      makePayload()
+    )
 
     expect(result.total).toBe(1)
     expect(adapter.send).toHaveBeenCalled()
@@ -115,7 +140,8 @@ describe("NotificationModule", () => {
     const bus = new NotificationModule(adapter, db as any)
     await bus.dispatch("DEMANDE_APPROBATION_MANAGER", makePayload())
 
-    const call = adapter.send.mock.calls[0]?.[0] as NotificationMessage | undefined
+    const call = adapter.send.mock.calls[0]?.[0] as
+      NotificationMessage | undefined
     expect(call).toBeDefined()
     expect(call!.titre).toBe("Demande approuvée par le manager")
     expect(call!.utilisateurId).toBe("fin-1")
@@ -141,7 +167,10 @@ describe("NotificationModule", () => {
     const db = mockDb()
     const bus = new NotificationModule(adapter, db as any)
 
-    await bus.dispatch("DEMANDE_RETIREE", makePayload({ assigneAId: "approver-1" }))
+    await bus.dispatch(
+      "DEMANDE_RETIREE",
+      makePayload({ assigneAId: "approver-1" })
+    )
 
     expect(adapter.send).toHaveBeenCalledTimes(1)
     const call = adapter.send.mock.calls[0]?.[0] as NotificationMessage
@@ -179,7 +208,12 @@ describe("NotificationModule", () => {
 
     const bus = new NotificationModule(adapter, db as any)
     const payload = makePayload({
-      employe: { id: "emp-1", prenom: "Jean", nom: "Dupont", departementId: "dept-hr" },
+      employe: {
+        id: "emp-1",
+        prenom: "Jean",
+        nom: "Dupont",
+        departementId: "dept-hr",
+      },
     })
     const result = await bus.dispatch("DEMANDE_NOTIFICATION_LUE", payload)
 
@@ -214,7 +248,13 @@ describe("NotificationModule", () => {
       id: "notif-1",
       utilisateurId: "emp-1",
       lu: false,
-      utilisateur: { id: "emp-1", prenom: "Jean", nom: "Dupont", role: "EMPLOYEE", departementId: "dept-hr" },
+      utilisateur: {
+        id: "emp-1",
+        prenom: "Jean",
+        nom: "Dupont",
+        role: "EMPLOYEE",
+        departementId: "dept-hr",
+      },
       demande: { id: "d-1", numero: "DD-2025-0001" },
     })
     db.select = mockSelectResult([{ id: "mgr-hr" }])
@@ -236,7 +276,13 @@ describe("NotificationModule", () => {
       id: "notif-1",
       utilisateurId: "emp-1",
       lu: true,
-      utilisateur: { id: "emp-1", prenom: "Jean", nom: "Dupont", role: "EMPLOYEE", departementId: "dept-hr" },
+      utilisateur: {
+        id: "emp-1",
+        prenom: "Jean",
+        nom: "Dupont",
+        role: "EMPLOYEE",
+        departementId: "dept-hr",
+      },
       demande: { id: "d-1", numero: "DD-2025-0001" },
     })
 
@@ -254,7 +300,13 @@ describe("NotificationModule", () => {
       id: "notif-1",
       utilisateurId: "mgr-1",
       lu: false,
-      utilisateur: { id: "mgr-1", prenom: "Admin", nom: "User", role: "MANAGER", departementId: "dept-hr" },
+      utilisateur: {
+        id: "mgr-1",
+        prenom: "Admin",
+        nom: "User",
+        role: "MANAGER",
+        departementId: "dept-hr",
+      },
       demande: { id: "d-1", numero: "DD-2025-0001" },
     })
 
@@ -271,9 +323,9 @@ describe("NotificationModule", () => {
     db.query.notifications.findFirst = vi.fn().mockResolvedValue(null)
 
     const bus = new NotificationModule(adapter, db as any)
-    await expect(bus.markAsRead("notif-nonexistent", "emp-1")).rejects.toBeInstanceOf(
-      NotificationNotFoundError
-    )
+    await expect(
+      bus.markAsRead("notif-nonexistent", "emp-1")
+    ).rejects.toBeInstanceOf(NotificationNotFoundError)
   })
 
   it("markAsRead throws UnauthorizedActionError when the reader does not own the notification", async () => {
@@ -283,14 +335,23 @@ describe("NotificationModule", () => {
       id: "notif-1",
       utilisateurId: "emp-1",
       lu: false,
-      utilisateur: { id: "emp-1", prenom: "Jean", nom: "Dupont", role: "EMPLOYEE", departementId: "dept-hr" },
+      utilisateur: {
+        id: "emp-1",
+        prenom: "Jean",
+        nom: "Dupont",
+        role: "EMPLOYEE",
+        departementId: "dept-hr",
+      },
       demande: { id: "d-1", numero: "DD-2025-0001" },
     })
 
     const bus = new NotificationModule(adapter, db as any)
     const promise = bus.markAsRead("notif-1", "emp-2")
     await expect(promise).rejects.toBeInstanceOf(UnauthorizedActionError)
-    await expect(promise).rejects.toMatchObject({ status: 403, message: "Non autorisé" })
+    await expect(promise).rejects.toMatchObject({
+      status: 403,
+      message: "Non autorisé",
+    })
 
     expect(db.update().set().where().returning).not.toHaveBeenCalled()
     expect(adapter.send).not.toHaveBeenCalled()
@@ -303,7 +364,13 @@ describe("NotificationModule", () => {
       id: "notif-1",
       utilisateurId: "mgr-1",
       lu: false,
-      utilisateur: { id: "mgr-1", prenom: "Admin", nom: "User", role: "MANAGER", departementId: "dept-hr" },
+      utilisateur: {
+        id: "mgr-1",
+        prenom: "Admin",
+        nom: "User",
+        role: "MANAGER",
+        departementId: "dept-hr",
+      },
       demande: { id: "d-1", numero: "DD-2025-0001" },
     })
 
@@ -321,7 +388,13 @@ describe("NotificationModule", () => {
       id: "notif-1",
       utilisateurId: "emp-1",
       lu: false,
-      utilisateur: { id: "emp-1", prenom: "Jean", nom: "Dupont", role: "EMPLOYEE", departementId: "dept-hr" },
+      utilisateur: {
+        id: "emp-1",
+        prenom: "Jean",
+        nom: "Dupont",
+        role: "EMPLOYEE",
+        departementId: "dept-hr",
+      },
       demande: null,
     })
 

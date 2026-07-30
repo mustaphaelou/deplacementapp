@@ -25,10 +25,14 @@ function Select({
     <div className={cn("flex flex-col gap-1.5", className)}>
       {label && <Label>{label}</Label>}
       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-      <SelectPrimitive.Root value={value as string | undefined} onValueChange={(v) => onValueChange?.(v as string | null)} {...props as any}>
+      <SelectPrimitive.Root
+        value={value as string | undefined}
+        onValueChange={(v) => onValueChange?.(v as string | null)}
+        {...(props as any)}
+      >
         <SelectPrimitive.Trigger
           className={cn(
-            "border-input flex h-8 w-full items-center justify-between rounded-lg border bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none",
+            "flex h-8 w-full items-center justify-between rounded-lg border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none",
             "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
             "aria-invalid:border-destructive aria-invalid:ring-destructive/20",
             "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
@@ -44,7 +48,7 @@ function Select({
           <SelectPrimitive.Positioner>
             <SelectPrimitive.Popup
               className={cn(
-                "bg-popover text-popover-foreground z-50 min-w-[8rem] overflow-hidden rounded-lg border shadow-md",
+                "z-50 min-w-[8rem] overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-md",
                 "origin-[var(--anchor-transform-origin)] transition-[transform,scale,opacity]",
                 "data-[ending-style]:scale-95 data-[ending-style]:opacity-0",
                 "data-[starting-style]:scale-95 data-[starting-style]:opacity-0"
@@ -56,16 +60,20 @@ function Select({
           </SelectPrimitive.Positioner>
         </SelectPrimitive.Portal>
       </SelectPrimitive.Root>
-      {error && <p className="text-destructive text-xs">{error}</p>}
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   )
 }
 
-function SelectItem({ className, children, ...props }: SelectPrimitive.Item.Props) {
+function SelectItem({
+  className,
+  children,
+  ...props
+}: SelectPrimitive.Item.Props) {
   return (
     <SelectPrimitive.Item
       className={cn(
-        "relative flex w-full cursor-default items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none",
+        "relative flex w-full cursor-default items-center rounded-sm py-1.5 pr-2 pl-8 text-sm outline-none",
         "data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground",
         "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         className

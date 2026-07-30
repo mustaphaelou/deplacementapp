@@ -1,34 +1,41 @@
-import { auth } from "@/lib/auth";
-import { redirect } from "next/navigation";
-import { findById } from "@/lib/demande";
-import { DemandeNotFoundError } from "@/lib/errors";
-import { formatCurrency, formatDate, TRANSPORT_LABELS, ETAPE_LABELS } from "@/lib/constants";
-import { parseMotif, type DemandeWithRelations } from "@/lib/demande-types";
+import { auth } from "@/lib/auth"
+import { redirect } from "next/navigation"
+import { findById } from "@/lib/demande"
+import { DemandeNotFoundError } from "@/lib/errors"
+import {
+  formatCurrency,
+  formatDate,
+  TRANSPORT_LABELS,
+  ETAPE_LABELS,
+} from "@/lib/constants"
+import { parseMotif, type DemandeWithRelations } from "@/lib/demande-types"
 
 export default async function ImprimerPage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ id: string }>
 }) {
-  const { id } = await params;
-  const session = await auth();
-  if (!session?.user) redirect("/login");
+  const { id } = await params
+  const session = await auth()
+  if (!session?.user) redirect("/login")
 
-  let demande: DemandeWithRelations;
+  let demande: DemandeWithRelations
   try {
-    demande = await findById(id);
+    demande = await findById(id)
   } catch (e) {
-    if (e instanceof DemandeNotFoundError) redirect("/demandes");
-    throw e;
+    if (e instanceof DemandeNotFoundError) redirect("/demandes")
+    throw e
   }
 
-  const motifs = parseMotif(demande.motif);
+  const motifs = parseMotif(demande.motif)
 
   return (
     <div className="mx-auto max-w-4xl p-8">
       <div className="mb-8 border-b-2 border-primary pb-4">
         <h1 className="text-2xl font-bold text-primary">HAY 2010 SARL</h1>
-        <p className="text-sm text-muted-foreground">Formulaire de Demande de Déplacement</p>
+        <p className="text-sm text-muted-foreground">
+          Formulaire de Demande de Déplacement
+        </p>
         <p className="text-sm text-muted-foreground">N° {demande.numero}</p>
       </div>
 
@@ -43,7 +50,9 @@ export default async function ImprimerPage({
           <tbody>
             <tr>
               <td className="w-48 text-muted-foreground">Nom complet</td>
-              <td>{demande.employePrenom} {demande.employeNom}</td>
+              <td>
+                {demande.employePrenom} {demande.employeNom}
+              </td>
             </tr>
             <tr>
               <td className="text-muted-foreground">Poste</td>
@@ -84,7 +93,9 @@ export default async function ImprimerPage({
             {demande.vehicule && (
               <tr>
                 <td className="text-muted-foreground">Véhicule</td>
-                <td>{demande.vehicule.nom} ({demande.vehicule.immatriculation})</td>
+                <td>
+                  {demande.vehicule.nom} ({demande.vehicule.immatriculation})
+                </td>
               </tr>
             )}
           </tbody>
@@ -97,29 +108,39 @@ export default async function ImprimerPage({
           <thead>
             <tr className="border-b text-left text-muted-foreground">
               <th className="pb-2 font-medium">Type</th>
-              <th className="pb-2 font-medium text-right">Montant</th>
+              <th className="pb-2 text-right font-medium">Montant</th>
             </tr>
           </thead>
           <tbody>
             <tr>
               <td className="py-1">Transport</td>
-              <td className="text-right">{formatCurrency(Number(demande.fraisTransport ?? 0))}</td>
+              <td className="text-right">
+                {formatCurrency(Number(demande.fraisTransport ?? 0))}
+              </td>
             </tr>
             <tr>
               <td className="py-1">Hébergement</td>
-              <td className="text-right">{formatCurrency(Number(demande.fraisHebergement ?? 0))}</td>
+              <td className="text-right">
+                {formatCurrency(Number(demande.fraisHebergement ?? 0))}
+              </td>
             </tr>
             <tr>
               <td className="py-1">Repas</td>
-              <td className="text-right">{formatCurrency(Number(demande.fraisRepas ?? 0))}</td>
+              <td className="text-right">
+                {formatCurrency(Number(demande.fraisRepas ?? 0))}
+              </td>
             </tr>
             <tr>
               <td className="py-1">Divers</td>
-              <td className="text-right">{formatCurrency(Number(demande.fraisDivers ?? 0))}</td>
+              <td className="text-right">
+                {formatCurrency(Number(demande.fraisDivers ?? 0))}
+              </td>
             </tr>
-            <tr className="font-bold border-t">
+            <tr className="border-t font-bold">
               <td className="py-1">Total estimé</td>
-              <td className="text-right">{formatCurrency(Number(demande.totalEstime ?? 0))}</td>
+              <td className="text-right">
+                {formatCurrency(Number(demande.totalEstime ?? 0))}
+              </td>
             </tr>
           </tbody>
         </table>
@@ -128,7 +149,9 @@ export default async function ImprimerPage({
       {demande.avanceRequise && (
         <section className="mb-6">
           <h2 className="mb-3 text-lg font-semibold">Avance</h2>
-          <p className="text-sm">Montant : {formatCurrency(Number(demande.montantAvance ?? 0))}</p>
+          <p className="text-sm">
+            Montant : {formatCurrency(Number(demande.montantAvance ?? 0))}
+          </p>
         </section>
       )}
 
@@ -140,8 +163,9 @@ export default async function ImprimerPage({
       )}
 
       <p className="mt-8 text-center text-xs text-muted-foreground">
-        Document généré le {new Date().toLocaleDateString("fr-FR")} - HAY 2010 SARL
+        Document généré le {new Date().toLocaleDateString("fr-FR")} - HAY 2010
+        SARL
       </p>
     </div>
-  );
+  )
 }

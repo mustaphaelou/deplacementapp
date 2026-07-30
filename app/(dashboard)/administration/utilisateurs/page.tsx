@@ -4,7 +4,12 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { toast } from "sonner"
 import { Plus, Loader2, Pencil, Search } from "lucide-react"
 import { ROLE_LABELS } from "@/lib/auth"
@@ -29,9 +34,12 @@ interface Departement {
 
 const ROLE_COLORS: Record<string, string> = {
   EMPLOYEE: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
-  MANAGER: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
-  FINANCE_ADMIN: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
-  GENERAL_DIRECTION: "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300",
+  MANAGER:
+    "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
+  FINANCE_ADMIN:
+    "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
+  GENERAL_DIRECTION:
+    "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300",
 }
 
 export default function UtilisateursPage() {
@@ -69,13 +77,16 @@ export default function UtilisateursPage() {
         const data = await deptRes.json()
         setDepartements(data)
       }
-    } catch {} finally {
+    } catch {
+    } finally {
       setLoading(false)
     }
   }
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => {
+    fetchData()
+  }, [])
 
   function openEdit(user: Utilisateur) {
     setEditingUser(user)
@@ -95,7 +106,17 @@ export default function UtilisateursPage() {
 
   function openCreate() {
     setEditingUser(null)
-    setForm({ email: "", nom: "", prenom: "", poste: "", role: "EMPLOYEE", departementId: departements[0]?.id || "", telephone: "", motDePasse: "", googleAuthEnabled: false })
+    setForm({
+      email: "",
+      nom: "",
+      prenom: "",
+      poste: "",
+      role: "EMPLOYEE",
+      departementId: departements[0]?.id || "",
+      telephone: "",
+      motDePasse: "",
+      googleAuthEnabled: false,
+    })
     setOpen(true)
   }
 
@@ -107,7 +128,9 @@ export default function UtilisateursPage() {
       const res = await fetch("/api/utilisateurs", {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editingUser ? { ...form, id: editingUser.id } : form),
+        body: JSON.stringify(
+          editingUser ? { ...form, id: editingUser.id } : form
+        ),
       })
       if (!res.ok) throw new Error()
       toast.success(editingUser ? "Utilisateur modifié" : "Utilisateur créé")
@@ -133,7 +156,9 @@ export default function UtilisateursPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Gestion des utilisateurs</h1>
-          <p className="text-sm text-muted-foreground">{users.length} utilisateur(s)</p>
+          <p className="text-sm text-muted-foreground">
+            {users.length} utilisateur(s)
+          </p>
         </div>
         <Button onClick={openCreate}>
           <Plus className="mr-2 size-4" />
@@ -144,7 +169,7 @@ export default function UtilisateursPage() {
       <div className="rounded-xl border bg-background">
         <div className="border-b p-3">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Rechercher nom, email, département..."
               value={search}
@@ -155,66 +180,92 @@ export default function UtilisateursPage() {
         </div>
 
         {loading ? (
-          <div className="p-8 text-center text-sm text-muted-foreground">Chargement...</div>
+          <div className="p-8 text-center text-sm text-muted-foreground">
+            Chargement...
+          </div>
         ) : filtered.length === 0 ? (
           <div className="p-8 text-center text-sm text-muted-foreground">
             {search ? "Aucun résultat" : "Aucun utilisateur"}
           </div>
         ) : (
           <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[500px]">
-            <thead>
-              <tr className="border-b bg-muted/50 text-left text-muted-foreground">
-                <th className="p-3 font-medium">Nom complet</th>
-                <th className="p-3 font-medium hidden md:table-cell">Email</th>
-                <th className="p-3 font-medium hidden md:table-cell">Poste</th>
-                <th className="p-3 font-medium hidden lg:table-cell">Département</th>
-                <th className="p-3 font-medium">Rôle</th>
-                <th className="p-3 font-medium">Statut</th>
-                <th className="p-3 font-medium hidden lg:table-cell">Auth</th>
-                <th className="p-3 font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((u) => (
-                <tr key={u.id} className="border-b last:border-0 hover:bg-muted/30">
-                  <td className="p-3">
-                    <div className="flex items-center gap-2">
-                      <div className="flex size-7 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                        {u.prenom[0]}{u.nom[0]}
-                      </div>
-                      <span className="font-medium">{u.prenom} {u.nom}</span>
-                    </div>
-                  </td>
-                  <td className="p-3 text-xs hidden md:table-cell">{u.email}</td>
-                  <td className="p-3 hidden md:table-cell">{u.poste}</td>
-                  <td className="p-3 hidden lg:table-cell">{u.departement.nom}</td>
-                  <td className="p-3">
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${ROLE_COLORS[u.role]}`}>
-                      {ROLE_LABELS[u.role]}
-                    </span>
-                  </td>
-                  <td className="p-3">
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${u.actif ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300" : "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"}`}>
-                      {u.actif ? "Actif" : "Inactif"}
-                    </span>
-                  </td>
-                  <td className="p-3">
-                    {u.googleAuthEnabled && (
-                      <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
-                        Google
-                      </span>
-                    )}
-                  </td>
-                  <td className="p-3">
-                    <Button variant="ghost" size="icon" onClick={() => openEdit(u)}>
-                      <Pencil className="size-4" />
-                    </Button>
-                  </td>
+            <table className="w-full min-w-[500px] text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50 text-left text-muted-foreground">
+                  <th className="p-3 font-medium">Nom complet</th>
+                  <th className="hidden p-3 font-medium md:table-cell">
+                    Email
+                  </th>
+                  <th className="hidden p-3 font-medium md:table-cell">
+                    Poste
+                  </th>
+                  <th className="hidden p-3 font-medium lg:table-cell">
+                    Département
+                  </th>
+                  <th className="p-3 font-medium">Rôle</th>
+                  <th className="p-3 font-medium">Statut</th>
+                  <th className="hidden p-3 font-medium lg:table-cell">Auth</th>
+                  <th className="p-3 font-medium">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filtered.map((u) => (
+                  <tr
+                    key={u.id}
+                    className="border-b last:border-0 hover:bg-muted/30"
+                  >
+                    <td className="p-3">
+                      <div className="flex items-center gap-2">
+                        <div className="flex size-7 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                          {u.prenom[0]}
+                          {u.nom[0]}
+                        </div>
+                        <span className="font-medium">
+                          {u.prenom} {u.nom}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="hidden p-3 text-xs md:table-cell">
+                      {u.email}
+                    </td>
+                    <td className="hidden p-3 md:table-cell">{u.poste}</td>
+                    <td className="hidden p-3 lg:table-cell">
+                      {u.departement.nom}
+                    </td>
+                    <td className="p-3">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${ROLE_COLORS[u.role]}`}
+                      >
+                        {ROLE_LABELS[u.role]}
+                      </span>
+                    </td>
+                    <td className="p-3">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${u.actif ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300" : "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"}`}
+                      >
+                        {u.actif ? "Actif" : "Inactif"}
+                      </span>
+                    </td>
+                    <td className="p-3">
+                      {u.googleAuthEnabled && (
+                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
+                          Google
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-3">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openEdit(u)}
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
@@ -222,38 +273,61 @@ export default function UtilisateursPage() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingUser ? "Modifier" : "Nouvel"} utilisateur</DialogTitle>
+            <DialogTitle>
+              {editingUser ? "Modifier" : "Nouvel"} utilisateur
+            </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Prénom</Label>
-                <Input value={form.prenom} onChange={(e) => setForm({ ...form, prenom: e.target.value })} required />
+                <Input
+                  value={form.prenom}
+                  onChange={(e) => setForm({ ...form, prenom: e.target.value })}
+                  required
+                />
               </div>
               <div className="space-y-2">
                 <Label>Nom</Label>
-                <Input value={form.nom} onChange={(e) => setForm({ ...form, nom: e.target.value })} required />
+                <Input
+                  value={form.nom}
+                  onChange={(e) => setForm({ ...form, nom: e.target.value })}
+                  required
+                />
               </div>
             </div>
             <div className="space-y-2">
               <Label>Email</Label>
-              <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
+              <Input
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                required
+              />
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Poste</Label>
-                <Input value={form.poste} onChange={(e) => setForm({ ...form, poste: e.target.value })} required />
+                <Input
+                  value={form.poste}
+                  onChange={(e) => setForm({ ...form, poste: e.target.value })}
+                  required
+                />
               </div>
               <div className="space-y-2">
                 <Label>Département</Label>
                 <select
                   value={form.departementId}
-                  onChange={(e) => setForm({ ...form, departementId: e.target.value })}
-                  className="border-input flex h-8 w-full rounded-lg border bg-transparent px-3 text-sm outline-none"
+                  onChange={(e) =>
+                    setForm({ ...form, departementId: e.target.value })
+                  }
+                  className="flex h-8 w-full rounded-lg border border-input bg-transparent px-3 text-sm outline-none"
                   required
                 >
                   {departements.map((d) => (
-                    <option key={d.id} value={d.id}>{d.nom}</option>
+                    <option key={d.id} value={d.id}>
+                      {d.nom}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -263,26 +337,47 @@ export default function UtilisateursPage() {
               <select
                 value={form.role}
                 onChange={(e) => setForm({ ...form, role: e.target.value })}
-                className="border-input flex h-8 w-full rounded-lg border bg-transparent px-3 text-sm outline-none"
+                className="flex h-8 w-full rounded-lg border border-input bg-transparent px-3 text-sm outline-none"
               >
                 {Object.entries(ROLE_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
                 ))}
               </select>
             </div>
             <div className="space-y-2">
               <Label>Téléphone</Label>
-              <Input value={form.telephone} onChange={(e) => setForm({ ...form, telephone: e.target.value })} />
+              <Input
+                value={form.telephone}
+                onChange={(e) =>
+                  setForm({ ...form, telephone: e.target.value })
+                }
+              />
             </div>
             <div className="space-y-2">
-              <Label>{editingUser ? "Nouveau mot de passe (laisser vide pour conserver)" : "Mot de passe"}</Label>
-              <Input type="password" value={form.motDePasse} onChange={(e) => setForm({ ...form, motDePasse: e.target.value })} required={!editingUser && !form.googleAuthEnabled} minLength={6} />
+              <Label>
+                {editingUser
+                  ? "Nouveau mot de passe (laisser vide pour conserver)"
+                  : "Mot de passe"}
+              </Label>
+              <Input
+                type="password"
+                value={form.motDePasse}
+                onChange={(e) =>
+                  setForm({ ...form, motDePasse: e.target.value })
+                }
+                required={!editingUser && !form.googleAuthEnabled}
+                minLength={6}
+              />
             </div>
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
                 checked={form.googleAuthEnabled}
-                onChange={(e) => setForm({ ...form, googleAuthEnabled: e.target.checked })}
+                onChange={(e) =>
+                  setForm({ ...form, googleAuthEnabled: e.target.checked })
+                }
                 className="size-4 rounded border-border accent-primary"
               />
               Connexion Google autorisée

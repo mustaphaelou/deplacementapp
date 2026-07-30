@@ -53,19 +53,19 @@ describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT }, () => {
   async function seedDemandes() {
     const draft = await createDraft(
       { ...sampleData, destination: "Rabat" },
-      { id: employeeId, role: "EMPLOYEE" },
+      { id: employeeId, role: "EMPLOYEE" }
     )
     draftId = draft.id
 
     const submitted = await createAndSubmit(
       { ...sampleData, destination: "Marrakech" },
-      { id: employeeId, role: "EMPLOYEE" },
+      { id: employeeId, role: "EMPLOYEE" }
     )
     submittedId = submitted.id
 
     const managerApproved = await createAndSubmit(
       { ...sampleData, destination: "Tanger" },
-      { id: employeeId, role: "EMPLOYEE" },
+      { id: employeeId, role: "EMPLOYEE" }
     )
     await executeTransition({
       demandeId: managerApproved.id,
@@ -76,7 +76,7 @@ describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT }, () => {
 
     const financeApproved = await createAndSubmit(
       { ...sampleData, destination: "Fes" },
-      { id: employeeId, role: "EMPLOYEE" },
+      { id: employeeId, role: "EMPLOYEE" }
     )
     await executeTransition({
       demandeId: financeApproved.id,
@@ -92,7 +92,7 @@ describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT }, () => {
 
     const fullyApproved = await createAndSubmit(
       { ...sampleData, destination: "Agadir" },
-      { id: employeeId, role: "EMPLOYEE" },
+      { id: employeeId, role: "EMPLOYEE" }
     )
     await executeTransition({
       demandeId: fullyApproved.id,
@@ -113,7 +113,7 @@ describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT }, () => {
 
     const secondDraft = await createDraft(
       { ...sampleData, destination: "Kenitra" },
-      { id: secondEmployeeId, role: "EMPLOYEE" },
+      { id: secondEmployeeId, role: "EMPLOYEE" }
     )
     secondEmployeeDraftId = secondDraft.id
   }
@@ -228,13 +228,17 @@ describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT }, () => {
       const demande = await findById(submittedId)
       expect(demande).not.toHaveProperty("documents")
 
-      const withDocs = await findById(submittedId, { include: { documents: true } })
+      const withDocs = await findById(submittedId, {
+        include: { documents: true },
+      })
       expect(withDocs).toHaveProperty("documents")
       expect(Array.isArray(withDocs.documents)).toBe(true)
     })
 
     it("throws DemandeNotFoundError for a missing id", async () => {
-      await expect(findById("nonexistent-id")).rejects.toThrow(DemandeNotFoundError)
+      await expect(findById("nonexistent-id")).rejects.toThrow(
+        DemandeNotFoundError
+      )
     })
 
     it("throws DemandeNotFoundError for a soft-deleted demande", async () => {
@@ -251,7 +255,10 @@ describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT }, () => {
 
   describe("findMany", () => {
     it("EMPLOYEE sees only their own demandes", async () => {
-      const result = await findMany("EMPLOYEE", employeeId, { page: 1, limit: 20 })
+      const result = await findMany("EMPLOYEE", employeeId, {
+        page: 1,
+        limit: 20,
+      })
 
       expect(result.demandes.length).toBeGreaterThanOrEqual(4)
       for (const d of result.demandes) {
@@ -260,7 +267,10 @@ describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT }, () => {
     })
 
     it("MANAGER sees all demandes (not scoped to their own)", async () => {
-      const result = await findMany("MANAGER", managerId, { page: 1, limit: 20 })
+      const result = await findMany("MANAGER", managerId, {
+        page: 1,
+        limit: 20,
+      })
 
       expect(result.demandes.length).toBeGreaterThanOrEqual(5)
     })
@@ -326,7 +336,10 @@ describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT }, () => {
     })
 
     it("excludes soft-deleted demandes", async () => {
-      const result = await findMany("MANAGER", managerId, { page: 1, limit: 100 })
+      const result = await findMany("MANAGER", managerId, {
+        page: 1,
+        limit: 100,
+      })
       const found = result.demandes.find((d) => d.id === draftId)
       expect(found).toBeUndefined()
     })
@@ -388,9 +401,12 @@ describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT }, () => {
     })
 
     it("respects the limit parameter", async () => {
-      const result = await findByEtapes(["MANAGER_REVIEW", "FINANCE_REVIEW", "DIRECTION_REVIEW"], {
-        limit: 2,
-      })
+      const result = await findByEtapes(
+        ["MANAGER_REVIEW", "FINANCE_REVIEW", "DIRECTION_REVIEW"],
+        {
+          limit: 2,
+        }
+      )
       expect(result).toHaveLength(2)
     })
 
@@ -503,7 +519,9 @@ describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT }, () => {
 
     it("excludes soft-deleted demandes", async () => {
       const before = await findAllForExport()
-      const tangerNumero = before.find((r) => r.destination === "Tanger")?.numero
+      const tangerNumero = before.find(
+        (r) => r.destination === "Tanger"
+      )?.numero
       expect(tangerNumero).toBeDefined()
 
       await pgliteDb
@@ -519,7 +537,7 @@ describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT }, () => {
       const rows = await findAllForExport()
       for (let i = 1; i < rows.length; i++) {
         expect(new Date(rows[i - 1].creeLe).getTime()).toBeGreaterThanOrEqual(
-          new Date(rows[i].creeLe).getTime(),
+          new Date(rows[i].creeLe).getTime()
         )
       }
     })

@@ -4,7 +4,7 @@ import { DemandeForm } from "@/components/demande-form"
 
 export default function NouvelleDemandePage() {
   return (
-    <div className="w-full min-h-screen pb-20">
+    <div className="min-h-screen w-full pb-20">
       <DemandeForm />
     </div>
   )

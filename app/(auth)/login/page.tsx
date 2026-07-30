@@ -6,7 +6,13 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
 import { SetupWizard } from "./setup-wizard"
@@ -88,7 +94,7 @@ export default function LoginPage() {
                 className="size-12 rounded-xl object-contain"
               />
             ) : (
-              <div className="bg-primary flex size-12 items-center justify-center rounded-xl text-primary-foreground text-lg font-bold">
+              <div className="flex size-12 items-center justify-center rounded-xl bg-primary text-lg font-bold text-primary-foreground">
                 {initial}
               </div>
             )}

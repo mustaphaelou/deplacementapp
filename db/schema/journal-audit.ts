@@ -5,7 +5,10 @@ export const journalAudit = pgTable("journal_audit", {
   id: text("id").primaryKey(),
   utilisateurId: text("utilisateurId")
     .notNull()
-    .references(() => utilisateurs.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    .references(() => utilisateurs.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
   action: text("action").notNull(),
   entite: text("entite").notNull(),
   entiteId: text("entiteId"),

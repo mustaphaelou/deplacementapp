@@ -21,38 +21,44 @@ export async function GET() {
   }
 }
 
-export const POST = withValidation(utilisateurSchema, async (_req, auth, data) => {
-  const authorized = requireAnyRole(auth, ADMIN_ROLES)
-  if (!authorized.ok) return authorized.response
+export const POST = withValidation(
+  utilisateurSchema,
+  async (_req, auth, data) => {
+    const authorized = requireAnyRole(auth, ADMIN_ROLES)
+    if (!authorized.ok) return authorized.response
 
-  try {
-    const user = await utilisateurService.create(
-      {
-        ...data,
-        motDePasse: data.motDePasse || undefined,
-        googleAuthEnabled: data.googleAuthEnabled ?? false,
-      },
-      auth.id
-    )
-    return NextResponse.json({ user })
-  } catch (e) {
-    return handleServiceError(e)
+    try {
+      const user = await utilisateurService.create(
+        {
+          ...data,
+          motDePasse: data.motDePasse || undefined,
+          googleAuthEnabled: data.googleAuthEnabled ?? false,
+        },
+        auth.id
+      )
+      return NextResponse.json({ user })
+    } catch (e) {
+      return handleServiceError(e)
+    }
   }
-})
+)
 
-export const PUT = withValidation(updateUtilisateurSchema, async (_req, auth, data) => {
-  const authorized = requireAnyRole(auth, ADMIN_ROLES)
-  if (!authorized.ok) return authorized.response
+export const PUT = withValidation(
+  updateUtilisateurSchema,
+  async (_req, auth, data) => {
+    const authorized = requireAnyRole(auth, ADMIN_ROLES)
+    if (!authorized.ok) return authorized.response
 
-  const { id, ...updateData } = data
-  try {
-    const user = await utilisateurService.update(
-      id,
-      { ...updateData, telephone: updateData.telephone || null },
-      auth.id
-    )
-    return NextResponse.json({ user })
-  } catch (e) {
-    return handleServiceError(e)
+    const { id, ...updateData } = data
+    try {
+      const user = await utilisateurService.update(
+        id,
+        { ...updateData, telephone: updateData.telephone || null },
+        auth.id
+      )
+      return NextResponse.json({ user })
+    } catch (e) {
+      return handleServiceError(e)
+    }
   }
-})
+)

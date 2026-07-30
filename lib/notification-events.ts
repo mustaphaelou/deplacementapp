@@ -33,8 +33,12 @@ interface RoleTarget {
 
 export const EVENT_ROLE_MAP: Record<NotificationEventType, RoleTarget[]> = {
   DEMANDE_SOUMISE: [{ role: "MANAGER", departmentScoped: true }],
-  DEMANDE_APPROBATION_MANAGER: [{ role: "FINANCE_ADMIN", departmentScoped: false }],
-  DEMANDE_APPROBATION_FINANCE: [{ role: "GENERAL_DIRECTION", departmentScoped: false }],
+  DEMANDE_APPROBATION_MANAGER: [
+    { role: "FINANCE_ADMIN", departmentScoped: false },
+  ],
+  DEMANDE_APPROBATION_FINANCE: [
+    { role: "GENERAL_DIRECTION", departmentScoped: false },
+  ],
   DEMANDE_APPROBATION_FINALE: [],
   DEMANDE_REJETEE: [],
   DEMANDE_RETIREE: [],

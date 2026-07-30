@@ -5,7 +5,12 @@ import { UtilisateurNotFoundError } from "@/lib/utilisateur-service"
 const { mockRequireAnyRole } = vi.hoisted(() => ({
   mockRequireAnyRole: (user: { role: string }, roles: readonly string[]) => {
     if (roles.includes(user.role)) return { ok: true }
-    return { ok: false, response: new Response(JSON.stringify({ error: "Accès refusé" }), { status: 403 }) }
+    return {
+      ok: false,
+      response: new Response(JSON.stringify({ error: "Accès refusé" }), {
+        status: 403,
+      }),
+    }
   },
 }))
 
@@ -15,7 +20,8 @@ vi.mock("@/lib/auth", () => ({
 }))
 
 vi.mock("@/lib/utilisateur-service", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/utilisateur-service")>()
+  const actual =
+    await importOriginal<typeof import("@/lib/utilisateur-service")>()
   return {
     ...actual,
     utilisateurService: {

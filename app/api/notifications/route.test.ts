@@ -27,7 +27,9 @@ describe("GET /api/notifications", () => {
 
   it("returns the list of notifications for the authenticated user", async () => {
     const { listForUser } = await import("@/lib/notification/queries")
-    ;(listForUser as ReturnType<typeof vi.fn>).mockResolvedValue(fakeNotifications)
+    ;(listForUser as ReturnType<typeof vi.fn>).mockResolvedValue(
+      fakeNotifications
+    )
 
     const { GET } = await import("./route")
     const response = await GET()

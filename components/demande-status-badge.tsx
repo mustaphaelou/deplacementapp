@@ -3,7 +3,10 @@
 import { Badge } from "@/components/ui/badge"
 import { ETAPE_LABELS } from "@/lib/constants"
 
-const variantMap: Record<string, "default" | "secondary" | "destructive" | "outline" | "success" | "warning"> = {
+const variantMap: Record<
+  string,
+  "default" | "secondary" | "destructive" | "outline" | "success" | "warning"
+> = {
   DRAFT: "outline",
   MANAGER_REVIEW: "warning",
   FINANCE_REVIEW: "secondary",

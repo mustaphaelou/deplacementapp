@@ -1,4 +1,12 @@
-import { describe, it, expect, beforeEach, afterEach, beforeAll, vi } from "vitest"
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  beforeAll,
+  vi,
+} from "vitest"
 import { sql } from "drizzle-orm"
 import * as schema from "../db/schema"
 import * as dbModule from "../db"
@@ -10,7 +18,9 @@ import { clearSocieteCache } from "@/lib/societe"
 
 const TIMEOUT = 30_000
 
-function fakeTransporter(): EmailTransporter & { sendMail: ReturnType<typeof vi.fn> } {
+function fakeTransporter(): EmailTransporter & {
+  sendMail: ReturnType<typeof vi.fn>
+} {
   return { sendMail: vi.fn().mockResolvedValue(undefined) }
 }
 

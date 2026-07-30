@@ -13,7 +13,8 @@ vi.mock("@/lib/auth", () => ({
 }))
 
 vi.mock("@/lib/utilisateur-service", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/utilisateur-service")>()
+  const actual =
+    await importOriginal<typeof import("@/lib/utilisateur-service")>()
   return {
     ...actual,
     utilisateurService: {
@@ -54,7 +55,9 @@ describe("profil route", () => {
     const { requireAuth } = await import("@/lib/auth")
     const { utilisateurService } = await import("@/lib/utilisateur-service")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
-    ;(utilisateurService.updateProfile as ReturnType<typeof vi.fn>).mockResolvedValue({
+    ;(
+      utilisateurService.updateProfile as ReturnType<typeof vi.fn>
+    ).mockResolvedValue({
       id: "u-1",
       email: "new@b.com",
       telephone: "0612345678",
@@ -82,7 +85,9 @@ describe("profil route", () => {
     const { requireAuth } = await import("@/lib/auth")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: false,
-      response: new Response(JSON.stringify({ error: "Non autorisé" }), { status: 401 }),
+      response: new Response(JSON.stringify({ error: "Non autorisé" }), {
+        status: 401,
+      }),
     })
 
     const { PUT } = await import("./route")
@@ -111,9 +116,9 @@ describe("profil route", () => {
     const { requireAuth } = await import("@/lib/auth")
     const { utilisateurService } = await import("@/lib/utilisateur-service")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
-    ;(utilisateurService.updateProfile as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new UtilisateurNotFoundError()
-    )
+    ;(
+      utilisateurService.updateProfile as ReturnType<typeof vi.fn>
+    ).mockRejectedValue(new UtilisateurNotFoundError())
 
     const { PUT } = await import("./route")
     const response = await PUT(mockRequest({ poste: "Lead" }), {
@@ -129,9 +134,9 @@ describe("profil route", () => {
     const { requireAuth } = await import("@/lib/auth")
     const { utilisateurService } = await import("@/lib/utilisateur-service")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
-    ;(utilisateurService.updateProfile as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new MotDePasseIncorrectError()
-    )
+    ;(
+      utilisateurService.updateProfile as ReturnType<typeof vi.fn>
+    ).mockRejectedValue(new MotDePasseIncorrectError())
 
     const { PUT } = await import("./route")
     const response = await PUT(
@@ -148,9 +153,9 @@ describe("profil route", () => {
     const { requireAuth } = await import("@/lib/auth")
     const { utilisateurService } = await import("@/lib/utilisateur-service")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
-    ;(utilisateurService.updateProfile as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new EmailChangeRequiresPasswordError()
-    )
+    ;(
+      utilisateurService.updateProfile as ReturnType<typeof vi.fn>
+    ).mockRejectedValue(new EmailChangeRequiresPasswordError())
 
     const { PUT } = await import("./route")
     const response = await PUT(mockRequest({ email: "new@b.com" }), {
@@ -166,9 +171,9 @@ describe("profil route", () => {
     const { requireAuth } = await import("@/lib/auth")
     const { utilisateurService } = await import("@/lib/utilisateur-service")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
-    ;(utilisateurService.updateProfile as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new NoProfileUpdateDataError()
-    )
+    ;(
+      utilisateurService.updateProfile as ReturnType<typeof vi.fn>
+    ).mockRejectedValue(new NoProfileUpdateDataError())
 
     const { PUT } = await import("./route")
     const response = await PUT(mockRequest({}), { params: Promise.resolve({}) })
@@ -182,14 +187,19 @@ describe("profil route", () => {
     const { requireAuth } = await import("@/lib/auth")
     const { utilisateurService } = await import("@/lib/utilisateur-service")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
-    ;(utilisateurService.updateProfile as ReturnType<typeof vi.fn>).mockRejectedValue(
+    ;(
+      utilisateurService.updateProfile as ReturnType<typeof vi.fn>
+    ).mockRejectedValue(
       new AvatarError("L'image ne doit pas dépasser 2 Mo", 400)
     )
 
     const { PUT } = await import("./route")
-    const response = await PUT(mockRequest({ avatarData: "data:image/png;base64,abc" }), {
-      params: Promise.resolve({}),
-    })
+    const response = await PUT(
+      mockRequest({ avatarData: "data:image/png;base64,abc" }),
+      {
+        params: Promise.resolve({}),
+      }
+    )
 
     expect(response.status).toBe(400)
     const body = await response.json()

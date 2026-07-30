@@ -2,19 +2,23 @@ import type { Role } from "@/lib/auth"
 import type { NotificationEventType } from "./notification-events"
 
 export type Etape =
-  | "DRAFT"
-  | "MANAGER_REVIEW"
-  | "FINANCE_REVIEW"
-  | "DIRECTION_REVIEW"
-  | "FINAL"
+  "DRAFT" | "MANAGER_REVIEW" | "FINANCE_REVIEW" | "DIRECTION_REVIEW" | "FINAL"
 
 export type Decision = "PENDING" | "APPROVED" | "REJECTED" | "WITHDRAWN"
 
 export const PIPELINE: readonly StageDefinition[] = [
   { id: "DRAFT", roleCanAct: "EMPLOYEE", onApprove: "MANAGER_REVIEW" },
   { id: "MANAGER_REVIEW", roleCanAct: "MANAGER", onApprove: "FINANCE_REVIEW" },
-  { id: "FINANCE_REVIEW", roleCanAct: "FINANCE_ADMIN", onApprove: "DIRECTION_REVIEW" },
-  { id: "DIRECTION_REVIEW", roleCanAct: "GENERAL_DIRECTION", onApprove: "FINAL" },
+  {
+    id: "FINANCE_REVIEW",
+    roleCanAct: "FINANCE_ADMIN",
+    onApprove: "DIRECTION_REVIEW",
+  },
+  {
+    id: "DIRECTION_REVIEW",
+    roleCanAct: "GENERAL_DIRECTION",
+    onApprove: "FINAL",
+  },
   { id: "FINAL" },
 ] as const
 
@@ -39,50 +43,84 @@ export interface TransitionEffect {
 
 export const TRANSITION_EFFECTS = [
   {
-    from: "DRAFT", action: "submit", to: "MANAGER_REVIEW",
-    auditAction: "SOUMISSION", notificationEvent: "DEMANDE_SOUMISE",
+    from: "DRAFT",
+    action: "submit",
+    to: "MANAGER_REVIEW",
+    auditAction: "SOUMISSION",
+    notificationEvent: "DEMANDE_SOUMISE",
     timestamps: ["soumiseLe"],
   },
   {
-    from: "MANAGER_REVIEW", action: "approuver", to: "FINANCE_REVIEW",
-    auditAction: "APPROBATION_MANAGER", notificationEvent: "DEMANDE_APPROBATION_MANAGER",
-    timestamps: ["approuveeManagerLe"], commentField: "commentaireManager", setAssignee: true,
+    from: "MANAGER_REVIEW",
+    action: "approuver",
+    to: "FINANCE_REVIEW",
+    auditAction: "APPROBATION_MANAGER",
+    notificationEvent: "DEMANDE_APPROBATION_MANAGER",
+    timestamps: ["approuveeManagerLe"],
+    commentField: "commentaireManager",
+    setAssignee: true,
   },
   {
-    from: "FINANCE_REVIEW", action: "approuver", to: "DIRECTION_REVIEW",
-    auditAction: "APPROBATION_FINANCE", notificationEvent: "DEMANDE_APPROBATION_FINANCE",
-    timestamps: ["approuveeFinanceLe"], commentField: "commentaireFinance", setAssignee: true,
+    from: "FINANCE_REVIEW",
+    action: "approuver",
+    to: "DIRECTION_REVIEW",
+    auditAction: "APPROBATION_FINANCE",
+    notificationEvent: "DEMANDE_APPROBATION_FINANCE",
+    timestamps: ["approuveeFinanceLe"],
+    commentField: "commentaireFinance",
+    setAssignee: true,
   },
   {
-    from: "DIRECTION_REVIEW", action: "approuver", to: "FINAL",
-    auditAction: "APPROBATION_DIRECTION", notificationEvent: "DEMANDE_APPROBATION_FINALE",
-    timestamps: ["approuveeDirectionLe"], commentField: "commentaireDirection", setAssignee: true,
+    from: "DIRECTION_REVIEW",
+    action: "approuver",
+    to: "FINAL",
+    auditAction: "APPROBATION_DIRECTION",
+    notificationEvent: "DEMANDE_APPROBATION_FINALE",
+    timestamps: ["approuveeDirectionLe"],
+    commentField: "commentaireDirection",
+    setAssignee: true,
   },
   {
-    from: "MANAGER_REVIEW", action: "rejeter", to: "MANAGER_REVIEW",
-    auditAction: "REJET", notificationEvent: "DEMANDE_REJETEE",
-    timestamps: ["rejeteeLe"], commentField: "commentaireManager",
+    from: "MANAGER_REVIEW",
+    action: "rejeter",
+    to: "MANAGER_REVIEW",
+    auditAction: "REJET",
+    notificationEvent: "DEMANDE_REJETEE",
+    timestamps: ["rejeteeLe"],
+    commentField: "commentaireManager",
   },
   {
-    from: "FINANCE_REVIEW", action: "rejeter", to: "FINANCE_REVIEW",
-    auditAction: "REJET", notificationEvent: "DEMANDE_REJETEE",
-    timestamps: ["rejeteeLe"], commentField: "commentaireFinance",
+    from: "FINANCE_REVIEW",
+    action: "rejeter",
+    to: "FINANCE_REVIEW",
+    auditAction: "REJET",
+    notificationEvent: "DEMANDE_REJETEE",
+    timestamps: ["rejeteeLe"],
+    commentField: "commentaireFinance",
   },
   {
-    from: "DIRECTION_REVIEW", action: "rejeter", to: "DIRECTION_REVIEW",
-    auditAction: "REJET", notificationEvent: "DEMANDE_REJETEE",
-    timestamps: ["rejeteeLe"], commentField: "commentaireDirection",
+    from: "DIRECTION_REVIEW",
+    action: "rejeter",
+    to: "DIRECTION_REVIEW",
+    auditAction: "REJET",
+    notificationEvent: "DEMANDE_REJETEE",
+    timestamps: ["rejeteeLe"],
+    commentField: "commentaireDirection",
   },
   {
-    from: "DRAFT", action: "retirer", to: "DRAFT",
-    auditAction: "RETRAIT", notificationEvent: "DEMANDE_RETIREE",
+    from: "DRAFT",
+    action: "retirer",
+    to: "DRAFT",
+    auditAction: "RETRAIT",
+    notificationEvent: "DEMANDE_RETIREE",
     timestamps: ["retireeLe"],
   },
 ] as const satisfies readonly TransitionEffect[]
 
 // ─── Read-model surface (dashboard-facing) ──────────────────────────────────
 
-export type TimestampColumn = (typeof TRANSITION_EFFECTS)[number]["timestamps"][number]
+export type TimestampColumn =
+  (typeof TRANSITION_EFFECTS)[number]["timestamps"][number]
 
 export interface PipelineView {
   queue: Etape[]
@@ -125,7 +163,10 @@ export function rollupEtapes(role: Role): Etape[] {
   return PIPELINE_VIEWS[role].rollup
 }
 
-export function laneOrderByColumn(etape: Etape): { column: TimestampColumn; direction: "desc" } {
+export function laneOrderByColumn(etape: Etape): {
+  column: TimestampColumn
+  direction: "desc"
+} {
   const effect = TRANSITION_EFFECTS.find((e) => e.to === etape)
   if (!effect) {
     throw new Error(`Aucun effet de transition ne cible l'étape: ${etape}`)
@@ -154,16 +195,29 @@ export interface AllowedActions {
   canWithdraw: boolean
 }
 
-function findEffect(action: WorkflowAction, etape: Etape): TransitionEffect | undefined {
+function findEffect(
+  action: WorkflowAction,
+  etape: Etape
+): TransitionEffect | undefined {
   return TRANSITION_EFFECTS.find((e) => e.from === etape && e.action === action)
 }
 
-export function canTransition(role: Role, etape: Etape, action: WorkflowAction, decision?: Decision): boolean {
+export function canTransition(
+  role: Role,
+  etape: Etape,
+  action: WorkflowAction,
+  decision?: Decision
+): boolean {
   const stage = PIPELINE.find((s) => s.id === etape)
   if (!stage || !stage.roleCanAct) return false
 
   // Terminal decisions block all further transitions
-  if (decision === "REJECTED" || decision === "WITHDRAWN" || decision === "APPROVED") return false
+  if (
+    decision === "REJECTED" ||
+    decision === "WITHDRAWN" ||
+    decision === "APPROVED"
+  )
+    return false
 
   // retirer is only allowed from DRAFT by EMPLOYEE
   if (action === "retirer") {
@@ -191,13 +245,20 @@ export function buildTransition(
   if (!stage || !stage.roleCanAct) return null
 
   // Terminal decisions block all further transitions
-  if (params?.decision === "REJECTED" || params?.decision === "WITHDRAWN" || params?.decision === "APPROVED") return null
+  if (
+    params?.decision === "REJECTED" ||
+    params?.decision === "WITHDRAWN" ||
+    params?.decision === "APPROVED"
+  )
+    return null
 
   // Guard: retirer only from DRAFT by EMPLOYEE
-  if (action === "retirer" && (role !== "EMPLOYEE" || etape !== "DRAFT")) return null
+  if (action === "retirer" && (role !== "EMPLOYEE" || etape !== "DRAFT"))
+    return null
 
   // Guard: submit only from DRAFT by EMPLOYEE
-  if (action === "submit" && (role !== "EMPLOYEE" || etape !== "DRAFT")) return null
+  if (action === "submit" && (role !== "EMPLOYEE" || etape !== "DRAFT"))
+    return null
 
   const effect = findEffect(action, etape)
   if (!effect) return null
@@ -216,7 +277,10 @@ export function buildTransition(
     newDecision = "PENDING"
   }
 
-  const fields: Record<string, unknown> = { etape: effect.to, decision: newDecision }
+  const fields: Record<string, unknown> = {
+    etape: effect.to,
+    decision: newDecision,
+  }
 
   for (const ts of effect.timestamps) {
     fields[ts] = new Date()
@@ -246,11 +310,11 @@ export function getAllowedActions(
   const r = role as Role
 
   return {
-    canSubmit: canTransition(r, demande.etape, "submit", demande.decision) && isOwner,
+    canSubmit:
+      canTransition(r, demande.etape, "submit", demande.decision) && isOwner,
     canApprove: canTransition(r, demande.etape, "approuver", demande.decision),
     canReject: canTransition(r, demande.etape, "rejeter", demande.decision),
-    canWithdraw: canTransition(r, demande.etape, "retirer", demande.decision) && isOwner,
+    canWithdraw:
+      canTransition(r, demande.etape, "retirer", demande.decision) && isOwner,
   }
 }
-
-

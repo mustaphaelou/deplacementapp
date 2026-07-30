@@ -185,7 +185,9 @@ describe("notification queries", { timeout: TIMEOUT }, () => {
     const result = await listForUser(userId, pgliteDb as any)
     expect(result).toHaveLength(3)
     for (let i = 1; i < result.length; i++) {
-      expect(result[i].creeLe.getTime()).toBeLessThanOrEqual(result[i - 1].creeLe.getTime())
+      expect(result[i].creeLe.getTime()).toBeLessThanOrEqual(
+        result[i - 1].creeLe.getTime()
+      )
     }
   })
 

@@ -8,7 +8,13 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import { Select, SelectItem } from "@/components/ui/select"
 import { toast } from "sonner"
 import { Loader2, Plus, Trash2 } from "lucide-react"
@@ -24,7 +30,15 @@ import {
 const STEP_FIELDS: Record<number, (keyof SetupWizardValues)[]> = {
   1: ["societeNom", "nomExpediteurEmail"],
   2: ["departements"],
-  3: ["prenom", "nom", "email", "poste", "password", "confirmPassword", "departementNom"],
+  3: [
+    "prenom",
+    "nom",
+    "email",
+    "poste",
+    "password",
+    "confirmPassword",
+    "departementNom",
+  ],
 }
 
 export function SetupWizard() {
@@ -51,7 +65,9 @@ export function SetupWizard() {
   const watchedPassword = useWatch({ control, name: "password" })
   const watchedDepartementNom = useWatch({ control, name: "departementNom" })
   const watchedSocieteNom = useWatch({ control, name: "societeNom" })
-  const passwordStrength = watchedPassword ? checkPasswordEntropy(watchedPassword) : null
+  const passwordStrength = watchedPassword
+    ? checkPasswordEntropy(watchedPassword)
+    : null
 
   const autoFilledExpediteur = useRef(false)
   useEffect(() => {
@@ -124,7 +140,11 @@ export function SetupWizard() {
       return
     }
 
-    const result = await signIn("credentials", { email: data.email, password: data.password, redirect: false })
+    const result = await signIn("credentials", {
+      email: data.email,
+      password: data.password,
+      redirect: false,
+    })
 
     if (result?.error) {
       setLoading(false)
@@ -163,12 +183,17 @@ export function SetupWizard() {
                   aria-invalid={!!errors.societeNom}
                 />
                 {errors.societeNom && (
-                  <p className="mt-1 text-xs text-destructive">{errors.societeNom.message}</p>
+                  <p className="mt-1 text-xs text-destructive">
+                    {errors.societeNom.message}
+                  </p>
                 )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="societe-email-domain">
-                  Domaine email <span className="text-muted-foreground text-xs">(optionnel)</span>
+                  Domaine email{" "}
+                  <span className="text-xs text-muted-foreground">
+                    (optionnel)
+                  </span>
                 </Label>
                 <Input
                   id="societe-email-domain"
@@ -180,7 +205,9 @@ export function SetupWizard() {
                 </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="nom-expediteur-email">Nom d'expéditeur email</Label>
+                <Label htmlFor="nom-expediteur-email">
+                  Nom d'expéditeur email
+                </Label>
                 <Input
                   id="nom-expediteur-email"
                   placeholder={watchedSocieteNom || "Nom de l'expéditeur"}
@@ -188,7 +215,9 @@ export function SetupWizard() {
                   aria-invalid={!!errors.nomExpediteurEmail}
                 />
                 {errors.nomExpediteurEmail && (
-                  <p className="mt-1 text-xs text-destructive">{errors.nomExpediteurEmail.message}</p>
+                  <p className="mt-1 text-xs text-destructive">
+                    {errors.nomExpediteurEmail.message}
+                  </p>
                 )}
               </div>
               <Button type="button" className="w-full" onClick={goToStep2}>
@@ -223,7 +252,9 @@ export function SetupWizard() {
                 </p>
               )}
               {errors.departements && (
-                <p className="text-xs text-destructive">{errors.departements.message}</p>
+                <p className="text-xs text-destructive">
+                  {errors.departements.message}
+                </p>
               )}
               <form onSubmit={addDepartement} className="flex gap-2">
                 <Input
@@ -237,7 +268,11 @@ export function SetupWizard() {
                 </Button>
               </form>
               <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={() => setStep(1)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setStep(1)}
+                >
                   Retour
                 </Button>
                 <Button
@@ -262,7 +297,9 @@ export function SetupWizard() {
                     aria-invalid={!!errors.prenom}
                   />
                   {errors.prenom && (
-                    <p className="mt-1 text-xs text-destructive">{errors.prenom.message}</p>
+                    <p className="mt-1 text-xs text-destructive">
+                      {errors.prenom.message}
+                    </p>
                   )}
                 </div>
                 <div className="space-y-2">
@@ -274,7 +311,9 @@ export function SetupWizard() {
                     aria-invalid={!!errors.nom}
                   />
                   {errors.nom && (
-                    <p className="mt-1 text-xs text-destructive">{errors.nom.message}</p>
+                    <p className="mt-1 text-xs text-destructive">
+                      {errors.nom.message}
+                    </p>
                   )}
                 </div>
               </div>
@@ -288,7 +327,9 @@ export function SetupWizard() {
                   aria-invalid={!!errors.email}
                 />
                 {errors.email && (
-                  <p className="mt-1 text-xs text-destructive">{errors.email.message}</p>
+                  <p className="mt-1 text-xs text-destructive">
+                    {errors.email.message}
+                  </p>
                 )}
               </div>
               <div className="space-y-2">
@@ -300,13 +341,17 @@ export function SetupWizard() {
                   aria-invalid={!!errors.poste}
                 />
                 {errors.poste && (
-                  <p className="mt-1 text-xs text-destructive">{errors.poste.message}</p>
+                  <p className="mt-1 text-xs text-destructive">
+                    {errors.poste.message}
+                  </p>
                 )}
               </div>
               <Select
                 label="Département"
                 value={watchedDepartementNom ?? ""}
-                onValueChange={(v) => { if (v) setValue("departementNom", v, { shouldValidate: true }) }}
+                onValueChange={(v) => {
+                  if (v) setValue("departementNom", v, { shouldValidate: true })
+                }}
               >
                 {departements.map((dep) => (
                   <SelectItem key={dep} value={dep}>
@@ -315,7 +360,9 @@ export function SetupWizard() {
                 ))}
               </Select>
               {errors.departementNom && (
-                <p className="text-xs text-destructive">{errors.departementNom.message}</p>
+                <p className="text-xs text-destructive">
+                  {errors.departementNom.message}
+                </p>
               )}
               <div className="space-y-2">
                 <Label htmlFor="setup-password">Mot de passe</Label>
@@ -327,25 +374,32 @@ export function SetupWizard() {
                   aria-invalid={!!errors.password}
                 />
                 {errors.password && (
-                  <p className="mt-1 text-xs text-destructive">{errors.password.message}</p>
+                  <p className="mt-1 text-xs text-destructive">
+                    {errors.password.message}
+                  </p>
                 )}
-                {watchedPassword && watchedPassword.length >= 8 && passwordStrength !== null && (
-                  <div className="mt-2 space-y-1">
-                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                      <div
-                        className={`h-full rounded-full transition-all ${getPasswordStrengthColor(passwordStrength)} ${getPasswordStrengthWidth(passwordStrength)}`}
-                      />
+                {watchedPassword &&
+                  watchedPassword.length >= 8 &&
+                  passwordStrength !== null && (
+                    <div className="mt-2 space-y-1">
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={`h-full rounded-full transition-all ${getPasswordStrengthColor(passwordStrength)} ${getPasswordStrengthWidth(passwordStrength)}`}
+                        />
+                      </div>
+                      <p
+                        className={`text-xs ${passwordStrength >= PasswordStrength.Moderate ? "text-muted-foreground" : "text-destructive"}`}
+                      >
+                        Mot de passe :{" "}
+                        {getPasswordStrengthLabel(passwordStrength)}
+                      </p>
                     </div>
-                    <p
-                      className={`text-xs ${passwordStrength >= PasswordStrength.Moderate ? "text-muted-foreground" : "text-destructive"}`}
-                    >
-                      Mot de passe : {getPasswordStrengthLabel(passwordStrength)}
-                    </p>
-                  </div>
-                )}
+                  )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="confirm-password">Confirmer le mot de passe</Label>
+                <Label htmlFor="confirm-password">
+                  Confirmer le mot de passe
+                </Label>
                 <Input
                   id="confirm-password"
                   type="password"
@@ -354,11 +408,18 @@ export function SetupWizard() {
                   aria-invalid={!!errors.confirmPassword}
                 />
                 {errors.confirmPassword && (
-                  <p className="mt-1 text-xs text-destructive">{errors.confirmPassword.message}</p>
+                  <p className="mt-1 text-xs text-destructive">
+                    {errors.confirmPassword.message}
+                  </p>
                 )}
               </div>
               <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={() => setStep(2)} disabled={loading}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setStep(2)}
+                  disabled={loading}
+                >
                   Retour
                 </Button>
                 <Button type="submit" className="flex-1" disabled={loading}>

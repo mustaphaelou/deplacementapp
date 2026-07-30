@@ -41,32 +41,35 @@ export default function NotificationsPage() {
     })()
   }, [session])
 
-  const markAsRead = useCallback(async (id: string) => {
-    setMarking((prev) => new Set(prev).add(id))
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, lu: true } : n)),
-    )
-    try {
-      const res = await fetch(`/api/notifications/${id}`, { method: "PATCH" })
-      if (!res.ok) {
-        setNotifications((prev) =>
-          prev.map((n) => (n.id === id ? { ...n, lu: false } : n)),
-        )
-      } else {
-        refreshBell()
-      }
-    } catch {
+  const markAsRead = useCallback(
+    async (id: string) => {
+      setMarking((prev) => new Set(prev).add(id))
       setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, lu: false } : n)),
+        prev.map((n) => (n.id === id ? { ...n, lu: true } : n))
       )
-    } finally {
-      setMarking((prev) => {
-        const next = new Set(prev)
-        next.delete(id)
-        return next
-      })
-    }
-  }, [refreshBell])
+      try {
+        const res = await fetch(`/api/notifications/${id}`, { method: "PATCH" })
+        if (!res.ok) {
+          setNotifications((prev) =>
+            prev.map((n) => (n.id === id ? { ...n, lu: false } : n))
+          )
+        } else {
+          refreshBell()
+        }
+      } catch {
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === id ? { ...n, lu: false } : n))
+        )
+      } finally {
+        setMarking((prev) => {
+          const next = new Set(prev)
+          next.delete(id)
+          return next
+        })
+      }
+    },
+    [refreshBell]
+  )
 
   if (!session?.user) redirect("/login")
 
@@ -76,7 +79,9 @@ export default function NotificationsPage() {
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Notifications</h1>
-        <p className="text-sm text-muted-foreground">{unreadCount} non lue(s)</p>
+        <p className="text-sm text-muted-foreground">
+          {unreadCount} non lue(s)
+        </p>
       </div>
 
       {loading ? (
@@ -95,20 +100,20 @@ export default function NotificationsPage() {
               key={n.id}
               className={cn(
                 "flex items-start gap-3 p-4 transition-colors",
-                n.lu ? "bg-muted/40 text-muted-foreground/70" : "bg-background",
+                n.lu ? "bg-muted/40 text-muted-foreground/70" : "bg-background"
               )}
             >
               <div
                 className={cn(
                   "mt-1.5 size-2 shrink-0 rounded-full",
-                  n.lu ? "bg-muted-foreground/30" : "bg-primary",
+                  n.lu ? "bg-muted-foreground/30" : "bg-primary"
                 )}
               />
               <div className="flex-1">
                 <p
                   className={cn(
                     "text-sm",
-                    n.lu ? "font-normal" : "font-semibold text-foreground",
+                    n.lu ? "font-normal" : "font-semibold text-foreground"
                   )}
                 >
                   {n.titre}
@@ -116,7 +121,7 @@ export default function NotificationsPage() {
                 <p
                   className={cn(
                     "text-sm",
-                    n.lu ? "text-muted-foreground/50" : "text-muted-foreground",
+                    n.lu ? "text-muted-foreground/50" : "text-muted-foreground"
                   )}
                 >
                   {n.message}
@@ -124,7 +129,9 @@ export default function NotificationsPage() {
                 <p
                   className={cn(
                     "mt-1 text-xs",
-                    n.lu ? "text-muted-foreground/40" : "text-muted-foreground/60",
+                    n.lu
+                      ? "text-muted-foreground/40"
+                      : "text-muted-foreground/60"
                   )}
                 >
                   {formatDateTime(n.creeLe)}
@@ -148,7 +155,7 @@ export default function NotificationsPage() {
                     href={`/demandes/${n.demandeId}`}
                     className={cn(
                       "shrink-0 text-xs underline",
-                      n.lu ? "text-muted-foreground/40" : "text-primary",
+                      n.lu ? "text-muted-foreground/40" : "text-primary"
                     )}
                   >
                     Voir

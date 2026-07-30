@@ -11,7 +11,10 @@ export default async function DashboardPage() {
   const role = session.user.role as Role
   const userId = session.user.id
 
-  const navItems = [...NAV_ITEMS.common, ...(NAV_ITEMS[role as keyof typeof NAV_ITEMS] ?? [])]
+  const navItems = [
+    ...NAV_ITEMS.common,
+    ...(NAV_ITEMS[role as keyof typeof NAV_ITEMS] ?? []),
+  ]
 
   let config: Awaited<ReturnType<typeof getDashboardPayload>>["config"]
   let demandes: Awaited<ReturnType<typeof getDashboardPayload>>["demandes"]
@@ -25,5 +28,7 @@ export default async function DashboardPage() {
     return
   }
 
-  return <DashboardLayout config={config} navItems={navItems} demandes={demandes} />
+  return (
+    <DashboardLayout config={config} navItems={navItems} demandes={demandes} />
+  )
 }

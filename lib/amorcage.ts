@@ -10,11 +10,9 @@ import { clearSocieteCache } from "@/lib/societe"
 
 async function countSocietes(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  dbOrTx: PgDatabase<any, any, any>,
+  dbOrTx: PgDatabase<any, any, any>
 ): Promise<number> {
-  const [result] = await dbOrTx
-    .select({ value: count() })
-    .from(societes)
+  const [result] = await dbOrTx.select({ value: count() }).from(societes)
   return result?.value ?? 0
 }
 

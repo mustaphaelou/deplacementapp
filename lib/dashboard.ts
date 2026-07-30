@@ -1,7 +1,18 @@
 import { formatCurrency } from "@/lib/constants"
-import { findByEtapes, countByEtape, findByEmployeeId, aggregateBudget } from "./demande"
+import {
+  findByEtapes,
+  countByEtape,
+  findByEmployeeId,
+  aggregateBudget,
+} from "./demande"
 import type { Role } from "@/lib/auth"
-import { queueEtapes, committedEtapes, rollupEtapes, laneOrderByColumn, type Etape } from "./workflow"
+import {
+  queueEtapes,
+  committedEtapes,
+  rollupEtapes,
+  laneOrderByColumn,
+  type Etape,
+} from "./workflow"
 
 export interface DashboardDemandeSummary {
   id: string
@@ -24,7 +35,8 @@ export interface StatPill {
   color: "blue" | "green" | "amber" | "orange" | "purple"
 }
 
-export type TableColumnId = "numero" | "employe" | "destination" | "dates" | "date" | "total" | "etape"
+export type TableColumnId =
+  "numero" | "employe" | "destination" | "dates" | "date" | "total" | "etape"
 
 export interface TableColumn {
   id: TableColumnId
@@ -70,7 +82,7 @@ async function fetchQueueDemandes(
 
 export async function getDashboardPayload(
   userId: string,
-  role: Role,
+  role: Role
 ): Promise<DashboardPayload> {
   switch (role) {
     case "EMPLOYEE": {
@@ -83,9 +95,14 @@ export async function getDashboardPayload(
         Promise.all(rollup.map((s) => countByEtape(s, userId))),
       ])
 
-      const countMap = Object.fromEntries(rollup.map((s, i) => [s, rollupCounts[i]]))
+      const countMap = Object.fromEntries(
+        rollup.map((s, i) => [s, rollupCounts[i]])
+      )
       const queueCount = queue.reduce((sum, s) => sum + (countMap[s] ?? 0), 0)
-      const committedCount = committed.reduce((sum, s) => sum + (countMap[s] ?? 0), 0)
+      const committedCount = committed.reduce(
+        (sum, s) => sum + (countMap[s] ?? 0),
+        0
+      )
       const total = rollupCounts.reduce((a, b) => a + b, 0)
       const submittedCount = total - queueCount - committedCount
 
@@ -94,9 +111,24 @@ export async function getDashboardPayload(
           subtitle: "Bienvenue sur votre espace personnel",
           statPills: [
             { icon: "file-text", label: "Total", value: total, color: "blue" },
-            { icon: "clock", label: "Brouillons", value: queueCount, color: "amber" },
-            { icon: "alert-circle", label: "Soumises", value: submittedCount, color: "orange" },
-            { icon: "check-circle", label: "Approuvées", value: committedCount, color: "green" },
+            {
+              icon: "clock",
+              label: "Brouillons",
+              value: queueCount,
+              color: "amber",
+            },
+            {
+              icon: "alert-circle",
+              label: "Soumises",
+              value: submittedCount,
+              color: "orange",
+            },
+            {
+              icon: "check-circle",
+              label: "Approuvées",
+              value: committedCount,
+              color: "green",
+            },
           ],
           table: {
             title: "Mes dernières demandes",
@@ -110,19 +142,31 @@ export async function getDashboardPayload(
             viewAllHref: "/demandes",
             emptyMessage: "Aucune demande pour le moment.",
           },
-          cta: { label: "Nouvelle demande de déplacement", href: "/demandes/nouvelle", icon: "plus" },
+          cta: {
+            label: "Nouvelle demande de déplacement",
+            href: "/demandes/nouvelle",
+            icon: "plus",
+          },
         },
         demandes,
       }
     }
     case "MANAGER": {
-      const { demandes, enAttente } = await fetchQueueDemandes(role, "MANAGER_REVIEW")
+      const { demandes, enAttente } = await fetchQueueDemandes(
+        role,
+        "MANAGER_REVIEW"
+      )
 
       return {
         config: {
           subtitle: "Gérez les demandes de votre équipe",
           statPills: [
-            { icon: "alert-circle", label: "En attente", value: enAttente, color: "orange" },
+            {
+              icon: "alert-circle",
+              label: "En attente",
+              value: enAttente,
+              color: "orange",
+            },
           ],
           table: {
             title: "Demandes en attente d'approbation",
@@ -141,13 +185,21 @@ export async function getDashboardPayload(
       }
     }
     case "FINANCE_ADMIN": {
-      const { demandes, enAttente } = await fetchQueueDemandes(role, "FINANCE_REVIEW")
+      const { demandes, enAttente } = await fetchQueueDemandes(
+        role,
+        "FINANCE_REVIEW"
+      )
 
       return {
         config: {
           subtitle: "Administration & Finances",
           statPills: [
-            { icon: "alert-circle", label: "En attente d'approbation", value: enAttente, color: "orange" },
+            {
+              icon: "alert-circle",
+              label: "En attente d'approbation",
+              value: enAttente,
+              color: "orange",
+            },
           ],
           table: {
             title: "Demandes en attente d'approbation financière",
@@ -177,8 +229,18 @@ export async function getDashboardPayload(
         config: {
           subtitle: "Direction Générale",
           statPills: [
-            { icon: "alert-circle", label: "En attente", value: enAttente, color: "orange" },
-            { icon: "dollar-sign", label: "Budget engagé", value: formatCurrency(budgetTotal), color: "purple" },
+            {
+              icon: "alert-circle",
+              label: "En attente",
+              value: enAttente,
+              color: "orange",
+            },
+            {
+              icon: "dollar-sign",
+              label: "Budget engagé",
+              value: formatCurrency(budgetTotal),
+              color: "purple",
+            },
           ],
           table: {
             title: "Demandes en attente d'approbation finale",

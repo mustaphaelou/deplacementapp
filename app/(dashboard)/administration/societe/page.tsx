@@ -4,7 +4,13 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import { toast } from "sonner"
 import { Loader2, Save } from "lucide-react"
 
@@ -89,7 +95,8 @@ export default function SocietePage() {
         <CardHeader>
           <CardTitle>Identité visuelle</CardTitle>
           <CardDescription>
-            Ces informations apparaissent dans l&apos;en-tête, les emails et les PDFs
+            Ces informations apparaissent dans l&apos;en-tête, les emails et les
+            PDFs
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -131,7 +138,8 @@ export default function SocietePage() {
                 placeholder="Ma Société"
               />
               <p className="text-xs text-muted-foreground">
-                Apparaît comme expéditeur des emails (ex: &quot;Ma Société&quot;)
+                Apparaît comme expéditeur des emails (ex: &quot;Ma
+                Société&quot;)
               </p>
             </div>
 

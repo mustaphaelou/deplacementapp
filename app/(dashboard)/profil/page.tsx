@@ -1,6 +1,9 @@
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
-import { utilisateurService, UtilisateurNotFoundError } from "@/lib/utilisateur-service"
+import {
+  utilisateurService,
+  UtilisateurNotFoundError,
+} from "@/lib/utilisateur-service"
 import ProfileEdit from "@/components/profile-edit"
 
 export default async function ProfilPage() {

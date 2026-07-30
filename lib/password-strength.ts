@@ -12,8 +12,8 @@ export function checkPasswordEntropy(password: string): PasswordStrength {
   const uniqueCharacters = new Set(password)
   const entropy = parseInt(
     Math.log2(
-      Math.pow(parseInt(uniqueCharacters.size.toString()), password.length),
-    ).toFixed(2),
+      Math.pow(parseInt(uniqueCharacters.size.toString()), password.length)
+    ).toFixed(2)
   )
   if (entropy < 16) return PasswordStrength.VeryWeak
   if (entropy < 31) return PasswordStrength.Weak

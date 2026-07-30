@@ -199,7 +199,7 @@ describe("appliquerEffets", { timeout: TIMEOUT }, () => {
         })
 
         throw new Error("force rollback")
-      }),
+      })
     ).rejects.toThrow("force rollback")
 
     const auditRows = await pgliteDb

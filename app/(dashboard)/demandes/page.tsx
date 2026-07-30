@@ -9,7 +9,13 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { DemandeStatusBadge } from "@/components/demande-status-badge"
 import { formatCurrency, formatDate, ETAPE_LABELS } from "@/lib/constants"
-import { Search, ChevronLeft, ChevronRight, FileText, Download } from "lucide-react"
+import {
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  Download,
+} from "lucide-react"
 import { toast } from "sonner"
 
 interface Demande {
@@ -53,7 +59,8 @@ export default function DemandesListPage() {
         setDemandes(data.demandes)
         setTotal(data.total)
       }
-    } catch {} finally {
+    } catch {
+    } finally {
       setLoading(false)
     }
   }, [page, search, etapeFilter])
@@ -90,8 +97,8 @@ export default function DemandesListPage() {
             {etapeFilter
               ? `${ETAPE_LABELS[etapeFilter] ?? "Demandes"}`
               : role === "EMPLOYEE"
-              ? "Mes demandes"
-              : "Demandes"}
+                ? "Mes demandes"
+                : "Demandes"}
           </h1>
           <p className="text-sm text-muted-foreground">{total} demande(s)</p>
         </div>
@@ -114,12 +121,15 @@ export default function DemandesListPage() {
       </div>
 
       <div className="relative">
-        <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+        <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           className="pl-9"
           placeholder="Rechercher par destination, numéro..."
           value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+          onChange={(e) => {
+            setSearch(e.target.value)
+            setPage(1)
+          }}
         />
       </div>
 
@@ -131,42 +141,65 @@ export default function DemandesListPage() {
             </div>
           ) : demandes.length === 0 ? (
             <div className="flex items-center justify-center p-8">
-              <p className="text-sm text-muted-foreground">Aucune demande trouvée.</p>
+              <p className="text-sm text-muted-foreground">
+                Aucune demande trouvée.
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[400px]">
-              <thead>
-                <tr className="border-b text-left text-muted-foreground">
-                  <th className="p-3 font-medium">N°</th>
-                  {role !== "EMPLOYEE" && <th className="p-3 font-medium hidden sm:table-cell">Employé</th>}
-                  <th className="p-3 font-medium">Destination</th>
-                  <th className="p-3 font-medium hidden md:table-cell">Dates</th>
-                  <th className="p-3 font-medium hidden lg:table-cell">Total</th>
-                  <th className="p-3 font-medium">Statut</th>
-                  <th className="p-3 font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {demandes.map((d) => (
-                  <tr key={d.id} className="border-b last:border-0 hover:bg-muted/30">
-                    <td className="p-3 font-medium">{d.numero}</td>
+              <table className="w-full min-w-[400px] text-sm">
+                <thead>
+                  <tr className="border-b text-left text-muted-foreground">
+                    <th className="p-3 font-medium">N°</th>
                     {role !== "EMPLOYEE" && (
-                      <td className="p-3 hidden sm:table-cell">{d.employe.prenom} {d.employe.nom}</td>
+                      <th className="hidden p-3 font-medium sm:table-cell">
+                        Employé
+                      </th>
                     )}
-                    <td className="p-3">{d.destination}</td>
-                    <td className="p-3 hidden md:table-cell">{formatDate(d.dateDepart)}</td>
-                    <td className="p-3 hidden lg:table-cell">{formatCurrency(Number(d.totalEstime ?? 0))}</td>
-                    <td className="p-3"><DemandeStatusBadge etape={d.etape} /></td>
-                    <td className="p-3">
-                      <Link href={`/demandes/${d.id}`}>
-                        <Button variant="ghost" size="xs">Voir</Button>
-                      </Link>
-                    </td>
+                    <th className="p-3 font-medium">Destination</th>
+                    <th className="hidden p-3 font-medium md:table-cell">
+                      Dates
+                    </th>
+                    <th className="hidden p-3 font-medium lg:table-cell">
+                      Total
+                    </th>
+                    <th className="p-3 font-medium">Statut</th>
+                    <th className="p-3 font-medium">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {demandes.map((d) => (
+                    <tr
+                      key={d.id}
+                      className="border-b last:border-0 hover:bg-muted/30"
+                    >
+                      <td className="p-3 font-medium">{d.numero}</td>
+                      {role !== "EMPLOYEE" && (
+                        <td className="hidden p-3 sm:table-cell">
+                          {d.employe.prenom} {d.employe.nom}
+                        </td>
+                      )}
+                      <td className="p-3">{d.destination}</td>
+                      <td className="hidden p-3 md:table-cell">
+                        {formatDate(d.dateDepart)}
+                      </td>
+                      <td className="hidden p-3 lg:table-cell">
+                        {formatCurrency(Number(d.totalEstime ?? 0))}
+                      </td>
+                      <td className="p-3">
+                        <DemandeStatusBadge etape={d.etape} />
+                      </td>
+                      <td className="p-3">
+                        <Link href={`/demandes/${d.id}`}>
+                          <Button variant="ghost" size="xs">
+                            Voir
+                          </Button>
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </CardContent>
@@ -174,13 +207,23 @@ export default function DemandesListPage() {
 
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2">
-          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page <= 1}
+            onClick={() => setPage(page - 1)}
+          >
             <ChevronLeft className="size-4" />
           </Button>
           <span className="text-sm text-muted-foreground">
             Page {page} / {totalPages}
           </span>
-          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page >= totalPages}
+            onClick={() => setPage(page + 1)}
+          >
             <ChevronRight className="size-4" />
           </Button>
         </div>

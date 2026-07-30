@@ -1,40 +1,101 @@
-export type Role = "EMPLOYEE" | "MANAGER" | "FINANCE_ADMIN" | "GENERAL_DIRECTION";
+export type Role =
+  "EMPLOYEE" | "MANAGER" | "FINANCE_ADMIN" | "GENERAL_DIRECTION"
 
 export const ROLE_LABELS: Record<string, string> = {
   EMPLOYEE: "Employé",
   MANAGER: "Responsable",
   FINANCE_ADMIN: "Administration & Finances",
   GENERAL_DIRECTION: "Direction Générale",
-};
+}
 
 export interface NavItem {
-  label: string;
-  href: string;
-  icon: string;
-  description: string;
+  label: string
+  href: string
+  icon: string
+  description: string
 }
 
 export const NAV_ITEMS: Record<string, NavItem[]> = {
   common: [
-    { label: "Tableau de bord", href: "/", icon: "bar-chart-3", description: "Vue d'ensemble et statistiques" },
+    {
+      label: "Tableau de bord",
+      href: "/",
+      icon: "bar-chart-3",
+      description: "Vue d'ensemble et statistiques",
+    },
   ],
   EMPLOYEE: [
-    { label: "Mes Demandes", href: "/demandes", icon: "file-text", description: "Historique de vos demandes" },
-    { label: "Nouvelle Demande", href: "/demandes/nouvelle", icon: "file-plus", description: "Créer une demande de déplacement" },
+    {
+      label: "Mes Demandes",
+      href: "/demandes",
+      icon: "file-text",
+      description: "Historique de vos demandes",
+    },
+    {
+      label: "Nouvelle Demande",
+      href: "/demandes/nouvelle",
+      icon: "file-plus",
+      description: "Créer une demande de déplacement",
+    },
   ],
   MANAGER: [
-    { label: "Demandes Équipe", href: "/demandes", icon: "users", description: "Demandes de votre équipe" },
-    { label: "En Attente", href: "/demandes?etape=MANAGER_REVIEW", icon: "clock", description: "Demandes en attente d'action" },
+    {
+      label: "Demandes Équipe",
+      href: "/demandes",
+      icon: "users",
+      description: "Demandes de votre équipe",
+    },
+    {
+      label: "En Attente",
+      href: "/demandes?etape=MANAGER_REVIEW",
+      icon: "clock",
+      description: "Demandes en attente d'action",
+    },
   ],
   FINANCE_ADMIN: [
-    { label: "Approbations Budget", href: "/demandes", icon: "dollar-sign", description: "Validation budgétaire des demandes" },
-    { label: "Société", href: "/administration/societe", icon: "building", description: "Paramètres de la société" },
-    { label: "Utilisateurs", href: "/administration/utilisateurs", icon: "users", description: "Gestion des comptes et rôles" },
-    { label: "Véhicules", href: "/administration/vehicules", icon: "car", description: "Gestion du parc automobile" },
-    { label: "Rapports", href: "/administration/rapports", icon: "bar-chart-3", description: "Statistiques et exports" },
+    {
+      label: "Approbations Budget",
+      href: "/demandes",
+      icon: "dollar-sign",
+      description: "Validation budgétaire des demandes",
+    },
+    {
+      label: "Société",
+      href: "/administration/societe",
+      icon: "building",
+      description: "Paramètres de la société",
+    },
+    {
+      label: "Utilisateurs",
+      href: "/administration/utilisateurs",
+      icon: "users",
+      description: "Gestion des comptes et rôles",
+    },
+    {
+      label: "Véhicules",
+      href: "/administration/vehicules",
+      icon: "car",
+      description: "Gestion du parc automobile",
+    },
+    {
+      label: "Rapports",
+      href: "/administration/rapports",
+      icon: "bar-chart-3",
+      description: "Statistiques et exports",
+    },
   ],
   GENERAL_DIRECTION: [
-    { label: "Approbations Finales", href: "/demandes?etape=DIRECTION_REVIEW", icon: "check-circle", description: "Validation finale des demandes" },
-    { label: "Rapports", href: "/administration/rapports", icon: "bar-chart-3", description: "Statistiques et exports" },
+    {
+      label: "Approbations Finales",
+      href: "/demandes?etape=DIRECTION_REVIEW",
+      icon: "check-circle",
+      description: "Validation finale des demandes",
+    },
+    {
+      label: "Rapports",
+      href: "/administration/rapports",
+      icon: "bar-chart-3",
+      description: "Statistiques et exports",
+    },
   ],
-};
+}

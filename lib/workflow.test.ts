@@ -57,7 +57,11 @@ describe("committedEtapes", () => {
 
 describe("rollupEtapes", () => {
   it("returns DRAFT + MANAGER_REVIEW + FINAL for EMPLOYEE", () => {
-    expect(rollupEtapes("EMPLOYEE")).toEqual(["DRAFT", "MANAGER_REVIEW", "FINAL"])
+    expect(rollupEtapes("EMPLOYEE")).toEqual([
+      "DRAFT",
+      "MANAGER_REVIEW",
+      "FINAL",
+    ])
   })
 
   it("returns MANAGER_REVIEW for MANAGER", () => {
@@ -77,23 +81,38 @@ describe("rollupEtapes", () => {
 
 describe("laneOrderByColumn", () => {
   it("orders MANAGER_REVIEW by soumiseLe desc", () => {
-    expect(laneOrderByColumn("MANAGER_REVIEW")).toEqual({ column: "soumiseLe", direction: "desc" })
+    expect(laneOrderByColumn("MANAGER_REVIEW")).toEqual({
+      column: "soumiseLe",
+      direction: "desc",
+    })
   })
 
   it("orders FINANCE_REVIEW by approuveeManagerLe desc", () => {
-    expect(laneOrderByColumn("FINANCE_REVIEW")).toEqual({ column: "approuveeManagerLe", direction: "desc" })
+    expect(laneOrderByColumn("FINANCE_REVIEW")).toEqual({
+      column: "approuveeManagerLe",
+      direction: "desc",
+    })
   })
 
   it("orders DIRECTION_REVIEW by approuveeFinanceLe desc", () => {
-    expect(laneOrderByColumn("DIRECTION_REVIEW")).toEqual({ column: "approuveeFinanceLe", direction: "desc" })
+    expect(laneOrderByColumn("DIRECTION_REVIEW")).toEqual({
+      column: "approuveeFinanceLe",
+      direction: "desc",
+    })
   })
 
   it("orders FINAL by approuveeDirectionLe desc", () => {
-    expect(laneOrderByColumn("FINAL")).toEqual({ column: "approuveeDirectionLe", direction: "desc" })
+    expect(laneOrderByColumn("FINAL")).toEqual({
+      column: "approuveeDirectionLe",
+      direction: "desc",
+    })
   })
 
   it("orders DRAFT by retireeLe desc", () => {
-    expect(laneOrderByColumn("DRAFT")).toEqual({ column: "retireeLe", direction: "desc" })
+    expect(laneOrderByColumn("DRAFT")).toEqual({
+      column: "retireeLe",
+      direction: "desc",
+    })
   })
 })
 
@@ -129,15 +148,21 @@ describe("canTransition", () => {
   })
 
   it("allows FINANCE_ADMIN to approve at FINANCE_REVIEW", () => {
-    expect(canTransition("FINANCE_ADMIN", "FINANCE_REVIEW", "approuver")).toBe(true)
+    expect(canTransition("FINANCE_ADMIN", "FINANCE_REVIEW", "approuver")).toBe(
+      true
+    )
   })
 
   it("allows FINANCE_ADMIN to reject at FINANCE_REVIEW", () => {
-    expect(canTransition("FINANCE_ADMIN", "FINANCE_REVIEW", "rejeter")).toBe(true)
+    expect(canTransition("FINANCE_ADMIN", "FINANCE_REVIEW", "rejeter")).toBe(
+      true
+    )
   })
 
   it("allows GENERAL_DIRECTION to approve at DIRECTION_REVIEW", () => {
-    expect(canTransition("GENERAL_DIRECTION", "DIRECTION_REVIEW", "approuver")).toBe(true)
+    expect(
+      canTransition("GENERAL_DIRECTION", "DIRECTION_REVIEW", "approuver")
+    ).toBe(true)
   })
 
   it("denies action on terminal FINAL stage", () => {
@@ -145,11 +170,15 @@ describe("canTransition", () => {
   })
 
   it("denies action on a stage with REJECTED decision", () => {
-    expect(canTransition("MANAGER", "MANAGER_REVIEW", "rejeter", "REJECTED")).toBe(false)
+    expect(
+      canTransition("MANAGER", "MANAGER_REVIEW", "rejeter", "REJECTED")
+    ).toBe(false)
   })
 
   it("denies action on a stage with WITHDRAWN decision", () => {
-    expect(canTransition("EMPLOYEE", "DRAFT", "submit", "WITHDRAWN")).toBe(false)
+    expect(canTransition("EMPLOYEE", "DRAFT", "submit", "WITHDRAWN")).toBe(
+      false
+    )
   })
 })
 
@@ -175,7 +204,10 @@ describe("buildTransition", () => {
     expect(result).not.toBeNull()
     expect(result!.auditAction).toBe("APPROBATION_MANAGER")
     expect(result!.transition.newEtape).toBe("FINANCE_REVIEW")
-    expect(result!.transition.fields).toHaveProperty("commentaireManager", "Looks good")
+    expect(result!.transition.fields).toHaveProperty(
+      "commentaireManager",
+      "Looks good"
+    )
     expect(result!.transition.fields).toHaveProperty("assigneAId", "user-2")
   })
 
@@ -191,18 +223,31 @@ describe("buildTransition", () => {
   })
 
   it("returns transition for FINANCE_ADMIN approving", () => {
-    const result = buildTransition("FINANCE_ADMIN", "FINANCE_REVIEW", "approuver", {
-      comment: "Budget OK",
-    })
+    const result = buildTransition(
+      "FINANCE_ADMIN",
+      "FINANCE_REVIEW",
+      "approuver",
+      {
+        comment: "Budget OK",
+      }
+    )
     expect(result).not.toBeNull()
     expect(result!.transition.newEtape).toBe("DIRECTION_REVIEW")
-    expect(result!.transition.fields).toHaveProperty("commentaireFinance", "Budget OK")
+    expect(result!.transition.fields).toHaveProperty(
+      "commentaireFinance",
+      "Budget OK"
+    )
   })
 
   it("returns transition for GENERAL_DIRECTION approving to terminal", () => {
-    const result = buildTransition("GENERAL_DIRECTION", "DIRECTION_REVIEW", "approuver", {
-      comment: "Final approval",
-    })
+    const result = buildTransition(
+      "GENERAL_DIRECTION",
+      "DIRECTION_REVIEW",
+      "approuver",
+      {
+        comment: "Final approval",
+      }
+    )
     expect(result).not.toBeNull()
     expect(result!.transition.newEtape).toBe("FINAL")
     expect(result!.transition.newDecision).toBe("APPROVED")
@@ -218,7 +263,9 @@ describe("buildTransition", () => {
   })
 
   it("returns null for wrong role on a stage", () => {
-    expect(buildTransition("EMPLOYEE", "MANAGER_REVIEW", "approuver")).toBeNull()
+    expect(
+      buildTransition("EMPLOYEE", "MANAGER_REVIEW", "approuver")
+    ).toBeNull()
   })
 
   it("returns null for unsupported action on a stage", () => {
@@ -226,7 +273,9 @@ describe("buildTransition", () => {
   })
 
   it("returns null for action on terminal stage", () => {
-    expect(buildTransition("GENERAL_DIRECTION", "FINAL", "approuver")).toBeNull()
+    expect(
+      buildTransition("GENERAL_DIRECTION", "FINAL", "approuver")
+    ).toBeNull()
   })
 
   it("returns null for withdraw on non-DRAFT stage", () => {
@@ -244,7 +293,11 @@ describe("getAllowedActions", () => {
   })
 
   it("employee can submit and withdraw a DRAFT demande they own", () => {
-    const actions = getAllowedActions("EMPLOYEE", "user-1", makeDemande("DRAFT", "PENDING", "user-1"))
+    const actions = getAllowedActions(
+      "EMPLOYEE",
+      "user-1",
+      makeDemande("DRAFT", "PENDING", "user-1")
+    )
     expect(actions.canSubmit).toBe(true)
     expect(actions.canWithdraw).toBe(true)
     expect(actions.canApprove).toBe(false)
@@ -252,13 +305,21 @@ describe("getAllowedActions", () => {
   })
 
   it("employee cannot act on a DRAFT demande they do not own", () => {
-    const actions = getAllowedActions("EMPLOYEE", "user-1", makeDemande("DRAFT", "PENDING", "user-2"))
+    const actions = getAllowedActions(
+      "EMPLOYEE",
+      "user-1",
+      makeDemande("DRAFT", "PENDING", "user-2")
+    )
     expect(actions.canSubmit).toBe(false)
     expect(actions.canWithdraw).toBe(false)
   })
 
   it("manager can approve and reject a MANAGER_REVIEW demande", () => {
-    const actions = getAllowedActions("MANAGER", "user-2", makeDemande("MANAGER_REVIEW", "PENDING", "user-1"))
+    const actions = getAllowedActions(
+      "MANAGER",
+      "user-2",
+      makeDemande("MANAGER_REVIEW", "PENDING", "user-1")
+    )
     expect(actions.canApprove).toBe(true)
     expect(actions.canReject).toBe(true)
     expect(actions.canSubmit).toBe(false)
@@ -266,19 +327,31 @@ describe("getAllowedActions", () => {
   })
 
   it("finance can approve and reject an FINANCE_REVIEW demande", () => {
-    const actions = getAllowedActions("FINANCE_ADMIN", "user-3", makeDemande("FINANCE_REVIEW", "PENDING", "user-1"))
+    const actions = getAllowedActions(
+      "FINANCE_ADMIN",
+      "user-3",
+      makeDemande("FINANCE_REVIEW", "PENDING", "user-1")
+    )
     expect(actions.canApprove).toBe(true)
     expect(actions.canReject).toBe(true)
   })
 
   it("direction can approve and reject an DIRECTION_REVIEW demande", () => {
-    const actions = getAllowedActions("GENERAL_DIRECTION", "user-4", makeDemande("DIRECTION_REVIEW", "PENDING", "user-1"))
+    const actions = getAllowedActions(
+      "GENERAL_DIRECTION",
+      "user-4",
+      makeDemande("DIRECTION_REVIEW", "PENDING", "user-1")
+    )
     expect(actions.canApprove).toBe(true)
     expect(actions.canReject).toBe(true)
   })
 
   it("no actions allowed on terminal FINAL demande", () => {
-    const actions = getAllowedActions("GENERAL_DIRECTION", "user-4", makeDemande("FINAL", "APPROVED", "user-1"))
+    const actions = getAllowedActions(
+      "GENERAL_DIRECTION",
+      "user-4",
+      makeDemande("FINAL", "APPROVED", "user-1")
+    )
     expect(actions.canApprove).toBe(false)
     expect(actions.canReject).toBe(false)
     expect(actions.canSubmit).toBe(false)
@@ -286,7 +359,11 @@ describe("getAllowedActions", () => {
   })
 
   it("no actions allowed on WITHDRAWN demande", () => {
-    const actions = getAllowedActions("EMPLOYEE", "user-1", makeDemande("DRAFT", "WITHDRAWN", "user-1"))
+    const actions = getAllowedActions(
+      "EMPLOYEE",
+      "user-1",
+      makeDemande("DRAFT", "WITHDRAWN", "user-1")
+    )
     expect(actions.canSubmit).toBe(false)
     expect(actions.canWithdraw).toBe(false)
     expect(actions.canApprove).toBe(false)

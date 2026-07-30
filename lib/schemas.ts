@@ -19,49 +19,60 @@ export const transportFields = z.object({
   vehiculeId: z.string().optional(),
 })
 
-export const demandeSchema = z.object({
-  motif: z.array(z.string()).min(1, "Sélectionnez au moins un motif"),
-  motifAutre: z.string().optional(),
-  dateDepart: z.string().min(1, "Date de départ requise"),
-  dateRetour: z.string().min(1, "Date de retour requise"),
-  destination: z.string().min(2, "Destination requise"),
-  horsMaroc: z.boolean().optional(),
-  typeTransport: z.enum([
-    "VOITURE_PERSONNELLE",
-    "VOITURE_SOCIETE",
-    "BUS",
-    "AVION",
-    "TRAIN",
-    "AUTRE",
-  ]),
-  autreTransport: z.string().optional(),
-  vehiculeId: z.string().optional(),
-  fraisTransport: z.string().optional(),
-  fraisHebergement: z.string().optional(),
-  fraisRepas: z.string().optional(),
-  fraisDivers: z.string().optional(),
-  avanceRequise: z.boolean(),
-  montantAvance: z.string().optional(),
-  description: z.string().optional(),
-  action: z.enum(["submit", "save"]).optional(),
-}).refine(
-  (data) => {
-    if (!data.dateDepart || !data.dateRetour) return true
-    return new Date(data.dateRetour) >= new Date(data.dateDepart)
-  },
-  { message: "La date de retour doit être après la date de départ", path: ["dateRetour"] }
-).refine(
-  (data) => {
-    if (data.horsMaroc) return true
-    return isValidCity(data.destination)
-  },
-  { message: "Veuillez sélectionner une ville valide depuis la liste", path: ["destination"] }
-)
+export const demandeSchema = z
+  .object({
+    motif: z.array(z.string()).min(1, "Sélectionnez au moins un motif"),
+    motifAutre: z.string().optional(),
+    dateDepart: z.string().min(1, "Date de départ requise"),
+    dateRetour: z.string().min(1, "Date de retour requise"),
+    destination: z.string().min(2, "Destination requise"),
+    horsMaroc: z.boolean().optional(),
+    typeTransport: z.enum([
+      "VOITURE_PERSONNELLE",
+      "VOITURE_SOCIETE",
+      "BUS",
+      "AVION",
+      "TRAIN",
+      "AUTRE",
+    ]),
+    autreTransport: z.string().optional(),
+    vehiculeId: z.string().optional(),
+    fraisTransport: z.string().optional(),
+    fraisHebergement: z.string().optional(),
+    fraisRepas: z.string().optional(),
+    fraisDivers: z.string().optional(),
+    avanceRequise: z.boolean(),
+    montantAvance: z.string().optional(),
+    description: z.string().optional(),
+    action: z.enum(["submit", "save"]).optional(),
+  })
+  .refine(
+    (data) => {
+      if (!data.dateDepart || !data.dateRetour) return true
+      return new Date(data.dateRetour) >= new Date(data.dateDepart)
+    },
+    {
+      message: "La date de retour doit être après la date de départ",
+      path: ["dateRetour"],
+    }
+  )
+  .refine(
+    (data) => {
+      if (data.horsMaroc) return true
+      return isValidCity(data.destination)
+    },
+    {
+      message: "Veuillez sélectionner une ville valide depuis la liste",
+      path: ["destination"],
+    }
+  )
 
 export type DemandeFormValues = z.infer<typeof demandeSchema>
 
 export const rejetSchema = z.object({
-  commentaire: z.string().min(1, "Le commentaire est obligatoire pour le rejet"),
+  commentaire: z
+    .string()
+    .min(1, "Le commentaire est obligatoire pour le rejet"),
 })
 
 export const approbationSchema = z.object({
@@ -77,7 +88,11 @@ export const utilisateurSchema = z.object({
   societeId: z.string().min(1, "Société requise"),
   departementId: z.string().min(1, "Département requis"),
   telephone: z.string().optional(),
-  motDePasse: z.string().min(6, "Minimum 6 caractères").optional().or(z.literal("")),
+  motDePasse: z
+    .string()
+    .min(6, "Minimum 6 caractères")
+    .optional()
+    .or(z.literal("")),
   googleAuthEnabled: z.boolean().optional(),
 })
 
@@ -109,49 +124,58 @@ export const updateVehiculeSchema = vehiculeSchema.extend({
 
 export const passwordChangeSchema = z.object({
   currentPassword: z.string().min(1, "Mot de passe actuel requis"),
-  newPassword: z.string().min(6, "Le nouveau mot de passe doit contenir au moins 6 caractères"),
+  newPassword: z
+    .string()
+    .min(6, "Le nouveau mot de passe doit contenir au moins 6 caractères"),
 })
 
-export const setupWizardSchema = z.object({
-  societeNom: z.string().min(1, "Nom de la société requis"),
-  societeEmailDomain: z.string().optional(),
-  departements: z
-    .array(z.string().min(1, "Nom de département requis"))
-    .min(1, "Ajoutez au moins un département"),
-  prenom: z.string().min(1, "Prénom requis"),
-  nom: z.string().min(1, "Nom requis"),
-  email: z.string().email("Email invalide"),
-  poste: z.string().min(1, "Poste requis"),
-  password: z.string().min(8, "8 caractères minimum"),
-  confirmPassword: z.string().min(1, "Confirmez le mot de passe"),
-  departementNom: z.string().min(1, "Sélectionnez un département"),
-  nomExpediteurEmail: z.string().min(1, "Nom d'expéditeur requis"),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Les mots de passe ne correspondent pas",
-  path: ["confirmPassword"],
-})
+export const setupWizardSchema = z
+  .object({
+    societeNom: z.string().min(1, "Nom de la société requis"),
+    societeEmailDomain: z.string().optional(),
+    departements: z
+      .array(z.string().min(1, "Nom de département requis"))
+      .min(1, "Ajoutez au moins un département"),
+    prenom: z.string().min(1, "Prénom requis"),
+    nom: z.string().min(1, "Nom requis"),
+    email: z.string().email("Email invalide"),
+    poste: z.string().min(1, "Poste requis"),
+    password: z.string().min(8, "8 caractères minimum"),
+    confirmPassword: z.string().min(1, "Confirmez le mot de passe"),
+    departementNom: z.string().min(1, "Sélectionnez un département"),
+    nomExpediteurEmail: z.string().min(1, "Nom d'expéditeur requis"),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Les mots de passe ne correspondent pas",
+    path: ["confirmPassword"],
+  })
 
 export type SetupWizardValues = z.infer<typeof setupWizardSchema>
 
-export const setupRegisterSchema = z.object({
-  societeNom: z.string().min(1, "Nom de la société requis"),
-  societeEmailDomain: z.string().optional(),
-  departements: z
-    .array(z.string().min(1, "Nom de département requis"))
-    .min(1, "Ajoutez au moins un département"),
-  admin: z.object({
-    email: z.string().email("Email invalide"),
-    password: z.string().min(8, "Le mot de passe doit contenir au moins 8 caractères"),
-    nom: z.string().min(1, "Nom requis"),
-    prenom: z.string().min(1, "Prénom requis"),
-    poste: z.string().min(1, "Poste requis"),
-    departementNom: z.string().min(1, "Département requis"),
-  }),
-  nomExpediteurEmail: z.string().min(1, "Nom d'expéditeur requis"),
-}).refine(
-  (data) => data.departements.includes(data.admin.departementNom),
-  { message: "Le département de l'administrateur doit faire partie des départements déclarés", path: ["admin", "departementNom"] }
-)
+export const setupRegisterSchema = z
+  .object({
+    societeNom: z.string().min(1, "Nom de la société requis"),
+    societeEmailDomain: z.string().optional(),
+    departements: z
+      .array(z.string().min(1, "Nom de département requis"))
+      .min(1, "Ajoutez au moins un département"),
+    admin: z.object({
+      email: z.string().email("Email invalide"),
+      password: z
+        .string()
+        .min(8, "Le mot de passe doit contenir au moins 8 caractères"),
+      nom: z.string().min(1, "Nom requis"),
+      prenom: z.string().min(1, "Prénom requis"),
+      poste: z.string().min(1, "Poste requis"),
+      departementNom: z.string().min(1, "Département requis"),
+    }),
+    nomExpediteurEmail: z.string().min(1, "Nom d'expéditeur requis"),
+  })
+  .refine((data) => data.departements.includes(data.admin.departementNom), {
+    message:
+      "Le département de l'administrateur doit faire partie des départements déclarés",
+    path: ["admin", "departementNom"],
+  })
 
 export const demandeQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -161,8 +185,16 @@ export const demandeQuerySchema = z.object({
 })
 
 export const actionBodySchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("approuver"), commentaire: z.string().optional() }),
-  z.object({ action: z.literal("rejeter"), commentaire: z.string().min(1, "Le commentaire est obligatoire pour le rejet") }),
+  z.object({
+    action: z.literal("approuver"),
+    commentaire: z.string().optional(),
+  }),
+  z.object({
+    action: z.literal("rejeter"),
+    commentaire: z
+      .string()
+      .min(1, "Le commentaire est obligatoire pour le rejet"),
+  }),
   z.object({ action: z.literal("retirer") }),
 ])
 export type ActionBody = z.infer<typeof actionBodySchema>

@@ -168,7 +168,10 @@ describe("requireRole", () => {
 
 describe("requireAnyRole", () => {
   it("returns ok:true when the user has one of the required roles", () => {
-    const result = requireAnyRole(makeUser("GENERAL_DIRECTION"), ["FINANCE_ADMIN", "GENERAL_DIRECTION"])
+    const result = requireAnyRole(makeUser("GENERAL_DIRECTION"), [
+      "FINANCE_ADMIN",
+      "GENERAL_DIRECTION",
+    ])
 
     expect(result.ok).toBe(true)
   })
@@ -204,7 +207,10 @@ describe("requireAnyRole", () => {
   })
 
   it("returns ok:false with 403 when the user has none of the required roles", async () => {
-    const result = requireAnyRole(makeUser("EMPLOYEE"), ["FINANCE_ADMIN", "GENERAL_DIRECTION"])
+    const result = requireAnyRole(makeUser("EMPLOYEE"), [
+      "FINANCE_ADMIN",
+      "GENERAL_DIRECTION",
+    ])
 
     expect(result.ok).toBe(false)
     if (!result.ok) {
@@ -222,11 +228,15 @@ describe("hasAnyRole", () => {
   })
 
   it("returns true when the role matches one of multiple allowed roles", () => {
-    expect(hasAnyRole("GENERAL_DIRECTION", ["FINANCE_ADMIN", "GENERAL_DIRECTION"])).toBe(true)
+    expect(
+      hasAnyRole("GENERAL_DIRECTION", ["FINANCE_ADMIN", "GENERAL_DIRECTION"])
+    ).toBe(true)
   })
 
   it("returns false when the role does not match any allowed role", () => {
-    expect(hasAnyRole("EMPLOYEE", ["FINANCE_ADMIN", "GENERAL_DIRECTION"])).toBe(false)
+    expect(hasAnyRole("EMPLOYEE", ["FINANCE_ADMIN", "GENERAL_DIRECTION"])).toBe(
+      false
+    )
   })
 
   it("returns false when the allowed list is empty", () => {
@@ -234,6 +244,8 @@ describe("hasAnyRole", () => {
   })
 
   it("returns false when the role casing differs from the allowed roles", () => {
-    expect(hasAnyRole("finance_admin", ["FINANCE_ADMIN", "GENERAL_DIRECTION"])).toBe(false)
+    expect(
+      hasAnyRole("finance_admin", ["FINANCE_ADMIN", "GENERAL_DIRECTION"])
+    ).toBe(false)
   })
 })

@@ -7,7 +7,10 @@ export async function GET() {
   try {
     const branding = await getSocieteBranding()
     if (!branding) {
-      return NextResponse.json({ error: "Aucune société configurée" }, { status: 404 })
+      return NextResponse.json(
+        { error: "Aucune société configurée" },
+        { status: 404 }
+      )
     }
     return NextResponse.json(branding)
   } catch (e) {

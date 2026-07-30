@@ -8,10 +8,27 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card"
 import { DateRangePicker } from "@/components/ui/date-range-picker"
 import { CityCombobox } from "@/components/ui/city-combobox"
-import { Loader2, Globe, Save, Send, Calendar, Truck, DollarSign, ClipboardList, ArrowLeft, ArrowRight } from "lucide-react"
+import {
+  Loader2,
+  Globe,
+  Save,
+  Send,
+  Calendar,
+  Truck,
+  DollarSign,
+  ClipboardList,
+  ArrowLeft,
+  ArrowRight,
+} from "lucide-react"
 import { PURPOSE_OPTIONS, TRANSPORT_LABELS } from "@/lib/constants"
 import { useDemandeForm } from "@/hooks/use-demande-form"
 import { demandeSchema, type DemandeFormValues } from "@/lib/schemas"
@@ -50,8 +67,12 @@ export function DemandeForm() {
   const selectedMotifs = useWatch({ control, name: "motif" })
   const typeTransport = useWatch({ control, name: "typeTransport" })
   const avanceRequise = useWatch({ control, name: "avanceRequise" })
-  const fTransport = parseFloat(useWatch({ control, name: "fraisTransport" }) || "0")
-  const fHebergement = parseFloat(useWatch({ control, name: "fraisHebergement" }) || "0")
+  const fTransport = parseFloat(
+    useWatch({ control, name: "fraisTransport" }) || "0"
+  )
+  const fHebergement = parseFloat(
+    useWatch({ control, name: "fraisHebergement" }) || "0"
+  )
   const fRepas = parseFloat(useWatch({ control, name: "fraisRepas" }) || "0")
   const fDivers = parseFloat(useWatch({ control, name: "fraisDivers" }) || "0")
   const total = fTransport + fHebergement + fRepas + fDivers
@@ -62,7 +83,10 @@ export function DemandeForm() {
   function toggleMotif(value: string) {
     const current = selectedMotifs || []
     if (current.includes(value)) {
-      setValue("motif", current.filter((m) => m !== value))
+      setValue(
+        "motif",
+        current.filter((m) => m !== value)
+      )
     } else {
       setValue("motif", [...current, value])
     }
@@ -107,10 +131,10 @@ export function DemandeForm() {
       <div className="mb-8">
         <div className="relative flex items-center justify-between">
           {/* Progress bar background line */}
-          <div className="absolute left-0 right-0 top-1/2 h-0.5 -translate-y-1/2 bg-zinc-200 dark:bg-zinc-800 z-0" />
+          <div className="absolute top-1/2 right-0 left-0 z-0 h-0.5 -translate-y-1/2 bg-zinc-200 dark:bg-zinc-800" />
           {/* Progress active bar line */}
           <div
-            className="absolute left-0 top-1/2 h-0.5 -translate-y-1/2 bg-primary transition-all duration-300 z-0"
+            className="absolute top-1/2 left-0 z-0 h-0.5 -translate-y-1/2 bg-primary transition-all duration-300"
             style={{ width: `${(step / (STEPS.length - 1)) * 100}%` }}
           />
 
@@ -118,7 +142,10 @@ export function DemandeForm() {
             const isCompleted = idx < step
             const isActive = idx === step
             return (
-              <div key={idx} className="relative z-10 flex flex-col items-center">
+              <div
+                key={idx}
+                className="relative z-10 flex flex-col items-center"
+              >
                 <button
                   type="button"
                   onClick={async () => {
@@ -130,9 +157,16 @@ export function DemandeForm() {
                       let canNavigate = true
                       for (let i = step; i < idx; i++) {
                         let fields: (keyof FormValues)[] = []
-                        if (i === 0) fields = ["motif", "motifAutre", "description"]
-                        if (i === 1) fields = ["dateDepart", "dateRetour", "destination"]
-                        if (i === 2) fields = ["typeTransport", "autreTransport", "vehiculeId"]
+                        if (i === 0)
+                          fields = ["motif", "motifAutre", "description"]
+                        if (i === 1)
+                          fields = ["dateDepart", "dateRetour", "destination"]
+                        if (i === 2)
+                          fields = [
+                            "typeTransport",
+                            "autreTransport",
+                            "vehiculeId",
+                          ]
                         const valid = await trigger(fields)
                         if (!valid) {
                           canNavigate = false
@@ -145,18 +179,20 @@ export function DemandeForm() {
                       }
                     }
                   }}
-                  className={`size-9 rounded-full flex items-center justify-center font-bold text-sm border-2 transition-all ${
+                  className={`flex size-9 items-center justify-center rounded-full border-2 text-sm font-bold transition-all ${
                     isCompleted
-                      ? "bg-primary border-primary text-primary-foreground"
+                      ? "border-primary bg-primary text-primary-foreground"
                       : isActive
-                      ? "bg-background border-primary text-primary shadow-md scale-110"
-                      : "bg-background border-zinc-200 dark:border-zinc-800 text-zinc-400 dark:text-zinc-600 hover:border-zinc-300"
+                        ? "scale-110 border-primary bg-background text-primary shadow-md"
+                        : "border-zinc-200 bg-background text-zinc-400 hover:border-zinc-300 dark:border-zinc-800 dark:text-zinc-600"
                   }`}
                 >
                   {isCompleted ? "✓" : idx + 1}
                 </button>
-                <div className="absolute top-11 flex flex-col items-center w-28 text-center">
-                  <span className={`text-xs font-semibold ${isActive ? "text-primary font-bold" : "text-zinc-500"}`}>
+                <div className="absolute top-11 flex w-28 flex-col items-center text-center">
+                  <span
+                    className={`text-xs font-semibold ${isActive ? "font-bold text-primary" : "text-zinc-500"}`}
+                  >
                     {s.label}
                   </span>
                 </div>
@@ -169,17 +205,21 @@ export function DemandeForm() {
       <form className="mt-14 space-y-6">
         {/* Step contents */}
         {step === 0 && (
-          <Card className="border border-zinc-200 dark:border-zinc-800 shadow-lg animate-in fade-in duration-300">
+          <Card className="animate-in border border-zinc-200 shadow-lg duration-300 fade-in dark:border-zinc-800">
             <CardHeader className="bg-zinc-50/50 dark:bg-zinc-900/50">
               <div className="flex items-center gap-3">
                 <ClipboardList className="size-5 text-primary" />
                 <div>
-                  <CardTitle className="text-lg">Étape 1: Motif & Contexte</CardTitle>
-                  <CardDescription>Quelle est la raison de ce déplacement ?</CardDescription>
+                  <CardTitle className="text-lg">
+                    Étape 1: Motif & Contexte
+                  </CardTitle>
+                  <CardDescription>
+                    Quelle est la raison de ce déplacement ?
+                  </CardDescription>
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="p-6 space-y-6">
+            <CardContent className="space-y-6 p-6">
               <div>
                 <Label className="text-sm font-semibold">Motifs</Label>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -188,34 +228,50 @@ export function DemandeForm() {
                     return (
                       <label
                         key={opt.value}
-                        className={`flex items-center gap-3 px-4 py-3 rounded-lg border cursor-pointer transition-all ${
+                        className={`flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 transition-all ${
                           checked
                             ? "border-primary bg-primary/5 text-primary-foreground"
-                            : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50"
+                            : "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800"
                         }`}
                       >
                         <Checkbox
                           checked={checked}
                           onCheckedChange={() => toggleMotif(opt.value)}
                         />
-                        <span className="text-sm text-zinc-700 dark:text-zinc-300">{opt.label}</span>
+                        <span className="text-sm text-zinc-700 dark:text-zinc-300">
+                          {opt.label}
+                        </span>
                       </label>
                     )
                   })}
                 </div>
                 {selectedMotifs?.includes("autre") && (
                   <div className="mt-4">
-                    <Label htmlFor="motifAutre" className="text-xs text-zinc-400">Précisez le motif</Label>
-                    <Input id="motifAutre" className="mt-1" {...register("motifAutre")} placeholder="Autre motif..." />
+                    <Label
+                      htmlFor="motifAutre"
+                      className="text-xs text-zinc-400"
+                    >
+                      Précisez le motif
+                    </Label>
+                    <Input
+                      id="motifAutre"
+                      className="mt-1"
+                      {...register("motifAutre")}
+                      placeholder="Autre motif..."
+                    />
                   </div>
                 )}
                 {errors.motif && (
-                  <p className="mt-2 text-xs text-destructive flex items-center gap-1">⚠️ {errors.motif.message}</p>
+                  <p className="mt-2 flex items-center gap-1 text-xs text-destructive">
+                    ⚠️ {errors.motif.message}
+                  </p>
                 )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="description" className="text-sm font-semibold">Description détaillée</Label>
+                <Label htmlFor="description" className="text-sm font-semibold">
+                  Description détaillée
+                </Label>
                 <Textarea
                   id="description"
                   placeholder="Objectif de la mission, réunions prévues, etc."
@@ -228,19 +284,23 @@ export function DemandeForm() {
         )}
 
         {step === 1 && (
-          <Card className="border border-zinc-200 dark:border-zinc-800 shadow-lg animate-in fade-in duration-300">
+          <Card className="animate-in border border-zinc-200 shadow-lg duration-300 fade-in dark:border-zinc-800">
             <CardHeader className="bg-zinc-50/50 dark:bg-zinc-900/50">
               <div className="flex items-center gap-3">
                 <Calendar className="size-5 text-primary" />
                 <div>
-                  <CardTitle className="text-lg">Étape 2: Destination & Dates</CardTitle>
+                  <CardTitle className="text-lg">
+                    Étape 2: Destination & Dates
+                  </CardTitle>
                   <CardDescription>Où et quand voyagez-vous ?</CardDescription>
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="p-6 space-y-6">
+            <CardContent className="space-y-6 p-6">
               <div className="space-y-3">
-                <Label className="text-sm font-semibold">Dates de déplacement</Label>
+                <Label className="text-sm font-semibold">
+                  Dates de déplacement
+                </Label>
                 <DateRangePicker
                   dateDepart={dateDepart}
                   dateRetour={dateRetour}
@@ -251,10 +311,15 @@ export function DemandeForm() {
                 />
               </div>
 
-              <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 space-y-4">
+              <div className="space-y-4 border-t border-zinc-100 pt-4 dark:border-zinc-800">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="destination" className="text-sm font-semibold">Ville de destination</Label>
-                  <label className="flex items-center gap-2 text-xs text-zinc-500 cursor-pointer select-none">
+                  <Label
+                    htmlFor="destination"
+                    className="text-sm font-semibold"
+                  >
+                    Ville de destination
+                  </Label>
+                  <label className="flex cursor-pointer items-center gap-2 text-xs text-zinc-500 select-none">
                     <Globe className="size-3.5" />
                     <span>Hors Maroc</span>
                     <input
@@ -266,21 +331,25 @@ export function DemandeForm() {
                         setValue("horsMaroc", checked)
                         setValue("destination", "")
                       }}
-                      className="accent-primary size-4"
+                      className="size-4 accent-primary"
                     />
                   </label>
                 </div>
 
                 {horsMaroc ? (
-                  <div className="animate-in fade-in duration-200">
+                  <div className="animate-in duration-200 fade-in">
                     <Input
                       id="destination"
                       placeholder="Indiquer la destination internationale..."
                       {...register("destination")}
-                      className={errors.destination?.message ? "border-destructive" : ""}
+                      className={
+                        errors.destination?.message ? "border-destructive" : ""
+                      }
                     />
                     {errors.destination && (
-                      <p className="mt-1 text-xs text-destructive">{errors.destination.message}</p>
+                      <p className="mt-1 text-xs text-destructive">
+                        {errors.destination.message}
+                      </p>
                     )}
                   </div>
                 ) : (
@@ -299,39 +368,52 @@ export function DemandeForm() {
         )}
 
         {step === 2 && (
-          <Card className="border border-zinc-200 dark:border-zinc-800 shadow-lg animate-in fade-in duration-300">
+          <Card className="animate-in border border-zinc-200 shadow-lg duration-300 fade-in dark:border-zinc-800">
             <CardHeader className="bg-zinc-50/50 dark:bg-zinc-900/50">
               <div className="flex items-center gap-3">
                 <Truck className="size-5 text-primary" />
                 <div>
-                  <CardTitle className="text-lg">Étape 3: Transport & Logistique</CardTitle>
-                  <CardDescription>Comment allez-vous vous déplacer ?</CardDescription>
+                  <CardTitle className="text-lg">
+                    Étape 3: Transport & Logistique
+                  </CardTitle>
+                  <CardDescription>
+                    Comment allez-vous vous déplacer ?
+                  </CardDescription>
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="p-6 space-y-6">
+            <CardContent className="space-y-6 p-6">
               <div className="space-y-3">
-                <Label className="text-sm font-semibold">Moyen de transport principal</Label>
+                <Label className="text-sm font-semibold">
+                  Moyen de transport principal
+                </Label>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {Object.entries(TRANSPORT_LABELS).map(([value, label]) => {
                     const active = typeTransport === value
                     return (
                       <label
                         key={value}
-                        className={`flex items-center gap-3 px-4 py-3 border rounded-lg cursor-pointer transition-all ${
+                        className={`flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 transition-all ${
                           active
-                            ? "border-primary bg-primary/5 text-primary-foreground font-medium"
-                            : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50"
+                            ? "border-primary bg-primary/5 font-medium text-primary-foreground"
+                            : "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800"
                         }`}
                       >
                         <input
                           type="radio"
                           value={value}
                           checked={active}
-                          onChange={(e) => setValue("typeTransport", e.target.value as FormValues["typeTransport"])}
+                          onChange={(e) =>
+                            setValue(
+                              "typeTransport",
+                              e.target.value as FormValues["typeTransport"]
+                            )
+                          }
                           className="accent-primary"
                         />
-                        <span className="text-sm text-zinc-700 dark:text-zinc-300">{label}</span>
+                        <span className="text-sm text-zinc-700 dark:text-zinc-300">
+                          {label}
+                        </span>
                       </label>
                     )
                   })}
@@ -339,27 +421,42 @@ export function DemandeForm() {
               </div>
 
               {showVehicleField && vehicules.length > 0 && (
-                <div className="p-4 bg-zinc-50 dark:bg-zinc-900 border rounded-lg space-y-2 animate-in fade-in duration-200">
-                  <Label htmlFor="vehiculeId" className="text-sm font-semibold">Véhicule de société</Label>
+                <div className="animate-in space-y-2 rounded-lg border bg-zinc-50 p-4 duration-200 fade-in dark:bg-zinc-900">
+                  <Label htmlFor="vehiculeId" className="text-sm font-semibold">
+                    Véhicule de société
+                  </Label>
                   <select
                     id="vehiculeId"
                     {...register("vehiculeId")}
-                    className="mt-1 border-zinc-200 flex h-10 w-full rounded-md border bg-background px-3 text-sm shadow-xs focus-visible:outline-hidden"
+                    className="mt-1 flex h-10 w-full rounded-md border border-zinc-200 bg-background px-3 text-sm shadow-xs focus-visible:outline-hidden"
                   >
-                    <option value="">Sélectionner un véhicule disponible</option>
-                    {vehicules.filter((v: Vehicule) => v.disponible).map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {v.nom} ({v.immatriculation})
-                      </option>
-                    ))}
+                    <option value="">
+                      Sélectionner un véhicule disponible
+                    </option>
+                    {vehicules
+                      .filter((v: Vehicule) => v.disponible)
+                      .map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.nom} ({v.immatriculation})
+                        </option>
+                      ))}
                   </select>
                 </div>
               )}
 
               {typeTransport === "AUTRE" && (
-                <div className="space-y-2 animate-in fade-in duration-200">
-                  <Label htmlFor="autreTransport" className="text-sm font-semibold">Précisez le moyen de transport</Label>
-                  <Input id="autreTransport" placeholder="Autre moyen..." {...register("autreTransport")} />
+                <div className="animate-in space-y-2 duration-200 fade-in">
+                  <Label
+                    htmlFor="autreTransport"
+                    className="text-sm font-semibold"
+                  >
+                    Précisez le moyen de transport
+                  </Label>
+                  <Input
+                    id="autreTransport"
+                    placeholder="Autre moyen..."
+                    {...register("autreTransport")}
+                  />
                 </div>
               )}
             </CardContent>
@@ -367,45 +464,78 @@ export function DemandeForm() {
         )}
 
         {step === 3 && (
-          <Card className="border border-zinc-200 dark:border-zinc-800 shadow-lg animate-in fade-in duration-300">
+          <Card className="animate-in border border-zinc-200 shadow-lg duration-300 fade-in dark:border-zinc-800">
             <CardHeader className="bg-zinc-50/50 dark:bg-zinc-900/50">
               <div className="flex items-center gap-3">
                 <DollarSign className="size-5 text-primary" />
                 <div>
-                  <CardTitle className="text-lg">Étape 4: Budget & Avance</CardTitle>
-                  <CardDescription>Estimez vos frais de déplacement</CardDescription>
+                  <CardTitle className="text-lg">
+                    Étape 4: Budget & Avance
+                  </CardTitle>
+                  <CardDescription>
+                    Estimez vos frais de déplacement
+                  </CardDescription>
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="p-6 space-y-6">
+            <CardContent className="space-y-6 p-6">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <Label className="text-xs text-zinc-500 font-medium">Frais Transport (Dhs)</Label>
-                  <Input type="number" min="0" step="0.01" {...register("fraisTransport")} />
+                  <Label className="text-xs font-medium text-zinc-500">
+                    Frais Transport (Dhs)
+                  </Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    {...register("fraisTransport")}
+                  />
                 </div>
                 <div>
-                  <Label className="text-xs text-zinc-500 font-medium">Hébergement (Dhs)</Label>
-                  <Input type="number" min="0" step="0.01" {...register("fraisHebergement")} />
+                  <Label className="text-xs font-medium text-zinc-500">
+                    Hébergement (Dhs)
+                  </Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    {...register("fraisHebergement")}
+                  />
                 </div>
                 <div>
-                  <Label className="text-xs text-zinc-500 font-medium">Repas (Dhs)</Label>
-                  <Input type="number" min="0" step="0.01" {...register("fraisRepas")} />
+                  <Label className="text-xs font-medium text-zinc-500">
+                    Repas (Dhs)
+                  </Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    {...register("fraisRepas")}
+                  />
                 </div>
                 <div>
-                  <Label className="text-xs text-zinc-500 font-medium">Divers (Dhs)</Label>
-                  <Input type="number" min="0" step="0.01" {...register("fraisDivers")} />
+                  <Label className="text-xs font-medium text-zinc-500">
+                    Divers (Dhs)
+                  </Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    {...register("fraisDivers")}
+                  />
                 </div>
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-primary/5 rounded-lg border border-primary/20">
+              <div className="flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 p-4">
                 <span className="text-sm font-semibold">Total estimé</span>
                 <span className="text-lg font-bold text-primary">
-                  {total.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} Dhs
+                  {total.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}{" "}
+                  Dhs
                 </span>
               </div>
 
-              <div className="pt-4 border-t space-y-4">
-                <label className="flex items-center gap-3 cursor-pointer">
+              <div className="space-y-4 border-t pt-4">
+                <label className="flex cursor-pointer items-center gap-3">
                   <Checkbox
                     checked={avanceRequise}
                     onCheckedChange={(checked: boolean) => {
@@ -413,13 +543,27 @@ export function DemandeForm() {
                       if (!checked) setValue("montantAvance", "")
                     }}
                   />
-                  <span className="text-sm font-semibold">Demander une avance sur frais</span>
+                  <span className="text-sm font-semibold">
+                    Demander une avance sur frais
+                  </span>
                 </label>
 
                 {avanceRequise && (
-                  <div className="p-4 bg-zinc-50 dark:bg-zinc-900 border rounded-lg space-y-2 animate-in fade-in duration-200">
-                    <Label htmlFor="montantAvance" className="text-sm font-semibold">Montant de l&apos;avance (Dhs)</Label>
-                    <Input id="montantAvance" type="number" min="0" step="0.01" {...register("montantAvance")} className="max-w-xs" />
+                  <div className="animate-in space-y-2 rounded-lg border bg-zinc-50 p-4 duration-200 fade-in dark:bg-zinc-900">
+                    <Label
+                      htmlFor="montantAvance"
+                      className="text-sm font-semibold"
+                    >
+                      Montant de l&apos;avance (Dhs)
+                    </Label>
+                    <Input
+                      id="montantAvance"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      {...register("montantAvance")}
+                      className="max-w-xs"
+                    />
                   </div>
                 )}
               </div>
@@ -428,7 +572,7 @@ export function DemandeForm() {
         )}
 
         {/* Wizard Controls */}
-        <div className="flex items-center justify-between gap-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
+        <div className="flex items-center justify-between gap-4 border-t border-zinc-100 pt-4 dark:border-zinc-800">
           <Button
             type="button"
             variant="outline"
@@ -463,7 +607,9 @@ export function DemandeForm() {
               </Button>
               <Button
                 type="button"
-                onClick={handleSubmit((data) => onSubmit({ ...data, horsMaroc }))}
+                onClick={handleSubmit((data) =>
+                  onSubmit({ ...data, horsMaroc })
+                )}
                 disabled={submitting || saving}
               >
                 {submitting && <Loader2 className="mr-2 size-4 animate-spin" />}

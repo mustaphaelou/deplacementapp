@@ -22,7 +22,9 @@ export interface SocieteBranding {
   domaineEmail: string | null
 }
 
-export async function getSocieteBranding(dbArg: DrizzleDb = db): Promise<SocieteBranding | null> {
+export async function getSocieteBranding(
+  dbArg: DrizzleDb = db
+): Promise<SocieteBranding | null> {
   try {
     const [result] = await dbArg
       .select({
@@ -49,7 +51,9 @@ export async function getSocieteBranding(dbArg: DrizzleDb = db): Promise<Societe
   }
 }
 
-export async function loadSocieteIdentity(dbArg: DrizzleDb = db): Promise<SocieteIdentity> {
+export async function loadSocieteIdentity(
+  dbArg: DrizzleDb = db
+): Promise<SocieteIdentity> {
   if (cachedIdentity) return cachedIdentity
 
   try {
@@ -67,7 +71,7 @@ export async function loadSocieteIdentity(dbArg: DrizzleDb = db): Promise<Societ
   } catch {
     if (!warnedOnce) {
       console.warn(
-        "[SocieteIdentity] Database unreachable — using SMTP env fallback",
+        "[SocieteIdentity] Database unreachable — using SMTP env fallback"
       )
       warnedOnce = true
     }
@@ -91,14 +95,21 @@ export function clearSocieteCache(): void {
 export async function updateSociete(
   changes: Record<string, unknown>,
   actorId: string,
-  dbArg: DrizzleDb = db,
+  dbArg: DrizzleDb = db
 ): Promise<Record<string, unknown>> {
   const [societe] = await dbArg.select().from(societes).limit(1)
   if (!societe) {
     throw new Error("Aucune société configurée")
   }
 
-  const allowed = ["nom", "logoUrl", "faviconUrl", "couleurPrimaire", "nomExpediteurEmail", "domaineEmail"]
+  const allowed = [
+    "nom",
+    "logoUrl",
+    "faviconUrl",
+    "couleurPrimaire",
+    "nomExpediteurEmail",
+    "domaineEmail",
+  ]
   const cleanChanges: Record<string, unknown> = {}
   for (const key of allowed) {
     if (key in changes) {
@@ -117,13 +128,16 @@ export async function updateSociete(
 
   clearSocieteCache()
 
-  await logAudit({
-    utilisateurId: actorId,
-    action: "MODIFIER_SOCIETE",
-    entite: "Societe",
-    entiteId: societe.id,
-    details: { changes: Object.keys(cleanChanges) },
-  }, dbArg)
+  await logAudit(
+    {
+      utilisateurId: actorId,
+      action: "MODIFIER_SOCIETE",
+      entite: "Societe",
+      entiteId: societe.id,
+      details: { changes: Object.keys(cleanChanges) },
+    },
+    dbArg
+  )
 
   return cleanChanges
 }

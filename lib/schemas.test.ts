@@ -165,8 +165,6 @@ describe("profilUpdateSchema", () => {
   })
 })
 
-
-
 describe("actionBodySchema", () => {
   it("accepts approuver without comment", async () => {
     const { actionBodySchema } = await getSchemas()
@@ -177,7 +175,10 @@ describe("actionBodySchema", () => {
 
   it("accepts approuver with comment", async () => {
     const { actionBodySchema } = await getSchemas()
-    const result = actionBodySchema.safeParse({ action: "approuver", commentaire: "OK" })
+    const result = actionBodySchema.safeParse({
+      action: "approuver",
+      commentaire: "OK",
+    })
 
     expect(result.success).toBe(true)
   })
@@ -191,7 +192,10 @@ describe("actionBodySchema", () => {
 
   it("accepts rejeter with comment", async () => {
     const { actionBodySchema } = await getSchemas()
-    const result = actionBodySchema.safeParse({ action: "rejeter", commentaire: "Pas valide" })
+    const result = actionBodySchema.safeParse({
+      action: "rejeter",
+      commentaire: "Pas valide",
+    })
 
     expect(result.success).toBe(true)
   })

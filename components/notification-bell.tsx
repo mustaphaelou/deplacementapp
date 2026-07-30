@@ -50,7 +50,7 @@ export function NotificationBell() {
       <Button variant="ghost" size="icon">
         <Bell className="size-5 md:size-4" />
       </Button>
-      <span className="bg-destructive text-destructive-foreground pointer-events-none absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full text-[10px] font-bold">
+      <span className="text-destructive-foreground pointer-events-none absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold">
         {count > 9 ? "9+" : count}
       </span>
     </Link>

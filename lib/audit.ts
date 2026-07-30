@@ -10,7 +10,10 @@ export interface AuditEvent {
   details?: Record<string, unknown>
 }
 
-export async function logAudit(event: AuditEvent, dbOrTx: DrizzleDb = db): Promise<void> {
+export async function logAudit(
+  event: AuditEvent,
+  dbOrTx: DrizzleDb = db
+): Promise<void> {
   await dbOrTx.insert(journalAudit).values({
     id: crypto.randomUUID(),
     utilisateurId: event.utilisateurId,
