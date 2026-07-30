@@ -1,9 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
-vi.mock("@/lib/departement-queries", () => ({
-  departementQueries: {
-    listAll: vi.fn(),
-  },
+vi.mock("@/lib/departement/queries", () => ({
+  listDepartements: vi.fn(),
 }))
 
 describe("departements route", () => {
@@ -12,8 +10,8 @@ describe("departements route", () => {
   })
 
   it("GET returns the list of Departement", async () => {
-    const { departementQueries } = await import("@/lib/departement-queries")
-    ;(departementQueries.listAll as ReturnType<typeof vi.fn>).mockResolvedValue([
+    const { listDepartements } = await import("@/lib/departement/queries")
+    ;(listDepartements as ReturnType<typeof vi.fn>).mockResolvedValue([
       { id: "d-1", nom: "IT" },
     ])
 
@@ -26,8 +24,8 @@ describe("departements route", () => {
   })
 
   it("GET returns 500 when the queries throw an unknown error", async () => {
-    const { departementQueries } = await import("@/lib/departement-queries")
-    ;(departementQueries.listAll as ReturnType<typeof vi.fn>).mockRejectedValue(
+    const { listDepartements } = await import("@/lib/departement/queries")
+    ;(listDepartements as ReturnType<typeof vi.fn>).mockRejectedValue(
       new Error("DB down")
     )
 
