@@ -594,6 +594,41 @@ describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT }, () => {
       expect(auditRows[1].action).toBe("SOUMISSION")
     })
 
+    it("persists the approver as Assignataire on a first approval", async () => {
+      const demande = await createDraftDemande()
+      await executeTransition({
+        demandeId: demande.id,
+        action: "submit",
+        actor: { id: employeeId, role: "EMPLOYEE" },
+      })
+
+      const updated = await executeTransition({
+        demandeId: demande.id,
+        action: "approuver",
+        actor: { id: managerId, role: "MANAGER" },
+      })
+
+      expect(updated.assigneAId).toBe(managerId)
+    })
+
+    it("persists the rejecter as Assignataire on a first rejection", async () => {
+      const demande = await createDraftDemande()
+      await executeTransition({
+        demandeId: demande.id,
+        action: "submit",
+        actor: { id: employeeId, role: "EMPLOYEE" },
+      })
+
+      const updated = await executeTransition({
+        demandeId: demande.id,
+        action: "rejeter",
+        actor: { id: managerId, role: "MANAGER" },
+        comment: "Non justifie",
+      })
+
+      expect(updated.assigneAId).toBe(managerId)
+    })
+
     it("committed rejection writes JournalAudit (REJET) + Notification", async () => {
       const demande = await createDraftDemande()
       await executeTransition({

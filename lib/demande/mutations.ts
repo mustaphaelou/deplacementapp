@@ -6,7 +6,7 @@ import { departements } from "../../db/schema/departements"
 import { documents } from "../../db/schema/documents"
 import type { CreateDemandeData } from "../demande-utils"
 import type { Role } from "@/lib/auth"
-import { canTransition, buildTransition } from "../workflow"
+import { checkTransition, buildTransition } from "../workflow"
 import type { Etape, Decision } from "../workflow"
 import type { NotificationEventType } from "../notification-events"
 import { appliquerEffets } from "./effets-transition"
@@ -193,33 +193,25 @@ export async function executeTransition(
   const etape = demande.etape as Etape
   const decision = demande.decision as Decision
 
-  if (
-    (action === "retirer" || action === "submit") &&
-    demande.employeId !== actor.id
-  ) {
-    throw new UnauthorizedActionError(
-      "Seul le proprietaire peut " +
-        (action === "submit" ? "soumettre" : "retirer") +
-        " la demande"
-    )
-  }
-
-  if (!canTransition(actor.role, etape, action, decision)) {
+  const ownerMatch = demande.employeId === actor.id
+  const check = checkTransition(actor.role, etape, action, decision, ownerMatch)
+  if (!check.ok) {
+    if (check.reason === "NOT_OWNER") {
+      throw new UnauthorizedActionError(
+        "Seul le proprietaire peut " +
+          (action === "submit" ? "soumettre" : "retirer") +
+          " la demande"
+      )
+    }
     throw new UnauthorizedActionError()
   }
 
   const transitionParams: {
     comment?: string
-    assigneAId?: string
+    actorId?: string
     decision?: Decision
-  } = { decision }
-  if (action === "approuver") {
-    transitionParams.assigneAId = actor.id
-    if (params.comment) transitionParams.comment = params.comment
-  }
-  if (action === "rejeter") {
-    transitionParams.comment = params.comment
-  }
+  } = { actorId: actor.id, decision }
+  if (params.comment) transitionParams.comment = params.comment
 
   const transition = buildTransition(
     actor.role,

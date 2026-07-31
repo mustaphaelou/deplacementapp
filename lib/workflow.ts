@@ -88,6 +88,7 @@ export const TRANSITION_EFFECTS = [
     notificationEvent: "DEMANDE_REJETEE",
     timestamps: ["rejeteeLe"],
     commentField: "commentaireManager",
+    setAssignee: true,
   },
   {
     from: "FINANCE_REVIEW",
@@ -97,6 +98,7 @@ export const TRANSITION_EFFECTS = [
     notificationEvent: "DEMANDE_REJETEE",
     timestamps: ["rejeteeLe"],
     commentField: "commentaireFinance",
+    setAssignee: true,
   },
   {
     from: "DIRECTION_REVIEW",
@@ -106,6 +108,7 @@ export const TRANSITION_EFFECTS = [
     notificationEvent: "DEMANDE_REJETEE",
     timestamps: ["rejeteeLe"],
     commentField: "commentaireDirection",
+    setAssignee: true,
   },
   {
     from: "DRAFT",
@@ -263,7 +266,7 @@ export function buildTransition(
   role: Role,
   etape: Etape,
   action: WorkflowAction,
-  params?: { comment?: string; assigneAId?: string; decision?: Decision }
+  params?: { comment?: string; actorId?: string; decision?: Decision }
 ): WorkflowResult | null {
   if (!checkTransition(role, etape, action, params?.decision, true).ok) {
     return null
@@ -296,8 +299,8 @@ export function buildTransition(
     fields[effect.commentField] = params.comment
   }
 
-  if (effect.setAssignee && params?.assigneAId) {
-    fields.assigneAId = params.assigneAId
+  if (effect.setAssignee && params?.actorId) {
+    fields.assigneAId = params.actorId
   }
 
   return {

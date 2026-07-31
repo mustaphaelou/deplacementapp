@@ -80,7 +80,7 @@ _Avoid_: Prepayment, advance payment, deposit
 ### Supporting
 
 **Assignataire**:
-The Utilisateur who last recorded an approve or reject Decision on a DemandeDeplacement. Persisted on `assigneAId`. NULL while the demande is still in DRAFT (no approver has acted yet); set when the first approver acts and updated on each subsequent approval. On a terminal REJECTED demande the Assignataire is the rejecter; on a terminal APPROVED demande it is the GENERAL_DIRECTION member who gave the final approval. The Assignataire is distinct from the Employe who created the demande.
+The Utilisateur who last recorded an approve or reject Decision on a DemandeDeplacement. Persisted on `assigneAId`. NULL while the demande is still in DRAFT (no approver has acted yet); set when the first approver acts and updated on each subsequent approval or rejection. On a terminal REJECTED demande the Assignataire is the rejecter; on a terminal APPROVED demande it is the GENERAL_DIRECTION member who gave the final approval. The Assignataire is distinct from the Employe who created the demande.
 _Avoid_: Approver, assigné, assignee, last-actor
 
 **Notification**:

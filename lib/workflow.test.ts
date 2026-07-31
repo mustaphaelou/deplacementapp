@@ -202,7 +202,7 @@ describe("buildTransition", () => {
   it("returns transition for MANAGER approving", () => {
     const result = buildTransition("MANAGER", "MANAGER_REVIEW", "approuver", {
       comment: "Looks good",
-      assigneAId: "user-2",
+      actorId: "user-2",
     })
     expect(result).not.toBeNull()
     expect(result!.auditAction).toBe("APPROBATION_MANAGER")
@@ -217,12 +217,14 @@ describe("buildTransition", () => {
   it("returns transition for MANAGER rejecting", () => {
     const result = buildTransition("MANAGER", "MANAGER_REVIEW", "rejeter", {
       comment: "Denied",
+      actorId: "user-2",
     })
     expect(result).not.toBeNull()
     expect(result!.auditAction).toBe("REJET")
     expect(result!.notificationEvent).toBe("DEMANDE_REJETEE")
     expect(result!.transition.newEtape).toBe("MANAGER_REVIEW")
     expect(result!.transition.newDecision).toBe("REJECTED")
+    expect(result!.transition.fields).toHaveProperty("assigneAId", "user-2")
   })
 
   it("returns transition for FINANCE_ADMIN approving", () => {

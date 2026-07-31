@@ -51,7 +51,7 @@ This glossary captures the canonical domain vocabulary for the DemandeDeplacemen
 
 | Term | Definition | Avoid |
 |------|------------|-------|
-| **Assignataire** | The Utilisateur who last recorded an approve or reject Decision on a DemandeDeplacement. Persisted on `assigneAId`. NULL at DRAFT; set when first approver acts; updated on each subsequent approval. On terminal REJECTED: the rejecter. On terminal APPROVED: the GENERAL_DIRECTION member who gave final approval. Distinct from the Employe who created the demande. | Approver, assigné, assignee, last-actor |
+| **Assignataire** | The Utilisateur who last recorded an approve or reject Decision on a DemandeDeplacement. Persisted on `assigneAId`. NULL at DRAFT; set when first approver acts; updated on each subsequent approval or rejection. On terminal REJECTED: the rejecter. On terminal APPROVED: the GENERAL_DIRECTION member who gave final approval. Distinct from the Employe who created the demande. | Approver, assigné, assignee, last-actor |
 | **Notification** | Message sent to a Utilisateur about a DemandeDeplacement event, delivered via in-app alert and email. MANAGER notifications scoped to employee's Departement; FINANCE_ADMIN and GENERAL_DIRECTION org-wide. | Alert, message, notice |
 | **AccuseLecture** | Read receipt automatically sent to the MANAGER of an Employee's Departement when that Employee marks a DemandeDeplacement-related Notification as read. Only triggered when reader's Role=EMPLOYEE. | Read receipt, acknowledgment |
 | **JournalAudit** | Timestamped record of a *committed* state change: who performed what action on which entity. Only successful transitions recorded — failed authorizations/guards throw before audit dispatch. | Audit log, history, trail |
