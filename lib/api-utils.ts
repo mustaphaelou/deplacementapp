@@ -1,6 +1,6 @@
 import { z } from "zod"
 import { NextRequest, NextResponse } from "next/server"
-import { requireAuth, type AuthUser } from "@/lib/auth"
+import { requireAuth, type AuthUser } from "@/lib/auth/server"
 
 export type ValidationResult<T> =
   { ok: true; data: T } | { ok: false; response: NextResponse }

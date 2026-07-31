@@ -1,5 +1,5 @@
 ﻿import { NextRequest, NextResponse } from "next/server"
-import { requireAuth, requireRole, type Role } from "@/lib/auth"
+import { requireAuth, requireRole, type Role } from "@/lib/auth/server"
 import { findMany, createDraft, createAndSubmit } from "@/lib/demande"
 import { demandeSchema, demandeQuerySchema } from "@/lib/schemas"
 import { withValidation, validateQueryParams } from "@/lib/api-utils"

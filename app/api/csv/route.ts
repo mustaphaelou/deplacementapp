@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { requireAuth, requireAnyRole, type Role } from "@/lib/auth"
+import { requireAuth, requireAnyRole, type Role } from "@/lib/auth/server"
 import { findAllForExport } from "@/lib/demande"
 import { handleServiceError } from "@/lib/errors"
 

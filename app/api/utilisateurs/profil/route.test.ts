@@ -8,7 +8,7 @@ import {
   AvatarError,
 } from "@/lib/utilisateur-service"
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/lib/auth/server", () => ({
   requireAuth: vi.fn(),
 }))
 
@@ -52,7 +52,7 @@ describe("profil route", () => {
   })
 
   it("returns the updated user on success", async () => {
-    const { requireAuth } = await import("@/lib/auth")
+    const { requireAuth } = await import("@/lib/auth/server")
     const { utilisateurService } = await import("@/lib/utilisateur-service")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
     ;(
@@ -82,7 +82,7 @@ describe("profil route", () => {
   })
 
   it("returns 401 when auth fails", async () => {
-    const { requireAuth } = await import("@/lib/auth")
+    const { requireAuth } = await import("@/lib/auth/server")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: false,
       response: new Response(JSON.stringify({ error: "Non autorisé" }), {
@@ -99,7 +99,7 @@ describe("profil route", () => {
   })
 
   it("returns 400 for validation errors", async () => {
-    const { requireAuth } = await import("@/lib/auth")
+    const { requireAuth } = await import("@/lib/auth/server")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
 
     const { PUT } = await import("./route")
@@ -113,7 +113,7 @@ describe("profil route", () => {
   })
 
   it("returns 404 when the user is not found", async () => {
-    const { requireAuth } = await import("@/lib/auth")
+    const { requireAuth } = await import("@/lib/auth/server")
     const { utilisateurService } = await import("@/lib/utilisateur-service")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
     ;(
@@ -131,7 +131,7 @@ describe("profil route", () => {
   })
 
   it("returns 400 when the current password is incorrect", async () => {
-    const { requireAuth } = await import("@/lib/auth")
+    const { requireAuth } = await import("@/lib/auth/server")
     const { utilisateurService } = await import("@/lib/utilisateur-service")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
     ;(
@@ -150,7 +150,7 @@ describe("profil route", () => {
   })
 
   it("returns 400 when the email change request omits the current password", async () => {
-    const { requireAuth } = await import("@/lib/auth")
+    const { requireAuth } = await import("@/lib/auth/server")
     const { utilisateurService } = await import("@/lib/utilisateur-service")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
     ;(
@@ -168,7 +168,7 @@ describe("profil route", () => {
   })
 
   it("returns 400 when no update data is provided", async () => {
-    const { requireAuth } = await import("@/lib/auth")
+    const { requireAuth } = await import("@/lib/auth/server")
     const { utilisateurService } = await import("@/lib/utilisateur-service")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
     ;(
@@ -184,7 +184,7 @@ describe("profil route", () => {
   })
 
   it("returns the avatar error status when avatar storage fails", async () => {
-    const { requireAuth } = await import("@/lib/auth")
+    const { requireAuth } = await import("@/lib/auth/server")
     const { utilisateurService } = await import("@/lib/utilisateur-service")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
     ;(

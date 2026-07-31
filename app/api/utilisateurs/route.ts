@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { requireAuth, requireAnyRole, type Role } from "@/lib/auth"
+import { requireAuth, requireAnyRole, type Role } from "@/lib/auth/server"
 import { utilisateurService } from "@/lib/utilisateur-service"
 import { utilisateurSchema, updateUtilisateurSchema } from "@/lib/schemas"
 import { withValidation } from "@/lib/api-utils"

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { NextRequest, NextResponse } from "next/server"
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/lib/auth/server", () => ({
   requireAuth: vi.fn(),
   auth: vi.fn(),
 }))
@@ -84,7 +84,7 @@ describe("withValidation", () => {
   })
 
   it("calls handler with validated data when auth succeeds and input is valid", async () => {
-    const { requireAuth } = await import("@/lib/auth")
+    const { requireAuth } = await import("@/lib/auth/server")
     ;(requireAuth as any).mockResolvedValue({
       ok: true,
       user: {
@@ -117,7 +117,7 @@ describe("withValidation", () => {
   })
 
   it("returns 401 when auth fails", async () => {
-    const { requireAuth } = await import("@/lib/auth")
+    const { requireAuth } = await import("@/lib/auth/server")
     ;(requireAuth as any).mockResolvedValue({
       ok: false,
       response: NextResponse.json({ error: "Non autorisé" }, { status: 401 }),
@@ -136,7 +136,7 @@ describe("withValidation", () => {
   })
 
   it("returns 400 when input is invalid", async () => {
-    const { requireAuth } = await import("@/lib/auth")
+    const { requireAuth } = await import("@/lib/auth/server")
     ;(requireAuth as any).mockResolvedValue({
       ok: true,
       user: {
@@ -163,7 +163,7 @@ describe("withValidation", () => {
   })
 
   it("returns 400 when body is not valid JSON", async () => {
-    const { requireAuth } = await import("@/lib/auth")
+    const { requireAuth } = await import("@/lib/auth/server")
     ;(requireAuth as any).mockResolvedValue({
       ok: true,
       user: {
@@ -202,7 +202,7 @@ describe("password route integration (withValidation + passwordChangeSchema)", (
   it("returns 200 when auth succeeds and body is valid", async () => {
     const { passwordChangeSchema } = await import("./schemas")
     const { withValidation } = await import("./api-utils")
-    const { requireAuth } = await import("@/lib/auth")
+    const { requireAuth } = await import("@/lib/auth/server")
     ;(requireAuth as any).mockResolvedValue({
       ok: true,
       user: {
@@ -243,7 +243,7 @@ describe("password route integration (withValidation + passwordChangeSchema)", (
   it("returns 400 when newPassword is too short", async () => {
     const { passwordChangeSchema } = await import("./schemas")
     const { withValidation } = await import("./api-utils")
-    const { requireAuth } = await import("@/lib/auth")
+    const { requireAuth } = await import("@/lib/auth/server")
     ;(requireAuth as any).mockResolvedValue({
       ok: true,
       user: {

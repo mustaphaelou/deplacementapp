@@ -1,4 +1,4 @@
-import type { PgDatabase } from "drizzle-orm/pg-core"
+import type { DrizzleDb } from "../../db"
 import { logAudit } from "../audit"
 import { notifications } from "../../db/schema/notifications"
 import type {
@@ -8,8 +8,7 @@ import type {
 import { buildMessage, resolveRecipients } from "../notification/helpers"
 
 export async function appliquerEffets(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  tx: PgDatabase<any, any, any>,
+  tx: DrizzleDb,
   params: {
     audit: {
       utilisateurId: string

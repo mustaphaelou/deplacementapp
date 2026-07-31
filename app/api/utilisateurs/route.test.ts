@@ -14,7 +14,7 @@ const { mockRequireAnyRole } = vi.hoisted(() => ({
   },
 }))
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/lib/auth/server", () => ({
   requireAuth: vi.fn(),
   requireAnyRole: mockRequireAnyRole,
 }))
@@ -71,7 +71,7 @@ describe("utilisateurs route", () => {
   })
 
   it("GET returns the list of Utilisateur", async () => {
-    const { requireAuth } = await import("@/lib/auth")
+    const { requireAuth } = await import("@/lib/auth/server")
     const { utilisateurService } = await import("@/lib/utilisateur-service")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
     ;(utilisateurService.list as ReturnType<typeof vi.fn>).mockResolvedValue([
@@ -87,7 +87,7 @@ describe("utilisateurs route", () => {
   })
 
   it("GET returns 404 when the service throws UtilisateurNotFoundError", async () => {
-    const { requireAuth } = await import("@/lib/auth")
+    const { requireAuth } = await import("@/lib/auth/server")
     const { utilisateurService } = await import("@/lib/utilisateur-service")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
     ;(utilisateurService.list as ReturnType<typeof vi.fn>).mockRejectedValue(
@@ -103,7 +103,7 @@ describe("utilisateurs route", () => {
   })
 
   it("POST returns 404 when the service throws UtilisateurNotFoundError", async () => {
-    const { requireAuth } = await import("@/lib/auth")
+    const { requireAuth } = await import("@/lib/auth/server")
     const { utilisateurService } = await import("@/lib/utilisateur-service")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
     ;(utilisateurService.create as ReturnType<typeof vi.fn>).mockRejectedValue(
@@ -121,7 +121,7 @@ describe("utilisateurs route", () => {
   })
 
   it("PUT returns 404 when the service throws UtilisateurNotFoundError", async () => {
-    const { requireAuth } = await import("@/lib/auth")
+    const { requireAuth } = await import("@/lib/auth/server")
     const { utilisateurService } = await import("@/lib/utilisateur-service")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
     ;(utilisateurService.update as ReturnType<typeof vi.fn>).mockRejectedValue(

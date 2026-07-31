@@ -1,4 +1,4 @@
-import { auth } from "@/lib/auth"
+import { auth } from "@/lib/auth/server"
 import { redirect } from "next/navigation"
 import { DashboardShell } from "@/components/dashboard-shell"
 import { NAV_ITEMS } from "@/lib/auth"

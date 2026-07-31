@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { requireAuth } from "@/lib/auth"
+import { requireAuth } from "@/lib/auth/server"
 import { findById, recordDocument } from "@/lib/demande"
 import { toPdfRenderData } from "@/lib/pdf-mapper"
 import { pdfAdapter } from "@/components/pdf/travel-request-pdf-adapter"

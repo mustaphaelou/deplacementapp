@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { auth } from "@/lib/auth"
+import { auth } from "@/lib/auth/server"
 import { redirect } from "next/navigation"
 import { Button } from "@/components/ui/button"
 

@@ -7,7 +7,7 @@ const { mockHasAnyRole } = vi.hoisted(() => ({
     allowed.includes(role),
 }))
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/lib/auth/server", () => ({
   auth: vi.fn(),
   hasAnyRole: mockHasAnyRole,
 }))
@@ -51,7 +51,7 @@ describe("Rapports page", () => {
   })
 
   it("reads counts and budget through the queries port and renders them", async () => {
-    const { auth } = await import("@/lib/auth")
+    const { auth } = await import("@/lib/auth/server")
     const {
       countByEtape: mockCountByEtape,
       aggregateBudget: mockAggregateBudget,
@@ -83,7 +83,7 @@ describe("Rapports page", () => {
   })
 
   it("redirects when role is not authorised", async () => {
-    const { auth } = await import("@/lib/auth")
+    const { auth } = await import("@/lib/auth/server")
     const { redirect } = await import("next/navigation")
 
     ;(auth as ReturnType<typeof vi.fn>).mockResolvedValue(
@@ -97,7 +97,7 @@ describe("Rapports page", () => {
   })
 
   it("redirects when not authenticated", async () => {
-    const { auth } = await import("@/lib/auth")
+    const { auth } = await import("@/lib/auth/server")
     const { redirect } = await import("next/navigation")
 
     ;(auth as ReturnType<typeof vi.fn>).mockResolvedValue(null)

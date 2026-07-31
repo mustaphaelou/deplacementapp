@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { DemandeNotFoundError } from "@/lib/errors"
 import type { DemandeWithRelations } from "@/lib/demande-types"
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/lib/auth/server", () => ({
   auth: vi.fn(),
 }))
 
@@ -92,7 +92,7 @@ describe("Imprimer page", () => {
   })
 
   it("renders the demande when found", async () => {
-    const { auth } = await import("@/lib/auth")
+    const { auth } = await import("@/lib/auth/server")
     const { findById: mockFindById } = await import("@/lib/demande")
 
     ;(auth as ReturnType<typeof vi.fn>).mockResolvedValue(mockSession())
@@ -110,7 +110,7 @@ describe("Imprimer page", () => {
   })
 
   it("redirects when the demande is soft-deleted or missing", async () => {
-    const { auth } = await import("@/lib/auth")
+    const { auth } = await import("@/lib/auth/server")
     const { findById: mockFindById } = await import("@/lib/demande")
     const { redirect } = await import("next/navigation")
 
@@ -128,7 +128,7 @@ describe("Imprimer page", () => {
   })
 
   it("redirects to login when not authenticated", async () => {
-    const { auth } = await import("@/lib/auth")
+    const { auth } = await import("@/lib/auth/server")
     const { redirect } = await import("next/navigation")
 
     ;(auth as ReturnType<typeof vi.fn>).mockResolvedValue(null)

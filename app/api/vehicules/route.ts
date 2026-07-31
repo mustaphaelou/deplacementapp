@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { requireAuth, requireRole } from "@/lib/auth"
+import { requireAuth, requireRole } from "@/lib/auth/server"
 import { vehiculeService } from "@/lib/vehicule-service"
 import {
   vehiculeSchema,

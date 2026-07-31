@@ -13,7 +13,7 @@ const { mockRequireAnyRole } = vi.hoisted(() => ({
   },
 }))
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/lib/auth/server", () => ({
   requireAuth: vi.fn(),
   requireAnyRole: mockRequireAnyRole,
 }))
@@ -70,7 +70,7 @@ describe("CSV export route", () => {
   })
 
   it("GET exports demandes through the queries port and returns CSV", async () => {
-    const { requireAuth } = await import("@/lib/auth")
+    const { requireAuth } = await import("@/lib/auth/server")
     const { findAllForExport } = await import("@/lib/demande")
 
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
@@ -98,7 +98,7 @@ describe("CSV export route", () => {
   })
 
   it("GET returns 401 when auth fails", async () => {
-    const { requireAuth } = await import("@/lib/auth")
+    const { requireAuth } = await import("@/lib/auth/server")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: false,
       response: new Response(JSON.stringify({ error: "Non autorisé" }), {
@@ -113,7 +113,7 @@ describe("CSV export route", () => {
   })
 
   it("GET returns 403 when role is not authorised", async () => {
-    const { requireAuth } = await import("@/lib/auth")
+    const { requireAuth } = await import("@/lib/auth/server")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(
       mockAuth("EMPLOYEE")
     )
@@ -125,7 +125,7 @@ describe("CSV export route", () => {
   })
 
   it("GET returns 500 when the queries port throws", async () => {
-    const { requireAuth } = await import("@/lib/auth")
+    const { requireAuth } = await import("@/lib/auth/server")
     const { findAllForExport } = await import("@/lib/demande")
 
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())

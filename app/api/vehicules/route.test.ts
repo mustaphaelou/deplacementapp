@@ -14,7 +14,7 @@ const { mockRequireRole } = vi.hoisted(() => ({
   },
 }))
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/lib/auth/server", () => ({
   requireAuth: vi.fn(),
   requireRole: mockRequireRole,
 }))
@@ -61,7 +61,7 @@ describe("vehicules route", () => {
   })
 
   it("GET returns the list of VehiculeEntreprise", async () => {
-    const { requireAuth } = await import("@/lib/auth")
+    const { requireAuth } = await import("@/lib/auth/server")
     const { vehiculeService } = await import("@/lib/vehicule-service")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
     ;(vehiculeService.list as ReturnType<typeof vi.fn>).mockResolvedValue([
@@ -77,7 +77,7 @@ describe("vehicules route", () => {
   })
 
   it("GET returns 404 when the service throws VehiculeNotFoundError", async () => {
-    const { requireAuth } = await import("@/lib/auth")
+    const { requireAuth } = await import("@/lib/auth/server")
     const { vehiculeService } = await import("@/lib/vehicule-service")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
     ;(vehiculeService.list as ReturnType<typeof vi.fn>).mockRejectedValue(
@@ -93,7 +93,7 @@ describe("vehicules route", () => {
   })
 
   it("POST returns 404 when the service throws VehiculeNotFoundError", async () => {
-    const { requireAuth } = await import("@/lib/auth")
+    const { requireAuth } = await import("@/lib/auth/server")
     const { vehiculeService } = await import("@/lib/vehicule-service")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
     ;(vehiculeService.create as ReturnType<typeof vi.fn>).mockRejectedValue(
@@ -112,7 +112,7 @@ describe("vehicules route", () => {
   })
 
   it("PUT returns 404 when the service throws VehiculeNotFoundError", async () => {
-    const { requireAuth } = await import("@/lib/auth")
+    const { requireAuth } = await import("@/lib/auth/server")
     const { vehiculeService } = await import("@/lib/vehicule-service")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
     ;(vehiculeService.update as ReturnType<typeof vi.fn>).mockRejectedValue(
@@ -134,7 +134,7 @@ describe("vehicules route", () => {
   })
 
   it("DELETE returns 404 when the service throws VehiculeNotFoundError", async () => {
-    const { requireAuth } = await import("@/lib/auth")
+    const { requireAuth } = await import("@/lib/auth/server")
     const { vehiculeService } = await import("@/lib/vehicule-service")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
     ;(vehiculeService.delete as ReturnType<typeof vi.fn>).mockRejectedValue(

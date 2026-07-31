@@ -1,10 +1,9 @@
-﻿import { auth } from "@/lib/auth"
+﻿import { auth, hasAnyRole } from "@/lib/auth/server"
 import { redirect } from "next/navigation"
 import { countByEtape, aggregateBudget } from "@/lib/demande"
 import type { Etape } from "@/lib/workflow"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { formatCurrency, ETAPE_LABELS } from "@/lib/constants"
-import { hasAnyRole } from "@/lib/auth"
 import Link from "next/link"
 import { FileText, TrendingUp, CheckCircle, XCircle } from "lucide-react"
 

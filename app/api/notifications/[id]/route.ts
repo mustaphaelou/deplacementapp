@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { requireAuth } from "@/lib/auth"
+import { requireAuth } from "@/lib/auth/server"
 import { markAsRead } from "@/lib/notification"
 import { handleServiceError } from "@/lib/errors"
 
