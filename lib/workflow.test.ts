@@ -470,50 +470,77 @@ describe("guard engine sweep", () => {
     undefined,
   ]
 
-  it("canTransition and buildTransition never disagree", () => {
+  function sweepTransitionSpace(
+    fn: (
+      role: Role,
+      etape: Etape,
+      action: WorkflowAction,
+      decision: Decision | undefined
+    ) => void
+  ): void {
     for (const role of roles) {
       for (const etape of etapes) {
         for (const action of actions) {
           for (const decision of decisions) {
-            for (const ownerMatch of [true, false]) {
-              const viaCan = canTransition(role, etape, action, decision)
-              const viaBuild =
-                buildTransition(role, etape, action, { decision }) !== null
-              expect({
-                role,
-                etape,
-                action,
-                decision,
-                ownerMatch,
-                allowed: viaCan,
-              }).toEqual({
-                role,
-                etape,
-                action,
-                decision,
-                ownerMatch,
-                allowed: viaBuild,
-              })
-            }
+            fn(role, etape, action, decision)
           }
         }
       }
     }
+  }
+
+  it("canTransition and buildTransition never disagree across the full tuple space", () => {
+    sweepTransitionSpace((role, etape, action, decision) => {
+      const viaCan = canTransition(role, etape, action, decision)
+      const viaBuild =
+        buildTransition(role, etape, action, { decision }) !== null
+      expect({ role, etape, action, decision, allowed: viaCan }).toEqual({
+        role,
+        etape,
+        action,
+        decision,
+        allowed: viaBuild,
+      })
+    })
   })
 
   it("both public functions are owner-neutral projections of checkTransition", () => {
-    for (const role of roles) {
-      for (const etape of etapes) {
-        for (const action of actions) {
-          for (const decision of decisions) {
-            const check = checkTransition(role, etape, action, decision, true)
-            expect(canTransition(role, etape, action, decision)).toBe(check.ok)
-            expect(
-              buildTransition(role, etape, action, { decision }) !== null
-            ).toBe(check.ok)
-          }
+    sweepTransitionSpace((role, etape, action, decision) => {
+      const ownerNeutral = checkTransition(
+        role,
+        etape,
+        action,
+        decision,
+        true
+      )
+      expect(canTransition(role, etape, action, decision)).toBe(
+        ownerNeutral.ok
+      )
+      expect(
+        buildTransition(role, etape, action, { decision }) !== null
+      ).toBe(ownerNeutral.ok)
+    })
+  })
+
+  it("ownerMatch never broadens access and only gates owner actions", () => {
+    for (const ownerMatch of [true, false]) {
+      sweepTransitionSpace((role, etape, action, decision) => {
+        const result = checkTransition(
+          role,
+          etape,
+          action,
+          decision,
+          ownerMatch
+        )
+        const isOwnerAction = action === "submit" || action === "retirer"
+        if (isOwnerAction && !ownerMatch) {
+          expect(result.ok).toBe(false)
+        } else if (!isOwnerAction) {
+          expect(result).toEqual(
+            checkTransition(role, etape, action, decision, true)
+          )
         }
-      }
+      })
     }
   })
 })

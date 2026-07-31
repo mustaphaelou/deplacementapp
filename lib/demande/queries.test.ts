@@ -212,7 +212,10 @@ describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT }, () => {
 
   describe("findById", () => {
     it("loads employe and assigneA relations", async () => {
-      const demande = await findById(managerApprovedId)
+      const demande = await findById(managerApprovedId, {
+        id: employeeId,
+        role: "EMPLOYEE",
+      })
 
       expect(demande.id).toBe(managerApprovedId)
       expect(demande.employe).toBeDefined()
@@ -225,20 +228,25 @@ describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT }, () => {
     })
 
     it("loads documents when include.documents is true", async () => {
-      const demande = await findById(submittedId)
+      const demande = await findById(submittedId, {
+        id: employeeId,
+        role: "EMPLOYEE",
+      })
       expect(demande).not.toHaveProperty("documents")
 
-      const withDocs = await findById(submittedId, {
-        include: { documents: true },
-      })
+      const withDocs = await findById(
+        submittedId,
+        { id: employeeId, role: "EMPLOYEE" },
+        { include: { documents: true } }
+      )
       expect(withDocs).toHaveProperty("documents")
       expect(Array.isArray(withDocs.documents)).toBe(true)
     })
 
     it("throws DemandeNotFoundError for a missing id", async () => {
-      await expect(findById("nonexistent-id")).rejects.toThrow(
-        DemandeNotFoundError
-      )
+      await expect(
+        findById("nonexistent-id", { id: employeeId, role: "EMPLOYEE" })
+      ).rejects.toThrow(DemandeNotFoundError)
     })
 
     it("throws DemandeNotFoundError for a soft-deleted demande", async () => {
@@ -247,7 +255,46 @@ describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT }, () => {
         .set({ deletedAt: new Date() })
         .where(eq(schema.demandesDeplacement.id, draftId))
 
-      await expect(findById(draftId)).rejects.toThrow(DemandeNotFoundError)
+      await expect(
+        findById(draftId, { id: employeeId, role: "EMPLOYEE" })
+      ).rejects.toThrow(DemandeNotFoundError)
+    })
+
+    it("EMPLOYEE sees their own demande", async () => {
+      const demande = await findById(submittedId, {
+        id: employeeId,
+        role: "EMPLOYEE",
+      })
+
+      expect(demande.id).toBe(submittedId)
+      expect(demande.employeId).toBe(employeeId)
+    })
+
+    it("EMPLOYEE reading another employee's demande gets not-found", async () => {
+      await expect(
+        findById(secondEmployeeDraftId, {
+          id: employeeId,
+          role: "EMPLOYEE",
+        })
+      ).rejects.toThrow(DemandeNotFoundError)
+    })
+
+    it.each([
+      ["MANAGER", managerId],
+      ["FINANCE_ADMIN", financeAdminId],
+      ["GENERAL_DIRECTION", directionId],
+    ] as const)("%s reads any demande", async (role, actorId) => {
+      const employeeDemande = await findById(submittedId, {
+        id: actorId,
+        role,
+      })
+      expect(employeeDemande.id).toBe(submittedId)
+
+      const otherEmployeeDemande = await findById(secondEmployeeDraftId, {
+        id: actorId,
+        role,
+      })
+      expect(otherEmployeeDemande.id).toBe(secondEmployeeDraftId)
     })
   })
 
@@ -255,32 +302,33 @@ describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT }, () => {
 
   describe("findMany", () => {
     it("EMPLOYEE sees only their own demandes", async () => {
-      const result = await findMany("EMPLOYEE", employeeId, {
-        page: 1,
-        limit: 20,
-      })
+      const result = await findMany(
+        { id: employeeId, role: "EMPLOYEE" },
+        { page: 1, limit: 20 }
+      )
 
       expect(result.demandes.length).toBeGreaterThanOrEqual(4)
+      const ids = result.demandes.map((d) => d.id)
+      expect(ids).not.toContain(secondEmployeeDraftId)
       for (const d of result.demandes) {
         expect(d.employe).toBeDefined()
       }
     })
 
     it("MANAGER sees all demandes (not scoped to their own)", async () => {
-      const result = await findMany("MANAGER", managerId, {
-        page: 1,
-        limit: 20,
-      })
+      const result = await findMany(
+        { id: managerId, role: "MANAGER" },
+        { page: 1, limit: 20 }
+      )
 
       expect(result.demandes.length).toBeGreaterThanOrEqual(5)
     })
 
     it("filters by etape", async () => {
-      const result = await findMany("MANAGER", managerId, {
-        page: 1,
-        limit: 20,
-        etape: "MANAGER_REVIEW",
-      })
+      const result = await findMany(
+        { id: managerId, role: "MANAGER" },
+        { page: 1, limit: 20, etape: "MANAGER_REVIEW" }
+      )
 
       for (const d of result.demandes) {
         expect(d.etape).toBe("MANAGER_REVIEW")
@@ -288,11 +336,10 @@ describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT }, () => {
     })
 
     it("searches destination case-insensitively", async () => {
-      const result = await findMany("MANAGER", managerId, {
-        page: 1,
-        limit: 20,
-        recherche: "marrakech",
-      })
+      const result = await findMany(
+        { id: managerId, role: "MANAGER" },
+        { page: 1, limit: 20, recherche: "marrakech" }
+      )
 
       expect(result.demandes.length).toBeGreaterThanOrEqual(1)
       for (const d of result.demandes) {
@@ -301,30 +348,47 @@ describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT }, () => {
     })
 
     it("searches numero case-insensitively", async () => {
-      const first = await findMany("MANAGER", managerId, { page: 1, limit: 1 })
+      const first = await findMany(
+        { id: managerId, role: "MANAGER" },
+        { page: 1, limit: 1 }
+      )
       const numero = first.demandes[0].numero
 
-      const result = await findMany("MANAGER", managerId, {
-        page: 1,
-        limit: 20,
-        recherche: numero.toLowerCase(),
-      })
+      const result = await findMany(
+        { id: managerId, role: "MANAGER" },
+        { page: 1, limit: 20, recherche: numero.toLowerCase() }
+      )
 
       expect(result.demandes.length).toBeGreaterThanOrEqual(1)
     })
 
     it("returns correct total count", async () => {
-      const all = await findMany("MANAGER", managerId, { page: 1, limit: 100 })
-      const page1 = await findMany("MANAGER", managerId, { page: 1, limit: 2 })
+      const all = await findMany(
+        { id: managerId, role: "MANAGER" },
+        { page: 1, limit: 100 }
+      )
+      const page1 = await findMany(
+        { id: managerId, role: "MANAGER" },
+        { page: 1, limit: 2 }
+      )
 
       expect(page1.total).toBe(all.demandes.length)
       expect(page1.demandes).toHaveLength(2)
     })
 
     it("paginates correctly", async () => {
-      const all = await findMany("MANAGER", managerId, { page: 1, limit: 100 })
-      const page1 = await findMany("MANAGER", managerId, { page: 1, limit: 2 })
-      const page2 = await findMany("MANAGER", managerId, { page: 2, limit: 2 })
+      const all = await findMany(
+        { id: managerId, role: "MANAGER" },
+        { page: 1, limit: 100 }
+      )
+      const page1 = await findMany(
+        { id: managerId, role: "MANAGER" },
+        { page: 1, limit: 2 }
+      )
+      const page2 = await findMany(
+        { id: managerId, role: "MANAGER" },
+        { page: 2, limit: 2 }
+      )
 
       expect(page1.total).toBe(page2.total)
       expect(page1.demandes.length).toBe(2)
@@ -336,10 +400,10 @@ describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT }, () => {
     })
 
     it("excludes soft-deleted demandes", async () => {
-      const result = await findMany("MANAGER", managerId, {
-        page: 1,
-        limit: 100,
-      })
+      const result = await findMany(
+        { id: managerId, role: "MANAGER" },
+        { page: 1, limit: 100 }
+      )
       const found = result.demandes.find((d) => d.id === draftId)
       expect(found).toBeUndefined()
     })

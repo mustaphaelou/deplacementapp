@@ -5,7 +5,7 @@ import { utilisateurs } from "../../db/schema/utilisateurs"
 import { departements } from "../../db/schema/departements"
 import { documents } from "../../db/schema/documents"
 import type { CreateDemandeData } from "../demande-utils"
-import type { Role } from "@/lib/auth"
+import type { Actor } from "../demande-types"
 import { checkTransition, buildTransition } from "../workflow"
 import type { Etape, Decision } from "../workflow"
 import type { NotificationEventType } from "../notification-events"
@@ -18,11 +18,6 @@ import {
 
 export type DemandeDeplacementRow = typeof demandesDeplacement.$inferSelect
 export type DocumentRow = typeof documents.$inferSelect
-
-export interface Actor {
-  id: string
-  role: Role
-}
 
 export interface ExecuteTransitionParams {
   demandeId: string

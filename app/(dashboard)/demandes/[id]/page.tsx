@@ -4,6 +4,7 @@ import { findById } from "@/lib/demande"
 import { DemandeNotFoundError } from "@/lib/errors"
 import { DemandeDetail } from "@/components/demande-detail"
 import type { DemandeWithRelations } from "@/lib/demande-types"
+import type { Role } from "@/lib/auth"
 import { notFound } from "next/navigation"
 import { getAllowedActions, type Etape, type Decision } from "@/lib/workflow"
 
@@ -18,7 +19,10 @@ export default async function DemandeDetailPage({
 
   let demande: DemandeWithRelations
   try {
-    demande = await findById(id)
+    demande = await findById(id, {
+      id: session.user.id,
+      role: session.user.role as Role,
+    })
   } catch (e) {
     if (e instanceof DemandeNotFoundError) notFound()
     throw e

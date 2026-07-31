@@ -154,7 +154,10 @@ describe("PDF route integration", () => {
 
     expect(response.status).toBe(200)
     expect(response.headers.get("Content-Type")).toBe("application/pdf")
-    expect(findById).toHaveBeenCalledWith("d-1")
+    expect(findById).toHaveBeenCalledWith("d-1", {
+      id: "u-1",
+      role: "EMPLOYEE",
+    })
     expect(recordDocument).toHaveBeenCalledWith("d-1", {
       type: "PDF",
       chemin: "demande-DD-2025-0001.pdf",

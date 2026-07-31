@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { requireAuth } from "@/lib/auth/server"
+import { requireAuth, type Role } from "@/lib/auth/server"
 import { findById, recordDocument } from "@/lib/demande"
 import { toPdfRenderData } from "@/lib/pdf-mapper"
 import { pdfAdapter } from "@/components/pdf/travel-request-pdf-adapter"
@@ -14,7 +14,10 @@ export async function GET(
   if (!auth.ok) return auth.response
 
   try {
-    const demande = await findById(id)
+    const demande = await findById(id, {
+      id: auth.user.id,
+      role: auth.user.role as Role,
+    })
     const data = toPdfRenderData(demande)
     const buffer = await pdfAdapter.render(data)
 

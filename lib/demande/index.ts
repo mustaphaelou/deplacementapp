@@ -8,9 +8,9 @@ export { appliquerEffets } from "./effets-transition"
 export type {
   DemandeDeplacementRow,
   DocumentRow,
-  Actor,
   ExecuteTransitionParams,
 } from "./mutations"
+export type { Actor } from "../demande-types"
 
 export {
   findById,

@@ -11,7 +11,10 @@ export async function GET(req: NextRequest) {
   const query = validateQueryParams(demandeQuerySchema, req)
   if (!query.ok) return query.response
   try {
-    const result = await findMany(auth.user.role, auth.user.id, query.data)
+    const result = await findMany(
+      { id: auth.user.id, role: auth.user.role as Role },
+      query.data
+    )
     return NextResponse.json(result)
   } catch (e) {
     return handleServiceError(e)

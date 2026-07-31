@@ -16,6 +16,7 @@ import { demandesDeplacement } from "../../db/schema/demandes-deplacement"
 import type { DemandeWithRelations } from "../demande-types"
 import type { DashboardDemandeSummary } from "../dashboard"
 import type { Etape, TimestampColumn } from "../workflow"
+import type { Actor } from "../demande-types"
 import { DemandeNotFoundError } from "../errors"
 
 export interface Document {
@@ -91,6 +92,12 @@ function mapToDemandeSummary(demande: {
   }
 }
 
+function visibilityCondition(actor: Actor): SQL | undefined {
+  return actor.role === "EMPLOYEE"
+    ? eq(demandesDeplacement.employeId, actor.id)
+    : undefined
+}
+
 function buildWithClause(options?: { include?: DemandeFindByIdInclude }) {
   const withClause: Record<
     string,
@@ -114,19 +121,25 @@ function buildWithClause(options?: { include?: DemandeFindByIdInclude }) {
   return withClause
 }
 
-export async function findById(id: string): Promise<DemandeWithRelations>
+export async function findById(
+  id: string,
+  actor: Actor
+): Promise<DemandeWithRelations>
 export async function findById<I extends DemandeFindByIdInclude>(
   id: string,
+  actor: Actor,
   options: { include: I }
 ): Promise<DemandeWithRelations & DemandeFindByIdExtra<I>>
 export async function findById(
   id: string,
+  actor: Actor,
   options?: { include?: DemandeFindByIdInclude }
 ): Promise<DemandeWithRelations> {
   const demande = await db.query.demandesDeplacement.findFirst({
     where: and(
       eq(demandesDeplacement.id, id),
-      isNull(demandesDeplacement.deletedAt)
+      isNull(demandesDeplacement.deletedAt),
+      visibilityCondition(actor)
     ),
     with: buildWithClause(options),
   })
@@ -135,18 +148,14 @@ export async function findById(
 }
 
 export async function findMany(
-  role: string,
-  userId: string,
+  actor: Actor,
   params: DemandeQueryParams
 ): Promise<{ demandes: DashboardDemandeSummary[]; total: number }> {
   const { page, limit, etape, recherche } = params
   const conditions: (SQL | undefined)[] = [
     isNull(demandesDeplacement.deletedAt),
+    visibilityCondition(actor),
   ]
-
-  if (role === "EMPLOYEE") {
-    conditions.push(eq(demandesDeplacement.employeId, userId))
-  }
 
   if (etape) {
     conditions.push(eq(demandesDeplacement.etape, etape as Etape))

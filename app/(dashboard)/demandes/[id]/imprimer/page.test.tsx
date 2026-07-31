@@ -103,7 +103,10 @@ describe("Imprimer page", () => {
       params: Promise.resolve({ id: "d-1" }),
     })
 
-    expect(mockFindById).toHaveBeenCalledWith("d-1")
+    expect(mockFindById).toHaveBeenCalledWith("d-1", {
+      id: "u-1",
+      role: "EMPLOYEE",
+    })
     expect(element.props.children[0].props.children[1].props.children).toBe(
       "Formulaire de Demande de Déplacement"
     )

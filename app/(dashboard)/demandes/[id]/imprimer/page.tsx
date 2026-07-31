@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth/server"
 import { redirect } from "next/navigation"
 import { findById } from "@/lib/demande"
 import { DemandeNotFoundError } from "@/lib/errors"
+import type { Role } from "@/lib/auth"
 import {
   formatCurrency,
   formatDate,
@@ -21,7 +22,10 @@ export default async function ImprimerPage({
 
   let demande: DemandeWithRelations
   try {
-    demande = await findById(id)
+    demande = await findById(id, {
+      id: session.user.id,
+      role: session.user.role as Role,
+    })
   } catch (e) {
     if (e instanceof DemandeNotFoundError) redirect("/demandes")
     throw e

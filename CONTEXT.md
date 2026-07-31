@@ -83,6 +83,10 @@ _Avoid_: Prepayment, advance payment, deposit
 The Utilisateur who last recorded an approve or reject Decision on a DemandeDeplacement. Persisted on `assigneAId`. NULL while the demande is still in DRAFT (no approver has acted yet); set when the first approver acts and updated on each subsequent approval or rejection. On a terminal REJECTED demande the Assignataire is the rejecter; on a terminal APPROVED demande it is the GENERAL_DIRECTION member who gave the final approval. The Assignataire is distinct from the Employe who created the demande.
 _Avoid_: Approver, assigné, assignee, last-actor
 
+**VisibiliteDemande (Demande Visibility)**:
+The rule determining which DemandesDeplacement a Utilisateur can view. An EMPLOYEE sees only the demandes they created; MANAGER, FINANCE_ADMIN, and GENERAL_DIRECTION see all demandes in the instance. The rule is owned by the demande query module and enforced in the WHERE clause of every read; viewing a demande outside one's visibility is indistinguishable from viewing a nonexistent demande (existence is never leaked).
+_Avoid_: row-level security, permissions matrix, access control list
+
 **Notification**:
 A message sent to a Utilisateur about a DemandeDeplacement event, delivered via both an in-app alert and an email. MANAGER notifications are scoped to the employee's Departement; FINANCE_ADMIN and GENERAL_DIRECTION notifications are org-wide.
 
