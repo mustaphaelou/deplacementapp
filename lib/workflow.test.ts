@@ -2,12 +2,15 @@ import { describe, it, expect } from "vitest"
 import {
   canTransition,
   buildTransition,
+  checkTransition,
   getAllowedActions,
   queueEtapes,
   committedEtapes,
   rollupEtapes,
   laneOrderByColumn,
 } from "./workflow"
+import type { Etape, Decision, WorkflowAction } from "./workflow"
+import type { Role } from "./auth"
 
 // ─── Read-model: queueEtapes (Etape-based) ─────────────────────────────────────
 
@@ -368,5 +371,127 @@ describe("getAllowedActions", () => {
     expect(actions.canWithdraw).toBe(false)
     expect(actions.canApprove).toBe(false)
     expect(actions.canReject).toBe(false)
+  })
+})
+
+// ─── checkTransition (reason-typed guard engine) ───────────────────────────
+
+describe("checkTransition", () => {
+  it("reports ok for an EMPLOYEE submitting from DRAFT", () => {
+    expect(checkTransition("EMPLOYEE", "DRAFT", "submit", "PENDING", true)).toEqual(
+      { ok: true }
+    )
+  })
+
+  it("reports NOT_OWNER for a non-owner submit or retirer", () => {
+    expect(checkTransition("EMPLOYEE", "DRAFT", "submit", "PENDING", false)).toEqual(
+      { ok: false, reason: "NOT_OWNER" }
+    )
+    expect(checkTransition("EMPLOYEE", "DRAFT", "retirer", "PENDING", false)).toEqual(
+      { ok: false, reason: "NOT_OWNER" }
+    )
+  })
+
+  it("reports TERMINAL for a terminal decision regardless of role", () => {
+    expect(
+      checkTransition("MANAGER", "MANAGER_REVIEW", "rejeter", "REJECTED", true)
+    ).toEqual({ ok: false, reason: "TERMINAL" })
+    expect(
+      checkTransition("EMPLOYEE", "DRAFT", "submit", "WITHDRAWN", true)
+    ).toEqual({ ok: false, reason: "TERMINAL" })
+  })
+
+  it("reports NO_EFFECT when no transition effect exists for the action on the stage", () => {
+    expect(
+      checkTransition("EMPLOYEE", "DRAFT", "approuver", "PENDING", true)
+    ).toEqual({ ok: false, reason: "NO_EFFECT" })
+    expect(
+      checkTransition("EMPLOYEE", "DRAFT", "rejeter", "PENDING", true)
+    ).toEqual({ ok: false, reason: "NO_EFFECT" })
+  })
+
+  it("reports WRONG_ROLE for a role that cannot act on the stage", () => {
+    expect(checkTransition("MANAGER", "DRAFT", "submit", "PENDING", true)).toEqual(
+      { ok: false, reason: "WRONG_ROLE" }
+    )
+    expect(
+      checkTransition("EMPLOYEE", "MANAGER_REVIEW", "approuver", "PENDING", true)
+    ).toEqual({ ok: false, reason: "WRONG_ROLE" })
+    expect(
+      checkTransition("GENERAL_DIRECTION", "FINAL", "approuver", "PENDING", true)
+    ).toEqual({ ok: false, reason: "WRONG_ROLE" })
+  })
+})
+
+// ─── Exhaustive sweep: one implementation, behavior locked ────────────────
+
+describe("guard engine sweep", () => {
+  const roles: Role[] = [
+    "EMPLOYEE",
+    "MANAGER",
+    "FINANCE_ADMIN",
+    "GENERAL_DIRECTION",
+  ]
+  const etapes: Etape[] = [
+    "DRAFT",
+    "MANAGER_REVIEW",
+    "FINANCE_REVIEW",
+    "DIRECTION_REVIEW",
+    "FINAL",
+  ]
+  const actions: WorkflowAction[] = ["submit", "approuver", "rejeter", "retirer"]
+  const decisions: (Decision | undefined)[] = [
+    "PENDING",
+    "APPROVED",
+    "REJECTED",
+    "WITHDRAWN",
+    undefined,
+  ]
+
+  it("canTransition and buildTransition never disagree", () => {
+    for (const role of roles) {
+      for (const etape of etapes) {
+        for (const action of actions) {
+          for (const decision of decisions) {
+            for (const ownerMatch of [true, false]) {
+              const viaCan = canTransition(role, etape, action, decision)
+              const viaBuild =
+                buildTransition(role, etape, action, { decision }) !== null
+              expect({
+                role,
+                etape,
+                action,
+                decision,
+                ownerMatch,
+                allowed: viaCan,
+              }).toEqual({
+                role,
+                etape,
+                action,
+                decision,
+                ownerMatch,
+                allowed: viaBuild,
+              })
+            }
+          }
+        }
+      }
+    }
+  })
+
+  it("both public functions are owner-neutral projections of checkTransition", () => {
+    for (const role of roles) {
+      for (const etape of etapes) {
+        for (const action of actions) {
+          for (const decision of decisions) {
+            const check = checkTransition(role, etape, action, decision, true)
+            expect(canTransition(role, etape, action, decision)).toBe(check.ok)
+            expect(
+              buildTransition(role, etape, action, { decision }) !== null
+            ).toBe(check.ok)
+          }
+        }
+      }
+    }
   })
 })

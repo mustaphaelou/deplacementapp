@@ -202,37 +202,61 @@ function findEffect(
   return TRANSITION_EFFECTS.find((e) => e.from === etape && e.action === action)
 }
 
-export function canTransition(
+// ─── Guard engine (single reason-typed check) ───────────────────────────────
+
+export type TransitionCheckReason =
+  | "TERMINAL"
+  | "NOT_OWNER"
+  | "WRONG_ROLE"
+  | "NO_EFFECT"
+
+export function checkTransition(
   role: Role,
   etape: Etape,
   action: WorkflowAction,
-  decision?: Decision
-): boolean {
+  decision?: Decision,
+  ownerMatch = true
+): { ok: true } | { ok: false; reason: TransitionCheckReason } {
   const stage = PIPELINE.find((s) => s.id === etape)
-  if (!stage || !stage.roleCanAct) return false
+  if (!stage || !stage.roleCanAct) {
+    return { ok: false, reason: "WRONG_ROLE" }
+  }
 
   // Terminal decisions block all further transitions
   if (
     decision === "REJECTED" ||
     decision === "WITHDRAWN" ||
     decision === "APPROVED"
-  )
-    return false
-
-  // retirer is only allowed from DRAFT by EMPLOYEE
-  if (action === "retirer") {
-    return role === "EMPLOYEE" && etape === "DRAFT"
+  ) {
+    return { ok: false, reason: "TERMINAL" }
   }
 
-  // submit is only allowed from DRAFT by EMPLOYEE
-  if (action === "submit") {
-    return role === "EMPLOYEE" && etape === "DRAFT"
+  // retirer and submit are DRAFT-owner actions
+  if (action === "retirer" || action === "submit") {
+    if (!ownerMatch) return { ok: false, reason: "NOT_OWNER" }
+    if (role !== "EMPLOYEE" || etape !== "DRAFT") {
+      return { ok: false, reason: "WRONG_ROLE" }
+    }
+    return { ok: true }
   }
 
   const effect = findEffect(action, etape)
-  if (!effect) return false
+  if (!effect) return { ok: false, reason: "NO_EFFECT" }
 
-  return stage.roleCanAct === role
+  if (stage.roleCanAct !== role) {
+    return { ok: false, reason: "WRONG_ROLE" }
+  }
+
+  return { ok: true }
+}
+
+export function canTransition(
+  role: Role,
+  etape: Etape,
+  action: WorkflowAction,
+  decision?: Decision
+): boolean {
+  return checkTransition(role, etape, action, decision, true).ok
 }
 
 export function buildTransition(
@@ -241,30 +265,12 @@ export function buildTransition(
   action: WorkflowAction,
   params?: { comment?: string; assigneAId?: string; decision?: Decision }
 ): WorkflowResult | null {
-  const stage = PIPELINE.find((s) => s.id === etape)
-  if (!stage || !stage.roleCanAct) return null
-
-  // Terminal decisions block all further transitions
-  if (
-    params?.decision === "REJECTED" ||
-    params?.decision === "WITHDRAWN" ||
-    params?.decision === "APPROVED"
-  )
+  if (!checkTransition(role, etape, action, params?.decision, true).ok) {
     return null
-
-  // Guard: retirer only from DRAFT by EMPLOYEE
-  if (action === "retirer" && (role !== "EMPLOYEE" || etape !== "DRAFT"))
-    return null
-
-  // Guard: submit only from DRAFT by EMPLOYEE
-  if (action === "submit" && (role !== "EMPLOYEE" || etape !== "DRAFT"))
-    return null
+  }
 
   const effect = findEffect(action, etape)
   if (!effect) return null
-
-  // Guard: role must match stage actor
-  if (stage.roleCanAct !== role) return null
 
   let newDecision: Decision
   if (action === "retirer") {
