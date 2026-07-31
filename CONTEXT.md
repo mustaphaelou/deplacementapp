@@ -162,6 +162,12 @@ The deployment choice for Nemotron model inference. Decided in ADR-0013: **hoste
 Per-field metadata on a DemandeDeplacement indicating how a value was sourced. One of `ai_proposed` (value came from an AI proposal, accepted by the employee) or `employee_entered` (value typed directly by the employee). Applies to each AI-proposable field: Ville, Motif, TypeTransport, avanceRequise. Written to JournalAudit at acceptance time as a single event per field (`field X set to value Y (provenance: ai_proposed, accepted by employee Z)`). Provenance is returned by the API for all roles (EMPLOYEE, MANAGER, FINANCE_ADMIN, GENERAL_DIRECTION) and may be displayed in the UI at every pipeline stage. Downstream rejection audit entries are silent on AI involvement — accountability rests with the employee per the `employee stays accountable` principle.
 _Avoid_: Source, origin, AI flag, assisted
 
+### Deployment
+
+**Release (Version)**:
+A deployable snapshot of the application, identified by a git tag `vX.Y.Z` pushed to main. Everything else derives from it: the Docker image tags (`vX.Y.Z`, `X.Y`), the GitHub Release object, and its changelog. The `latest` image tag is a rolling alias for main, not a Release. Releasing is the act of pushing the tag; nothing else needs to be configured.
+_Avoid_: Version bump, deploy, artifact, build
+
 - "approved" was used to mean both a stage-level outcome (manager said yes) and a terminal outcome (whole pipeline complete). Resolved by splitting into **Etape** (where we are) and **Decision** (what happened there). Terminal approval is `Etape: FINAL, Decision: APPROVED`.
 - "status" / "statut" was previously a single-column legacy enum resolved to **StatutDemande**. As of ADR-0005, the column is split into two persisted columns: **Etape + Decision**. The old `fromLegacyStatus`/`toLegacyStatus` bridging layer is removed.
 - "retirée" (withdrawn) was initially treated as a separate StatutDemande value. Resolved: withdrawal is a **Decision** (`WITHDRAWN`) and a terminal outcome, not a stage.
