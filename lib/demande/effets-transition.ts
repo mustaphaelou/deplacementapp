@@ -1,4 +1,4 @@
-import type { DrizzleDb } from "../../db"
+import type { DrizzleTransactionClient } from "../../db"
 import { logAudit } from "../audit"
 import { notifications } from "../../db/schema/notifications"
 import type {
@@ -8,7 +8,7 @@ import type {
 import { buildMessage, resolveRecipients } from "../notification/helpers"
 
 export async function appliquerEffets(
-  tx: DrizzleDb,
+  tx: DrizzleTransactionClient,
   params: {
     audit: {
       utilisateurId: string

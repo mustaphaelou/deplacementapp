@@ -87,7 +87,7 @@ describe("appliquerEffets", { timeout: TIMEOUT }, () => {
         modifieLe: new Date(),
       } as any)
 
-      await appliquerEffets(tx as any, {
+      await appliquerEffets(tx, {
         audit: {
           utilisateurId: employeeId,
           action: "SOUMISSION",
@@ -129,7 +129,7 @@ describe("appliquerEffets", { timeout: TIMEOUT }, () => {
     const otherDemandeId = crypto.randomUUID()
 
     await pgliteDb.transaction(async (tx) => {
-      await appliquerEffets(tx as any, {
+      await appliquerEffets(tx, {
         audit: {
           utilisateurId: employeeId,
           action: "CREATION",
@@ -177,7 +177,7 @@ describe("appliquerEffets", { timeout: TIMEOUT }, () => {
           modifieLe: new Date(),
         } as any)
 
-        await appliquerEffets(tx as any, {
+        await appliquerEffets(tx, {
           audit: {
             utilisateurId: employeeId,
             action: "SOUMISSION",

@@ -1,6 +1,6 @@
 import { hash } from "bcryptjs"
 import { count } from "drizzle-orm"
-import type { PgDatabase } from "drizzle-orm/pg-core"
+import type { DrizzleTransactionClient } from "../db"
 import { db } from "../db"
 import { societes } from "../db/schema/societes"
 import { departements } from "../db/schema/departements"
@@ -9,8 +9,7 @@ import { AmorcageDejaConfigureError } from "./errors"
 import { clearSocieteCache } from "@/lib/societe"
 
 async function countSocietes(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  dbOrTx: PgDatabase<any, any, any>
+  dbOrTx: DrizzleTransactionClient
 ): Promise<number> {
   const [result] = await dbOrTx.select({ value: count() }).from(societes)
   return result?.value ?? 0

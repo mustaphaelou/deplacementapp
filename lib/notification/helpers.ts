@@ -1,5 +1,5 @@
 import { eq, and } from "drizzle-orm"
-import type { PgDatabase } from "drizzle-orm/pg-core"
+import type { DrizzleTransactionClient } from "../../db"
 import { utilisateurs } from "../../db/schema/utilisateurs"
 import type {
   NotificationEventType,
@@ -68,8 +68,7 @@ const ASSIGNEE_EVENTS: NotificationEventType[] = ["DEMANDE_RETIREE"]
 export async function resolveRecipients(
   event: NotificationEventType,
   payload: NotificationPayload,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  tx: PgDatabase<any, any, any>
+  tx: DrizzleTransactionClient
 ): Promise<string[]> {
   const ids = new Set<string>()
 

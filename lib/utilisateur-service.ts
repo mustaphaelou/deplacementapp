@@ -116,7 +116,7 @@ export class UtilisateurService {
           entiteId: user.id,
           details: { email: user.email },
         },
-        tx as any
+        tx
       )
 
       return user
@@ -161,7 +161,7 @@ export class UtilisateurService {
           entiteId: user.id,
           details: { email: user.email },
         },
-        tx as any
+        tx
       )
 
       return user
@@ -199,7 +199,7 @@ export class UtilisateurService {
           entite: "Utilisateur",
           entiteId: userId,
         },
-        tx as any
+        tx
       )
     })
   }
@@ -284,7 +284,7 @@ export class UtilisateurService {
             entiteId: updated.id,
             details: { champs: Object.keys(updateData) },
           },
-          tx as any
+          tx
         )
 
         return updated

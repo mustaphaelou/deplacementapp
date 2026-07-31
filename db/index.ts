@@ -1,9 +1,10 @@
 import { drizzle } from "drizzle-orm/node-postgres"
+import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core"
 import { Pool } from "pg"
 import * as schema from "./schema"
 
 export type DrizzleDb = ReturnType<typeof drizzle<typeof schema>>
-export type DrizzleTransactionClient = DrizzleDb
+export type DrizzleTransactionClient = PgDatabase<PgQueryResultHKT, typeof schema>
 
 const globalForDrizzle = globalThis as unknown as { db: DrizzleDb }
 

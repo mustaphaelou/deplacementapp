@@ -126,8 +126,7 @@ async function createDemande(
       .values(createValues as never)
       .returning()
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await appliquerEffets(tx as any, {
+    await appliquerEffets(tx, {
       audit: {
         utilisateurId: userRow.id,
         action: auditAction,
@@ -225,8 +224,7 @@ export async function executeTransition(
       .where(eq(demandesDeplacement.id, demandeId))
       .returning()
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await appliquerEffets(tx as any, {
+    await appliquerEffets(tx, {
       audit: {
         utilisateurId: actor.id,
         action: transition.auditAction,

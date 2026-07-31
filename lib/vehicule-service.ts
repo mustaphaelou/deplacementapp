@@ -40,7 +40,7 @@ export class VehiculeService {
           entiteId: vehicule.id,
           details: { nom: vehicule.nom },
         },
-        tx as any
+        tx
       )
 
       return vehicule
@@ -69,7 +69,7 @@ export class VehiculeService {
           entiteId: vehicule.id,
           details: { nom: vehicule.nom },
         },
-        tx as any
+        tx
       )
 
       return vehicule
@@ -92,7 +92,7 @@ export class VehiculeService {
           entite: "VehiculeEntreprise",
           entiteId: id,
         },
-        tx as any
+        tx
       )
     })
   }

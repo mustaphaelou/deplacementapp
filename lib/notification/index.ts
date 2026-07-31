@@ -46,8 +46,7 @@ export class NotificationModule {
     event: NotificationEventType,
     payload: NotificationPayload
   ): Promise<DispatchResult> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const recipients = await resolveRecipients(event, payload, this._db as any)
+    const recipients = await resolveRecipients(event, payload, this._db)
     const { titre, message } = buildMessage(
       event,
       payload.numero,

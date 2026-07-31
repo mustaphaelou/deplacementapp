@@ -53,7 +53,7 @@ describe("logAudit", { timeout: TIMEOUT }, () => {
       details: { email: "test@example.com" },
     }
 
-    await logAudit(event, pgliteDb as any)
+    await logAudit(event, pgliteDb)
 
     const rows = await pgliteDb
       .select()
@@ -76,7 +76,7 @@ describe("logAudit", { timeout: TIMEOUT }, () => {
       entite: "VehiculeEntreprise",
     }
 
-    await logAudit(event, pgliteDb as any)
+    await logAudit(event, pgliteDb)
 
     const rows = await pgliteDb
       .select()
@@ -100,7 +100,7 @@ describe("logAudit", { timeout: TIMEOUT }, () => {
       },
     }
 
-    await logAudit(event, pgliteDb as any)
+    await logAudit(event, pgliteDb)
 
     const rows = await pgliteDb
       .select()
@@ -123,7 +123,7 @@ describe("logAudit", { timeout: TIMEOUT }, () => {
         entiteId: "tx-demande",
       }
 
-      await logAudit(event, tx as any)
+      await logAudit(event, tx)
     })
 
     const rows = await pgliteDb
@@ -144,7 +144,7 @@ describe("logAudit", { timeout: TIMEOUT }, () => {
           entite: "DemandeDeplacement",
         }
 
-        await logAudit(event, tx as any)
+        await logAudit(event, tx)
         throw new Error("force rollback")
       })
     } catch {
@@ -166,7 +166,7 @@ describe("logAudit", { timeout: TIMEOUT }, () => {
       entite: "Utilisateur",
     }
 
-    await logAudit(event, pgliteDb as any)
+    await logAudit(event, pgliteDb)
 
     const rows = await pgliteDb
       .select()

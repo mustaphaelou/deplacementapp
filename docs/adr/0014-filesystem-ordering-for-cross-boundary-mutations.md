@@ -82,7 +82,7 @@ try {
 ### What this does NOT mean
 
 - **This does not re-open ADR-0006's restriction on re-extracting DB ports.** The class shape and constructor-injected `DrizzleDb` stay as decided by Candidate 2's grilling; the fs-ordering principle is orthogonal.
-- **This does not change ADR-0011's `logAudit` contract.** The function is called with `tx as any` (matching the existing `any` cast in `lib/societe/index.ts:121` and `lib/demande/mutations.ts:135+241`) and writes inside the transaction.
+- **This does not change ADR-0011's `logAudit` contract.** The function is called with `tx as any` (matching the existing `any` cast in `lib/societe/index.ts:121` and `lib/demande/mutations.ts:135+241`) and writes inside the transaction. *(Post-adoption annotation: the `tx as any` convention is retired by issue #149 — `DrizzleTransactionClient` types every transaction-aware seam, so `logAudit(event, tx)` is fully typed; this ADR's contract note should be read in the pre-typing context.)*
 - **This does not mandate a periodic orphan-cleanup pass.** The rollback-catch harvest is sufficient for the single orphan per rollback scenario. If future cross-boundary mutations produce many orphans per rollback, the architectural decision to add a cleanup pass should be made at that point.
 
 ## Rationale

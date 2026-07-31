@@ -1,4 +1,4 @@
-import type { DrizzleDb } from "../db"
+import type { DrizzleTransactionClient } from "../db"
 import { db } from "../db"
 import { journalAudit } from "../db/schema/journal-audit"
 
@@ -12,7 +12,7 @@ export interface AuditEvent {
 
 export async function logAudit(
   event: AuditEvent,
-  dbOrTx: DrizzleDb = db
+  dbOrTx: DrizzleTransactionClient = db
 ): Promise<void> {
   await dbOrTx.insert(journalAudit).values({
     id: crypto.randomUUID(),
