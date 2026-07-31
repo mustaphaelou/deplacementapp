@@ -85,7 +85,7 @@ describe("appliquerEffets", { timeout: TIMEOUT }, () => {
         destination: "Casablanca",
         typeTransport: "VOITURE_PERSONNELLE",
         modifieLe: new Date(),
-      } as any)
+      })
 
       await appliquerEffets(tx, {
         audit: {
@@ -175,7 +175,7 @@ describe("appliquerEffets", { timeout: TIMEOUT }, () => {
           destination: "Rabat",
           typeTransport: "VOITURE_PERSONNELLE",
           modifieLe: new Date(),
-        } as any)
+        })
 
         await appliquerEffets(tx, {
           audit: {
