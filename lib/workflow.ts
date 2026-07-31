@@ -7,25 +7,16 @@ export type Etape =
 export type Decision = "PENDING" | "APPROVED" | "REJECTED" | "WITHDRAWN"
 
 export const PIPELINE: readonly StageDefinition[] = [
-  { id: "DRAFT", roleCanAct: "EMPLOYEE", onApprove: "MANAGER_REVIEW" },
-  { id: "MANAGER_REVIEW", roleCanAct: "MANAGER", onApprove: "FINANCE_REVIEW" },
-  {
-    id: "FINANCE_REVIEW",
-    roleCanAct: "FINANCE_ADMIN",
-    onApprove: "DIRECTION_REVIEW",
-  },
-  {
-    id: "DIRECTION_REVIEW",
-    roleCanAct: "GENERAL_DIRECTION",
-    onApprove: "FINAL",
-  },
+  { id: "DRAFT", roleCanAct: "EMPLOYEE" },
+  { id: "MANAGER_REVIEW", roleCanAct: "MANAGER" },
+  { id: "FINANCE_REVIEW", roleCanAct: "FINANCE_ADMIN" },
+  { id: "DIRECTION_REVIEW", roleCanAct: "GENERAL_DIRECTION" },
   { id: "FINAL" },
 ] as const
 
 export interface StageDefinition {
   id: Etape
   roleCanAct?: Role
-  onApprove?: Etape
 }
 
 // ─── Transition effects (side-effects per transition) ──────────────────────
@@ -166,11 +157,21 @@ export function rollupEtapes(role: Role): Etape[] {
   return PIPELINE_VIEWS[role].rollup
 }
 
+export function enteringEffect<E extends readonly TransitionEffect[]>(
+  etape: Etape,
+  effects: E
+): E[number] | undefined {
+  if (etape === "DRAFT") {
+    return effects.find((e) => e.from === etape && e.action === "retirer")
+  }
+  return effects.find((e) => e.to === etape && e.to !== e.from)
+}
+
 export function laneOrderByColumn(etape: Etape): {
   column: TimestampColumn
   direction: "desc"
 } {
-  const effect = TRANSITION_EFFECTS.find((e) => e.to === etape)
+  const effect = enteringEffect(etape, TRANSITION_EFFECTS)
   if (!effect) {
     throw new Error(`Aucun effet de transition ne cible l'étape: ${etape}`)
   }

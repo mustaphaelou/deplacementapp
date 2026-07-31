@@ -8,6 +8,8 @@ import {
   committedEtapes,
   rollupEtapes,
   laneOrderByColumn,
+  enteringEffect,
+  TRANSITION_EFFECTS,
 } from "./workflow"
 import type { Etape, Decision, WorkflowAction } from "./workflow"
 import type { Role } from "./auth"
@@ -116,6 +118,24 @@ describe("laneOrderByColumn", () => {
       column: "retireeLe",
       direction: "desc",
     })
+  })
+})
+
+describe("enteringEffect", () => {
+  it("picks the entering effect, ignoring self-loop effects that appear earlier", () => {
+    const rejeter = TRANSITION_EFFECTS.find(
+      (e) => e.from === "MANAGER_REVIEW" && e.action === "rejeter"
+    )!
+    const perturbed = [rejeter, ...TRANSITION_EFFECTS]
+    expect(enteringEffect("MANAGER_REVIEW", perturbed)?.timestamps[0]).toBe(
+      "soumiseLe"
+    )
+  })
+
+  it("preserves the explicit DRAFT → retireeLe case", () => {
+    expect(enteringEffect("DRAFT", TRANSITION_EFFECTS)?.timestamps[0]).toBe(
+      "retireeLe"
+    )
   })
 })
 
