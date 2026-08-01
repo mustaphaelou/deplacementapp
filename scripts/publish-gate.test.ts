@@ -7,6 +7,7 @@ import yaml from "js-yaml"
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 const WORKFLOW_PATH = join(ROOT, ".github/workflows/docker-publish.yml")
 const WRAPPER_PATH = join(ROOT, "scripts/test-docker-build.sh")
+const CONTEXT_PATH = join(ROOT, "CONTEXT.md")
 
 interface Step {
   name?: string
@@ -134,6 +135,15 @@ describe(".github/workflows/docker-publish.yml", () => {
     }
   })
 
+  it("writes the smoke builds to the GHA cache so verification feeds the publish build", () => {
+    const smokeBuildSteps = buildAndPublishSteps().filter(isSmokeBuildStep)
+    expect(smokeBuildSteps).toHaveLength(2)
+    for (const step of smokeBuildSteps) {
+      expect(step.with?.["cache-from"]).toContain("type=gha")
+      expect(step.with?.["cache-to"]).toContain("type=gha")
+    }
+  })
+
   it("publishes both images multi-arch and reuses the smoke build's GHA cache", () => {
     const pushSteps = buildAndPublishSteps().filter(isPushStep)
     expect(pushSteps).toHaveLength(2)
@@ -158,5 +168,25 @@ describe(".github/workflows/docker-publish.yml", () => {
   it("keeps the production dependency-tree check out of the local wrapper", () => {
     const wrapper = readFileSync(WRAPPER_PATH, "utf8")
     expect(wrapper).not.toContain("npm ls --omit=dev --depth=0")
+  })
+
+  it("defines the publish gate term in the deployment documentation", () => {
+    const context = readFileSync(CONTEXT_PATH, "utf8")
+    const deployment = context.split("### Deployment")[1] ?? ""
+    expect(deployment).toContain("Publish Gate")
+    expect(deployment).toContain("verify")
+    expect(deployment).toContain("smoke-test")
+  })
+
+  it("wires the local wrapper and the workflow to the same smoke-test module", () => {
+    const wrapper = readFileSync(WRAPPER_PATH, "utf8")
+    const workflowRuns = buildAndPublishSteps()
+      .map((step) => step.run ?? "")
+      .join("\n")
+    expect(wrapper).toContain("smoke-test.sh")
+    expect(workflowRuns).toContain("smoke-test.sh")
+    expect(wrapper).toContain("--image")
+    expect(wrapper).toContain("--migrator-image")
+    expect(workflowRuns).toContain("--migrator-image")
   })
 })
