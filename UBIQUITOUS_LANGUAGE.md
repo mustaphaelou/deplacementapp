@@ -71,6 +71,14 @@ This glossary captures the canonical domain vocabulary for the DemandeDeplacemen
 
 ---
 
+## Deployment
+
+| Term | Definition | Avoid |
+|------|------------|-------|
+| **Release** | A deployable snapshot of the application: a git tag `vX.Y.Z` pushed to main. Derives GHCR image tags (`vX.Y.Z`, `X.Y`), the GitHub Release object, and the changelog. `latest` is a rolling alias for main, not a Release. The `package.json` version is decorative. | Calling a main push, the `latest` image, or the `package.json` version a "Release" |
+
+---
+
 ## Relationships
 
 - A **Societe** has one or more **Utilisateurs** and one or more **Departements**.

@@ -168,9 +168,10 @@ _Avoid_: Source, origin, AI flag, assisted
 
 ### Deployment
 
-**Release (Version)**:
-A deployable snapshot of the application, identified by a git tag `vX.Y.Z` pushed to main. Everything else derives from it: the Docker image tags (`vX.Y.Z`, `X.Y`), the GitHub Release object, and its changelog. The `latest` image tag is a rolling alias for main, not a Release. Releasing is the act of pushing the tag; nothing else needs to be configured.
-_Avoid_: Version bump, deploy, artifact, build
+**Release**:
+A deployable snapshot of the application, identified by a git tag `vX.Y.Z` pushed to main. Everything else derives from it: the GHCR image tags (`vX.Y.Z`, `X.Y`), the GitHub Release object (auto-created as a draft with generated notes), and its changelog. The `latest` image tag is a rolling alias for main, not a Release. The `package.json` version field is decorative (private app); the git tag is canonical. Releasing is the act of pushing the tag; nothing else needs to be configured.
+_Avoid_: Calling a main-branch push, the `latest` image, or the `package.json` version a "Release".
+_Cites_: ADR-0004
 
 - "approved" was used to mean both a stage-level outcome (manager said yes) and a terminal outcome (whole pipeline complete). Resolved by splitting into **Etape** (where we are) and **Decision** (what happened there). Terminal approval is `Etape: FINAL, Decision: APPROVED`.
 - "status" / "statut" was previously a single-column legacy enum resolved to **StatutDemande**. As of ADR-0005, the column is split into two persisted columns: **Etape + Decision**. The old `fromLegacyStatus`/`toLegacyStatus` bridging layer is removed.

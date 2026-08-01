@@ -12,5 +12,5 @@ The project's Docker images (runner and migrator) are built by GitHub Actions an
 
 - The build is now decoupled from deployment. A failed build produces no new image, but the old image on GHCR remains available — Coolify keeps running the last good image.
 - The `GITHUB_TOKEN` in the Actions workflow needs `packages: write` permission (already set in the workflow). For private repos, Coolify needs a separate GitHub PAT with `read:packages` scope to pull.
-- Tag strategy is managed by `docker/metadata-action`: `latest` on default branch, `vX.Y.Z` on version tags, branch refs on feature branches.
+- Tag strategy is managed by `docker/metadata-action` in the single publish workflow (`.github/workflows/docker-publish.yml`): semver `vX.Y.Z` + `X.Y` tags on `v*` version tags, `latest` + full-sha on every run (including tag pushes). A `vX.Y.Z` tag push also auto-creates a draft GitHub Release with generated notes. Non-semver tags produce no versioned images and no Release. See `CONTEXT.md` (*Deployment*) and `docs/agents/release.md` for the release-as-ticket process.
 - Two separate packages appear on GHCR: `deplacementapp/runner` and `deplacementapp-migrator`.
