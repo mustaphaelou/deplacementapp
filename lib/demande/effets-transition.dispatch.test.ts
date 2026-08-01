@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { appliquerEffets } from "./effets-transition"
-import type { NotificationEventType } from "../notification-events"
+import type { NotificationEventType } from "../notification"
 
 vi.mock("../audit", () => ({
   logAudit: vi.fn().mockResolvedValue(undefined),
@@ -14,6 +14,7 @@ import { logAudit } from "../audit"
 import { dispatchRows } from "../notification"
 
 const mockedDispatchRows = vi.mocked(dispatchRows)
+const mockedLogAudit = vi.mocked(logAudit)
 
 const makeParams = () => ({
   audit: {
@@ -82,6 +83,6 @@ describe("appliquerEffets notification delegation", () => {
     await appliquerEffets(tx as any, makeParams())
 
     expect(mockedDispatchRows).toHaveBeenCalledTimes(1)
-    expect(logAudit).toHaveBeenCalledTimes(1)
+    expect(mockedLogAudit).toHaveBeenCalledTimes(1)
   })
 })

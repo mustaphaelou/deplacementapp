@@ -40,16 +40,16 @@ export async function appliquerEffets(
     tx
   )
 
-  if (params.notification) {
-    const { event, demandeId, numero, employe, assigneAId } =
-      params.notification
+  if (!params.notification) return
 
-    const payload: NotificationPayload = {
-      demandeId,
-      numero,
-      employe,
-      assigneAId,
-    }
-    await dispatchRows(event, payload, tx)
+  const { event, demandeId, numero, employe, assigneAId } =
+    params.notification
+
+  const payload: NotificationPayload = {
+    demandeId,
+    numero,
+    employe,
+    assigneAId,
   }
+  await dispatchRows(event, payload, tx)
 }
