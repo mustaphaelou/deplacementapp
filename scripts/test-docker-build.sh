@@ -39,19 +39,11 @@ info "Building migrator image..."
 docker build --target migrator --tag "$MIGRATOR_IMAGE" "$PROJECT_DIR"
 pass "Migrator image built"
 
-# ------------------------------------------------------------------
-# 2. Verify production dependency tree
-# ------------------------------------------------------------------
-info "Verifying production dependency tree..."
-if ! (cd "$PROJECT_DIR" && npm ls --omit=dev --depth=0) >/dev/null 2>&1; then
-  fail "Production dependency tree has issues"
-  (cd "$PROJECT_DIR" && npm ls --omit=dev --depth=0) 2>&1 || true
-  exit 1
-fi
-pass "Production dependency tree is clean"
+# The production dependency-tree check (npm ls --omit=dev) lives in the CI
+# verify job, not here — it is a project-tree check, not a container check.
 
 # ------------------------------------------------------------------
-# 3. Run the shared smoke-test module
+# 2. Run the shared smoke-test module
 # ------------------------------------------------------------------
 info "Running smoke-test module..."
 "$SCRIPT_DIR/smoke-test.sh" --image "$IMAGE_NAME" --migrator-image "$MIGRATOR_IMAGE"

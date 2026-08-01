@@ -76,7 +76,7 @@ This glossary captures the canonical domain vocabulary for the DemandeDeplacemen
 | Term | Definition | Avoid |
 |------|------------|-------|
 | **Release** | A deployable snapshot of the application: a git tag `vX.Y.Z` pushed to main. Derives GHCR image tags (`vX.Y.Z`, `X.Y`), the GitHub Release object, and the changelog. `latest` is a rolling alias for main, not a Release. The `package.json` version is decorative. | Calling a main push, the `latest` image, or the `package.json` version a "Release" |
-| **Publish Gate** | The verification sequence every image must pass before being pushed to GHCR: the unit checks (`lint` + `typecheck` + the unit test suite) plus the reusable image smoke test (`scripts/smoke-test.sh`), whose exit code is 0 iff the deployment set is runnable. CI and local development share one verification path (`scripts/test-docker-build.sh`). | Smoke test (the check alone), docker build test |
+| **Publish Gate** | The verification sequence every image must pass before being pushed to GHCR: the unit checks (`lint` + `typecheck` + the unit test suite, incl. the `npm ls --omit=dev` dependency-tree check) plus the reusable image smoke test (`scripts/smoke-test.sh`), whose exit code is 0 iff the deployment set is runnable. In CI the gate is structural — the publish workflow's `build-and-publish` job `needs:` the `verify` job, then smoke-tests the loaded amd64 images before the multi-arch push; a failed step publishes nothing and creates no GitHub Release. Pull requests run the unit checks only. CI and local development share one verification path (`scripts/test-docker-build.sh`). | Smoke test (the check alone), docker build test |
 
 ---
 
