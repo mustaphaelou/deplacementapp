@@ -42,6 +42,8 @@ export const PURPOSE_OPTIONS = [
 
 export const ITEMS_PER_PAGE = [10, 25, 50]
 
+export const DEFAULT_SOCIETE_NOM = "Application"
+
 export function formatCurrency(amount: number | null | undefined): string {
   if (amount == null) return "0,00 Dhs"
   const formatted = amount.toLocaleString("fr-FR", {

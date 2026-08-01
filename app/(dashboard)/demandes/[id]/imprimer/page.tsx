@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth/server"
 import { redirect } from "next/navigation"
 import { findById } from "@/lib/demande"
+import { getSocieteBranding } from "@/lib/societe"
 import { DemandeNotFoundError } from "@/lib/errors"
 import type { Role } from "@/lib/auth"
 import {
@@ -8,6 +9,7 @@ import {
   formatDate,
   TRANSPORT_LABELS,
   ETAPE_LABELS,
+  DEFAULT_SOCIETE_NOM,
 } from "@/lib/constants"
 import { parseMotif, type DemandeWithRelations } from "@/lib/demande-types"
 
@@ -32,11 +34,28 @@ export default async function ImprimerPage({
   }
 
   const motifs = parseMotif(demande.motif)
+  const societe = await getSocieteBranding()
+  const societeNom = societe?.nom ?? DEFAULT_SOCIETE_NOM
+  const societeLogoUrl = societe?.logoUrl ?? null
+  const accentColor = societe?.couleurPrimaire ?? null
 
   return (
     <div className="mx-auto max-w-4xl p-8">
-      <div className="mb-8 border-b-2 border-primary pb-4">
-        <h1 className="text-2xl font-bold text-primary">HAY 2010 SARL</h1>
+      <div
+        className="mb-8 border-b-2 border-primary pb-4"
+        style={accentColor ? { borderColor: accentColor } : undefined}
+      >
+        <div className="flex items-center gap-3">
+          {societeLogoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={societeLogoUrl}
+              alt={societeNom}
+              className="h-10 w-10 object-contain"
+            />
+          )}
+          <h1 className="text-2xl font-bold text-primary">{societeNom}</h1>
+        </div>
         <p className="text-sm text-muted-foreground">
           Formulaire de Demande de Déplacement
         </p>
@@ -167,8 +186,8 @@ export default async function ImprimerPage({
       )}
 
       <p className="mt-8 text-center text-xs text-muted-foreground">
-        Document généré le {new Date().toLocaleDateString("fr-FR")} - HAY 2010
-        SARL
+        Document généré le {new Date().toLocaleDateString("fr-FR")} -{" "}
+        {societeNom}
       </p>
     </div>
   )

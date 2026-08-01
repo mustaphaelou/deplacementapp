@@ -5,6 +5,10 @@ export {
   recordDocument,
 } from "./mutations"
 export { appliquerEffets } from "./effets-transition"
+export {
+  generateDemandeDocumentPdf,
+  type GenerateDemandeDocumentPdfParams,
+} from "./documents"
 export type {
   DemandeDeplacementRow,
   DocumentRow,

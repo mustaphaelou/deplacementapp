@@ -111,7 +111,7 @@ An optional profile image uploaded by a Utilisateur. Stored as a file on the loc
 _Avoid_: Profile picture, profile photo, user image
 
 **Document**:
-A file attached to a DemandeDeplacement (e.g., invoice, receipt, PDF). The `type` field is free-text (typically a MIME type or descriptive label), not a fixed enum.
+A file attached to a DemandeDeplacement (e.g., invoice, receipt, PDF). The `type` field is free-text (typically a MIME type or descriptive label), not a fixed enum. Generated PDFs are orchestrated by the `lib/demande/documents.ts` module — `generateDemandeDocumentPdf` maps the DemandeDeplacement (via `toPdfRenderData`, threading the Societe's IdentiteVisuelle), renders through the injected renderer seam, and records the row via `recordDocument` (the recording primitive, exported from `lib/demande`).
 
 **Amorçage (Setup)**:
 The bootstrap lifecycle state of the system while zero Societes exist. It is not a persistent entity — it is a lifecycle state, detected by counting Societes. While in Amorçage, the /login page renders a setup wizard instead of the sign-in form; the wizard creates the initial Societe, the first Departements, and the first Utilisateur (Role GENERAL_DIRECTION), after which the system leaves Amorçage permanently and the wizard never appears again. The lifecycle state is carried in code by the `lib/amorcage` module — `estEnAmorcage` (the count gate) and `quitterAmorcage` (the atomic bootstrap).

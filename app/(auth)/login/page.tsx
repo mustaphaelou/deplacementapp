@@ -16,6 +16,7 @@ import {
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
 import { SetupWizard } from "./setup-wizard"
+import { DEFAULT_SOCIETE_NOM } from "@/lib/constants"
 
 interface Societe {
   nom: string
@@ -99,7 +100,7 @@ export default function LoginPage() {
               </div>
             )}
           </div>
-          <CardTitle>{societe?.nom ?? "Application"}</CardTitle>
+          <CardTitle>{societe?.nom ?? DEFAULT_SOCIETE_NOM}</CardTitle>
           <CardDescription>Connexion à votre espace de travail</CardDescription>
         </CardHeader>
         <CardContent>

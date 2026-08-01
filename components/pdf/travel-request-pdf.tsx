@@ -1,7 +1,12 @@
 import ReactPDF from "@react-pdf/renderer"
-import { format } from "date-fns"
-import { fr } from "date-fns/locale"
 import type { PdfRenderData } from "@/lib/pdf-types"
+import {
+  TRANSPORT_LABELS,
+  formatCurrency,
+  formatDate,
+  formatDateTime,
+  DEFAULT_SOCIETE_NOM,
+} from "@/lib/constants"
 
 const { Document, Page, Text, View, StyleSheet } = ReactPDF
 
@@ -147,35 +152,6 @@ const watermarkStyles = StyleSheet.create({
   },
 })
 
-const STATUS_LABELS: Record<string, string> = {
-  BROUILLON: "BROUILLON",
-  SOUMISE: "SOUMISE",
-  APPROUVEE_MANAGER: "APPROUVEE MANAGER",
-  APPROUVEE_FINANCE: "APPROUVEE FINANCE",
-  APPROUVEE: "APPROUVEE",
-  REJETEE_MANAGER: "REJETEE MANAGER",
-  REJETEE_FINANCE: "REJETEE FINANCE",
-  REJETEE_DIRECTION: "REJETEE DIRECTION",
-  RETIREE: "RETIREE",
-}
-
-const TRANSPORT_LABELS: Record<string, string> = {
-  VOITURE_PERSONNELLE: "Voiture personnelle",
-  VOITURE_SOCIETE: "Véhicule de société",
-  BUS: "Bus",
-  AVION: "Avion",
-  TRAIN: "Train",
-  AUTRE: "Autre",
-}
-
-function formatDate(date: Date): string {
-  return format(new Date(date), "PPP", { locale: fr })
-}
-
-function formatDateTime(date: Date): string {
-  return format(new Date(date), "dd MMM yyyy 'a' HH:mm", { locale: fr })
-}
-
 function getStatusColor(etape: string, decision: string): string {
   if (decision === "REJECTED" || decision === "WITHDRAWN") return "#dc2626"
   if (decision === "APPROVED") return "#16a34a"
@@ -188,15 +164,17 @@ export function TravelRequestPdf({ data }: { data: PdfRenderData }) {
   const isDraft = data.etape === "DRAFT"
   const statusLabel = data.etape
   const statusColor = getStatusColor(data.etape, data.decision)
+  const societeNom = data.branding?.nom ?? DEFAULT_SOCIETE_NOM
+  const accentColor = data.branding?.couleurPrimaire
   const transportLabel =
     TRANSPORT_LABELS[data.typeTransport] || data.typeTransport
 
   return (
     <Document
       title={`Deplacement - ${data.destination}`}
-      author="HAY 2010 SARL"
+      author={societeNom}
       subject={`Demande de deplacement: ${data.destination}`}
-      creator="HAY 2010 SARL - Systeme de Gestion des Deplacements"
+      creator={`${societeNom} - Systeme de Gestion des Deplacements`}
     >
       <Page size="A4" style={styles.page}>
         {isDraft && (
@@ -205,8 +183,14 @@ export function TravelRequestPdf({ data }: { data: PdfRenderData }) {
           </View>
         )}
 
-        <View style={styles.header}>
-          <Text style={styles.companyName}>HAY 2010 SARL</Text>
+        <View
+          style={
+            accentColor
+              ? [styles.header, { borderBottomColor: accentColor }]
+              : styles.header
+          }
+        >
+          <Text style={styles.companyName}>{societeNom}</Text>
           <Text style={styles.docTitle}>FORMULAIRE DE DEPLACEMENT</Text>
         </View>
 
@@ -293,31 +277,31 @@ export function TravelRequestPdf({ data }: { data: PdfRenderData }) {
           <View style={styles.tableRow}>
             <Text style={styles.tableCell}>Transport</Text>
             <Text style={styles.tableCell}>
-              {data.couts.transport.toLocaleString("fr-FR")} EUR
+              {formatCurrency(data.couts.transport)}
             </Text>
           </View>
           <View style={styles.tableRow}>
             <Text style={styles.tableCell}>Hebergement</Text>
             <Text style={styles.tableCell}>
-              {data.couts.hebergement.toLocaleString("fr-FR")} EUR
+              {formatCurrency(data.couts.hebergement)}
             </Text>
           </View>
           <View style={styles.tableRow}>
             <Text style={styles.tableCell}>Repas</Text>
             <Text style={styles.tableCell}>
-              {data.couts.repas.toLocaleString("fr-FR")} EUR
+              {formatCurrency(data.couts.repas)}
             </Text>
           </View>
           <View style={styles.tableRow}>
             <Text style={styles.tableCell}>Divers</Text>
             <Text style={styles.tableCell}>
-              {data.couts.divers.toLocaleString("fr-FR")} EUR
+              {formatCurrency(data.couts.divers)}
             </Text>
           </View>
           <View style={[styles.tableRow, { fontWeight: "bold" }]}>
             <Text style={styles.tableCell}>Total estime</Text>
             <Text style={styles.tableCell}>
-              {data.couts.total.toLocaleString("fr-FR")} EUR
+              {formatCurrency(data.couts.total)}
             </Text>
           </View>
         </View>
@@ -355,7 +339,7 @@ export function TravelRequestPdf({ data }: { data: PdfRenderData }) {
             <View style={styles.field}>
               <Text style={styles.fieldLabel}>Montant avance</Text>
               <Text style={styles.fieldValue}>
-                {(data.montantAvance ?? 0).toLocaleString("fr-FR")} EUR
+                {formatCurrency(data.montantAvance)}
               </Text>
             </View>
           </>
@@ -380,7 +364,7 @@ export function TravelRequestPdf({ data }: { data: PdfRenderData }) {
 
         <View style={styles.footer} fixed>
           <Text>
-            HAY 2010 SARL - Formulaire de Deplacement - Genere le{" "}
+            {societeNom} - Formulaire de Deplacement - Genere le{" "}
             {formatDateTime(new Date())} - Document non contractuel
           </Text>
         </View>

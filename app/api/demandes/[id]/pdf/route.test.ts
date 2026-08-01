@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { NextRequest } from "next/server"
 import type { DemandeWithRelations } from "@/lib/demande-types"
-import { TravelRequestPdfAdapter } from "@/components/pdf/travel-request-pdf-adapter"
 import { DemandeNotFoundError, PdfRenderError } from "@/lib/errors"
 
 vi.mock("@/lib/auth/server", () => ({
@@ -10,7 +9,11 @@ vi.mock("@/lib/auth/server", () => ({
 
 vi.mock("@/lib/demande", () => ({
   findById: vi.fn(),
-  recordDocument: vi.fn().mockResolvedValue(undefined),
+  generateDemandeDocumentPdf: vi.fn(),
+}))
+
+vi.mock("@/lib/societe", () => ({
+  getSocieteBranding: vi.fn(),
 }))
 
 vi.mock(
@@ -86,6 +89,16 @@ const mockDemande: DemandeWithRelations = {
   },
 }
 
+const mockBranding = {
+  id: "s-1",
+  nom: "Acme SARL",
+  logoUrl: null,
+  faviconUrl: null,
+  couleurPrimaire: "#0055aa",
+  nomExpediteurEmail: "Acme",
+  domaineEmail: "acme.ma",
+}
+
 function mockAuth() {
   return {
     ok: true,
@@ -110,42 +123,22 @@ describe("PDF route integration", () => {
     vi.resetAllMocks()
   })
 
-  it("toPdfRenderData produces valid PdfRenderData for TravelRequestPdfAdapter", async () => {
-    const { toPdfRenderData } = await import("@/lib/pdf-mapper")
-    const data = toPdfRenderData(mockDemande)
-
-    expect(data.numero).toBe("DD-2025-0001")
-    expect(data.etape).toBe("FINANCE_REVIEW")
-    expect(data.assigneA).toEqual({
-      id: "u-2",
-      nom: "Bernard",
-      prenom: "Pierre",
-    })
-    expect(data.vehicule).toEqual({
-      nom: "Peugeot 3008",
-      immatriculation: "AB-123-CD",
-    })
-  })
-
-  it("TravelRequestPdfAdapter renders a non-empty buffer from mapped data", async () => {
-    const { toPdfRenderData } = await import("@/lib/pdf-mapper")
-
-    const data = toPdfRenderData(mockDemande)
-    const adapter = new TravelRequestPdfAdapter()
-    const buffer = await adapter.render(data)
-
-    expect(Buffer.isBuffer(buffer)).toBe(true)
-    expect(buffer.length).toBeGreaterThan(0)
-  })
-
-  it("GET returns a PDF buffer when demande is found", async () => {
+  it("GET returns a PDF buffer and delegates to the document module", async () => {
     const { requireAuth } = await import("@/lib/auth/server")
-    const { findById, recordDocument } = await import("@/lib/demande")
+    const { findById, generateDemandeDocumentPdf } =
+      await import("@/lib/demande")
+    const { getSocieteBranding } = await import("@/lib/societe")
     const { pdfAdapter } =
       await import("@/components/pdf/travel-request-pdf-adapter")
 
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
     ;(findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockDemande)
+    ;(getSocieteBranding as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockBranding
+    )
+    ;(generateDemandeDocumentPdf as ReturnType<typeof vi.fn>).mockResolvedValue(
+      Buffer.from("%PDF-1.4")
+    )
 
     const { GET } = await import("./route")
     const response = await GET(mockRequest("d-1"), {
@@ -158,11 +151,11 @@ describe("PDF route integration", () => {
       id: "u-1",
       role: "EMPLOYEE",
     })
-    expect(recordDocument).toHaveBeenCalledWith("d-1", {
-      type: "PDF",
-      chemin: "demande-DD-2025-0001.pdf",
+    expect(generateDemandeDocumentPdf).toHaveBeenCalledWith({
+      demande: mockDemande,
+      branding: mockBranding,
+      renderer: pdfAdapter,
     })
-    expect(pdfAdapter.render).toHaveBeenCalledOnce()
   })
 
   it("GET returns 401 when auth fails", async () => {
@@ -201,15 +194,18 @@ describe("PDF route integration", () => {
     expect(body.error).toBe("Demande introuvable")
   })
 
-  it("GET returns 500 when PDF render fails and does not create a document", async () => {
+  it("GET returns 500 when PDF generation fails", async () => {
     const { requireAuth } = await import("@/lib/auth/server")
-    const { findById, recordDocument } = await import("@/lib/demande")
-    const { pdfAdapter } =
-      await import("@/components/pdf/travel-request-pdf-adapter")
+    const { findById, generateDemandeDocumentPdf } =
+      await import("@/lib/demande")
+    const { getSocieteBranding } = await import("@/lib/societe")
 
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
     ;(findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockDemande)
-    ;(pdfAdapter.render as ReturnType<typeof vi.fn>).mockRejectedValue(
+    ;(getSocieteBranding as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockBranding
+    )
+    ;(generateDemandeDocumentPdf as ReturnType<typeof vi.fn>).mockRejectedValue(
       new PdfRenderError()
     )
 
@@ -221,6 +217,5 @@ describe("PDF route integration", () => {
     expect(response.status).toBe(500)
     const body = await response.json()
     expect(body.error).toBe("Erreur de génération PDF")
-    expect(recordDocument).not.toHaveBeenCalled()
   })
 })

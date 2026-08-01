@@ -30,6 +30,7 @@ function makePdfRenderData(overrides?: Partial<PdfRenderData>): PdfRenderData {
     description: null,
     creeLe: new Date("2025-05-24"),
     assigneA: null,
+    branding: null,
     ...overrides,
   }
 }
