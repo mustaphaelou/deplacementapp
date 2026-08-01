@@ -5,6 +5,7 @@ import {
   formatCurrency,
   formatDate,
   formatDateTime,
+  DEFAULT_SOCIETE_NOM,
 } from "@/lib/constants"
 
 const { Document, Page, Text, View, StyleSheet } = ReactPDF
@@ -163,7 +164,7 @@ export function TravelRequestPdf({ data }: { data: PdfRenderData }) {
   const isDraft = data.etape === "DRAFT"
   const statusLabel = data.etape
   const statusColor = getStatusColor(data.etape, data.decision)
-  const societeNom = data.branding?.nom ?? "Application"
+  const societeNom = data.branding?.nom ?? DEFAULT_SOCIETE_NOM
   const accentColor = data.branding?.couleurPrimaire
   const transportLabel =
     TRANSPORT_LABELS[data.typeTransport] || data.typeTransport

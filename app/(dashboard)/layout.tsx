@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import { DashboardShell } from "@/components/dashboard-shell"
 import { NAV_ITEMS } from "@/lib/auth"
 import { getSocieteBranding } from "@/lib/societe"
+import { DEFAULT_SOCIETE_NOM } from "@/lib/constants"
 
 export default async function DashboardLayout({
   children,
@@ -23,7 +24,7 @@ export default async function DashboardLayout({
   return (
     <DashboardShell
       navItems={navItems}
-      societeNom={societe?.nom ?? "Application"}
+      societeNom={societe?.nom ?? DEFAULT_SOCIETE_NOM}
       societeLogoUrl={societe?.logoUrl ?? null}
     >
       {children}

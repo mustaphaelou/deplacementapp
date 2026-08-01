@@ -9,6 +9,7 @@ import {
   formatDate,
   TRANSPORT_LABELS,
   ETAPE_LABELS,
+  DEFAULT_SOCIETE_NOM,
 } from "@/lib/constants"
 import { parseMotif, type DemandeWithRelations } from "@/lib/demande-types"
 
@@ -34,7 +35,7 @@ export default async function ImprimerPage({
 
   const motifs = parseMotif(demande.motif)
   const societe = await getSocieteBranding()
-  const societeNom = societe?.nom ?? "Application"
+  const societeNom = societe?.nom ?? DEFAULT_SOCIETE_NOM
   const societeLogoUrl = societe?.logoUrl ?? null
   const accentColor = societe?.couleurPrimaire ?? null
 

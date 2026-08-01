@@ -9,9 +9,6 @@ vi.mock("@/lib/auth/server", () => ({
 
 vi.mock("@/lib/demande", () => ({
   findById: vi.fn(),
-}))
-
-vi.mock("@/lib/demande/documents", () => ({
   generateDemandeDocumentPdf: vi.fn(),
 }))
 
@@ -128,10 +125,8 @@ describe("PDF route integration", () => {
 
   it("GET returns a PDF buffer and delegates to the document module", async () => {
     const { requireAuth } = await import("@/lib/auth/server")
-    const { findById } = await import("@/lib/demande")
-    const { generateDemandeDocumentPdf } = await import(
-      "@/lib/demande/documents"
-    )
+    const { findById, generateDemandeDocumentPdf } =
+      await import("@/lib/demande")
     const { getSocieteBranding } = await import("@/lib/societe")
     const { pdfAdapter } =
       await import("@/components/pdf/travel-request-pdf-adapter")
@@ -201,10 +196,8 @@ describe("PDF route integration", () => {
 
   it("GET returns 500 when PDF generation fails", async () => {
     const { requireAuth } = await import("@/lib/auth/server")
-    const { findById } = await import("@/lib/demande")
-    const { generateDemandeDocumentPdf } = await import(
-      "@/lib/demande/documents"
-    )
+    const { findById, generateDemandeDocumentPdf } =
+      await import("@/lib/demande")
     const { getSocieteBranding } = await import("@/lib/societe")
 
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())

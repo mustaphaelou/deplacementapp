@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth, type Role } from "@/lib/auth/server"
-import { findById } from "@/lib/demande"
-import { generateDemandeDocumentPdf } from "@/lib/demande/documents"
+import { findById, generateDemandeDocumentPdf } from "@/lib/demande"
 import { getSocieteBranding } from "@/lib/societe"
 import { pdfAdapter } from "@/components/pdf/travel-request-pdf-adapter"
 import { handleServiceError } from "@/lib/errors"
