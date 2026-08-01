@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from "vitest"
+import { describe, it, expect, vi, beforeEach } from "vitest"
 import { NotificationModule } from "./index"
+import { sendEmail } from "./adapter"
 import type {
   NotificationAdapter,
   NotificationMessage,
@@ -11,6 +12,10 @@ vi.mock("./adapter", () => ({
   DrizzleNotificationAdapter: vi.fn(),
   sendEmail: vi.fn(),
 }))
+
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 function mockAdapter(): NotificationAdapter & {
   send: ReturnType<typeof vi.fn>
@@ -239,6 +244,76 @@ describe("NotificationModule", () => {
 
     expect(result.total).toBe(0)
     expect(adapter.send).not.toHaveBeenCalled()
+  })
+
+  it("dispatch passes the module's db to send explicitly", async () => {
+    const adapter = mockAdapter()
+    const db = mockDb()
+    db.select = mockSelectResult([{ id: "mgr-hr" }])
+
+    const bus = new NotificationModule(adapter, db as any)
+    await bus.dispatch("DEMANDE_SOUMISE", makePayload())
+
+    expect(adapter.send.mock.calls[0][1]).toBe(db)
+  })
+
+  it("dispatchRows resolves recipients from the caller's tx and calls send with (message, tx)", async () => {
+    const adapter = mockAdapter()
+    const tx = mockDb()
+    tx.select = mockSelectResult([{ id: "mgr-hr" }])
+
+    const bus = new NotificationModule(adapter, tx as any)
+    await bus.dispatchRows("DEMANDE_SOUMISE", makePayload(), tx as any)
+
+    expect(adapter.send).toHaveBeenCalledTimes(1)
+    const [message, dbArg] = adapter.send.mock.calls[0] as [
+      NotificationMessage,
+      unknown,
+    ]
+    expect(message.utilisateurId).toBe("mgr-hr")
+    expect(message.demandeId).toBe("d-1")
+    expect(dbArg).toBe(tx)
+  })
+
+  it("dispatchRows sends no email (rows-only invariant)", async () => {
+    const adapter = mockAdapter()
+    const tx = mockDb()
+    tx.select = mockSelectResult([{ id: "mgr-hr" }])
+
+    const bus = new NotificationModule(adapter, tx as any)
+    await bus.dispatchRows("DEMANDE_SOUMISE", makePayload(), tx as any)
+
+    expect(sendEmail).not.toHaveBeenCalled()
+  })
+
+  it("dispatchRows throws when the adapter fails so the caller's transaction rolls back", async () => {
+    const adapter = mockAdapter()
+    adapter.send.mockResolvedValueOnce({
+      success: false,
+      error: new Error("DB write error"),
+    })
+    const tx = mockDb()
+    tx.select = mockSelectResult([{ id: "mgr-hr" }])
+
+    const bus = new NotificationModule(adapter, tx as any)
+    await expect(
+      bus.dispatchRows("DEMANDE_SOUMISE", makePayload(), tx as any)
+    ).rejects.toThrow("DB write error")
+  })
+
+  it("dispatchRows no-ops on zero recipients", async () => {
+    const adapter = mockAdapter()
+    const tx = mockDb()
+    tx.select = mockSelectResult([{ id: "mgr-1" }])
+
+    const bus = new NotificationModule(adapter, tx as any)
+    const payload = makePayload({
+      employe: { id: "emp-1", prenom: "Jean", nom: "Dupont" },
+    })
+    await bus.dispatchRows("DEMANDE_NOTIFICATION_LUE", payload, tx as any)
+
+    expect(adapter.send).not.toHaveBeenCalled()
+    expect(sendEmail).not.toHaveBeenCalled()
   })
 
   it("markAsRead marks the notification as read and dispatches read receipt for the owner employee", async () => {

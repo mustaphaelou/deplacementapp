@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm"
-import type { DrizzleDb } from "../../db"
+import type { DrizzleDb, DrizzleTransactionClient } from "../../db"
 import { db } from "../../db"
 import { DrizzleNotificationAdapter } from "./adapter"
 import type { NotificationAdapter, AdapterResult } from "./adapter"
@@ -62,7 +62,7 @@ export class NotificationModule {
           utilisateurId,
           demandeId: payload.demandeId,
         }
-        const adapterResult = await this.adapter.send(msg)
+        const adapterResult = await this.adapter.send(msg, this._db)
         if (adapterResult.success) {
           await sendEmail(msg, this._db)
         }
@@ -89,6 +89,35 @@ export class NotificationModule {
     }
 
     return { total: recipients.length, succeeded, failed, failures }
+  }
+
+  async dispatchRows(
+    event: NotificationEventType,
+    payload: NotificationPayload,
+    tx: DrizzleTransactionClient
+  ): Promise<void> {
+    const recipients = await resolveRecipients(event, payload, tx)
+    if (recipients.length === 0) return
+
+    const { titre, message } = buildMessage(
+      event,
+      payload.numero,
+      payload.employe.prenom,
+      payload.employe.nom
+    )
+
+    for (const utilisateurId of recipients) {
+      const msg: NotificationMessage = {
+        titre,
+        message,
+        utilisateurId,
+        demandeId: payload.demandeId,
+      }
+      const adapterResult = await this.adapter.send(msg, tx)
+      if (!adapterResult.success) {
+        throw adapterResult.error ?? new Error("Notification row write failed")
+      }
+    }
   }
 
   async markAsRead(notificationId: string, userId: string): Promise<void> {
@@ -140,6 +169,7 @@ export class NotificationModule {
   }
 }
 
-const _default = new NotificationModule(new DrizzleNotificationAdapter(db), db)
+const _default = new NotificationModule(new DrizzleNotificationAdapter(), db)
 export const dispatch = _default.dispatch.bind(_default)
+export const dispatchRows = _default.dispatchRows.bind(_default)
 export const markAsRead = _default.markAsRead.bind(_default)

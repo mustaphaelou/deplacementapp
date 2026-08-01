@@ -71,7 +71,7 @@ describe("DrizzleNotificationAdapter", { timeout: TIMEOUT }, () => {
   })
 
   it("inserts a notification row into the notifications table", async () => {
-    const adapter = new DrizzleNotificationAdapter(pgliteDb as any)
+    const adapter = new DrizzleNotificationAdapter()
     const message: NotificationMessage = {
       titre: "Nouvelle demande",
       message: "Test message content",
@@ -79,7 +79,7 @@ describe("DrizzleNotificationAdapter", { timeout: TIMEOUT }, () => {
       demandeId,
     }
 
-    const result = await adapter.send(message)
+    const result = await adapter.send(message, pgliteDb as any)
 
     expect(result.success).toBe(true)
 
@@ -97,7 +97,7 @@ describe("DrizzleNotificationAdapter", { timeout: TIMEOUT }, () => {
   })
 
   it("inserts notification with null demandeId", async () => {
-    const adapter = new DrizzleNotificationAdapter(pgliteDb as any)
+    const adapter = new DrizzleNotificationAdapter()
     const message: NotificationMessage = {
       titre: "Notification sans demande",
       message: "Test message",
@@ -105,13 +105,13 @@ describe("DrizzleNotificationAdapter", { timeout: TIMEOUT }, () => {
       demandeId: null as any,
     }
 
-    const result = await adapter.send(message)
+    const result = await adapter.send(message, pgliteDb as any)
     expect(result.success).toBe(true)
   })
 
   it("returns failure when insert fails", async () => {
     // Pass an invalid db to force a failure
-    const adapter = new DrizzleNotificationAdapter(null as any)
+    const adapter = new DrizzleNotificationAdapter()
     const message: NotificationMessage = {
       titre: "Fail",
       message: "Should fail",
@@ -119,7 +119,7 @@ describe("DrizzleNotificationAdapter", { timeout: TIMEOUT }, () => {
       demandeId: null as any,
     }
 
-    const result = await adapter.send(message)
+    const result = await adapter.send(message, null as any)
     expect(result.success).toBe(false)
     expect(result.error).toBeDefined()
   })
