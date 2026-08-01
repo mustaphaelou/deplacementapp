@@ -1,11 +1,10 @@
 import type { DrizzleTransactionClient } from "../../db"
 import { logAudit } from "../audit"
-import { notifications } from "../../db/schema/notifications"
+import { dispatchRows } from "../notification"
 import type {
   NotificationEventType,
   NotificationPayload,
-} from "../notification-events"
-import { buildMessage, resolveRecipients } from "../notification/helpers"
+} from "../notification"
 
 export async function appliquerEffets(
   tx: DrizzleTransactionClient,
@@ -44,12 +43,6 @@ export async function appliquerEffets(
   if (params.notification) {
     const { event, demandeId, numero, employe, assigneAId } =
       params.notification
-    const { titre, message } = buildMessage(
-      event,
-      numero,
-      employe.prenom,
-      employe.nom
-    )
 
     const payload: NotificationPayload = {
       demandeId,
@@ -57,18 +50,6 @@ export async function appliquerEffets(
       employe,
       assigneAId,
     }
-    const recipientIds = await resolveRecipients(event, payload, tx)
-
-    if (recipientIds.length > 0) {
-      await tx.insert(notifications).values(
-        recipientIds.map((utilisateurId) => ({
-          id: crypto.randomUUID(),
-          utilisateurId,
-          demandeId,
-          titre,
-          message,
-        }))
-      )
-    }
+    await dispatchRows(event, payload, tx)
   }
 }

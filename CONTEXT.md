@@ -88,7 +88,7 @@ The rule determining which DemandesDeplacement a Utilisateur can view. An EMPLOY
 _Avoid_: row-level security, permissions matrix, access control list
 
 **Notification**:
-A message sent to a Utilisateur about a DemandeDeplacement event, delivered via both an in-app alert and an email. MANAGER notifications are scoped to the employee's Departement; FINANCE_ADMIN and GENERAL_DIRECTION notifications are org-wide.
+A message sent to a Utilisateur about a DemandeDeplacement event, delivered via both an in-app alert and an email. MANAGER notifications are scoped to the employee's Departement; FINANCE_ADMIN and GENERAL_DIRECTION notifications are org-wide. The Notification module is the single writer of notification rows — via `dispatch` (rows + email) and the rows-only `dispatchRows` — no other module writes them directly.
 
 **AccuseLecture (Read Receipt)**:
 A Notification automatically sent to the MANAGER of an Employee's Departement when that Employee marks a Notification related to a DemandeDeplacement as read (lu). Dispatched only when the reader's Role is EMPLOYEE and the Notification is linked to a DemandeDeplacement — reads by MANAGER, FINANCE_ADMIN, or GENERAL_DIRECTION (or reads of demande-less notifications) produce no AccuseLecture. The email step of the AccuseLecture is dispatched via the EmailSender module.
@@ -102,7 +102,7 @@ _Avoid_: EmailService (the predecessor's name), mailer, email service
 A timestamped record of a *committed* state change: who performed what action on which entity. Only successful transitions are recorded — attempts that fail authorization or transition guards (wrong role, invalid action, missing record) throw before the audit dispatch and produce no JournalAudit entry. The `logAudit(event, dbOrTx)` function in `lib/audit` is the single entry point for all audit writes — called by `UtilisateurService`, `VehiculeService`, `app/api/societe/route.ts`, and `appliquerEffets` (with the transaction `tx`).
 
 **EffetsTransition (Transition Effects)**:
-The side-effects executed immediately following a committed DemandeDeplacement transition, combining JournalAudit logging and Notification dispatches behind a single internal seam. The seam is **rows-only**: JournalAudit inserts and Notification row inserts run inside the caller's `db.transaction`. Email dispatch is explicitly out of scope — email belongs to the EmailSender module, fired by AccuseLecture, not by transitions.
+The side-effects executed immediately following a committed DemandeDeplacement transition, combining JournalAudit logging and Notification dispatches behind a single internal seam. The seam is **rows-only**: JournalAudit inserts and Notification row inserts run inside the caller's `db.transaction`. The Notification side is dispatched through the Notification module's rows-only `dispatchRows(event, payload, tx)` — the module is the single writer of notification rows, and transitions never write them directly. Email dispatch is explicitly out of scope — email belongs to the EmailSender module, fired by AccuseLecture, not by transitions.
 _Avoid_: Event bus, side-effect bus, notification bus
 
 
