@@ -83,9 +83,10 @@ export default function UtilisateursPage() {
     }
   }
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
-    fetchData()
+    ;(async () => {
+      await fetchData()
+    })()
   }, [])
 
   function openEdit(user: Utilisateur) {

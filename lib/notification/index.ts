@@ -2,10 +2,9 @@ import { eq } from "drizzle-orm"
 import type { DrizzleDb, DrizzleTransactionClient } from "../../db"
 import { db } from "../../db"
 import { DrizzleNotificationAdapter } from "./adapter"
-import type { NotificationAdapter, AdapterResult } from "./adapter"
+import type { NotificationAdapter } from "./adapter"
 import { sendEmail } from "./adapter"
 import { buildNotificationMessage, resolveRecipients } from "./helpers"
-import { listForUser, countUnread } from "./queries"
 import type {
   NotificationEventType,
   NotificationPayload,

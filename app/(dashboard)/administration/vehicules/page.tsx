@@ -39,9 +39,10 @@ export default function VehiculesPage() {
     }
   }
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
-    fetchVehicules()
+    ;(async () => {
+      await fetchVehicules()
+    })()
   }, [])
 
   function openEdit(v: Vehicule) {

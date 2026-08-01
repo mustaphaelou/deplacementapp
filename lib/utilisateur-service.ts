@@ -241,7 +241,7 @@ export class UtilisateurService {
       updateData.email = data.email
     }
 
-    let previousAvatarUrl: string | null = user.avatarUrl
+    const previousAvatarUrl: string | null = user.avatarUrl
     let savedNewAvatar = false
 
     if (data.avatarData !== undefined) {

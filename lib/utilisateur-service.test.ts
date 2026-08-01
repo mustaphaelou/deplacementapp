@@ -10,9 +10,6 @@ import type { AvatarStorage } from "./avatar-storage"
 import {
   UtilisateurService,
   UtilisateurNotFoundError,
-  MotDePasseIncorrectError,
-  EmailChangeRequiresPasswordError,
-  NoProfileUpdateDataError,
 } from "./utilisateur-service"
 
 vi.mock("bcryptjs", () => ({
