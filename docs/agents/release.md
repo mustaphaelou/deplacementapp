@@ -50,7 +50,7 @@ On-demand. There is no automated version bump. The cadence is decided by filing 
 
 ## Behaviors to rely on
 
-- **Malformed tags** (`v-weird`, not SemVer): no versioned images and no GitHub Release — the `docker/metadata-action` semver patterns filter the image side and the strict `vX.Y.Z` gate (`release-check` step) blocks the Release object. Only the full-sha image is still pushed (harmless); `latest` and the versioned tags are left untouched.
+- **Malformed tags** (`v-weird`, not SemVer): the `release-gate` step fails the run immediately with a clear error naming the tag and the expected `vX.Y.Z` shape, before any Docker setup — nothing is pushed (no versioned, sha, or `latest` tag) and no GitHub Release object is created.
 - **Draft-first**: the auto-created Release is a draft, so generated-notes inaccuracies are fixed before anyone can read them.
 - **Version trace**: a running image's digest → sha-tagged image → its Release answers "what's running?" in two hops. Production keeps pulling `latest`; no Coolify changes are needed for a Release.
 

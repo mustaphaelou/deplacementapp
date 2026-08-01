@@ -11,6 +11,7 @@ const CONTEXT_PATH = join(ROOT, "CONTEXT.md")
 
 interface Step {
   name?: string
+  id?: string
   uses?: string
   run?: string
   if?: string
@@ -54,6 +55,18 @@ function runScripts(steps: Step[]): string {
 
 function wrapperContents(): string {
   return readFileSync(WRAPPER_PATH, "utf8")
+}
+
+function releaseGateStep(): Step {
+  const gate = buildAndPublishSteps().find((step) => step.id === "release-gate")
+  if (!gate) throw new Error("release-gate step not found")
+  return gate
+}
+
+function metadataSteps(): Step[] {
+  return buildAndPublishSteps().filter((step) =>
+    step.uses?.includes("docker/metadata-action")
+  )
 }
 
 function isDockerBuildStep(step: Step): boolean {
@@ -192,5 +205,90 @@ describe(".github/workflows/docker-publish.yml", () => {
     expect(wrapper).toContain("--image")
     expect(wrapper).toContain("--migrator-image")
     expect(workflowRuns).toContain("--migrator-image")
+  })
+
+  describe("release gate", () => {
+    it("runs the release gate right after checkout, before any Docker setup", () => {
+      const steps = buildAndPublishSteps()
+      const gateIndex = steps.findIndex((step) => step.id === "release-gate")
+      const checkoutIndex = steps.findIndex((step) =>
+        step.uses?.includes("actions/checkout")
+      )
+      const qemuIndex = steps.findIndex((step) =>
+        step.uses?.includes("docker/setup-qemu-action")
+      )
+      expect(gateIndex).toBeGreaterThan(-1)
+      expect(checkoutIndex).toBeGreaterThan(-1)
+      expect(qemuIndex).toBeGreaterThan(-1)
+      expect(gateIndex).toBeGreaterThan(checkoutIndex)
+      expect(gateIndex).toBeLessThan(qemuIndex)
+    })
+
+    it("computes release-ness once, from a strict semver regex on tag refs", () => {
+      const computing = buildAndPublishSteps().filter((step) =>
+        (step.run ?? "").includes("is_release=")
+      )
+      expect(computing).toHaveLength(1)
+      const gate = computing[0]
+      expect(gate.id).toBe("release-gate")
+      const run = gate.run ?? ""
+      expect(run).toContain("github.ref_type")
+      expect(run).toContain("^v[0-9]+\\.[0-9]+\\.[0-9]+$")
+      expect(run).toContain("is_release=true")
+      expect(run).toContain("is_release=false")
+    })
+
+    it("fails fast on a malformed v* tag with a clear error, before Docker work", () => {
+      const run = releaseGateStep().run ?? ""
+      expect(run).toContain("::error::")
+      expect(run).toContain("exit 1")
+      expect(run).toContain("github.ref_name")
+    })
+
+    it("derives every release-ness consumer from the gate's single output", () => {
+      const steps = buildAndPublishSteps()
+      const body = [
+        ...steps.map((step) => JSON.stringify(step.with ?? {})),
+        ...steps.map((step) => step.if ?? ""),
+        runScripts(steps),
+      ].join("\n")
+      expect(body).not.toContain("release-check")
+      expect(body).toContain("steps.release-gate.outputs.is_release")
+      for (const step of metadataSteps()) {
+        expect(step.with?.tags).toContain("steps.release-gate.outputs.is_release")
+      }
+      const release = steps.find((step) =>
+        step.uses?.includes("softprops/action-gh-release")
+      )
+      expect(release?.if).toContain("steps.release-gate.outputs.is_release")
+    })
+
+    it("keeps the default-branch half of the latest alias inline in both metadata steps", () => {
+      const steps = metadataSteps()
+      expect(steps).toHaveLength(2)
+      for (const step of steps) {
+        expect(step.with?.tags).toContain("github.event.repository.default_branch")
+      }
+    })
+
+    it("keeps the coarse v* trigger so the gate is the single owner of release-ness", () => {
+      expect(loadWorkflow().on?.push?.tags).toContain("v*")
+    })
+
+    it("documents that malformed tags fail the run and push nothing", () => {
+      const releaseDocs = readFileSync(
+        join(ROOT, "docs/agents/release.md"),
+        "utf8"
+      )
+      const adr = readFileSync(
+        join(ROOT, "docs/adr/0004-ghcr-as-container-registry.md"),
+        "utf8"
+      )
+      expect(releaseDocs).toContain("release-gate")
+      expect(releaseDocs).not.toContain("harmless")
+      expect(releaseDocs).not.toContain("release-check")
+      expect(adr.toLowerCase()).toContain("non-semver tags fail")
+      expect(adr).not.toContain("release-check")
+    })
   })
 })
