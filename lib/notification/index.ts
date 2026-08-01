@@ -4,12 +4,11 @@ import { db } from "../../db"
 import { DrizzleNotificationAdapter } from "./adapter"
 import type { NotificationAdapter, AdapterResult } from "./adapter"
 import { sendEmail } from "./adapter"
-import { buildMessage, resolveRecipients } from "./helpers"
+import { buildNotificationMessage, resolveRecipients } from "./helpers"
 import { listForUser, countUnread } from "./queries"
 import type {
   NotificationEventType,
   NotificationPayload,
-  NotificationMessage,
 } from "../notification-events"
 import { NotificationNotFoundError, UnauthorizedActionError } from "../errors"
 import { notifications } from "../../db/schema/notifications"
@@ -47,21 +46,10 @@ export class NotificationModule {
     payload: NotificationPayload
   ): Promise<DispatchResult> {
     const recipients = await resolveRecipients(event, payload, this._db)
-    const { titre, message } = buildMessage(
-      event,
-      payload.numero,
-      payload.employe.prenom,
-      payload.employe.nom
-    )
 
     const results = await Promise.allSettled(
       recipients.map(async (utilisateurId) => {
-        const msg: NotificationMessage = {
-          titre,
-          message,
-          utilisateurId,
-          demandeId: payload.demandeId,
-        }
+        const msg = buildNotificationMessage(event, payload, utilisateurId)
         const adapterResult = await this.adapter.send(msg, this._db)
         if (adapterResult.success) {
           await sendEmail(msg, this._db)
@@ -99,20 +87,8 @@ export class NotificationModule {
     const recipients = await resolveRecipients(event, payload, tx)
     if (recipients.length === 0) return
 
-    const { titre, message } = buildMessage(
-      event,
-      payload.numero,
-      payload.employe.prenom,
-      payload.employe.nom
-    )
-
     for (const utilisateurId of recipients) {
-      const msg: NotificationMessage = {
-        titre,
-        message,
-        utilisateurId,
-        demandeId: payload.demandeId,
-      }
+      const msg = buildNotificationMessage(event, payload, utilisateurId)
       const adapterResult = await this.adapter.send(msg, tx)
       if (!adapterResult.success) {
         throw adapterResult.error ?? new Error("Notification row write failed")

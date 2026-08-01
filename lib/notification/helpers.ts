@@ -3,6 +3,7 @@ import type { DrizzleTransactionClient } from "../../db"
 import { utilisateurs } from "../../db/schema/utilisateurs"
 import type {
   NotificationEventType,
+  NotificationMessage,
   NotificationPayload,
 } from "../notification-events"
 import { EVENT_ROLE_MAP } from "../notification-events"
@@ -56,6 +57,20 @@ export function buildMessage(
       throw new Error(`Unknown event type: ${_exhaustive}`)
     }
   }
+}
+
+export function buildNotificationMessage(
+  event: NotificationEventType,
+  payload: NotificationPayload,
+  utilisateurId: string
+): NotificationMessage {
+  const { titre, message } = buildMessage(
+    event,
+    payload.numero,
+    payload.employe.prenom,
+    payload.employe.nom
+  )
+  return { titre, message, utilisateurId, demandeId: payload.demandeId }
 }
 
 const EMPLOYEE_EVENTS: NotificationEventType[] = [
