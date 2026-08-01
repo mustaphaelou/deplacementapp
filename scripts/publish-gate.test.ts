@@ -69,7 +69,17 @@ function isPushStep(step: Step): boolean {
   return isDockerBuildStep(step) && step.with?.push === true
 }
 
-function dockerBuildStepIndices(
+function isDockerSetupStep(step: Step): boolean {
+  return ["setup-qemu", "setup-buildx", "login-action"].some((needle) =>
+    step.uses?.includes(needle)
+  )
+}
+
+function isReleaseGateStep(step: Step): boolean {
+  return step.id === "release-gate"
+}
+
+function stepIndices(
   steps: Step[],
   predicate: (step: Step) => boolean
 ): number[] {
@@ -118,7 +128,7 @@ describe(".github/workflows/docker-publish.yml", () => {
 
   it("smoke-tests both loaded images before anything is pushed", () => {
     const steps = buildAndPublishSteps()
-    const smokeBuildIndices = dockerBuildStepIndices(steps, isSmokeBuildStep)
+    const smokeBuildIndices = stepIndices(steps, isSmokeBuildStep)
     expect(smokeBuildIndices).toHaveLength(2)
     for (const index of smokeBuildIndices) {
       expect(steps[index].with?.platforms).toBe("linux/amd64")
@@ -135,7 +145,7 @@ describe(".github/workflows/docker-publish.yml", () => {
     expect(smokeTestRun).toContain("--image")
     expect(smokeTestRun).toContain("--migrator-image")
 
-    const pushIndices = dockerBuildStepIndices(steps, isPushStep)
+    const pushIndices = stepIndices(steps, isPushStep)
     expect(pushIndices).toHaveLength(2)
     for (const index of pushIndices) {
       expect(index).toBeGreaterThan(smokeTestIndex)
@@ -163,20 +173,12 @@ describe(".github/workflows/docker-publish.yml", () => {
 
   it("computes release-ness in exactly one step, named release-gate, before any Docker setup", () => {
     const steps = buildAndPublishSteps()
-    const gateSteps = steps.filter((step) => step.id === "release-gate")
+    const gateSteps = steps.filter(isReleaseGateStep)
     expect(gateSteps).toHaveLength(1)
     expect(steps.some((step) => step.id === "release-check")).toBe(false)
 
-    const gateIndex = steps.findIndex((step) => step.id === "release-gate")
-    expect(gateIndex).toBeGreaterThan(-1)
-    const dockerSetupIndices = steps
-      .map((step, index) => ({ step, index }))
-      .filter(({ step }) =>
-        ["setup-qemu", "setup-buildx", "login-action"].some((needle) =>
-          step.uses?.includes(needle)
-        )
-      )
-      .map(({ index }) => index)
+    const gateIndex = steps.findIndex(isReleaseGateStep)
+    const dockerSetupIndices = stepIndices(steps, isDockerSetupStep)
     expect(dockerSetupIndices).toHaveLength(3)
     for (const index of dockerSetupIndices) {
       expect(gateIndex).toBeLessThan(index)
@@ -184,9 +186,7 @@ describe(".github/workflows/docker-publish.yml", () => {
   })
 
   it("sets is_release from the strict semver rule as the release-gate output", () => {
-    const gate = buildAndPublishSteps().find(
-      (step) => step.id === "release-gate"
-    )
+    const gate = buildAndPublishSteps().find(isReleaseGateStep)
     expect(gate?.name).toContain("Release")
     expect(gate?.run).toContain("is_release")
     expect(gate?.run).toContain("github.ref_type")
@@ -222,7 +222,7 @@ describe(".github/workflows/docker-publish.yml", () => {
       step.uses?.includes("softprops/action-gh-release")
     )
     expect(releaseIndex).toBeGreaterThan(-1)
-    const lastPushIndex = Math.max(...dockerBuildStepIndices(steps, isPushStep))
+    const lastPushIndex = Math.max(...stepIndices(steps, isPushStep))
     expect(Number.isFinite(lastPushIndex)).toBe(true)
     expect(releaseIndex).toBeGreaterThan(lastPushIndex)
   })
