@@ -86,7 +86,7 @@ export async function countUnread(userId: string, db: DrizzleDb): Promise<number
 
 - **This does not alter the rows-only invariant in `EffetsTransition`** (ADR-0007 locked). Email dispatch is still explicitly out of scope for transitions — the `sendEmail` call fires from `dispatch`, not from `appliquerEffets`.
 - **This does not re-deepen the `EmailSender` module** (ADR-0008 locked). The email transport seam and `loadSocieteIdentity` resolver are unchanged.
-- **This does not change the `NotificationAdapter` interface seam** used by the orchestration test suite. The interface is preserved at its current shape.
+- **This does not change the `NotificationAdapter` interface seam** used by the orchestration test suite. The interface is preserved at its current shape. *(Post-adoption annotation: the seam has since evolved — issue #145 changed `send` to take the db per-call (`send(notification, dbOrTx)`) and added a rows-only `dispatchRows(event, payload, tx)` path; "preserved at its current shape" refers to the pre-unification shape.)*
 - **This does not add a `lib/email/` subdirectory.** Revisit if a future candidate grows the email surface beyond the current two-function shape.
 
 ## Rationale

@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm"
-import type { DrizzleDb } from "../../db"
+import type { DrizzleDb, DrizzleTransactionClient } from "../../db"
 import { notifications } from "../../db/schema/notifications"
 import { utilisateurs } from "../../db/schema/utilisateurs"
 import { emailSender } from "../email-sender"
@@ -11,15 +11,19 @@ export interface AdapterResult {
 }
 
 export interface NotificationAdapter {
-  send(notification: NotificationMessage): Promise<AdapterResult>
+  send(
+    notification: NotificationMessage,
+    dbOrTx: DrizzleTransactionClient
+  ): Promise<AdapterResult>
 }
 
 export class DrizzleNotificationAdapter implements NotificationAdapter {
-  constructor(private _db: DrizzleDb) {}
-
-  async send(notification: NotificationMessage): Promise<AdapterResult> {
+  async send(
+    notification: NotificationMessage,
+    dbOrTx: DrizzleTransactionClient
+  ): Promise<AdapterResult> {
     try {
-      await this._db.insert(notifications).values({
+      await dbOrTx.insert(notifications).values({
         id: crypto.randomUUID(),
         utilisateurId: notification.utilisateurId,
         titre: notification.titre,
