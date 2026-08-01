@@ -50,10 +50,10 @@ jobs:
       - name: Gate release-ness before any Docker work
         id: release-gate
         run: |
-          if [[ "${{ github.ref_type }}" == "tag" && "${{ github.ref_name }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          if [[ "$GITHUB_REF_TYPE" == "tag" && "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "is_release=true" >> "$GITHUB_OUTPUT"
-          elif [[ "${{ github.ref_type }}" == "tag" ]]; then
-            echo "::error::Tag '${{ github.ref_name }}' is not a Release: expected a strict semver tag vX.Y.Z (e.g. v0.1.0)"
+          elif [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            echo "::error::Tag '$GITHUB_REF_NAME' is not a Release: expected a strict semver tag vX.Y.Z (e.g. v0.1.0)"
             exit 1
           else
             echo "is_release=false" >> "$GITHUB_OUTPUT"

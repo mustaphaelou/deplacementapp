@@ -232,7 +232,7 @@ describe(".github/workflows/docker-publish.yml", () => {
       const gate = computing[0]
       expect(gate.id).toBe("release-gate")
       const run = gate.run ?? ""
-      expect(run).toContain("github.ref_type")
+      expect(run).toContain("GITHUB_REF_TYPE")
       expect(run).toContain("^v[0-9]+\\.[0-9]+\\.[0-9]+$")
       expect(run).toContain("is_release=true")
       expect(run).toContain("is_release=false")
@@ -242,7 +242,7 @@ describe(".github/workflows/docker-publish.yml", () => {
       const run = releaseGateStep().run ?? ""
       expect(run).toContain("::error::")
       expect(run).toContain("exit 1")
-      expect(run).toContain("github.ref_name")
+      expect(run).toContain("GITHUB_REF_NAME")
     })
 
     it("derives every release-ness consumer from the gate's single output", () => {
