@@ -24,8 +24,8 @@ function Select({
     <div className={cn("flex flex-col gap-1.5", className)}>
       {label && <Label>{label}</Label>}
       <SelectPrimitive.Root
-        value={value as string | undefined}
-        onValueChange={(v) => onValueChange?.(v as string | null)}
+        value={value}
+        onValueChange={onValueChange}
         {...props}
       >
         <SelectPrimitive.Trigger
