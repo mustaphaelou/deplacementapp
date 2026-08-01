@@ -32,6 +32,7 @@ describe("PdfRenderData contract", () => {
       description: null,
       creeLe: new Date("2025-05-24"),
       assigneA: null,
+      branding: null,
     }
 
     expect(data.numero).toBe("DD-2025-0001")
@@ -56,6 +57,56 @@ describe("PdfRenderData contract", () => {
     expect(data.description).toBeNull()
     expect(data.creeLe).toEqual(new Date("2025-05-24"))
     expect(data.assigneA).toBeNull()
+    expect(data.branding).toBeNull()
+  })
+
+  it("carries nullable branding with nom and optional couleurPrimaire", () => {
+    const couts: CoutEstime = {
+      transport: 0,
+      hebergement: 0,
+      repas: 0,
+      divers: 0,
+      total: 0,
+    }
+
+    const withColor: PdfRenderData = {
+      numero: "DD-2025-0004",
+      etape: "MANAGER_REVIEW",
+      decision: "PENDING",
+      employeNom: "Durand",
+      employePrenom: "Marie",
+      employePoste: "Commercial",
+      employeDepartement: "Ventes",
+      motif: ["Déplacement client"],
+      dateDepart: new Date("2025-08-01"),
+      dateRetour: new Date("2025-08-10"),
+      destination: "Fès",
+      typeTransport: "TRAIN",
+      autreTransport: null,
+      vehicule: null,
+      couts,
+      avanceRequise: false,
+      montantAvance: null,
+      description: null,
+      creeLe: new Date("2025-05-24"),
+      assigneA: null,
+      branding: { nom: "Acme SARL", couleurPrimaire: "#0055aa" },
+    }
+
+    expect(withColor.branding).toEqual({
+      nom: "Acme SARL",
+      couleurPrimaire: "#0055aa",
+    })
+
+    const withoutColor: PdfRenderData = {
+      ...withColor,
+      branding: { nom: "Acme SARL", couleurPrimaire: null },
+    }
+
+    expect(withoutColor.branding).toEqual({
+      nom: "Acme SARL",
+      couleurPrimaire: null,
+    })
   })
 
   it("allows valid assigneA with id, nom, prenom", () => {
@@ -88,6 +139,7 @@ describe("PdfRenderData contract", () => {
       description: "Formation interne",
       creeLe: new Date("2025-05-24"),
       assigneA: { id: "u-1", nom: "Bernard", prenom: "Pierre" },
+      branding: null,
     }
 
     expect(data.assigneA).toEqual({
@@ -129,6 +181,7 @@ describe("PdfRenderData contract", () => {
       description: null,
       creeLe: new Date("2025-05-24"),
       assigneA: null,
+      branding: null,
     }
 
     expect(data.vehicule).toEqual({

@@ -1,5 +1,6 @@
 import type { PdfRenderData } from "./pdf-types"
 import { parseMotif, type DemandeWithRelations } from "./demande-types"
+import type { SocieteBranding } from "./societe"
 
 function toNumber(value: unknown): number {
   if (typeof value === "number") return value
@@ -12,7 +13,10 @@ function toNumber(value: unknown): number {
   return Number(value) || 0
 }
 
-export function toPdfRenderData(demande: DemandeWithRelations): PdfRenderData {
+export function toPdfRenderData(
+  demande: DemandeWithRelations,
+  branding: SocieteBranding | null = null
+): PdfRenderData {
   return {
     numero: demande.numero,
     etape: demande.etape,
@@ -52,6 +56,9 @@ export function toPdfRenderData(demande: DemandeWithRelations): PdfRenderData {
           nom: demande.assigneA.nom,
           prenom: demande.assigneA.prenom,
         }
+      : null,
+    branding: branding
+      ? { nom: branding.nom, couleurPrimaire: branding.couleurPrimaire }
       : null,
   }
 }

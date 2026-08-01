@@ -10,6 +10,11 @@ export interface PdfRendererAdapter {
   render(data: PdfRenderData): Promise<Buffer>
 }
 
+export interface PdfBranding {
+  nom: string
+  couleurPrimaire: string | null
+}
+
 export interface PdfRenderData {
   numero: string
   etape: string
@@ -31,4 +36,5 @@ export interface PdfRenderData {
   description: string | null
   creeLe: Date
   assigneA: { id: string; nom: string; prenom: string } | null
+  branding: PdfBranding | null
 }

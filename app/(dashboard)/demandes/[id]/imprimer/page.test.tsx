@@ -10,6 +10,10 @@ vi.mock("@/lib/demande", () => ({
   findById: vi.fn(),
 }))
 
+vi.mock("@/lib/societe", () => ({
+  getSocieteBranding: vi.fn(),
+}))
+
 vi.mock("next/navigation", () => ({
   redirect: vi.fn((path: string) => {
     throw new Error(`NEXT_REDIRECT: ${path}`)
@@ -86,6 +90,46 @@ function mockSession() {
   }
 }
 
+function mockBranding(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "s-1",
+    nom: "Acme SARL",
+    logoUrl: null,
+    faviconUrl: null,
+    couleurPrimaire: "#0055aa",
+    nomExpediteurEmail: "Acme",
+    domaineEmail: "acme.ma",
+    ...overrides,
+  }
+}
+
+function findByType(node: unknown, type: string): unknown {
+  if (node == null || typeof node !== "object") return undefined
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const found = findByType(child, type)
+      if (found) return found
+    }
+    return undefined
+  }
+  const el = node as {
+    type?: unknown
+    props?: { children?: unknown; src?: string }
+  }
+  if (el.type === type) return el
+  return findByType(el.props?.children, type)
+}
+
+function collectText(node: unknown): string {
+  if (node == null || typeof node === "boolean") return ""
+  if (typeof node === "string" || typeof node === "number") return String(node)
+  if (Array.isArray(node)) return node.map(collectText).join(" ")
+  if (typeof node === "object" && "props" in node && node.props) {
+    return collectText((node as { props: { children: unknown } }).props.children)
+  }
+  return ""
+}
+
 describe("Imprimer page", () => {
   beforeEach(() => {
     vi.resetAllMocks()
@@ -94,9 +138,13 @@ describe("Imprimer page", () => {
   it("renders the demande when found", async () => {
     const { auth } = await import("@/lib/auth/server")
     const { findById: mockFindById } = await import("@/lib/demande")
+    const { getSocieteBranding } = await import("@/lib/societe")
 
     ;(auth as ReturnType<typeof vi.fn>).mockResolvedValue(mockSession())
     ;(mockFindById as ReturnType<typeof vi.fn>).mockResolvedValue(mockDemande)
+    ;(getSocieteBranding as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockBranding()
+    )
 
     const { default: ImprimerPage } = await import("./page")
     const element = await ImprimerPage({
@@ -110,6 +158,62 @@ describe("Imprimer page", () => {
     expect(element.props.children[0].props.children[1].props.children).toBe(
       "Formulaire de Demande de Déplacement"
     )
+  })
+
+  it("renders the societe nom, logo, and couleurPrimaire accent in the header", async () => {
+    const { auth } = await import("@/lib/auth/server")
+    const { findById: mockFindById } = await import("@/lib/demande")
+    const { getSocieteBranding } = await import("@/lib/societe")
+
+    ;(auth as ReturnType<typeof vi.fn>).mockResolvedValue(mockSession())
+    ;(mockFindById as ReturnType<typeof vi.fn>).mockResolvedValue(mockDemande)
+    ;(getSocieteBranding as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockBranding({ logoUrl: "/logo-acme.png" })
+    )
+
+    const { default: ImprimerPage } = await import("./page")
+    const element = await ImprimerPage({
+      params: Promise.resolve({ id: "d-1" }),
+    })
+
+    const h1 = findByType(element, "h1") as {
+      props?: { children?: string }
+    }
+    expect(h1?.props?.children).toBe("Acme SARL")
+
+    const img = findByType(element, "img") as {
+      props?: { src?: string; alt?: string }
+    }
+    expect(img?.props?.src).toBe("/logo-acme.png")
+    expect(img?.props?.alt).toBe("Acme SARL")
+
+    expect(collectText(element)).toContain("Acme SARL")
+    expect(collectText(element)).not.toContain("HAY 2010")
+
+    const header = element.props.children[0]
+    expect(header.props.style).toEqual({ borderColor: "#0055aa" })
+  })
+
+  it("falls back to Application when branding is null", async () => {
+    const { auth } = await import("@/lib/auth/server")
+    const { findById: mockFindById } = await import("@/lib/demande")
+    const { getSocieteBranding } = await import("@/lib/societe")
+
+    ;(auth as ReturnType<typeof vi.fn>).mockResolvedValue(mockSession())
+    ;(mockFindById as ReturnType<typeof vi.fn>).mockResolvedValue(mockDemande)
+    ;(getSocieteBranding as ReturnType<typeof vi.fn>).mockResolvedValue(null)
+
+    const { default: ImprimerPage } = await import("./page")
+    const element = await ImprimerPage({
+      params: Promise.resolve({ id: "d-1" }),
+    })
+
+    const h1 = findByType(element, "h1") as {
+      props?: { children?: string }
+    }
+    expect(h1?.props?.children).toBe("Application")
+    expect(findByType(element, "img")).toBeUndefined()
+    expect(element.props.children[0].props.style).toBeUndefined()
   })
 
   it("redirects when the demande is soft-deleted or missing", async () => {

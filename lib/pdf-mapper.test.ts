@@ -144,6 +144,46 @@ describe("toPdfRenderData", () => {
     expect(result.assigneA).toBeNull()
   })
 
+  it("maps null branding when none is passed", () => {
+    const demande = makeDemandeWithRelations()
+    const result = toPdfRenderData(demande)
+
+    expect(result.branding).toBeNull()
+  })
+
+  it("maps branding to nom and couleurPrimaire", () => {
+    const demande = makeDemandeWithRelations()
+    const result = toPdfRenderData(demande, {
+      id: "s-1",
+      nom: "Acme SARL",
+      logoUrl: "/logo.png",
+      faviconUrl: "/favicon.ico",
+      couleurPrimaire: "#0055aa",
+      nomExpediteurEmail: "Acme",
+      domaineEmail: "acme.ma",
+    })
+
+    expect(result.branding).toEqual({
+      nom: "Acme SARL",
+      couleurPrimaire: "#0055aa",
+    })
+  })
+
+  it("maps branding with a null couleurPrimaire", () => {
+    const demande = makeDemandeWithRelations()
+    const result = toPdfRenderData(demande, {
+      id: "s-1",
+      nom: "Acme SARL",
+      logoUrl: null,
+      faviconUrl: null,
+      couleurPrimaire: null,
+      nomExpediteurEmail: "Acme",
+      domaineEmail: "acme.ma",
+    })
+
+    expect(result.branding).toEqual({ nom: "Acme SARL", couleurPrimaire: null })
+  })
+
   it("falls back to raw motif string when JSON.parse fails", () => {
     const demande = makeDemandeWithRelations({ demande: { motif: "not-json" } })
     const result = toPdfRenderData(demande)

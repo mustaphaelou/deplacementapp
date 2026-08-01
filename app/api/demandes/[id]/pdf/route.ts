@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth, type Role } from "@/lib/auth/server"
-import { findById, recordDocument } from "@/lib/demande"
-import { toPdfRenderData } from "@/lib/pdf-mapper"
+import { findById } from "@/lib/demande"
+import { generateDemandeDocumentPdf } from "@/lib/demande/documents"
+import { getSocieteBranding } from "@/lib/societe"
 import { pdfAdapter } from "@/components/pdf/travel-request-pdf-adapter"
 import { handleServiceError } from "@/lib/errors"
 
@@ -18,12 +19,11 @@ export async function GET(
       id: auth.user.id,
       role: auth.user.role as Role,
     })
-    const data = toPdfRenderData(demande)
-    const buffer = await pdfAdapter.render(data)
-
-    await recordDocument(id, {
-      type: "PDF",
-      chemin: `demande-${demande.numero}.pdf`,
+    const branding = await getSocieteBranding()
+    const buffer = await generateDemandeDocumentPdf({
+      demande,
+      branding,
+      renderer: pdfAdapter,
     })
 
     return new NextResponse(new Uint8Array(buffer), {

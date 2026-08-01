@@ -16,7 +16,7 @@ Commit `9eaec36` reified the Societe management module — `lib/societe/index.ts
 
    Sub-effect: `getSocieteBranding` returns `domaineEmail` as the **composed** value produced by `loadSocieteIdentity` (`noreply@<domain>`, see `lib/societe/index.ts` L73). The management-page form pre-populates with that composed value; on save it writes the composed value back as the column's `domaineEmail`, so the next `loadSocieteIdentity` produces `noreply@noreply@<domain>` — a round-trip corruption transient on any admin save.
 
-4. **Silent failure.** `getSocieteBranding` (L23-42) still has the empty `catch { return null }` that ADR-0008 line 31 named as one of the two silences its "warn-once-and-succeed" contract would "replace." The `EmailService.send` half was closed (the warn-once pattern now lives in `loadSocieteIdentity`, L77-81); the `getSocieteBranding` half was not — commit `9eaec36` migrated the function verbatim with the silent catch intact.
+4. **Silent failure.** `getSocieteBranding` (L23-42) still has the empty `catch { return null }` that ADR-0008 line 31 named as one of the two silences its "warn-once-and-succeed" contract would "replace." The `EmailService.send` half was closed (the warn-once pattern now lives in `loadSocieteIdentity`, L77-81); the `getSocieteBranding` half was not — commit `9eaec36` migrated the function verbatim with the silent catch intact. *(Post-adoption annotation: issue #150 is aligned with this ADR's pending residual — the generated-document surfaces (PDF + print page) consume exactly the visual fields (`nom`, `couleurPrimaire`) this ADR proposes narrowing `getSocieteBranding` to, and leave the `catch → null` residual untouched.)*
 
 ## Decision
 
