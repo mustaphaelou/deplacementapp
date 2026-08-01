@@ -39,6 +39,14 @@ function loadWorkflow(): Workflow {
   return yaml.load(raw) as Workflow
 }
 
+function verifySteps(): Step[] {
+  return loadWorkflow().jobs?.["verify"]?.steps ?? []
+}
+
+function buildAndPublishSteps(): Step[] {
+  return loadWorkflow().jobs?.["build-and-publish"]?.steps ?? []
+}
+
 function isDockerBuildStep(step: Step): boolean {
   return step.uses?.includes("docker/build-push-action") ?? false
 }
@@ -55,10 +63,11 @@ function dockerBuildStepIndices(
   steps: Step[],
   predicate: (step: Step) => boolean
 ): number[] {
-  return steps
-    .map((step, index) => ({ step, index }))
-    .filter(({ step }) => predicate(step))
-    .map(({ index }) => index)
+  const indices: number[] = []
+  for (const [index, step] of steps.entries()) {
+    if (predicate(step)) indices.push(index)
+  }
+  return indices
 }
 
 describe(".github/workflows/docker-publish.yml", () => {
@@ -67,10 +76,10 @@ describe(".github/workflows/docker-publish.yml", () => {
   })
 
   it("defines the two-job gate: verify, then build-and-publish depending on it", () => {
-    const jobs: Record<string, Job> = loadWorkflow().jobs ?? {}
-    expect(jobs.verify).toBeDefined()
-    expect(jobs["build-and-publish"]).toBeDefined()
-    expect(jobs["build-and-publish"].needs).toContain("verify")
+    const jobs = loadWorkflow().jobs
+    expect(jobs?.["verify"]).toBeDefined()
+    expect(jobs?.["build-and-publish"]).toBeDefined()
+    expect(jobs?.["build-and-publish"]?.needs).toContain("verify")
   })
 
   it("runs the unit gate on every trigger, including pull requests", () => {
@@ -82,17 +91,15 @@ describe(".github/workflows/docker-publish.yml", () => {
   })
 
   it("keeps pull requests to unit checks only (no Docker builds, publish job skipped)", () => {
-    const workflow = loadWorkflow()
-    const verify = workflow.jobs?.["verify"]
-    const dockerBuilds = (verify?.steps ?? []).filter(isDockerBuildStep)
+    const dockerBuilds = verifySteps().filter(isDockerBuildStep)
     expect(dockerBuilds).toHaveLength(0)
-    const publish = workflow.jobs?.["build-and-publish"]
+    const publish = loadWorkflow().jobs?.["build-and-publish"]
     expect(publish?.if).toContain("github.event_name")
     expect(publish?.if).toContain("pull_request")
   })
 
   it("runs lint, typecheck, the unit tests, and the production dependency-tree check in verify", () => {
-    const runs = (loadWorkflow().jobs?.["verify"]?.steps ?? [])
+    const runs = verifySteps()
       .map((step) => step.run ?? "")
       .join("\n")
     expect(runs).toContain("npm run lint")
@@ -102,7 +109,7 @@ describe(".github/workflows/docker-publish.yml", () => {
   })
 
   it("smoke-tests both loaded images before anything is pushed", () => {
-    const steps = loadWorkflow().jobs?.["build-and-publish"]?.steps ?? []
+    const steps = buildAndPublishSteps()
     const smokeBuildIndices = dockerBuildStepIndices(steps, isSmokeBuildStep)
     expect(smokeBuildIndices).toHaveLength(2)
     for (const index of smokeBuildIndices) {
@@ -128,9 +135,7 @@ describe(".github/workflows/docker-publish.yml", () => {
   })
 
   it("publishes both images multi-arch and reuses the smoke build's GHA cache", () => {
-    const pushSteps = (
-      loadWorkflow().jobs?.["build-and-publish"]?.steps ?? []
-    ).filter(isPushStep)
+    const pushSteps = buildAndPublishSteps().filter(isPushStep)
     expect(pushSteps).toHaveLength(2)
     for (const step of pushSteps) {
       expect(step.with?.platforms).toContain("linux/amd64")
@@ -140,7 +145,7 @@ describe(".github/workflows/docker-publish.yml", () => {
   })
 
   it("keeps the draft-Release step after every push, so a failed gate creates no Release", () => {
-    const steps = loadWorkflow().jobs?.["build-and-publish"]?.steps ?? []
+    const steps = buildAndPublishSteps()
     const releaseIndex = steps.findIndex((step) =>
       step.uses?.includes("softprops/action-gh-release")
     )
