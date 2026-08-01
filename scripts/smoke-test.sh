@@ -23,8 +23,14 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 pass() { echo -e "${GREEN}[PASS]${NC} $1"; }
-fail()  { echo -e "${RED}[FAIL]${NC} $1"; }
-info()  { echo -e "${YELLOW}[INFO]${NC} $1"; }
+fail() { echo -e "${RED}[FAIL]${NC} $1"; }
+info() { echo -e "${YELLOW}[INFO]${NC} $1"; }
+
+dump_container_logs() {
+  local name="$1" label="${2:-Container}"
+  info "$label logs (last 20 lines):"
+  docker logs "$name" --tail 20 2>&1 || true
+}
 
 # ------------------------------------------------------------------
 # Constants — all topology knowledge lives here
@@ -92,6 +98,10 @@ if ! command -v docker &>/dev/null; then
   fail "Docker is not installed or not in PATH"
   exit 1
 fi
+if ! command -v curl &>/dev/null; then
+  fail "Curl is not installed or not in PATH"
+  exit 1
+fi
 
 # ------------------------------------------------------------------
 # 1. Create isolated Docker network
@@ -131,12 +141,11 @@ pass "Database container started"
 info "Waiting for database to be ready..."
 START_TIME=$(date +%s)
 while true; do
+  ELAPSED=$(( $(date +%s) - START_TIME ))
   if docker exec "$DB_CONTAINER_NAME" pg_isready -U test -d testdb >/dev/null 2>&1; then
-    ELAPSED=$(( $(date +%s) - START_TIME ))
     pass "Database ready (${ELAPSED}s)"
     break
   fi
-  ELAPSED=$(( $(date +%s) - START_TIME ))
   if [ "$ELAPSED" -ge "$DB_TIMEOUT" ]; then
     fail "Database did not become ready within ${DB_TIMEOUT}s"
     exit 1
@@ -154,8 +163,7 @@ if [ -n "$MIGRATOR_IMAGE" ]; then
     --network "$NETWORK_NAME" \
     -e "DATABASE_URL=postgresql://test:test@${DB_CONTAINER_NAME}:5432/testdb" \
     "$MIGRATOR_IMAGE"; then
-    info "Migrator logs (last 20 lines):"
-    docker logs "$MIGRATOR_CONTAINER_NAME" --tail 20 2>&1 || true
+    dump_container_logs "$MIGRATOR_CONTAINER_NAME" "Migrator"
     fail "Migrator exited non-zero"
     exit 1
   fi
@@ -183,12 +191,10 @@ pass "Runner container started on port $HOST_PORT"
 info "Waiting for HEALTHCHECK (up to ${HEALTH_TIMEOUT}s)..."
 START_TIME=$(date +%s)
 while true; do
-  CURRENT_TIME=$(date +%s)
-  ELAPSED=$((CURRENT_TIME - START_TIME))
+  ELAPSED=$(( $(date +%s) - START_TIME ))
 
   if [ "$ELAPSED" -ge "$HEALTH_TIMEOUT" ]; then
-    info "Container logs (last 20 lines):"
-    docker logs "$CONTAINER_NAME" --tail 20 2>&1 || true
+    dump_container_logs "$CONTAINER_NAME"
     fail "HEALTHCHECK did not become healthy within ${HEALTH_TIMEOUT}s"
     exit 1
   fi
@@ -199,8 +205,7 @@ while true; do
     pass "HEALTHCHECK passed (${ELAPSED}s)"
     break
   elif [ "$STATUS" = "unhealthy" ]; then
-    info "Container logs (last 20 lines):"
-    docker logs "$CONTAINER_NAME" --tail 20 2>&1 || true
+    dump_container_logs "$CONTAINER_NAME"
     fail "HEALTHCHECK failed (unhealthy)"
     exit 1
   fi
