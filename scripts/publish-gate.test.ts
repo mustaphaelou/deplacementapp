@@ -11,6 +11,7 @@ const CONTEXT_PATH = join(ROOT, "CONTEXT.md")
 
 interface Step {
   name?: string
+  id?: string
   uses?: string
   run?: string
   if?: string
@@ -158,6 +159,61 @@ describe(".github/workflows/docker-publish.yml", () => {
       expect(step.with?.platforms).toContain("linux/arm64")
       expect(step.with?.["cache-from"]).toContain("type=gha")
     }
+  })
+
+  it("computes release-ness in exactly one step, named release-gate, before any Docker setup", () => {
+    const steps = buildAndPublishSteps()
+    const gateSteps = steps.filter((step) => step.id === "release-gate")
+    expect(gateSteps).toHaveLength(1)
+    expect(steps.some((step) => step.id === "release-check")).toBe(false)
+
+    const gateIndex = steps.findIndex((step) => step.id === "release-gate")
+    expect(gateIndex).toBeGreaterThan(-1)
+    const dockerSetupIndices = steps
+      .map((step, index) => ({ step, index }))
+      .filter(({ step }) =>
+        ["setup-qemu", "setup-buildx", "login-action"].some((needle) =>
+          step.uses?.includes(needle)
+        )
+      )
+      .map(({ index }) => index)
+    expect(dockerSetupIndices).toHaveLength(3)
+    for (const index of dockerSetupIndices) {
+      expect(gateIndex).toBeLessThan(index)
+    }
+  })
+
+  it("sets is_release from the strict semver rule as the release-gate output", () => {
+    const gate = buildAndPublishSteps().find(
+      (step) => step.id === "release-gate"
+    )
+    expect(gate?.name).toContain("Release")
+    expect(gate?.run).toContain("is_release")
+    expect(gate?.run).toContain("github.ref_type")
+    expect(gate?.run).toContain("GITHUB_OUTPUT")
+  })
+
+  it("derives every latest enable= and the draft-Release condition from the release-gate output", () => {
+    const steps = buildAndPublishSteps()
+    const metadataSteps = steps.filter((step) =>
+      step.uses?.includes("docker/metadata-action")
+    )
+    expect(metadataSteps).toHaveLength(2)
+    for (const step of metadataSteps) {
+      const tags = String(step.with?.tags ?? "")
+      expect(tags).toContain("steps.release-gate.outputs.is_release")
+      expect(tags).toContain("github.event.repository.default_branch")
+    }
+
+    const releaseStep = steps.find((step) =>
+      step.uses?.includes("softprops/action-gh-release")
+    )
+    expect(releaseStep?.if).toContain("steps.release-gate.outputs.is_release")
+  })
+
+  it("leaves no reference to the previous step name anywhere in the workflow", () => {
+    const raw = readFileSync(WORKFLOW_PATH, "utf8")
+    expect(raw).not.toContain("release-check")
   })
 
   it("keeps the draft-Release step after every push, so a failed gate creates no Release", () => {
