@@ -173,6 +173,11 @@ A deployable snapshot of the application, identified by a git tag `vX.Y.Z` pushe
 _Avoid_: Calling a main-branch push, the `latest` image, or the `package.json` version a "Release".
 _Cites_: ADR-0004
 
+**Publish Gate**:
+The verification sequence every image must pass before it is pushed to GHCR: the unit checks (`lint` + `typecheck` + the unit test suite) plus the image smoke test. The smoke test is the reusable `scripts/smoke-test.sh` module — its contract is an exit code: 0 iff a scratch Postgres starts, the migrator runs and exits 0 (when passed), the runner image passes its HEALTHCHECK, and `/api/health` answers 200; any failure exits non-zero with a diagnostic tail of container logs. CI and local development share this one verification path — `scripts/test-docker-build.sh` builds the images and calls the module.
+_Avoid_: Smoke test (the check alone, not the gate), docker build test
+_Cites_: ADR-0004
+
 - "approved" was used to mean both a stage-level outcome (manager said yes) and a terminal outcome (whole pipeline complete). Resolved by splitting into **Etape** (where we are) and **Decision** (what happened there). Terminal approval is `Etape: FINAL, Decision: APPROVED`.
 - "status" / "statut" was previously a single-column legacy enum resolved to **StatutDemande**. As of ADR-0005, the column is split into two persisted columns: **Etape + Decision**. The old `fromLegacyStatus`/`toLegacyStatus` bridging layer is removed.
 - "retirée" (withdrawn) was initially treated as a separate StatutDemande value. Resolved: withdrawal is a **Decision** (`WITHDRAWN`) and a terminal outcome, not a stage.
