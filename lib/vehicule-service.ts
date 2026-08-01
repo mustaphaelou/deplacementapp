@@ -1,4 +1,4 @@
-import { eq, asc, desc } from "drizzle-orm"
+import { eq, asc } from "drizzle-orm"
 import type { DrizzleDb } from "../db"
 import { vehiculesEntreprise } from "../db/schema/vehicules-entreprise"
 import { db } from "../db"

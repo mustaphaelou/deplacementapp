@@ -66,8 +66,9 @@ export default function DemandesListPage() {
   }, [page, search, etapeFilter])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchDemandes()
+    ;(async () => {
+      await fetchDemandes()
+    })()
   }, [fetchDemandes])
 
   const totalPages = Math.ceil(total / perPage)

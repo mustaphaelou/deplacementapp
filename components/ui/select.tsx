@@ -13,9 +13,8 @@ function Select({
   value,
   onValueChange,
   ...props
-}: {
+}: SelectPrimitive.Root.Props<string> & {
   className?: string
-  children: React.ReactNode
   label?: string
   error?: string
   value?: string | null
@@ -24,11 +23,10 @@ function Select({
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
       {label && <Label>{label}</Label>}
-      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
       <SelectPrimitive.Root
         value={value as string | undefined}
         onValueChange={(v) => onValueChange?.(v as string | null)}
-        {...(props as any)}
+        {...props}
       >
         <SelectPrimitive.Trigger
           className={cn(

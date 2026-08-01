@@ -206,7 +206,7 @@ export function SetupWizard() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="nom-expediteur-email">
-                  Nom d'expéditeur email
+                  Nom d&apos;expéditeur email
                 </Label>
                 <Input
                   id="nom-expediteur-email"

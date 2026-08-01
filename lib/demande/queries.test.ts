@@ -31,8 +31,6 @@ describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT }, () => {
   let draftId: string
   let submittedId: string
   let managerApprovedId: string
-  let financeApprovedId: string
-  let fullyApprovedId: string
   let secondEmployeeDraftId: string
 
   const sampleData = {
@@ -88,7 +86,6 @@ describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT }, () => {
       action: "approuver",
       actor: { id: financeAdminId, role: "FINANCE_ADMIN" },
     })
-    financeApprovedId = financeApproved.id
 
     const fullyApproved = await createAndSubmit(
       { ...sampleData, destination: "Agadir" },
@@ -109,7 +106,6 @@ describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT }, () => {
       action: "approuver",
       actor: { id: directionId, role: "GENERAL_DIRECTION" },
     })
-    fullyApprovedId = fullyApproved.id
 
     const secondDraft = await createDraft(
       { ...sampleData, destination: "Kenitra" },
@@ -377,10 +373,6 @@ describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT }, () => {
     })
 
     it("paginates correctly", async () => {
-      const all = await findMany(
-        { id: managerId, role: "MANAGER" },
-        { page: 1, limit: 100 }
-      )
       const page1 = await findMany(
         { id: managerId, role: "MANAGER" },
         { page: 1, limit: 2 }

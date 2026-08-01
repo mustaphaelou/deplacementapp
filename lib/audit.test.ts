@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest"
-import { sql, eq } from "drizzle-orm"
+import { eq } from "drizzle-orm"
 import * as schema from "../db/schema"
 import { createPgliteDb } from "./test/create-pglite-db"
 import type { PgliteDb } from "./test/create-pglite-db"
