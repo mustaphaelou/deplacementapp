@@ -7,6 +7,10 @@ set -euo pipefail
 # smoke-test module (scripts/smoke-test.sh). One command for a developer:
 #   scripts/test-docker-build.sh
 # exits 0 iff the deployment set (runner + migrator) is runnable.
+#
+# The production dependency-tree check (npm ls --omit=dev) intentionally does
+# not run here — it is a project-tree check, not a container check, so it lives
+# in the CI verify job (.github/workflows/docker-publish.yml).
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -40,18 +44,7 @@ docker build --target migrator --tag "$MIGRATOR_IMAGE" "$PROJECT_DIR"
 pass "Migrator image built"
 
 # ------------------------------------------------------------------
-# 2. Verify production dependency tree
-# ------------------------------------------------------------------
-info "Verifying production dependency tree..."
-if ! (cd "$PROJECT_DIR" && npm ls --omit=dev --depth=0) >/dev/null 2>&1; then
-  fail "Production dependency tree has issues"
-  (cd "$PROJECT_DIR" && npm ls --omit=dev --depth=0) 2>&1 || true
-  exit 1
-fi
-pass "Production dependency tree is clean"
-
-# ------------------------------------------------------------------
-# 3. Run the shared smoke-test module
+# 2. Run the shared smoke-test module
 # ------------------------------------------------------------------
 info "Running smoke-test module..."
 "$SCRIPT_DIR/smoke-test.sh" --image "$IMAGE_NAME" --migrator-image "$MIGRATOR_IMAGE"
