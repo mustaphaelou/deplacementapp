@@ -7,6 +7,7 @@ import yaml from "js-yaml"
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 const WORKFLOW_PATH = join(ROOT, ".github/workflows/docker-publish.yml")
 const WRAPPER_PATH = join(ROOT, "scripts/test-docker-build.sh")
+const CONTEXT_PATH = join(ROOT, "CONTEXT.md")
 
 interface Step {
   name?: string
@@ -45,6 +46,14 @@ function verifySteps(): Step[] {
 
 function buildAndPublishSteps(): Step[] {
   return loadWorkflow().jobs?.["build-and-publish"]?.steps ?? []
+}
+
+function runScripts(steps: Step[]): string {
+  return steps.map((step) => step.run ?? "").join("\n")
+}
+
+function wrapperContents(): string {
+  return readFileSync(WRAPPER_PATH, "utf8")
 }
 
 function isDockerBuildStep(step: Step): boolean {
@@ -99,9 +108,7 @@ describe(".github/workflows/docker-publish.yml", () => {
   })
 
   it("runs lint, typecheck, the unit tests, and the production dependency-tree check in verify", () => {
-    const runs = verifySteps()
-      .map((step) => step.run ?? "")
-      .join("\n")
+    const runs = runScripts(verifySteps())
     expect(runs).toContain("npm run lint")
     expect(runs).toContain("npm run typecheck")
     expect(runs).toContain("npm run test")
@@ -134,6 +141,15 @@ describe(".github/workflows/docker-publish.yml", () => {
     }
   })
 
+  it("writes the smoke builds to the GHA cache so verification feeds the publish build", () => {
+    const smokeBuildSteps = buildAndPublishSteps().filter(isSmokeBuildStep)
+    expect(smokeBuildSteps).toHaveLength(2)
+    for (const step of smokeBuildSteps) {
+      expect(step.with?.["cache-from"]).toContain("type=gha")
+      expect(step.with?.["cache-to"]).toContain("type=gha")
+    }
+  })
+
   it("publishes both images multi-arch and reuses the smoke build's GHA cache", () => {
     const pushSteps = buildAndPublishSteps().filter(isPushStep)
     expect(pushSteps).toHaveLength(2)
@@ -156,7 +172,25 @@ describe(".github/workflows/docker-publish.yml", () => {
   })
 
   it("keeps the production dependency-tree check out of the local wrapper", () => {
-    const wrapper = readFileSync(WRAPPER_PATH, "utf8")
+    const wrapper = wrapperContents()
     expect(wrapper).not.toContain("npm ls --omit=dev --depth=0")
+  })
+
+  it("defines the publish gate term in the deployment documentation", () => {
+    const docs = readFileSync(CONTEXT_PATH, "utf8")
+    const deployment = docs.split("### Deployment")[1] ?? ""
+    expect(deployment).toContain("Publish Gate")
+    expect(deployment).toContain("verify")
+    expect(deployment).toContain("smoke-test")
+  })
+
+  it("wires the local wrapper and the workflow to the same smoke-test module", () => {
+    const wrapper = wrapperContents()
+    const workflowRuns = runScripts(buildAndPublishSteps())
+    expect(wrapper).toContain("smoke-test.sh")
+    expect(workflowRuns).toContain("smoke-test.sh")
+    expect(wrapper).toContain("--image")
+    expect(wrapper).toContain("--migrator-image")
+    expect(workflowRuns).toContain("--migrator-image")
   })
 })
