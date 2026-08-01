@@ -48,6 +48,14 @@ function buildAndPublishSteps(): Step[] {
   return loadWorkflow().jobs?.["build-and-publish"]?.steps ?? []
 }
 
+function runScripts(steps: Step[]): string {
+  return steps.map((step) => step.run ?? "").join("\n")
+}
+
+function wrapperContents(): string {
+  return readFileSync(WRAPPER_PATH, "utf8")
+}
+
 function isDockerBuildStep(step: Step): boolean {
   return step.uses?.includes("docker/build-push-action") ?? false
 }
@@ -100,9 +108,7 @@ describe(".github/workflows/docker-publish.yml", () => {
   })
 
   it("runs lint, typecheck, the unit tests, and the production dependency-tree check in verify", () => {
-    const runs = verifySteps()
-      .map((step) => step.run ?? "")
-      .join("\n")
+    const runs = runScripts(verifySteps())
     expect(runs).toContain("npm run lint")
     expect(runs).toContain("npm run typecheck")
     expect(runs).toContain("npm run test")
@@ -166,23 +172,21 @@ describe(".github/workflows/docker-publish.yml", () => {
   })
 
   it("keeps the production dependency-tree check out of the local wrapper", () => {
-    const wrapper = readFileSync(WRAPPER_PATH, "utf8")
+    const wrapper = wrapperContents()
     expect(wrapper).not.toContain("npm ls --omit=dev --depth=0")
   })
 
   it("defines the publish gate term in the deployment documentation", () => {
-    const context = readFileSync(CONTEXT_PATH, "utf8")
-    const deployment = context.split("### Deployment")[1] ?? ""
+    const docs = readFileSync(CONTEXT_PATH, "utf8")
+    const deployment = docs.split("### Deployment")[1] ?? ""
     expect(deployment).toContain("Publish Gate")
     expect(deployment).toContain("verify")
     expect(deployment).toContain("smoke-test")
   })
 
   it("wires the local wrapper and the workflow to the same smoke-test module", () => {
-    const wrapper = readFileSync(WRAPPER_PATH, "utf8")
-    const workflowRuns = buildAndPublishSteps()
-      .map((step) => step.run ?? "")
-      .join("\n")
+    const wrapper = wrapperContents()
+    const workflowRuns = runScripts(buildAndPublishSteps())
     expect(wrapper).toContain("smoke-test.sh")
     expect(workflowRuns).toContain("smoke-test.sh")
     expect(wrapper).toContain("--image")
