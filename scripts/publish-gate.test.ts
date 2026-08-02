@@ -34,7 +34,10 @@ interface Workflow {
       tags?: string[]
     }
     workflow_dispatch?: {
-      inputs?: Record<string, { description?: string; type?: string; default?: boolean }>
+      inputs?: Record<
+        string,
+        { description?: string; type?: string; default?: boolean }
+      >
     }
   }
   jobs?: Record<string, Job>
@@ -55,6 +58,14 @@ function buildAndPublishSteps(): Step[] {
 
 function deploySteps(): Step[] {
   return loadWorkflow().jobs?.["deploy"]?.steps ?? []
+}
+
+function deployScriptStep(): Step {
+  const step = deploySteps().find((s) =>
+    (s.run ?? "").includes("deploy-coolify.sh")
+  )
+  if (!step) throw new Error("deploy-coolify.sh step not found")
+  return step
 }
 
 function runScripts(steps: Step[]): string {
@@ -265,7 +276,9 @@ describe(".github/workflows/docker-publish.yml", () => {
       expect(body).not.toContain("release-check")
       expect(body).toContain("steps.release-gate.outputs.is_release")
       for (const step of metadataSteps()) {
-        expect(step.with?.tags).toContain("steps.release-gate.outputs.is_release")
+        expect(step.with?.tags).toContain(
+          "steps.release-gate.outputs.is_release"
+        )
       }
       const release = steps.find((step) =>
         step.uses?.includes("softprops/action-gh-release")
@@ -277,7 +290,9 @@ describe(".github/workflows/docker-publish.yml", () => {
       const steps = metadataSteps()
       expect(steps).toHaveLength(2)
       for (const step of steps) {
-        expect(step.with?.tags).toContain("github.event.repository.default_branch")
+        expect(step.with?.tags).toContain(
+          "github.event.repository.default_branch"
+        )
       }
     })
 
@@ -315,52 +330,42 @@ describe(".github/workflows/docker-publish.yml", () => {
       )
     })
 
-    it("deploys only on Release tags, reusing the gate's is_release output", () => {
-      const deploy = loadWorkflow().jobs?.["deploy"]
-      expect(deploy?.if).toContain(
-        "needs.build-and-publish.outputs.is_release"
-      )
-      expect(deploy?.if).toContain("'true'")
-    })
-
-    it("keeps branch pushes, PRs, and tag-less dispatches from deploying", () => {
-      const deploy = loadWorkflow().jobs?.["deploy"]
-      expect(deploy?.if).toContain("github.event_name")
-      expect(deploy?.if).toContain("workflow_dispatch")
-    })
-
-    it("adds a workflow_dispatch dry-run input so the seam is testable without firing", () => {
-      const inputs = loadWorkflow().on?.workflow_dispatch?.inputs
-      expect(inputs?.["deploy-dry-run"]).toBeDefined()
-      expect(inputs?.["deploy-dry-run"]?.type).toBe("boolean")
-      expect(deploySteps().find((s) => (s.run ?? "").includes("--dry-run"))).toBeDefined()
-      expect(runScripts(deploySteps())).toContain("deploy-coolify.sh")
-    })
-
-    it("fires the Coolify deploy webhook with secrets by name only", () => {
-      const deploy = loadWorkflow().jobs?.["deploy"]
-      const step = deploy?.steps?.find((s) => (s.run ?? "").includes("deploy-coolify.sh"))
-      expect(step?.env?.COOLIFY_WEBHOOK).toContain("secrets.COOLIFY_WEBHOOK")
-      expect(step?.env?.COOLIFY_TOKEN).toContain("secrets.COOLIFY_TOKEN")
-      expect(runScripts(deploySteps())).not.toContain("COOLIFY_WEBHOOK:")
-    })
-
-    it("uses the exact single-owner formula: Release output alone, plus an explicit dry-run dispatch", () => {
+    it("deploys only on the exact single-owner gate: Release output, or an explicit dry-run dispatch", () => {
       const deploy = loadWorkflow().jobs?.["deploy"]
       expect(deploy?.if).toBe(
         "needs.build-and-publish.outputs.is_release == 'true' || (github.event_name == 'workflow_dispatch' && inputs.deploy-dry-run == 'true')"
       )
     })
 
+    it("adds a workflow_dispatch dry-run input so the seam is testable without firing", () => {
+      const inputs = loadWorkflow().on?.workflow_dispatch?.inputs
+      expect(inputs?.["deploy-dry-run"]).toBeDefined()
+      expect(inputs?.["deploy-dry-run"]?.type).toBe("boolean")
+      expect(deployScriptStep().run).toContain("--dry-run")
+      expect(runScripts(deploySteps())).toContain("deploy-coolify.sh")
+    })
+
+    it("maps the Coolify secrets into the deploy step by name only, never embedding values", () => {
+      const step = deployScriptStep()
+      expect(step.env?.COOLIFY_WEBHOOK).toBe("${{ secrets.COOLIFY_WEBHOOK }}")
+      expect(step.env?.COOLIFY_TOKEN).toBe("${{ secrets.COOLIFY_TOKEN }}")
+      expect(runScripts(deploySteps())).not.toContain("COOLIFY_WEBHOOK:")
+      const raw = readFileSync(WORKFLOW_PATH, "utf8")
+      expect(raw).toContain("secrets.COOLIFY_WEBHOOK")
+      expect(raw).toContain("secrets.COOLIFY_TOKEN")
+    })
+
     it("switches between dry-run and the real webhook from the dispatch input, passing the ref on both paths", () => {
-      const step = deploySteps().find((s) =>
-        (s.run ?? "").includes("deploy-coolify.sh")
+      const step = deployScriptStep()
+      const run = step.run ?? ""
+      expect(run).toContain(
+        'scripts/deploy-coolify.sh --dry-run --ref "$GITHUB_REF_NAME"'
       )
-      const run = step?.run ?? ""
-      expect(run).toContain('scripts/deploy-coolify.sh --dry-run --ref "$GITHUB_REF_NAME"')
-      expect(run).toContain('scripts/deploy-coolify.sh --ref "$GITHUB_REF_NAME"')
+      expect(run).toContain(
+        'scripts/deploy-coolify.sh --ref "$GITHUB_REF_NAME"'
+      )
       expect(run).toContain("DEPLOY_DRY_RUN")
-      expect(step?.env?.DEPLOY_DRY_RUN).toContain("inputs.deploy-dry-run")
+      expect(step.env?.DEPLOY_DRY_RUN).toContain("inputs.deploy-dry-run")
     })
 
     it("keeps the deploy job a leaf: nothing depends on it, so a webhook failure re-runs no other job", () => {
@@ -368,22 +373,8 @@ describe(".github/workflows/docker-publish.yml", () => {
       const others = Object.entries(jobs).filter(([name]) => name !== "deploy")
       expect(others.length).toBeGreaterThan(0)
       for (const [, job] of others) {
-        const needs = job.needs
-        if (typeof needs === "string") expect(needs).not.toContain("deploy")
-        else if (Array.isArray(needs)) expect(needs).not.toContain("deploy")
-        else expect(needs).toBeUndefined()
+        if (job.needs) expect(job.needs).not.toContain("deploy")
       }
-    })
-
-    it("maps the Coolify secrets into the deploy step by name only, never embedding their values", () => {
-      const step = deploySteps().find((s) =>
-        (s.run ?? "").includes("deploy-coolify.sh")
-      )
-      expect(step?.env?.COOLIFY_WEBHOOK).toBe("${{ secrets.COOLIFY_WEBHOOK }}")
-      expect(step?.env?.COOLIFY_TOKEN).toBe("${{ secrets.COOLIFY_TOKEN }}")
-      const raw = readFileSync(WORKFLOW_PATH, "utf8")
-      expect(raw).toContain("secrets.COOLIFY_WEBHOOK")
-      expect(raw).toContain("secrets.COOLIFY_TOKEN")
     })
 
     it("keeps deploy as the final job of the workflow (deploy is the last act)", () => {
