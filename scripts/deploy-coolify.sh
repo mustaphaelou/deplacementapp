@@ -78,6 +78,11 @@ if [ "$DRY_RUN" = true ]; then
   exit 0
 fi
 
+if ! command -v curl &>/dev/null; then
+  fail "Curl is not installed or not in PATH (cannot fire the deploy webhook)"
+  exit 1
+fi
+
 info "Firing Coolify deploy webhook at $(endpoint_shape) for ref '$REF'..."
 HTTP_CODE=$(curl --silent --show-error --output /dev/null \
   --request GET "$COOLIFY_WEBHOOK" \

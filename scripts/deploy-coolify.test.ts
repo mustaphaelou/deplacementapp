@@ -1,6 +1,14 @@
 import { describe, it, expect, beforeAll } from "vitest"
 import { spawnSync } from "node:child_process"
-import { mkdtempSync, writeFileSync, rmSync, existsSync, statSync } from "node:fs"
+import {
+  mkdtempSync,
+  writeFileSync,
+  readFileSync,
+  symlinkSync,
+  rmSync,
+  existsSync,
+  statSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -60,9 +68,13 @@ describe("scripts/deploy-coolify.sh", () => {
     expect(statSync(SCRIPT).mode & 0o111).not.toBe(0)
   })
 
-  it("exits 0 when the deploy webhook answers HTTP 2xx", () => {
+  it("exits 0 with a short success line when the deploy webhook answers HTTP 2xx", () => {
     const result = runDeploy(["--ref", REF])
     expect(result.code).toBe(0)
+    expect(result.output).toContain("[PASS]")
+    expect(result.output).toContain("Deploy webhook accepted")
+    expect(result.output).not.toContain(TOKEN)
+    expect(result.output).not.toContain("abc-123-secret")
   })
 
   it("exits non-zero with a diagnostic when the webhook answers non-2xx", () => {
@@ -71,22 +83,40 @@ describe("scripts/deploy-coolify.sh", () => {
     expect(result.output).toContain("HTTP 500")
   })
 
+  it("never prints the webhook URL or token values on a 5xx response", () => {
+    const result = runDeploy(["--ref", REF], { HTTP_CODE: "500" })
+    expect(result.code).not.toBe(0)
+    expect(result.output).not.toContain(TOKEN)
+    expect(result.output).not.toContain("abc-123-secret")
+  })
+
   it("exits non-zero when curl fails (network error)", () => {
     const result = runDeploy(["--ref", REF], { CURL_NETWORK_ERROR: "1" })
     expect(result.code).not.toBe(0)
     expect(result.output).toContain("network error")
   })
 
-  it("exits non-zero when COOLIFY_WEBHOOK is missing", () => {
+  it("never prints the webhook URL or token values on a network error", () => {
+    const result = runDeploy(["--ref", REF], { CURL_NETWORK_ERROR: "1" })
+    expect(result.code).not.toBe(0)
+    expect(result.output).not.toContain(TOKEN)
+    expect(result.output).not.toContain("abc-123-secret")
+  })
+
+  it("exits non-zero naming the missing variable when COOLIFY_WEBHOOK is missing", () => {
     const result = runDeploy(["--ref", REF], { COOLIFY_WEBHOOK: "" })
     expect(result.code).not.toBe(0)
     expect(result.output).toContain("COOLIFY_WEBHOOK")
+    expect(result.output).not.toContain(TOKEN)
+    expect(result.output).not.toContain("abc-123-secret")
   })
 
-  it("exits non-zero when COOLIFY_TOKEN is missing", () => {
+  it("exits non-zero naming the missing variable when COOLIFY_TOKEN is missing", () => {
     const result = runDeploy(["--ref", REF], { COOLIFY_TOKEN: "" })
     expect(result.code).not.toBe(0)
     expect(result.output).toContain("COOLIFY_TOKEN")
+    expect(result.output).not.toContain(TOKEN)
+    expect(result.output).not.toContain("abc-123-secret")
   })
 
   it("never prints COOLIFY_WEBHOOK or COOLIFY_TOKEN values", () => {
@@ -109,6 +139,39 @@ describe("scripts/deploy-coolify.sh", () => {
     expect(result.output).not.toContain(TOKEN)
     expect(result.output).not.toContain("abc-123-secret")
     rmSync(logDir, { recursive: true, force: true })
+  })
+
+  it("--dry-run still validates secret presence, naming the missing variable without a value", () => {
+    const result = runDeploy(["--dry-run", "--ref", REF], { COOLIFY_TOKEN: "" })
+    expect(result.code).not.toBe(0)
+    expect(result.output).toContain("COOLIFY_TOKEN")
+    expect(result.output).not.toContain(TOKEN)
+    expect(result.output).not.toContain("abc-123-secret")
+  })
+
+  it("names curl as the cause when curl is not installed", () => {
+    const emptyDir = mkdtempSync(join(tmpdir(), "deploy-coolify-nocurl-"))
+    symlinkSync("/bin/bash", join(emptyDir, "bash"))
+    const result = spawnSync("bash", [SCRIPT, "--ref", REF], {
+      env: {
+        ...process.env,
+        PATH: emptyDir,
+        COOLIFY_WEBHOOK: WEBHOOK,
+        COOLIFY_TOKEN: TOKEN,
+      },
+      encoding: "utf8",
+      timeout: 30000,
+    })
+    rmSync(emptyDir, { recursive: true, force: true })
+    expect(result.status).not.toBe(0)
+    expect(`${result.stdout}\n${result.stderr}`).toContain("Curl")
+  })
+
+  it("is standalone: a one-shot curl-based module with no workflow-template interpolation", () => {
+    const body = readFileSync(SCRIPT, "utf8")
+    expect(body).toContain("#!/usr/bin/env bash")
+    expect(body).toContain("curl")
+    expect(body).not.toContain("${{")
   })
 
   it("rejects unknown parameters", () => {
