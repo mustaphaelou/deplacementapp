@@ -16,11 +16,13 @@ interface Step {
   run?: string
   if?: string
   with?: Record<string, unknown>
+  env?: Record<string, unknown>
 }
 
 interface Job {
   if?: string
   needs?: string | string[]
+  outputs?: Record<string, unknown>
   steps?: Step[]
 }
 
@@ -31,7 +33,9 @@ interface Workflow {
       branches?: string[]
       tags?: string[]
     }
-    workflow_dispatch?: unknown
+    workflow_dispatch?: {
+      inputs?: Record<string, { description?: string; type?: string; default?: boolean }>
+    }
   }
   jobs?: Record<string, Job>
 }
@@ -47,6 +51,10 @@ function verifySteps(): Step[] {
 
 function buildAndPublishSteps(): Step[] {
   return loadWorkflow().jobs?.["build-and-publish"]?.steps ?? []
+}
+
+function deploySteps(): Step[] {
+  return loadWorkflow().jobs?.["deploy"]?.steps ?? []
 }
 
 function runScripts(steps: Step[]): string {
@@ -97,11 +105,13 @@ describe(".github/workflows/docker-publish.yml", () => {
     expect(() => loadWorkflow()).not.toThrow()
   })
 
-  it("defines the two-job gate: verify, then build-and-publish depending on it", () => {
+  it("defines the three-job gate: verify, then build-and-publish, then deploy", () => {
     const jobs = loadWorkflow().jobs
     expect(jobs?.["verify"]).toBeDefined()
     expect(jobs?.["build-and-publish"]).toBeDefined()
+    expect(jobs?.["deploy"]).toBeDefined()
     expect(jobs?.["build-and-publish"]?.needs).toContain("verify")
+    expect(jobs?.["deploy"]?.needs).toContain("build-and-publish")
   })
 
   it("runs the unit gate on every trigger, including pull requests", () => {
@@ -289,6 +299,55 @@ describe(".github/workflows/docker-publish.yml", () => {
       expect(releaseDocs).not.toContain("release-check")
       expect(adr.toLowerCase()).toContain("non-semver tags fail")
       expect(adr).not.toContain("release-check")
+    })
+  })
+
+  describe("deploy job", () => {
+    it("depends on build-and-publish, so verify is transitively covered", () => {
+      const deploy = loadWorkflow().jobs?.["deploy"]
+      expect(deploy?.needs).toContain("build-and-publish")
+    })
+
+    it("promotes the release-gate output to a build-and-publish job output", () => {
+      const publish = loadWorkflow().jobs?.["build-and-publish"]
+      expect(publish?.outputs?.is_release).toContain(
+        "steps.release-gate.outputs.is_release"
+      )
+    })
+
+    it("deploys only on Release tags, reusing the gate's is_release output", () => {
+      const deploy = loadWorkflow().jobs?.["deploy"]
+      expect(deploy?.if).toContain(
+        "needs.build-and-publish.outputs.is_release"
+      )
+      expect(deploy?.if).toContain("'true'")
+    })
+
+    it("keeps branch pushes, PRs, and tag-less dispatches from deploying", () => {
+      const deploy = loadWorkflow().jobs?.["deploy"]
+      expect(deploy?.if).toContain("github.event_name")
+      expect(deploy?.if).toContain("workflow_dispatch")
+    })
+
+    it("adds a workflow_dispatch dry-run input so the seam is testable without firing", () => {
+      const inputs = loadWorkflow().on?.workflow_dispatch?.inputs
+      expect(inputs?.["deploy-dry-run"]).toBeDefined()
+      expect(inputs?.["deploy-dry-run"]?.type).toBe("boolean")
+      expect(deploySteps().find((s) => (s.run ?? "").includes("--dry-run"))).toBeDefined()
+      expect(runScripts(deploySteps())).toContain("deploy-coolify.sh")
+    })
+
+    it("fires the Coolify deploy webhook with secrets by name only", () => {
+      const deploy = loadWorkflow().jobs?.["deploy"]
+      const step = deploy?.steps?.find((s) => (s.run ?? "").includes("deploy-coolify.sh"))
+      expect(step?.env?.COOLIFY_WEBHOOK).toContain("secrets.COOLIFY_WEBHOOK")
+      expect(step?.env?.COOLIFY_TOKEN).toContain("secrets.COOLIFY_TOKEN")
+      expect(runScripts(deploySteps())).not.toContain("COOLIFY_WEBHOOK:")
+    })
+
+    it("keeps deploy as the final job of the workflow (deploy is the last act)", () => {
+      const jobNames = Object.keys(loadWorkflow().jobs ?? {})
+      expect(jobNames[jobNames.length - 1]).toBe("deploy")
     })
   })
 })

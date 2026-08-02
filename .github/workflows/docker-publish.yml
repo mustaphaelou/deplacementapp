@@ -6,6 +6,11 @@ on:
     branches: [main]
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      deploy-dry-run:
+        description: "Validate the deploy job without firing the Coolify webhook (dry run)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -43,6 +48,8 @@ jobs:
     if: github.event_name != 'pull_request'
     needs: verify
     runs-on: ubuntu-latest
+    outputs:
+      is_release: ${{ steps.release-gate.outputs.is_release }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -151,3 +158,23 @@ jobs:
           name: ${{ github.ref_name }}
           generate_release_notes: true
           draft: true
+
+  deploy:
+    if: needs.build-and-publish.outputs.is_release == 'true' || (github.event_name == 'workflow_dispatch' && inputs.deploy-dry-run == 'true')
+    needs: build-and-publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to production (Coolify deploy webhook)
+        env:
+          COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          DEPLOY_DRY_RUN: ${{ inputs.deploy-dry-run }}
+        run: |
+          if [[ "$DEPLOY_DRY_RUN" == "true" ]]; then
+            scripts/deploy-coolify.sh --dry-run --ref "$GITHUB_REF_NAME"
+          else
+            scripts/deploy-coolify.sh --ref "$GITHUB_REF_NAME"
+          fi
