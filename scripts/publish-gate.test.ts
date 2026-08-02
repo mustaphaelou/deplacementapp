@@ -9,7 +9,11 @@ const WORKFLOW_PATH = join(ROOT, ".github/workflows/docker-publish.yml")
 const WRAPPER_PATH = join(ROOT, "scripts/test-docker-build.sh")
 const CONTEXT_PATH = join(ROOT, "CONTEXT.md")
 const RELEASE_DOCS_PATH = join(ROOT, "docs/agents/release.md")
-const ADR_0015_PATH = join(ROOT, "docs/adr/0015-deployment-triggered-on-release-tags.md")
+const ADR_0004_PATH = join(ROOT, "docs/adr/0004-ghcr-as-container-registry.md")
+const ADR_0015_PATH = join(
+  ROOT,
+  "docs/adr/0015-deployment-triggered-on-release-tags.md"
+)
 
 interface Step {
   name?: string
@@ -303,14 +307,8 @@ describe(".github/workflows/docker-publish.yml", () => {
     })
 
     it("documents that malformed tags fail the run and push nothing", () => {
-      const releaseDocs = readFileSync(
-        join(ROOT, "docs/agents/release.md"),
-        "utf8"
-      )
-      const adr = readFileSync(
-        join(ROOT, "docs/adr/0004-ghcr-as-container-registry.md"),
-        "utf8"
-      )
+      const releaseDocs = readFileSync(RELEASE_DOCS_PATH, "utf8")
+      const adr = readFileSync(ADR_0004_PATH, "utf8")
       expect(releaseDocs).toContain("release-gate")
       expect(releaseDocs).not.toContain("harmless")
       expect(releaseDocs).not.toContain("release-check")
