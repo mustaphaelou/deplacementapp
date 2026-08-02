@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest"
 import { spawnSync } from "node:child_process"
-import { mkdtempSync, writeFileSync, rmSync, existsSync } from "node:fs"
+import { mkdtempSync, writeFileSync, rmSync, existsSync, statSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -54,6 +54,10 @@ function runDeploy(
 describe("scripts/deploy-coolify.sh", () => {
   beforeAll(() => {
     expect(existsSync(SCRIPT)).toBe(true)
+  })
+
+  it("is executable so the workflow can invoke it directly", () => {
+    expect(statSync(SCRIPT).mode & 0o111).not.toBe(0)
   })
 
   it("exits 0 when the deploy webhook answers HTTP 2xx", () => {
