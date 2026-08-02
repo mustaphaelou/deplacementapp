@@ -345,6 +345,47 @@ describe(".github/workflows/docker-publish.yml", () => {
       expect(runScripts(deploySteps())).not.toContain("COOLIFY_WEBHOOK:")
     })
 
+    it("uses the exact single-owner formula: Release output alone, plus an explicit dry-run dispatch", () => {
+      const deploy = loadWorkflow().jobs?.["deploy"]
+      expect(deploy?.if).toBe(
+        "needs.build-and-publish.outputs.is_release == 'true' || (github.event_name == 'workflow_dispatch' && inputs.deploy-dry-run == 'true')"
+      )
+    })
+
+    it("switches between dry-run and the real webhook from the dispatch input, passing the ref on both paths", () => {
+      const step = deploySteps().find((s) =>
+        (s.run ?? "").includes("deploy-coolify.sh")
+      )
+      const run = step?.run ?? ""
+      expect(run).toContain('scripts/deploy-coolify.sh --dry-run --ref "$GITHUB_REF_NAME"')
+      expect(run).toContain('scripts/deploy-coolify.sh --ref "$GITHUB_REF_NAME"')
+      expect(run).toContain("DEPLOY_DRY_RUN")
+      expect(step?.env?.DEPLOY_DRY_RUN).toContain("inputs.deploy-dry-run")
+    })
+
+    it("keeps the deploy job a leaf: nothing depends on it, so a webhook failure re-runs no other job", () => {
+      const jobs = loadWorkflow().jobs ?? {}
+      const others = Object.entries(jobs).filter(([name]) => name !== "deploy")
+      expect(others.length).toBeGreaterThan(0)
+      for (const [, job] of others) {
+        const needs = job.needs
+        if (typeof needs === "string") expect(needs).not.toContain("deploy")
+        else if (Array.isArray(needs)) expect(needs).not.toContain("deploy")
+        else expect(needs).toBeUndefined()
+      }
+    })
+
+    it("maps the Coolify secrets into the deploy step by name only, never embedding their values", () => {
+      const step = deploySteps().find((s) =>
+        (s.run ?? "").includes("deploy-coolify.sh")
+      )
+      expect(step?.env?.COOLIFY_WEBHOOK).toBe("${{ secrets.COOLIFY_WEBHOOK }}")
+      expect(step?.env?.COOLIFY_TOKEN).toBe("${{ secrets.COOLIFY_TOKEN }}")
+      const raw = readFileSync(WORKFLOW_PATH, "utf8")
+      expect(raw).toContain("secrets.COOLIFY_WEBHOOK")
+      expect(raw).toContain("secrets.COOLIFY_TOKEN")
+    })
+
     it("keeps deploy as the final job of the workflow (deploy is the last act)", () => {
       const jobNames = Object.keys(loadWorkflow().jobs ?? {})
       expect(jobNames[jobNames.length - 1]).toBe("deploy")
