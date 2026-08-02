@@ -8,6 +8,6 @@ export default NextAuth({
 
 export const config = {
   matcher: [
-    "/((?!api/auth|api/health|api/setup|_next/static|_next/image|favicon.ico|login).*)",
+    "/((?!api/auth|api/health|api/setup|_next/static|_next/image|favicon.ico|login|prototype).*)",
   ],
 }
