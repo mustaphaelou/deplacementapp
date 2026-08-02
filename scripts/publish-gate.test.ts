@@ -8,6 +8,8 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 const WORKFLOW_PATH = join(ROOT, ".github/workflows/docker-publish.yml")
 const WRAPPER_PATH = join(ROOT, "scripts/test-docker-build.sh")
 const CONTEXT_PATH = join(ROOT, "CONTEXT.md")
+const RELEASE_DOCS_PATH = join(ROOT, "docs/agents/release.md")
+const ADR_0015_PATH = join(ROOT, "docs/adr/0015-deployment-triggered-on-release-tags.md")
 
 interface Step {
   name?: string
@@ -380,6 +382,73 @@ describe(".github/workflows/docker-publish.yml", () => {
     it("keeps deploy as the final job of the workflow (deploy is the last act)", () => {
       const jobNames = Object.keys(loadWorkflow().jobs ?? {})
       expect(jobNames[jobNames.length - 1]).toBe("deploy")
+    })
+  })
+
+  describe("deploy docs (ADR-0015 + docs sync)", () => {
+    const adr = readFileSync(ADR_0015_PATH, "utf8")
+    const releaseDocs = readFileSync(RELEASE_DOCS_PATH, "utf8")
+
+    it("records the who-pulls decision in ADR-0015 and cites ADR-0004", () => {
+      expect(adr).toContain("Coolify deploy webhook")
+      expect(adr).toContain("Release tags")
+      expect(adr).toContain("Bearer")
+      expect(adr).toContain("HTTP 2xx")
+      expect(adr).toContain("latest")
+      expect(adr).toContain("ADR-0004")
+    })
+
+    it("records the publish gate as the trust precondition for auto-deploy", () => {
+      expect(adr.toLowerCase()).toContain("trust precondition")
+      expect(adr.toLowerCase()).toContain("publish gate")
+    })
+
+    it("release.md drops the no-Coolify-changes claim and documents the deploy + escape hatch", () => {
+      expect(releaseDocs).not.toContain(
+        "no Coolify changes are needed for a Release"
+      )
+      expect(releaseDocs).not.toContain("no Coolify changes")
+      expect(releaseDocs).toContain("Coolify deploy webhook")
+      expect(releaseDocs).toContain("escape hatch")
+    })
+
+    it("describes the deploy hop in the release process overview", () => {
+      const overview =
+        releaseDocs
+          .split("## Process overview")[1]
+          ?.split("## When to cut a Release")[0] ?? ""
+      expect(overview).toContain("Coolify deploy webhook")
+      expect(overview).toContain("queued to serve")
+    })
+
+    it("CONTEXT.md Release entry gains the deploy-step consequence without a new term", () => {
+      const context = readFileSync(CONTEXT_PATH, "utf8")
+      const deployment = context.split("### Deployment")[1] ?? ""
+      const releaseEntry = deployment.split("**Release**")[1] ?? ""
+      expect(releaseEntry).toContain("Coolify deploy webhook")
+      expect(releaseEntry).toContain("ADR-0015")
+      expect(deployment).not.toContain("**Deploy step**")
+    })
+
+    it("references the Coolify secrets by name only across the deploy docs", () => {
+      const docs = [ADR_0015_PATH, RELEASE_DOCS_PATH, CONTEXT_PATH]
+        .map((path) => readFileSync(path, "utf8"))
+        .join("\n")
+      expect(docs).toContain("COOLIFY_WEBHOOK")
+      expect(docs).toContain("COOLIFY_TOKEN")
+      expect(docs).not.toContain("COOLIFY_WEBHOOK=")
+      expect(docs).not.toContain("COOLIFY_TOKEN=")
+    })
+
+    it("documents the deploy exactly as the workflow ships it", () => {
+      const deploy = loadWorkflow().jobs?.["deploy"] ?? {}
+      expect(releaseDocs).toContain("needs: build-and-publish")
+      expect(releaseDocs).toContain("deploy-coolify.sh")
+      expect(releaseDocs).toContain("HTTP 2xx")
+      expect(releaseDocs).toContain("Branch pushes")
+      expect(releaseDocs).toContain("deploy nothing")
+      expect(deploy.if).toContain("is_release")
+      expect(deploy.if).toContain("deploy-dry-run")
     })
   })
 })
