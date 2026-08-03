@@ -1,10 +1,13 @@
-import NextAuth from "next-auth"
-import { authConfig } from "@/lib/auth/server"
+import { NextRequest, NextResponse } from "next/server"
+import { getSessionCookie } from "better-auth/cookies"
 
-export default NextAuth({
-  ...authConfig,
-  providers: [],
-}).auth
+export function proxy(request: NextRequest) {
+  const sessionCookie = getSessionCookie(request)
+  if (!sessionCookie) {
+    return NextResponse.redirect(new URL("/login", request.url))
+  }
+  return NextResponse.next()
+}
 
 export const config = {
   matcher: [

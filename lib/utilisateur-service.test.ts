@@ -6,6 +6,8 @@ import type { PgliteDb } from "./test/create-pglite-db"
 import * as auditModule from "./audit"
 import { journalAudit } from "../db/schema/journal-audit"
 import { utilisateurs } from "../db/schema/utilisateurs"
+import { account } from "../db/schema/auth-tables"
+import { CREDENTIAL_PROVIDER_ID } from "./auth/set-password"
 import type { AvatarStorage } from "./avatar-storage"
 import {
   UtilisateurService,
@@ -35,7 +37,6 @@ function makeUser(overrides?: Record<string, unknown>) {
   return {
     id: crypto.randomUUID(),
     email: `${crypto.randomUUID()}@test.com`,
-    motDePasse: "$hashed$",
     nom: "Dupont",
     prenom: "Jean",
     poste: "Dev",
@@ -56,7 +57,6 @@ function makeActor() {
   return {
     id: crypto.randomUUID(),
     email: `${crypto.randomUUID()}@actor.com`,
-    motDePasse: null,
     nom: "Admin",
     prenom: "User",
     poste: "Admin",
@@ -86,6 +86,8 @@ describe("UtilisateurService", { timeout: TIMEOUT }, () => {
   beforeEach(async () => {
     vi.clearAllMocks()
 
+    await pgliteDb.execute(sql`DELETE FROM session`)
+    await pgliteDb.execute(sql`DELETE FROM account`)
     await pgliteDb.execute(sql`DELETE FROM journal_audit`)
     await pgliteDb.execute(sql`DELETE FROM utilisateurs`)
     await pgliteDb.execute(sql`DELETE FROM departements`)
@@ -297,23 +299,32 @@ describe("UtilisateurService", { timeout: TIMEOUT }, () => {
       targetUser = makeUser({
         societeId,
         departementId,
-        motDePasse: "$hashed$",
       })
       targetUser.email = `${crypto.randomUUID()}@target.com`
       await pgliteDb.insert(schema.utilisateurs).values(targetUser)
+      await pgliteDb.insert(account).values({
+        id: crypto.randomUUID(),
+        accountId: targetUser.email,
+        providerId: CREDENTIAL_PROVIDER_ID,
+        userId: targetUser.id,
+        password: "$hashed$",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
     })
 
-    it("updates the password hash and writes journal_audit", async () => {
+    it("updates the credential row and writes journal_audit", async () => {
       ;(compare as ReturnType<typeof vi.fn>).mockResolvedValue(true)
       ;(hash as ReturnType<typeof vi.fn>).mockResolvedValue("$newhash$")
 
       await svc.changePassword(targetUser.id, "correctpass", "newpass")
 
-      const [row] = await pgliteDb
+      const [cred] = await pgliteDb
         .select()
-        .from(utilisateurs)
-        .where(eq(utilisateurs.id, targetUser.id))
-      expect(row.motDePasse).toBe("$newhash$")
+        .from(account)
+        .where(eq(account.userId, targetUser.id))
+        .limit(1)
+      expect(cred.password).toBe("$newhash$")
 
       const [auditRow] = await pgliteDb
         .select()
@@ -323,7 +334,7 @@ describe("UtilisateurService", { timeout: TIMEOUT }, () => {
       expect(auditRow.action).toBe("CHANGEMENT_MOT_DE_PASSE")
     })
 
-    it("rolls back when logAudit fails (password hash unchanged)", async () => {
+    it("rolls back when logAudit fails (credential row unchanged)", async () => {
       ;(compare as ReturnType<typeof vi.fn>).mockResolvedValue(true)
       ;(hash as ReturnType<typeof vi.fn>).mockResolvedValue("$newhash$")
       const spy = vi
@@ -334,11 +345,12 @@ describe("UtilisateurService", { timeout: TIMEOUT }, () => {
         svc.changePassword(targetUser.id, "correctpass", "newpass")
       ).rejects.toThrow("audit failure")
 
-      const [row] = await pgliteDb
+      const [cred] = await pgliteDb
         .select()
-        .from(utilisateurs)
-        .where(eq(utilisateurs.id, targetUser.id))
-      expect(row.motDePasse).toBe("$hashed$")
+        .from(account)
+        .where(eq(account.userId, targetUser.id))
+        .limit(1)
+      expect(cred.password).toBe("$hashed$")
 
       spy.mockRestore()
     })
@@ -351,7 +363,6 @@ describe("UtilisateurService", { timeout: TIMEOUT }, () => {
       targetUser = makeUser({
         societeId,
         departementId,
-        motDePasse: "$hashed$",
       })
       targetUser.email = `${crypto.randomUUID()}@target.com`
       await pgliteDb.insert(schema.utilisateurs).values(targetUser)

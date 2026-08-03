@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { signIn } from "next-auth/react"
+import { signInWithCredentials } from "@/lib/auth/client"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -140,11 +140,7 @@ export function SetupWizard() {
       return
     }
 
-    const result = await signIn("credentials", {
-      email: data.email,
-      password: data.password,
-      redirect: false,
-    })
+    const result = await signInWithCredentials(data.email, data.password)
 
     if (result?.error) {
       setLoading(false)

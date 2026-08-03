@@ -1,0 +1,1 @@
+ALTER TABLE "utilisateurs" DROP COLUMN "motDePasse";

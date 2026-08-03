@@ -114,8 +114,8 @@ services:
       - "3000:3000"
     environment:
       - DATABASE_URL=${DATABASE_URL}
-      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
-      - NEXTAUTH_URL=${NEXTAUTH_URL}
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+      - BETTER_AUTH_URL=${BETTER_AUTH_URL}
       - SMTP_HOST=${SMTP_HOST}
       - SMTP_PORT=${SMTP_PORT}
       - SMTP_USER=${SMTP_USER}
@@ -135,8 +135,8 @@ DATABASE_URL=postgresql://user:pass@db:5432/deplacementapp
 POSTGRES_USER=user
 POSTGRES_PASSWORD=<strong-password>
 POSTGRES_DB=deplacementapp
-NEXTAUTH_SECRET=<generate with: openssl rand -base64 32>
-NEXTAUTH_URL=https://your-domain.com
+BETTER_AUTH_SECRET=<generate with: openssl rand -base64 32>
+BETTER_AUTH_URL=https://your-domain.com
 SMTP_HOST=smtp.your-provider.com
 SMTP_PORT=587
 SMTP_USER=your-smtp-user
@@ -186,7 +186,7 @@ Uploads (such as avatars) persist automatically in named volumes.
 | **Framework** | [Next.js 16](https://nextjs.org/) (App Router, Turbopack) |
 | **Language** | [TypeScript](https://www.typescriptlang.org/) |
 | **UI System** | [React 19](https://react.dev/), [Tailwind CSS v4](https://tailwindcss.com/), [shadcn/ui](https://ui.shadcn.com/) on [Base UI](https://base-ui.com/), [Hugeicons](https://hugeicons.com/) & [Lucide](https://lucide.dev/) |
-| **Authentication** | [NextAuth v5](https://next-auth.js.org/) |
+| **Authentication** | [Better Auth](https://better-auth.com/) (mapped onto the existing Utilisateur table) |
 | **Database & ORM** | [PostgreSQL](https://www.postgresql.org/) with [Drizzle ORM](https://orm.drizzle.team/) |
 | **Forms & Validation** | [React Hook Form](https://react-hook-form.com/) + [Zod](https://zod.dev/) |
 | **PDF Generation** | [@react-pdf/renderer](https://react-pdf.org/) |

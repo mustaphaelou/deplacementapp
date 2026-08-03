@@ -1,4 +1,4 @@
-import { auth } from "@/lib/auth/server"
+import { getAuthUser } from "@/lib/auth/server"
 import { redirect } from "next/navigation"
 import { DashboardShell } from "@/components/dashboard-shell"
 import { NAV_ITEMS } from "@/lib/auth"
@@ -10,10 +10,10 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const session = await auth()
-  if (!session?.user) redirect("/login")
+  const user = await getAuthUser()
+  if (!user) redirect("/login")
 
-  const role = session.user.role
+  const role = user.role
   const navItems = [
     ...NAV_ITEMS.common,
     ...(NAV_ITEMS[role as keyof typeof NAV_ITEMS] ?? []),

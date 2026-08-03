@@ -1,6 +1,6 @@
 "use client"
 
-import { useSession } from "next-auth/react"
+import { useAuthUser } from "@/lib/auth/client"
 import { redirect } from "next/navigation"
 import { useEffect, useState, useCallback } from "react"
 import { Bell, Eye } from "lucide-react"
@@ -20,14 +20,16 @@ type Notification = {
 }
 
 export default function NotificationsPage() {
-  const { data: session } = useSession()
+  const { user } = useAuthUser()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
   const [marking, setMarking] = useState<Set<string>>(new Set())
   const { refreshBell } = useNotificationContext()
 
+  const userId = user?.id
+
   useEffect(() => {
-    if (!session?.user) return
+    if (!userId) return
     ;(async () => {
       try {
         const res = await fetch("/api/notifications")
@@ -39,7 +41,7 @@ export default function NotificationsPage() {
         setLoading(false)
       }
     })()
-  }, [session])
+  }, [userId])
 
   const markAsRead = useCallback(
     async (id: string) => {
@@ -71,7 +73,7 @@ export default function NotificationsPage() {
     [refreshBell]
   )
 
-  if (!session?.user) redirect("/login")
+  if (!user) redirect("/login")
 
   const unreadCount = notifications.filter((n) => !n.lu).length
 

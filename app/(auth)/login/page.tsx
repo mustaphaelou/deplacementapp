@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { signIn } from "next-auth/react"
+import { signInWithCredentials, signInWithGoogle } from "@/lib/auth/client"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -52,11 +52,7 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
 
-    const result = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-    })
+    const result = await signInWithCredentials(email, password)
 
     setLoading(false)
 
@@ -143,7 +139,7 @@ export default function LoginPage() {
           <Button
             variant="outline"
             className="w-full"
-            onClick={() => signIn("google", { redirectTo: "/" })}
+            onClick={() => signInWithGoogle()}
           >
             <svg className="mr-2 size-4" viewBox="0 0 24 24">
               <path

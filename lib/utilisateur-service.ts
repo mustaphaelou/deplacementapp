@@ -1,9 +1,13 @@
 import { eq, asc } from "drizzle-orm"
-import { hash, compare } from "bcryptjs"
 import type { DrizzleDb } from "../db"
 import { db } from "../db"
 import { utilisateurs } from "../db/schema/utilisateurs"
 import { logAudit } from "./audit"
+import {
+  setPassword,
+  verifyCredential,
+  syncCredentialIdentifier,
+} from "./auth/set-password"
 import {
   avatarStorage as defaultAvatarStorage,
   type AvatarStorage,
@@ -38,6 +42,8 @@ export {
   NoProfileUpdateDataError,
   AvatarError,
 }
+
+const DEFAULT_PASSWORD = "password123"
 
 export class UtilisateurService {
   constructor(
@@ -81,8 +87,7 @@ export class UtilisateurService {
     },
     actorId: string
   ) {
-    const password = data.motDePasse || "password123"
-    const hashedPassword = await hash(password, 12)
+    const password = data.motDePasse || DEFAULT_PASSWORD
     const userId = crypto.randomUUID()
 
     return this._db.transaction(async (tx) => {
@@ -91,7 +96,6 @@ export class UtilisateurService {
         .values({
           id: userId,
           email: data.email,
-          motDePasse: hashedPassword,
           googleAuthEnabled: data.googleAuthEnabled ?? false,
           nom: data.nom,
           prenom: data.prenom,
@@ -107,6 +111,8 @@ export class UtilisateurService {
           modifieLe: new Date(),
         })
         .returning()
+
+      await setPassword(tx, user.id, password)
 
       await logAudit(
         {
@@ -138,10 +144,10 @@ export class UtilisateurService {
     },
     actorId: string
   ) {
-    const { motDePasse, ...rest } = data
+    const { motDePasse, email, ...rest } = data
     const updateData: Record<string, unknown> = { ...rest }
-    if (motDePasse) {
-      updateData.motDePasse = await hash(motDePasse, 12)
+    if (email !== undefined) {
+      updateData.email = email
     }
 
     return this._db.transaction(async (tx) => {
@@ -152,6 +158,13 @@ export class UtilisateurService {
         .returning()
 
       if (!user) throw new UtilisateurNotFoundError()
+
+      if (motDePasse) {
+        await setPassword(tx, id, motDePasse)
+      }
+      if (email !== undefined) {
+        await syncCredentialIdentifier(tx, id)
+      }
 
       await logAudit(
         {
@@ -173,24 +186,18 @@ export class UtilisateurService {
     currentPassword: string,
     newPassword: string
   ): Promise<void> {
-    const [user] = await this._db
-      .select()
+    const [utilisateur] = await this._db
+      .select({ id: utilisateurs.id })
       .from(utilisateurs)
       .where(eq(utilisateurs.id, userId))
       .limit(1)
-    if (!user) throw new UtilisateurNotFoundError()
-    if (!user.motDePasse) throw new MotDePasseIncorrectError()
+    if (!utilisateur) throw new UtilisateurNotFoundError()
 
-    const isValid = await compare(currentPassword, user.motDePasse)
+    const isValid = await verifyCredential(this._db, userId, currentPassword)
     if (!isValid) throw new MotDePasseIncorrectError()
 
-    const hashed = await hash(newPassword, 12)
-
     await this._db.transaction(async (tx) => {
-      await tx
-        .update(utilisateurs)
-        .set({ motDePasse: hashed })
-        .where(eq(utilisateurs.id, userId))
+      await setPassword(tx, userId, newPassword)
 
       await logAudit(
         {
@@ -222,6 +229,7 @@ export class UtilisateurService {
     if (!user) throw new UtilisateurNotFoundError()
 
     const updateData: Record<string, unknown> = {}
+    let emailChanged = false
 
     if (data.telephone !== undefined) {
       updateData.telephone = data.telephone || null
@@ -235,10 +243,10 @@ export class UtilisateurService {
       if (!data.currentPassword) {
         throw new EmailChangeRequiresPasswordError()
       }
-      if (!user.motDePasse) throw new MotDePasseIncorrectError()
-      const isValid = await compare(data.currentPassword, user.motDePasse)
+      const isValid = await verifyCredential(this._db, userId, data.currentPassword)
       if (!isValid) throw new MotDePasseIncorrectError()
       updateData.email = data.email
+      emailChanged = true
     }
 
     const previousAvatarUrl: string | null = user.avatarUrl
@@ -275,6 +283,10 @@ export class UtilisateurService {
           })
 
         if (!updated) throw new UtilisateurNotFoundError()
+
+        if (emailChanged) {
+          await syncCredentialIdentifier(tx, userId)
+        }
 
         await logAudit(
           {

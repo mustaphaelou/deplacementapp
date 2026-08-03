@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { signOut } from "next-auth/react"
+import { signOut } from "@/lib/auth/client"
 import { toast } from "sonner"
 
 interface ProfileUser {
@@ -101,7 +101,7 @@ export function useProfileForm(user: ProfileUser) {
 
       if (needsRelogin) {
         toast.success("Email modifié — veuillez vous reconnecter")
-        await signOut({ redirectTo: "/login" })
+        await signOut("/login")
       } else {
         router.refresh()
       }

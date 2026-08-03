@@ -179,8 +179,8 @@ docker run --rm -d \
   --name "$CONTAINER_NAME" \
   --network "$NETWORK_NAME" \
   -e "DATABASE_URL=postgresql://test:test@${DB_CONTAINER_NAME}:5432/testdb" \
-  -e NEXTAUTH_SECRET="test-secret-not-for-production" \
-  -e NEXTAUTH_URL="http://localhost:3000" \
+  -e BETTER_AUTH_SECRET="dev-only-secret-0123456789-abcdefghijklmnopqrstuvwxyz" \
+  -e BETTER_AUTH_URL="http://localhost:3000" \
   -e AUTH_TRUST_HOST=true \
   "$IMAGE_NAME"
 pass "Runner container started on port $HOST_PORT"

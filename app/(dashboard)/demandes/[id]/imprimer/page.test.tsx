@@ -3,7 +3,7 @@ import { DemandeNotFoundError } from "@/lib/errors"
 import type { DemandeWithRelations } from "@/lib/demande-types"
 
 vi.mock("@/lib/auth/server", () => ({
-  auth: vi.fn(),
+  getAuthUser: vi.fn(),
 }))
 
 vi.mock("@/lib/demande", () => ({
@@ -76,17 +76,16 @@ const mockDemande: DemandeWithRelations = {
   assigneA: null,
 }
 
-function mockSession() {
+function mockUser() {
   return {
-    user: {
-      id: "u-1",
-      email: "user@example.com",
-      name: "User",
-      role: "EMPLOYEE",
-      departementId: "d-1",
-      departement: "IT",
-      poste: "Dev",
-    },
+    id: "u-1",
+    email: "user@example.com",
+    name: "User",
+    role: "EMPLOYEE",
+    departementId: "d-1",
+    departement: "IT",
+    poste: "Dev",
+    avatarUrl: null,
   }
 }
 
@@ -136,11 +135,11 @@ describe("Imprimer page", () => {
   })
 
   it("renders the demande when found", async () => {
-    const { auth } = await import("@/lib/auth/server")
+    const { getAuthUser } = await import("@/lib/auth/server")
     const { findById: mockFindById } = await import("@/lib/demande")
     const { getSocieteBranding } = await import("@/lib/societe")
 
-    ;(auth as ReturnType<typeof vi.fn>).mockResolvedValue(mockSession())
+    ;(getAuthUser as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser())
     ;(mockFindById as ReturnType<typeof vi.fn>).mockResolvedValue(mockDemande)
     ;(getSocieteBranding as ReturnType<typeof vi.fn>).mockResolvedValue(
       mockBranding()
@@ -161,11 +160,11 @@ describe("Imprimer page", () => {
   })
 
   it("renders the societe nom, logo, and couleurPrimaire accent in the header", async () => {
-    const { auth } = await import("@/lib/auth/server")
+    const { getAuthUser } = await import("@/lib/auth/server")
     const { findById: mockFindById } = await import("@/lib/demande")
     const { getSocieteBranding } = await import("@/lib/societe")
 
-    ;(auth as ReturnType<typeof vi.fn>).mockResolvedValue(mockSession())
+    ;(getAuthUser as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser())
     ;(mockFindById as ReturnType<typeof vi.fn>).mockResolvedValue(mockDemande)
     ;(getSocieteBranding as ReturnType<typeof vi.fn>).mockResolvedValue(
       mockBranding({ logoUrl: "/logo-acme.png" })
@@ -195,11 +194,11 @@ describe("Imprimer page", () => {
   })
 
   it("falls back to Application when branding is null", async () => {
-    const { auth } = await import("@/lib/auth/server")
+    const { getAuthUser } = await import("@/lib/auth/server")
     const { findById: mockFindById } = await import("@/lib/demande")
     const { getSocieteBranding } = await import("@/lib/societe")
 
-    ;(auth as ReturnType<typeof vi.fn>).mockResolvedValue(mockSession())
+    ;(getAuthUser as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser())
     ;(mockFindById as ReturnType<typeof vi.fn>).mockResolvedValue(mockDemande)
     ;(getSocieteBranding as ReturnType<typeof vi.fn>).mockResolvedValue(null)
 
@@ -217,11 +216,11 @@ describe("Imprimer page", () => {
   })
 
   it("redirects when the demande is soft-deleted or missing", async () => {
-    const { auth } = await import("@/lib/auth/server")
+    const { getAuthUser } = await import("@/lib/auth/server")
     const { findById: mockFindById } = await import("@/lib/demande")
     const { redirect } = await import("next/navigation")
 
-    ;(auth as ReturnType<typeof vi.fn>).mockResolvedValue(mockSession())
+    ;(getAuthUser as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser())
     ;(mockFindById as ReturnType<typeof vi.fn>).mockRejectedValue(
       new DemandeNotFoundError()
     )
@@ -235,10 +234,10 @@ describe("Imprimer page", () => {
   })
 
   it("redirects to login when not authenticated", async () => {
-    const { auth } = await import("@/lib/auth/server")
+    const { getAuthUser } = await import("@/lib/auth/server")
     const { redirect } = await import("next/navigation")
 
-    ;(auth as ReturnType<typeof vi.fn>).mockResolvedValue(null)
+    ;(getAuthUser as ReturnType<typeof vi.fn>).mockResolvedValue(null)
 
     const { default: ImprimerPage } = await import("./page")
     await expect(

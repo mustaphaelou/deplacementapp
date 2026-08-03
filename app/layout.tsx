@@ -3,7 +3,6 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { cn } from "@/lib/utils"
 import { Toaster } from "sonner"
-import { SessionProvider } from "next-auth/react"
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
 
@@ -29,12 +28,10 @@ export default function RootLayout({
       )}
     >
       <body>
-        <SessionProvider>
-          <ThemeProvider>
-            {children}
-            <Toaster richColors position="top-right" />
-          </ThemeProvider>
-        </SessionProvider>
+        <ThemeProvider>
+          {children}
+          <Toaster richColors position="top-right" />
+        </ThemeProvider>
       </body>
     </html>
   )

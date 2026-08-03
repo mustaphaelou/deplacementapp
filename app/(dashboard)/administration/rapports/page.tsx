@@ -1,4 +1,4 @@
-﻿import { auth, hasAnyRole } from "@/lib/auth/server"
+﻿import { getAuthUser, hasAnyRole } from "@/lib/auth/server"
 import { redirect } from "next/navigation"
 import { countByEtape, aggregateBudget } from "@/lib/demande"
 import type { Etape } from "@/lib/workflow"
@@ -8,9 +8,8 @@ import Link from "next/link"
 import { FileText, TrendingUp, CheckCircle, XCircle } from "lucide-react"
 
 export default async function RapportsPage() {
-  const session = await auth()
-  const userRole = session?.user?.role
-  if (!hasAnyRole(userRole ?? "", ["FINANCE_ADMIN", "GENERAL_DIRECTION"])) {
+  const user = await getAuthUser()
+  if (!user || !hasAnyRole(user.role, ["FINANCE_ADMIN", "GENERAL_DIRECTION"])) {
     redirect("/")
   }
 
