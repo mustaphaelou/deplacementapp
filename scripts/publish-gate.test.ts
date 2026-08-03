@@ -9,6 +9,10 @@ const WORKFLOW_PATH = join(ROOT, ".github/workflows/docker-publish.yml")
 const WRAPPER_PATH = join(ROOT, "scripts/test-docker-build.sh")
 const CONTEXT_PATH = join(ROOT, "CONTEXT.md")
 const RELEASE_DOCS_PATH = join(ROOT, "docs/agents/release.md")
+const ADR_0003_PATH = join(
+  ROOT,
+  "docs/adr/0003-separate-migrations-from-runtime-image.md"
+)
 const ADR_0004_PATH = join(ROOT, "docs/adr/0004-ghcr-as-container-registry.md")
 const ADR_0015_PATH = join(
   ROOT,
@@ -202,6 +206,16 @@ describe(".github/workflows/docker-publish.yml", () => {
     expect(deployment).toContain("smoke-test")
   })
 
+  it("describes the two-job structure in the Deployment docs with the matrix as the image map", () => {
+    const docs = readFileSync(CONTEXT_PATH, "utf8")
+    const deployment = docs.split("### Deployment")[1] ?? ""
+    expect(deployment).toContain("publish-check")
+    expect(deployment).toContain("build-and-push")
+    expect(deployment).toContain("image map")
+    expect(deployment).not.toContain("build-and-publish")
+    expect(deployment).not.toContain("after the publish job")
+  })
+
   describe("publish-check (gate owner + smoke)", () => {
     it("smoke-tests both loaded images before the matrix can push", () => {
       const steps = publishCheckSteps()
@@ -291,6 +305,15 @@ describe(".github/workflows/docker-publish.yml", () => {
       expect(adr).toContain("deplacementapp-migrator")
       expect(adr).toContain("Future architecture reviews should not")
       expect(adr).toContain("twin-block deepening candidate is closed")
+    })
+
+    it("records the migrator's amd64-only scope and the absent arm64 consumers in ADR-0003", () => {
+      const adr = readFileSync(ADR_0003_PATH, "utf8")
+      expect(adr).toContain("linux/amd64")
+      expect(adr).toContain("no consumer pulls an arm64 migrator")
+      expect(adr).toContain("linux/amd64,linux/arm64")
+      expect(adr).toContain("arm64 drop is this consequence's direct outcome")
+      expect(adr).not.toContain("linux/arm64,linux/amd64")
     })
 
     it("fans the build and push out of one matrix template using the row's own fields", () => {

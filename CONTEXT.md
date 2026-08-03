@@ -169,7 +169,7 @@ _Avoid_: Source, origin, AI flag, assisted
 ### Deployment
 
 **Release**:
-A deployable snapshot of the application, identified by a git tag `vX.Y.Z` pushed to main. Everything else derives from it: the GHCR image tags (`vX.Y.Z`, `X.Y`), the GitHub Release object (auto-created as a draft with generated notes), its changelog, and — since ADR-0015 — the deploy: a Release push fires the Coolify deploy webhook (`deploy` job, after the publish job) so production is queued to serve the Release's exact digest. The `latest` image tag is a rolling alias for main, not a Release; at Release time the deploy tells Coolify to pull, so the deployed digest is the Release's. The `package.json` version field is decorative (private app); the git tag is canonical. Releasing is the act of pushing the tag; nothing else needs to be configured.
+A deployable snapshot of the application, identified by a git tag `vX.Y.Z` pushed to main. Everything else derives from it: the GHCR image tags (`vX.Y.Z`, `X.Y`), the GitHub Release object (auto-created as a draft with generated notes), its changelog, and — since ADR-0015 — the deploy: a Release push fires the Coolify deploy webhook (`deploy` job, after `build-and-push` has pushed the matrix rows) so production is queued to serve the Release's exact digest. The `latest` image tag is a rolling alias for main, not a Release; at Release time the deploy tells Coolify to pull, so the deployed digest is the Release's. The `package.json` version field is decorative (private app); the git tag is canonical. Releasing is the act of pushing the tag; nothing else needs to be configured.
 _Avoid_: Calling a main-branch push, the `latest` image, or the `package.json` version a "Release".
 _Cites_: ADR-0004, ADR-0015
 
