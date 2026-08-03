@@ -28,6 +28,13 @@
       "when": 1785097776049,
       "tag": "0003_stormy_molly_hayes",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785772576699,
+      "tag": "0004_optimal_hobgoblin",
+      "breakpoints": true
     }
   ]
 }
