@@ -1,6 +1,7 @@
 import { getAuthUser } from "@/lib/auth/server"
 import { redirect } from "next/navigation"
 import { DashboardShell } from "@/components/dashboard-shell"
+import { BrandProvider } from "@/components/brand-provider"
 import { NAV_ITEMS } from "@/lib/auth"
 import { getSocieteBranding } from "@/lib/societe"
 import { DEFAULT_SOCIETE_NOM } from "@/lib/constants"
@@ -22,12 +23,14 @@ export default async function DashboardLayout({
   const societe = await getSocieteBranding()
 
   return (
-    <DashboardShell
-      navItems={navItems}
-      societeNom={societe?.nom ?? DEFAULT_SOCIETE_NOM}
-      societeLogoUrl={societe?.logoUrl ?? null}
-    >
-      {children}
-    </DashboardShell>
+    <BrandProvider>
+      <DashboardShell
+        navItems={navItems}
+        societeNom={societe?.nom ?? DEFAULT_SOCIETE_NOM}
+        societeLogoUrl={societe?.logoUrl ?? null}
+      >
+        {children}
+      </DashboardShell>
+    </BrandProvider>
   )
 }
