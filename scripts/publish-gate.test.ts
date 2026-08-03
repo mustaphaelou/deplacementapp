@@ -30,6 +30,11 @@ interface Job {
   needs?: string | string[]
   outputs?: Record<string, unknown>
   steps?: Step[]
+  strategy?: {
+    matrix?: {
+      include?: Record<string, string>[]
+    }
+  }
 }
 
 interface Workflow {
@@ -58,12 +63,22 @@ function verifySteps(): Step[] {
   return loadWorkflow().jobs?.["verify"]?.steps ?? []
 }
 
-function buildAndPublishSteps(): Step[] {
-  return loadWorkflow().jobs?.["build-and-publish"]?.steps ?? []
+function publishCheckSteps(): Step[] {
+  return loadWorkflow().jobs?.["publish-check"]?.steps ?? []
+}
+
+function buildAndPushSteps(): Step[] {
+  return loadWorkflow().jobs?.["build-and-push"]?.steps ?? []
 }
 
 function deploySteps(): Step[] {
   return loadWorkflow().jobs?.["deploy"]?.steps ?? []
+}
+
+function matrixRows(): Record<string, string>[] {
+  return (
+    loadWorkflow().jobs?.["build-and-push"]?.strategy?.matrix?.include ?? []
+  )
 }
 
 function deployScriptStep(): Step {
@@ -83,13 +98,13 @@ function wrapperContents(): string {
 }
 
 function releaseGateStep(): Step {
-  const gate = buildAndPublishSteps().find((step) => step.id === "release-gate")
+  const gate = publishCheckSteps().find((step) => step.id === "release-gate")
   if (!gate) throw new Error("release-gate step not found")
   return gate
 }
 
 function metadataSteps(): Step[] {
-  return buildAndPublishSteps().filter((step) =>
+  return buildAndPushSteps().filter((step) =>
     step.uses?.includes("docker/metadata-action")
   )
 }
@@ -117,18 +132,28 @@ function dockerBuildStepIndices(
   return indices
 }
 
+const PUBLISH_CHAIN = [
+  "verify",
+  "publish-check",
+  "build-and-push",
+  "release",
+  "deploy",
+]
+
 describe(".github/workflows/docker-publish.yml", () => {
   it("parses as YAML", () => {
     expect(() => loadWorkflow()).not.toThrow()
   })
 
-  it("defines the three-job gate: verify, then build-and-publish, then deploy", () => {
+  it("defines the publish gate chain: verify → publish-check → build-and-push (matrix) → release → deploy", () => {
     const jobs = loadWorkflow().jobs
-    expect(jobs?.["verify"]).toBeDefined()
-    expect(jobs?.["build-and-publish"]).toBeDefined()
-    expect(jobs?.["deploy"]).toBeDefined()
-    expect(jobs?.["build-and-publish"]?.needs).toContain("verify")
-    expect(jobs?.["deploy"]?.needs).toContain("build-and-publish")
+    for (const name of PUBLISH_CHAIN) {
+      expect(jobs?.[name]).toBeDefined()
+    }
+    expect(jobs?.["publish-check"]?.needs).toContain("verify")
+    expect(jobs?.["build-and-push"]?.needs).toContain("publish-check")
+    expect(jobs?.["release"]?.needs).toContain("build-and-push")
+    expect(jobs?.["deploy"]?.needs).toContain("build-and-push")
   })
 
   it("runs the unit gate on every trigger, including pull requests", () => {
@@ -139,12 +164,14 @@ describe(".github/workflows/docker-publish.yml", () => {
     expect(on?.push?.tags).toContain("v*")
   })
 
-  it("keeps pull requests to unit checks only (no Docker builds, publish job skipped)", () => {
+  it("keeps pull requests to unit checks only (no Docker work, publish jobs skipped)", () => {
     const dockerBuilds = verifySteps().filter(isDockerBuildStep)
     expect(dockerBuilds).toHaveLength(0)
-    const publish = loadWorkflow().jobs?.["build-and-publish"]
-    expect(publish?.if).toContain("github.event_name")
-    expect(publish?.if).toContain("pull_request")
+    for (const name of ["publish-check", "build-and-push"]) {
+      const job = loadWorkflow().jobs?.[name]
+      expect(job?.if).toContain("github.event_name")
+      expect(job?.if).toContain("pull_request")
+    }
   })
 
   it("runs lint, typecheck, the unit tests, and the production dependency-tree check in verify", () => {
@@ -153,62 +180,6 @@ describe(".github/workflows/docker-publish.yml", () => {
     expect(runs).toContain("npm run typecheck")
     expect(runs).toContain("npm run test")
     expect(runs).toContain("npm ls --omit=dev")
-  })
-
-  it("smoke-tests both loaded images before anything is pushed", () => {
-    const steps = buildAndPublishSteps()
-    const smokeBuildIndices = dockerBuildStepIndices(steps, isSmokeBuildStep)
-    expect(smokeBuildIndices).toHaveLength(2)
-    for (const index of smokeBuildIndices) {
-      expect(steps[index].with?.platforms).toBe("linux/amd64")
-      expect(steps[index].with?.push).toBeUndefined()
-    }
-    const lastSmokeBuildIndex = Math.max(...smokeBuildIndices)
-
-    const smokeTestIndex = steps.findIndex((step) =>
-      (step.run ?? "").includes("smoke-test.sh")
-    )
-    expect(smokeTestIndex).toBeGreaterThan(-1)
-    expect(smokeTestIndex).toBeGreaterThan(lastSmokeBuildIndex)
-    const smokeTestRun = steps[smokeTestIndex].run ?? ""
-    expect(smokeTestRun).toContain("--image")
-    expect(smokeTestRun).toContain("--migrator-image")
-
-    const pushIndices = dockerBuildStepIndices(steps, isPushStep)
-    expect(pushIndices).toHaveLength(2)
-    for (const index of pushIndices) {
-      expect(index).toBeGreaterThan(smokeTestIndex)
-    }
-  })
-
-  it("writes the smoke builds to the GHA cache so verification feeds the publish build", () => {
-    const smokeBuildSteps = buildAndPublishSteps().filter(isSmokeBuildStep)
-    expect(smokeBuildSteps).toHaveLength(2)
-    for (const step of smokeBuildSteps) {
-      expect(step.with?.["cache-from"]).toContain("type=gha")
-      expect(step.with?.["cache-to"]).toContain("type=gha")
-    }
-  })
-
-  it("publishes both images multi-arch and reuses the smoke build's GHA cache", () => {
-    const pushSteps = buildAndPublishSteps().filter(isPushStep)
-    expect(pushSteps).toHaveLength(2)
-    for (const step of pushSteps) {
-      expect(step.with?.platforms).toContain("linux/amd64")
-      expect(step.with?.platforms).toContain("linux/arm64")
-      expect(step.with?.["cache-from"]).toContain("type=gha")
-    }
-  })
-
-  it("keeps the draft-Release step after every push, so a failed gate creates no Release", () => {
-    const steps = buildAndPublishSteps()
-    const releaseIndex = steps.findIndex((step) =>
-      step.uses?.includes("softprops/action-gh-release")
-    )
-    expect(releaseIndex).toBeGreaterThan(-1)
-    const lastPushIndex = Math.max(...dockerBuildStepIndices(steps, isPushStep))
-    expect(Number.isFinite(lastPushIndex)).toBe(true)
-    expect(releaseIndex).toBeGreaterThan(lastPushIndex)
   })
 
   it("keeps the production dependency-tree check out of the local wrapper", () => {
@@ -221,22 +192,135 @@ describe(".github/workflows/docker-publish.yml", () => {
     const deployment = docs.split("### Deployment")[1] ?? ""
     expect(deployment).toContain("Publish Gate")
     expect(deployment).toContain("verify")
+    expect(deployment).toContain("publish-check")
     expect(deployment).toContain("smoke-test")
   })
 
-  it("wires the local wrapper and the workflow to the same smoke-test module", () => {
-    const wrapper = wrapperContents()
-    const workflowRuns = runScripts(buildAndPublishSteps())
-    expect(wrapper).toContain("smoke-test.sh")
-    expect(workflowRuns).toContain("smoke-test.sh")
-    expect(wrapper).toContain("--image")
-    expect(wrapper).toContain("--migrator-image")
-    expect(workflowRuns).toContain("--migrator-image")
+  describe("publish-check (gate owner + smoke)", () => {
+    it("smoke-tests both loaded images before the matrix can push", () => {
+      const steps = publishCheckSteps()
+      const smokeBuildIndices = dockerBuildStepIndices(steps, isSmokeBuildStep)
+      expect(smokeBuildIndices).toHaveLength(2)
+      for (const index of smokeBuildIndices) {
+        expect(steps[index].with?.platforms).toBe("linux/amd64")
+        expect(steps[index].with?.push).toBeUndefined()
+      }
+      const lastSmokeBuildIndex = Math.max(...smokeBuildIndices)
+
+      const smokeTestIndex = steps.findIndex((step) =>
+        (step.run ?? "").includes("smoke-test.sh")
+      )
+      expect(smokeTestIndex).toBeGreaterThan(-1)
+      expect(smokeTestIndex).toBeGreaterThan(lastSmokeBuildIndex)
+      const smokeTestRun = steps[smokeTestIndex].run ?? ""
+      expect(smokeTestRun).toContain("--image")
+      expect(smokeTestRun).toContain("--migrator-image")
+
+      // publish-check never pushes; the push job cannot start until it is green
+      expect(publishCheckSteps().filter(isPushStep)).toHaveLength(0)
+      expect(loadWorkflow().jobs?.["build-and-push"]?.needs).toContain(
+        "publish-check"
+      )
+    })
+
+    it("writes the smoke builds to the GHA cache so verification feeds the publish build", () => {
+      const smokeBuildSteps = publishCheckSteps().filter(isSmokeBuildStep)
+      expect(smokeBuildSteps).toHaveLength(2)
+      for (const step of smokeBuildSteps) {
+        expect(step.with?.["cache-from"]).toContain("type=gha")
+        expect(step.with?.["cache-to"]).toContain("type=gha")
+      }
+    })
+
+    it("keeps the smoke image names as a documented one-place duplication of the map", () => {
+      const runs = runScripts(publishCheckSteps())
+      expect(runs).toContain(
+        'scripts/smoke-test.sh --image "ghcr.io/${{ github.repository }}/runner:smoke"'
+      )
+      expect(runs).toContain(
+        '"ghcr.io/${{ github.repository }}-migrator:smoke"'
+      )
+    })
+
+    it("wires the local wrapper and the workflow to the same smoke-test module", () => {
+      const wrapper = wrapperContents()
+      const workflowRuns = runScripts(publishCheckSteps())
+      expect(wrapper).toContain("smoke-test.sh")
+      expect(workflowRuns).toContain("smoke-test.sh")
+      expect(wrapper).toContain("--image")
+      expect(wrapper).toContain("--migrator-image")
+      expect(workflowRuns).toContain("--migrator-image")
+    })
+  })
+
+  describe("build-and-push (image-map matrix)", () => {
+    it("drives the build from one matrix include row per image", () => {
+      const rows = matrixRows()
+      expect(rows).toHaveLength(2)
+      const byId = new Map(rows.map((row) => [row.id, row]))
+
+      const runner = byId.get("runner")
+      const migrator = byId.get("migrator")
+      expect(runner).toBeDefined()
+      expect(migrator).toBeDefined()
+      expect(runner?.target).toBe("runner")
+      expect(migrator?.target).toBe("migrator")
+      expect(runner?.image).toBe("ghcr.io/${{ github.repository }}/runner")
+      expect(migrator?.image).toBe("ghcr.io/${{ github.repository }}-migrator")
+    })
+
+    it("builds and pushes exactly as today: both rows multi-arch on amd64 and arm64", () => {
+      const rows = matrixRows()
+      expect(rows).toHaveLength(2)
+      for (const row of rows) {
+        expect(row.platforms).toContain("linux/amd64")
+        expect(row.platforms).toContain("linux/arm64")
+      }
+    })
+
+    it("fans the build and push out of one matrix template using the row's own fields", () => {
+      const pushSteps = buildAndPushSteps().filter(isPushStep)
+      expect(pushSteps).toHaveLength(1)
+      const step = pushSteps[0]
+      expect(step.with?.context).toBe(".")
+      expect(step.with?.target).toBe("${{ matrix.target }}")
+      expect(step.with?.platforms).toBe("${{ matrix.platforms }}")
+      expect(step.with?.push).toBe(true)
+      expect(step.with?.tags).toBe("${{ steps.meta.outputs.tags }}")
+      expect(step.with?.labels).toBe("${{ steps.meta.outputs.labels }}")
+      expect(step.with?.["cache-from"]).toContain("type=gha")
+      expect(step.with?.["cache-to"]).toContain("type=gha")
+
+      const metas = metadataSteps()
+      expect(metas).toHaveLength(1)
+      expect(metas[0].with?.images).toBe("${{ matrix.image }}")
+    })
+
+    it("keeps the tag policy identical across rows and gated on is_release", () => {
+      const metas = metadataSteps()
+      expect(metas).toHaveLength(1)
+      const tags = String(metas[0].with?.tags ?? "")
+      expect(tags).toContain("type=semver,pattern=v{{version}}")
+      expect(tags).toContain("type=semver,pattern={{major}}.{{minor}}")
+      expect(tags).toContain("type=sha,format=long")
+      expect(tags).toContain("value=latest")
+      expect(tags).toContain("needs.publish-check.outputs.is_release")
+      expect(tags).toContain("github.event.repository.default_branch")
+    })
+
+    it("keeps a matrix job output out of gating (last-to-finish semantics)", () => {
+      const buildAndPush = loadWorkflow().jobs?.["build-and-push"]
+      expect(buildAndPush?.outputs).toBeUndefined()
+      const jobs = loadWorkflow().jobs ?? {}
+      for (const [, job] of Object.entries(jobs)) {
+        if (job.if) expect(job.if).not.toContain("needs.build-and-push.outputs")
+      }
+    })
   })
 
   describe("release gate", () => {
     it("runs the release gate right after checkout, before any Docker setup", () => {
-      const steps = buildAndPublishSteps()
+      const steps = publishCheckSteps()
       const gateIndex = steps.findIndex((step) => step.id === "release-gate")
       const checkoutIndex = steps.findIndex((step) =>
         step.uses?.includes("actions/checkout")
@@ -252,7 +336,7 @@ describe(".github/workflows/docker-publish.yml", () => {
     })
 
     it("computes release-ness once, from a strict semver regex on tag refs", () => {
-      const computing = buildAndPublishSteps().filter((step) =>
+      const computing = publishCheckSteps().filter((step) =>
         (step.run ?? "").includes("is_release=")
       )
       expect(computing).toHaveLength(1)
@@ -272,34 +356,32 @@ describe(".github/workflows/docker-publish.yml", () => {
       expect(run).toContain("GITHUB_REF_NAME")
     })
 
-    it("derives every release-ness consumer from the gate's single output", () => {
-      const steps = buildAndPublishSteps()
+    it("flows the gate's single output to the metadata enable and both downstream gate jobs", () => {
+      const publishCheck = loadWorkflow().jobs?.["publish-check"]
       const body = [
-        ...steps.map((step) => JSON.stringify(step.with ?? {})),
-        ...steps.map((step) => step.if ?? ""),
-        runScripts(steps),
+        ...publishCheckSteps().map((step) => JSON.stringify(step.with ?? {})),
+        ...publishCheckSteps().map((step) => step.if ?? ""),
+        ...buildAndPushSteps().map((step) => JSON.stringify(step.with ?? {})),
+        runScripts(publishCheckSteps()),
+        runScripts(buildAndPushSteps()),
+        loadWorkflow().jobs?.["release"]?.if ?? "",
+        loadWorkflow().jobs?.["deploy"]?.if ?? "",
       ].join("\n")
       expect(body).not.toContain("release-check")
-      expect(body).toContain("steps.release-gate.outputs.is_release")
-      for (const step of metadataSteps()) {
-        expect(step.with?.tags).toContain(
-          "steps.release-gate.outputs.is_release"
-        )
-      }
-      const release = steps.find((step) =>
-        step.uses?.includes("softprops/action-gh-release")
+      expect(publishCheck?.outputs?.is_release).toContain(
+        "steps.release-gate.outputs.is_release"
       )
-      expect(release?.if).toContain("steps.release-gate.outputs.is_release")
-    })
-
-    it("keeps the default-branch half of the latest alias inline in both metadata steps", () => {
-      const steps = metadataSteps()
-      expect(steps).toHaveLength(2)
-      for (const step of steps) {
-        expect(step.with?.tags).toContain(
-          "github.event.repository.default_branch"
+      for (const step of metadataSteps()) {
+        expect(String(step.with?.tags ?? "")).toContain(
+          "needs.publish-check.outputs.is_release"
         )
       }
+      expect(loadWorkflow().jobs?.["release"]?.if).toContain(
+        "needs.publish-check.outputs.is_release"
+      )
+      expect(loadWorkflow().jobs?.["deploy"]?.if).toContain(
+        "needs.publish-check.outputs.is_release"
+      )
     })
 
     it("keeps the coarse v* trigger so the gate is the single owner of release-ness", () => {
@@ -317,15 +399,34 @@ describe(".github/workflows/docker-publish.yml", () => {
     })
   })
 
+  describe("draft Release job", () => {
+    it("creates the draft Release in its own job after the matrix push, gated on is_release only", () => {
+      const release = loadWorkflow().jobs?.["release"] ?? {}
+      expect(release.needs).toContain("build-and-push")
+      expect(release.needs).toContain("publish-check")
+      expect(release.if).toBe(
+        "needs.publish-check.outputs.is_release == 'true'"
+      )
+      const steps = release.steps ?? []
+      const draft = steps.find((step) =>
+        step.uses?.includes("softprops/action-gh-release")
+      )
+      expect(draft).toBeDefined()
+      expect(draft?.with?.draft).toBe(true)
+      expect(draft?.with?.tag_name).toContain("github.ref_name")
+      expect(draft?.with?.name).toContain("github.ref_name")
+    })
+  })
+
   describe("deploy job", () => {
-    it("depends on build-and-publish, so verify is transitively covered", () => {
+    it("depends on build-and-push, so verify is transitively covered", () => {
       const deploy = loadWorkflow().jobs?.["deploy"]
-      expect(deploy?.needs).toContain("build-and-publish")
+      expect(deploy?.needs).toContain("build-and-push")
     })
 
-    it("promotes the release-gate output to a build-and-publish job output", () => {
-      const publish = loadWorkflow().jobs?.["build-and-publish"]
-      expect(publish?.outputs?.is_release).toContain(
+    it("promotes the release-gate output to a publish-check job output", () => {
+      const publishCheck = loadWorkflow().jobs?.["publish-check"]
+      expect(publishCheck?.outputs?.is_release).toContain(
         "steps.release-gate.outputs.is_release"
       )
     })
@@ -333,7 +434,7 @@ describe(".github/workflows/docker-publish.yml", () => {
     it("deploys only on the exact single-owner gate: Release output, or an explicit dry-run dispatch", () => {
       const deploy = loadWorkflow().jobs?.["deploy"]
       expect(deploy?.if).toBe(
-        "needs.build-and-publish.outputs.is_release == 'true' || (github.event_name == 'workflow_dispatch' && inputs.deploy-dry-run == 'true')"
+        "needs.publish-check.outputs.is_release == 'true' || (github.event_name == 'workflow_dispatch' && inputs.deploy-dry-run == 'true')"
       )
     })
 
@@ -440,7 +541,7 @@ describe(".github/workflows/docker-publish.yml", () => {
 
     it("documents the deploy exactly as the workflow ships it", () => {
       const deploy = loadWorkflow().jobs?.["deploy"] ?? {}
-      expect(releaseDocs).toContain("needs: build-and-publish")
+      expect(releaseDocs).toContain("needs: build-and-push")
       expect(releaseDocs).toContain("deploy-coolify.sh")
       expect(releaseDocs).toContain("HTTP 2xx")
       expect(releaseDocs).toContain("Branch pushes")
