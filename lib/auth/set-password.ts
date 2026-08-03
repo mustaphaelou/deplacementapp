@@ -18,10 +18,11 @@ function credentialWhere(utilisateurId: string) {
 }
 
 /**
- * The single accessor of the credential (`account`, `providerId: "credential"`)
- * row for a Utilisateur: `setPassword` writes, `verifyCredential` reads, and
- * `syncCredentialIdentifier` keeps the row's identifier aligned with the
- * Utilisateur's current email.
+ * The runtime writer/accessor of the credential (`account`,
+ * `providerId: "credential"`) row for a Utilisateur: `setPassword` writes,
+ * `verifyCredential` reads, and `syncCredentialIdentifier` keeps the row's
+ * identifier aligned with the Utilisateur's current email.  Legacy hashes are
+ * backfilled once by the one-off migration in `scripts/seed-credential-rows`.
  */
 
 /**

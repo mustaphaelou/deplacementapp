@@ -21,7 +21,8 @@
     "docker:prod": "docker compose up --build",
     "docker:down": "docker compose down -v",
     "postinstall": "drizzle-kit generate",
-    "sandcastle": "npx tsx .sandcastle/main.ts"
+    "sandcastle": "npx tsx .sandcastle/main.ts",
+    "seed:credential-rows": "npx tsx scripts/seed-credential-rows.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
