@@ -41,7 +41,7 @@ const planSchema = z.object({
 
 // Maximum number of plan→execute→merge cycles before stopping.
 // Raise this if your backlog is large; lower it for a quick smoke-test run.
-const MAX_ITERATIONS = 4;
+const MAX_ITERATIONS = 10;
 
 // Hooks run inside the sandbox before the agent starts each iteration.
 // npm install ensures the sandbox always has fresh dependencies.
