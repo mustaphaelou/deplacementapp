@@ -30,10 +30,37 @@ All variants use the Societe's couleurPrimaire (placeholder `#0F766E` in
 
 ## Verdict
 
-**Pending — HITL ticket.** User reacts to the variants; the winning variant
-(and the shell decisions it locks) becomes the spec for the page-family
-tickets of map #169. Record the verdict here, then:
+**Winner: Variant A — Notion classique** (HITL approval on #171, 2026-08-03).
 
-- Fold the winning variant into the real `/login` page and `(dashboard)` shell
-  (rewritten properly — no tests/error-handling here, this is throwaway).
-- Delete the losing variants, the switcher, and this route.
+### What it locks (spec for the page-family tickets of map #169)
+
+- **Login**: centered ~380px column, brand logo mark above heading, 14px
+  labels, hairline inputs (3px radius, focus ring = 1px couleurPrimaire),
+  primary "Continuer" button (couleurPrimaire, hover darken, Notion button
+  shadow `0 1px 2px rgba(15,15,15,.1)`), "Ou" divider, full-width provider
+  button, footer links.
+- **Shell**: 240px warm sidebar `#F7F6F3` with inset 1px `#F0EFED` right
+  hairline; 11px uppercase section headings; 28px-high nav rows (14px text,
+  hover `rgba(55,53,47,.06)`, active `rgba(0,0,0,.03)` + medium weight);
+  hover-reveal chevron on rows; collapse icon top-right; user row at bottom.
+- **No top navbar — the page header lives inside the content**: breadcrumb
+  row (14px, `#787774`, current part `#37352F` medium) with actions
+  top-right (ghost icon buttons + primary action); page icon tile + 40px/700
+  title + muted subtitle.
+- **List page**: database-style table — muted 60%-ink header row, hairline
+  borders (no left/right), row hover `rgba(55,53,47,.024)`, tab filters +
+  search input above the table.
+- **Form page**: max-width 720px, uppercase section headings with hairline
+  rule, 2-col field grid, h-9 inputs, avance checkbox, ghost "Annuler" +
+  primary "Enregistrer".
+- **Accent = couleurPrimaire** (placeholder `#0F766E` in `mock-data.tsx`).
+- **Sidebar width: 240px** — resolves research unknown #2 (240–300px band)
+  toward the verified 240px skeleton.
+
+### Cleanup
+
+- The prototype stays as the linked reference asset for the page-family
+  tickets (per #171: "Link the prototype as an asset from this issue").
+- Variants B/C and the switcher may be deleted once A has been folded into
+  the real `/login` page and `(dashboard)` shell. Do not promote prototype
+  code directly — it has no tests and uses mock data.
