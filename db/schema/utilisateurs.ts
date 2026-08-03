@@ -14,6 +14,7 @@ export const utilisateurs = pgTable(
   {
     id: text("id").primaryKey(),
     email: text("email").notNull(),
+    emailVerified: boolean("emailVerified").notNull().default(false),
     motDePasse: text("motDePasse"),
     googleAuthEnabled: boolean("googleAuthEnabled").notNull().default(false),
     nom: text("nom").notNull(),

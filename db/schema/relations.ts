@@ -7,6 +7,7 @@ import { vehiculesEntreprise } from "./vehicules-entreprise"
 import { notifications } from "./notifications"
 import { journalAudit } from "./journal-audit"
 import { documents } from "./documents"
+import { session, account } from "./auth-tables"
 
 export const societesRelations = relations(societes, ({ many }) => ({
   utilisateurs: many(utilisateurs),
@@ -41,8 +42,24 @@ export const utilisateursRelations = relations(
     }),
     notifications: many(notifications),
     journalAudits: many(journalAudit),
+    sessions: many(session),
+    accounts: many(account),
   })
 )
+
+export const sessionsRelations = relations(session, ({ one }) => ({
+  utilisateur: one(utilisateurs, {
+    fields: [session.userId],
+    references: [utilisateurs.id],
+  }),
+}))
+
+export const accountsRelations = relations(account, ({ one }) => ({
+  utilisateur: one(utilisateurs, {
+    fields: [account.userId],
+    references: [utilisateurs.id],
+  }),
+}))
 
 export const vehiculesEntrepriseRelations = relations(
   vehiculesEntreprise,
