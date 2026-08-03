@@ -1,10 +1,10 @@
-import { hash } from "bcryptjs"
 import { count } from "drizzle-orm"
 import type { DrizzleTransactionClient } from "../db"
 import { db } from "../db"
 import { societes } from "../db/schema/societes"
 import { departements } from "../db/schema/departements"
 import { utilisateurs } from "../db/schema/utilisateurs"
+import { setPassword } from "./auth/set-password"
 import { AmorcageDejaConfigureError } from "./errors"
 import { clearSocieteCache } from "@/lib/societe"
 
@@ -34,8 +34,6 @@ export async function quitterAmorcage(input: {
 }): Promise<{
   user: { id: string; email: string; prenom: string; nom: string; role: string }
 }> {
-  const hashedPassword = await hash(input.admin.password, 12)
-
   const result = await db.transaction(async (tx) => {
     const existingCount = await countSocietes(tx)
     if (existingCount > 0) {
@@ -66,7 +64,6 @@ export async function quitterAmorcage(input: {
     await tx.insert(utilisateurs).values({
       id: userId,
       email: input.admin.email,
-      motDePasse: hashedPassword,
       nom: input.admin.nom,
       prenom: input.admin.prenom,
       poste: input.admin.poste,
@@ -76,6 +73,7 @@ export async function quitterAmorcage(input: {
       actif: true,
       modifieLe: new Date(),
     })
+    await setPassword(tx, userId, input.admin.password)
 
     return {
       user: {

@@ -28,7 +28,8 @@ export interface BetterAuthOptions {
  */
 export function createAuth(db: DrizzleDb, options: BetterAuthOptions = {}) {
   return betterAuth({
-    secret: options.secret,
+    secret: options.secret ?? process.env.BETTER_AUTH_SECRET,
+    baseURL: process.env.BETTER_AUTH_URL,
     database: drizzleAdapter(db, { provider: "pg", camelCase: true }),
     emailAndPassword: {
       enabled: true,

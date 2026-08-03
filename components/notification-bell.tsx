@@ -1,6 +1,6 @@
 "use client"
 
-import { useSession } from "next-auth/react"
+import { useAuthUser } from "@/lib/auth/client"
 import Link from "next/link"
 import { Bell } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -8,7 +8,7 @@ import { useEffect, useState, useCallback } from "react"
 import { useNotificationContext } from "@/components/notification-context"
 
 export function NotificationBell() {
-  const { data: session } = useSession()
+  const { user } = useAuthUser()
   const [count, setCount] = useState(0)
   const { onRefresh } = useNotificationContext()
 
@@ -22,8 +22,10 @@ export function NotificationBell() {
     } catch {}
   }, [])
 
+  const userId = user?.id
+
   useEffect(() => {
-    if (!session?.user?.id) return
+    if (!userId) return
 
     const interval = setInterval(fetchCount, 120000)
     const unsubscribe = onRefresh(fetchCount)
@@ -33,7 +35,7 @@ export function NotificationBell() {
       clearInterval(interval)
       unsubscribe()
     }
-  }, [session, fetchCount, onRefresh])
+  }, [userId, fetchCount, onRefresh])
 
   if (count === 0) {
     return (

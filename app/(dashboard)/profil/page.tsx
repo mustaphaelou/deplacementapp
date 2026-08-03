@@ -1,4 +1,4 @@
-import { auth } from "@/lib/auth/server"
+import { getAuthUser } from "@/lib/auth/server"
 import { redirect } from "next/navigation"
 import {
   utilisateurService,
@@ -7,16 +7,16 @@ import {
 import ProfileEdit from "@/components/profile-edit"
 
 export default async function ProfilPage() {
-  const session = await auth()
-  if (!session?.user) redirect("/login")
+  const user = await getAuthUser()
+  if (!user) redirect("/login")
 
-  let user: Awaited<ReturnType<typeof utilisateurService.findProfile>>
+  let profile: Awaited<ReturnType<typeof utilisateurService.findProfile>>
   try {
-    user = await utilisateurService.findProfile(session.user.id)
+    profile = await utilisateurService.findProfile(user.id)
   } catch (e) {
     if (e instanceof UtilisateurNotFoundError) redirect("/login")
     throw e
   }
 
-  return <ProfileEdit user={user} />
+  return <ProfileEdit user={profile} />
 }

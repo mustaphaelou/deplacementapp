@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { useSession } from "next-auth/react"
+import { useAuthUser } from "@/lib/auth/client"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
@@ -32,7 +32,7 @@ interface Demande {
 }
 
 export default function DemandesListPage() {
-  const { data: session } = useSession()
+  const { user } = useAuthUser()
   const searchParams = useSearchParams()
   const [demandes, setDemandes] = useState<Demande[]>([])
   const [total, setTotal] = useState(0)
@@ -42,7 +42,7 @@ export default function DemandesListPage() {
 
   const etapeFilter = searchParams.get("etape") || ""
   const perPage = 10
-  const role = session?.user?.role
+  const role = user?.role
 
   const fetchDemandes = useCallback(async () => {
     setLoading(true)

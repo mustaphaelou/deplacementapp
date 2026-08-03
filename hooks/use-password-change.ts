@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { signOut } from "next-auth/react"
+import { signOut } from "@/lib/auth/client"
 import { toast } from "sonner"
 
 export function usePasswordChange() {
@@ -45,7 +45,7 @@ export function usePasswordChange() {
       }
 
       toast.success("Mot de passe modifié — veuillez vous reconnecter")
-      await signOut({ redirectTo: "/login" })
+      await signOut("/login")
     } catch {
       toast.error("Erreur")
     } finally {

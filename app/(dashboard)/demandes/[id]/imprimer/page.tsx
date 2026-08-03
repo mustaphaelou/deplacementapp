@@ -1,4 +1,4 @@
-import { auth } from "@/lib/auth/server"
+import { getAuthUser } from "@/lib/auth/server"
 import { redirect } from "next/navigation"
 import { findById } from "@/lib/demande"
 import { getSocieteBranding } from "@/lib/societe"
@@ -19,14 +19,14 @@ export default async function ImprimerPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const session = await auth()
-  if (!session?.user) redirect("/login")
+  const user = await getAuthUser()
+  if (!user) redirect("/login")
 
   let demande: DemandeWithRelations
   try {
     demande = await findById(id, {
-      id: session.user.id,
-      role: session.user.role as Role,
+      id: user.id,
+      role: user.role as Role,
     })
   } catch (e) {
     if (e instanceof DemandeNotFoundError) redirect("/demandes")

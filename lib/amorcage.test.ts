@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest"
-import { sql } from "drizzle-orm"
+import { sql, eq } from "drizzle-orm"
 import * as schema from "../db/schema"
 import * as dbModule from "../db"
 import { createPgliteDb } from "./test/create-pglite-db"
@@ -7,6 +7,8 @@ import type { PgliteDb } from "./test/create-pglite-db"
 import { estEnAmorcage, quitterAmorcage } from "./amorcage"
 import { AmorcageDejaConfigureError } from "./errors"
 import { loadSocieteIdentity, clearSocieteCache } from "@/lib/societe"
+import { account } from "../db/schema/auth-tables"
+import { CREDENTIAL_PROVIDER_ID } from "./auth/set-password"
 
 const TIMEOUT = 30_000
 
@@ -19,6 +21,8 @@ describe("Amorcage module", { timeout: TIMEOUT }, () => {
   })
 
   beforeEach(async () => {
+    await pgliteDb.execute(sql`DELETE FROM session`)
+    await pgliteDb.execute(sql`DELETE FROM account`)
     await pgliteDb.execute(sql`DELETE FROM utilisateurs`)
     await pgliteDb.execute(sql`DELETE FROM departements`)
     await pgliteDb.execute(sql`DELETE FROM societes`)
@@ -88,11 +92,19 @@ describe("Amorcage module", { timeout: TIMEOUT }, () => {
       role: "GENERAL_DIRECTION",
       actif: true,
     })
-    expect(userRow.motDePasse).toBeDefined()
-    expect(userRow.motDePasse).not.toBe("securePassword123")
+
+    const [cred] = await pgliteDb
+      .select()
+      .from(account)
+      .where(eq(account.userId, userRow.id))
+      .limit(1)
+    expect(cred.providerId).toBe(CREDENTIAL_PROVIDER_ID)
+    expect(cred.accountId).toBe("admin@ma-societe.ma")
+    expect(cred.password).toBeDefined()
+    expect(cred.password).not.toBe("securePassword123")
 
     const { compare } = await import("bcryptjs")
-    const isMatch = await compare("securePassword123", userRow.motDePasse!)
+    const isMatch = await compare("securePassword123", cred.password!)
     expect(isMatch).toBe(true)
   })
 

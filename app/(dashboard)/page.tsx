@@ -1,15 +1,15 @@
-import { auth } from "@/lib/auth/server"
+import { getAuthUser } from "@/lib/auth/server"
 import { redirect } from "next/navigation"
 import { getDashboardPayload } from "@/lib/dashboard"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { NAV_ITEMS, type Role } from "@/lib/auth"
 
 export default async function DashboardPage() {
-  const session = await auth()
-  if (!session?.user) redirect("/login")
+  const user = await getAuthUser()
+  if (!user) redirect("/login")
 
-  const role = session.user.role as Role
-  const userId = session.user.id
+  const role = user.role as Role
+  const userId = user.id
 
   const navItems = [
     ...NAV_ITEMS.common,

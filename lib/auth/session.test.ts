@@ -1,24 +1,33 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { NextResponse } from "next/server"
 
-const { mockAuth } = vi.hoisted(() => ({
-  mockAuth: vi.fn(),
+const { mockGetSession, mockActifQuery } = vi.hoisted(() => ({
+  mockGetSession: vi.fn(),
+  mockActifQuery: vi.fn(),
 }))
 
-vi.mock("next-auth", () => ({
-  default: vi.fn(() => ({
-    auth: mockAuth,
-    handlers: { GET: vi.fn(), POST: vi.fn() },
-    signIn: vi.fn(),
-    signOut: vi.fn(),
-  })),
+vi.mock("./better-auth", () => ({
+  auth: { api: { getSession: mockGetSession } },
 }))
 
-vi.mock("next-auth/providers/credentials", () => ({ default: vi.fn() }))
-vi.mock("next-auth/providers/google", () => ({ default: vi.fn() }))
-vi.mock("drizzle-orm", () => ({ eq: vi.fn() }))
-vi.mock("../../db", () => ({ db: {} }))
+vi.mock("next/headers", () => ({
+  headers: vi.fn().mockResolvedValue(new Headers()),
+}))
+
+vi.mock("../../db", () => ({
+  db: {
+    select: vi.fn(() => ({
+      from: vi.fn(() => ({
+        where: vi.fn(() => ({
+          limit: vi.fn(() => mockActifQuery()),
+        })),
+      })),
+    })),
+  },
+}))
+
 vi.mock("../../db/schema/utilisateurs", () => ({ utilisateurs: {} }))
+vi.mock("drizzle-orm", () => ({ eq: vi.fn() }))
 
 import {
   requireAuth,
@@ -29,6 +38,19 @@ import {
 } from "./session"
 import type { AuthUser } from "./session"
 
+function sessionUser() {
+  return {
+    id: "user-1",
+    email: "jean@example.com",
+    name: "Dupont",
+    prenom: "Jean",
+    role: "EMPLOYEE",
+    departementId: "dep-1",
+    poste: "Développeur",
+    image: "/avatars/jean.png",
+  }
+}
+
 function makeUser(role: string): AuthUser {
   return {
     id: "user-1",
@@ -38,16 +60,18 @@ function makeUser(role: string): AuthUser {
     departementId: "dep-1",
     departement: "IT",
     poste: "Développeur",
+    avatarUrl: null,
   }
 }
 
 describe("requireAuth", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockActifQuery.mockResolvedValue([{ actif: true }])
   })
 
   it("returns ok:false with 401 when auth() returns null", async () => {
-    mockAuth.mockResolvedValue(null)
+    mockGetSession.mockResolvedValue(null)
 
     const result = await requireAuth()
 
@@ -61,34 +85,51 @@ describe("requireAuth", () => {
   })
 
   it("returns ok:false when session has no user", async () => {
-    mockAuth.mockResolvedValue({})
+    mockGetSession.mockResolvedValue({})
 
     const result = await requireAuth()
 
     expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.response.status).toBe(401)
   })
 
-  it("returns ok:true with AuthUser when auth succeeds", async () => {
-    const userFixture = {
-      id: "user-1",
-      email: "jean@example.com",
-      name: "Jean Dupont",
-      role: "EMPLOYEE",
-      departementId: "dep-1",
-      departement: "IT",
-      poste: "Développeur",
-    }
+  it("returns 401 when the Utilisateur is deactivated (per-request actif check)", async () => {
+    mockGetSession.mockResolvedValue({ user: sessionUser() })
+    mockActifQuery.mockResolvedValue([{ actif: false }])
 
-    mockAuth.mockResolvedValue({ user: userFixture })
+    const result = await requireAuth()
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.response.status).toBe(401)
+  })
+
+  it("returns 401 when the Utilisateur row no longer exists", async () => {
+    mockGetSession.mockResolvedValue({ user: sessionUser() })
+    mockActifQuery.mockResolvedValue([])
+
+    const result = await requireAuth()
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.response.status).toBe(401)
+  })
+
+  it("returns ok:true with the mapped AuthUser when auth succeeds", async () => {
+    mockGetSession.mockResolvedValue({ user: sessionUser() })
 
     const result = await requireAuth()
 
     expect(result.ok).toBe(true)
     if (result.ok) {
-      expect(result.user.id).toBe("user-1")
-      expect(result.user.email).toBe("jean@example.com")
-      expect(result.user.name).toBe("Jean Dupont")
-      expect(result.user.role).toBe("EMPLOYEE")
+      expect(result.user).toEqual({
+        id: "user-1",
+        email: "jean@example.com",
+        name: "Jean Dupont",
+        role: "EMPLOYEE",
+        departementId: "dep-1",
+        departement: "",
+        poste: "Développeur",
+        avatarUrl: "/avatars/jean.png",
+      })
     }
   })
 })
@@ -96,41 +137,58 @@ describe("requireAuth", () => {
 describe("getAuthUser", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockActifQuery.mockResolvedValue([{ actif: true }])
   })
 
   it("returns null when auth() returns null", async () => {
-    mockAuth.mockResolvedValue(null)
+    mockGetSession.mockResolvedValue(null)
 
     const result = await getAuthUser()
     expect(result).toBeNull()
   })
 
   it("returns null when session has no user", async () => {
-    mockAuth.mockResolvedValue({})
+    mockGetSession.mockResolvedValue({})
+
+    const result = await getAuthUser()
+    expect(result).toBeNull()
+  })
+
+  it("returns null when the Utilisateur is deactivated", async () => {
+    mockGetSession.mockResolvedValue({ user: sessionUser() })
+    mockActifQuery.mockResolvedValue([{ actif: false }])
 
     const result = await getAuthUser()
     expect(result).toBeNull()
   })
 
   it("returns AuthUser when session has user", async () => {
-    mockAuth.mockResolvedValue({
+    mockGetSession.mockResolvedValue({
       user: {
+        ...sessionUser(),
         id: "user-2",
         email: "marie@example.com",
-        name: "Marie Curie",
+        name: "Curie",
+        prenom: "Marie",
         role: "MANAGER",
         departementId: "dep-2",
-        departement: "R&D",
         poste: "Chef de projet",
+        image: null,
       },
     })
 
     const result = await getAuthUser()
     expect(result).not.toBeNull()
-    expect(result!.id).toBe("user-2")
-    expect(result!.email).toBe("marie@example.com")
-    expect(result!.name).toBe("Marie Curie")
-    expect(result!.role).toBe("MANAGER")
+    expect(result).toEqual({
+      id: "user-2",
+      email: "marie@example.com",
+      name: "Marie Curie",
+      role: "MANAGER",
+      departementId: "dep-2",
+      departement: "",
+      poste: "Chef de projet",
+      avatarUrl: null,
+    })
   })
 })
 
@@ -247,5 +305,25 @@ describe("hasAnyRole", () => {
     expect(
       hasAnyRole("finance_admin", ["FINANCE_ADMIN", "GENERAL_DIRECTION"])
     ).toBe(false)
+  })
+})
+
+describe("seam surface", () => {
+  it("exports the Better Auth instance and no next-auth re-exports", async () => {
+    const mod = (await import("./session")) as unknown as Record<
+      string,
+      unknown
+    >
+    expect(mod.auth).toBeDefined()
+    for (const name of [
+      "handlers",
+      "GET",
+      "POST",
+      "signIn",
+      "signOut",
+      "authConfig",
+    ]) {
+      expect(mod[name]).toBeUndefined()
+    }
   })
 })

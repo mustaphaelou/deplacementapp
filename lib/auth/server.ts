@@ -1,4 +1,4 @@
-export { auth, handlers, GET, POST, signIn, signOut } from "./session"
+export { auth } from "./session"
 export type { AuthUser, AuthResult, AuthorizationResult } from "./session"
 export {
   requireAuth,
@@ -7,5 +7,4 @@ export {
   requireAnyRole,
   hasAnyRole,
 } from "./session"
-export { authConfig } from "./config"
 export type { Role, NavItem } from "./roles"

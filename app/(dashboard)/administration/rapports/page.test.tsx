@@ -8,7 +8,7 @@ const { mockHasAnyRole } = vi.hoisted(() => ({
 }))
 
 vi.mock("@/lib/auth/server", () => ({
-  auth: vi.fn(),
+  getAuthUser: vi.fn(),
   hasAnyRole: mockHasAnyRole,
 }))
 
@@ -23,17 +23,16 @@ vi.mock("next/navigation", () => ({
   }),
 }))
 
-function mockSession(role = "FINANCE_ADMIN") {
+function mockUser(role = "FINANCE_ADMIN") {
   return {
-    user: {
-      id: "u-1",
-      email: "user@example.com",
-      name: "User",
-      role,
-      departementId: "d-1",
-      departement: "IT",
-      poste: "Dev",
-    },
+    id: "u-1",
+    email: "user@example.com",
+    name: "User",
+    role,
+    departementId: "d-1",
+    departement: "IT",
+    poste: "Dev",
+    avatarUrl: null,
   }
 }
 
@@ -51,13 +50,13 @@ describe("Rapports page", () => {
   })
 
   it("reads counts and budget through the queries port and renders them", async () => {
-    const { auth } = await import("@/lib/auth/server")
+    const { getAuthUser } = await import("@/lib/auth/server")
     const {
       countByEtape: mockCountByEtape,
       aggregateBudget: mockAggregateBudget,
     } = await import("@/lib/demande")
 
-    ;(auth as ReturnType<typeof vi.fn>).mockResolvedValue(mockSession())
+    ;(getAuthUser as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser())
     ;(mockCountByEtape as ReturnType<typeof vi.fn>).mockImplementation(
       (etape: string) => Promise.resolve(ETAPE_COUNTS[etape] ?? 0)
     )
@@ -83,11 +82,11 @@ describe("Rapports page", () => {
   })
 
   it("redirects when role is not authorised", async () => {
-    const { auth } = await import("@/lib/auth/server")
+    const { getAuthUser } = await import("@/lib/auth/server")
     const { redirect } = await import("next/navigation")
 
-    ;(auth as ReturnType<typeof vi.fn>).mockResolvedValue(
-      mockSession("EMPLOYEE")
+    ;(getAuthUser as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockUser("EMPLOYEE")
     )
 
     const { default: RapportsPage } = await import("./page")
@@ -97,10 +96,10 @@ describe("Rapports page", () => {
   })
 
   it("redirects when not authenticated", async () => {
-    const { auth } = await import("@/lib/auth/server")
+    const { getAuthUser } = await import("@/lib/auth/server")
     const { redirect } = await import("next/navigation")
 
-    ;(auth as ReturnType<typeof vi.fn>).mockResolvedValue(null)
+    ;(getAuthUser as ReturnType<typeof vi.fn>).mockResolvedValue(null)
 
     const { default: RapportsPage } = await import("./page")
     await expect(RapportsPage()).rejects.toThrow("NEXT_REDIRECT: /")
