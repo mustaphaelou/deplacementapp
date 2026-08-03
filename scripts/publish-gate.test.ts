@@ -283,13 +283,14 @@ describe(".github/workflows/docker-publish.yml", () => {
       expect(migrator?.platforms).toBe("linux/amd64")
     })
 
-    it("marks the architecture review's twin-block candidate done in ADR-0004", () => {
+    it("records the twin-block deepening candidate as closed in ADR-0004", () => {
       const adr = readFileSync(ADR_0004_PATH, "utf8")
       expect(adr).toContain("image map")
       expect(adr).toContain("source of truth")
       expect(adr).toContain("known wart")
       expect(adr).toContain("deplacementapp-migrator")
       expect(adr).toContain("Future architecture reviews should not")
+      expect(adr).toContain("twin-block deepening candidate is closed")
     })
 
     it("fans the build and push out of one matrix template using the row's own fields", () => {
