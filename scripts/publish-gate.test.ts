@@ -269,13 +269,17 @@ describe(".github/workflows/docker-publish.yml", () => {
       expect(migrator?.image).toBe("ghcr.io/${{ github.repository }}-migrator")
     })
 
-    it("builds and pushes exactly as today: both rows multi-arch on amd64 and arm64", () => {
+    it("keeps the runner multi-arch but narrows the migrator to amd64 only", () => {
       const rows = matrixRows()
       expect(rows).toHaveLength(2)
-      for (const row of rows) {
-        expect(row.platforms).toContain("linux/amd64")
-        expect(row.platforms).toContain("linux/arm64")
-      }
+      const byId = new Map(rows.map((row) => [row.id, row]))
+
+      const runner = byId.get("runner")
+      expect(runner?.platforms).toBe("linux/amd64,linux/arm64")
+
+      const migrator = byId.get("migrator")
+      expect(migrator?.platforms).toBe("linux/amd64")
+      expect(migrator?.platforms).not.toContain("linux/arm64")
     })
 
     it("fans the build and push out of one matrix template using the row's own fields", () => {
