@@ -81,6 +81,10 @@ function matrixRows(): Record<string, string>[] {
   )
 }
 
+function matrixRowsById(): Map<string, Record<string, string>> {
+  return new Map(matrixRows().map((row) => [row.id, row]))
+}
+
 function job(name: string): Job {
   return loadWorkflow().jobs?.[name] ?? {}
 }
@@ -255,9 +259,8 @@ describe(".github/workflows/docker-publish.yml", () => {
 
   describe("build-and-push (image-map matrix)", () => {
     it("drives the build from one matrix include row per image", () => {
-      const rows = matrixRows()
-      expect(rows).toHaveLength(2)
-      const byId = new Map(rows.map((row) => [row.id, row]))
+      const byId = matrixRowsById()
+      expect(byId.size).toBe(2)
 
       const runner = byId.get("runner")
       const migrator = byId.get("migrator")
@@ -270,16 +273,14 @@ describe(".github/workflows/docker-publish.yml", () => {
     })
 
     it("keeps the runner multi-arch but narrows the migrator to amd64 only", () => {
-      const rows = matrixRows()
-      expect(rows).toHaveLength(2)
-      const byId = new Map(rows.map((row) => [row.id, row]))
+      const byId = matrixRowsById()
+      expect(byId.size).toBe(2)
 
       const runner = byId.get("runner")
       expect(runner?.platforms).toBe("linux/amd64,linux/arm64")
 
       const migrator = byId.get("migrator")
       expect(migrator?.platforms).toBe("linux/amd64")
-      expect(migrator?.platforms).not.toContain("linux/arm64")
     })
 
     it("fans the build and push out of one matrix template using the row's own fields", () => {
