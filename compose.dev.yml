@@ -37,8 +37,8 @@ services:
       - "3000:3000"
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-pass}@db:5432/${POSTGRES_DB:-deplacementapp}
-      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-dev-secret-not-for-production-use}
-      - NEXTAUTH_URL=http://localhost:${PORT:-3000}
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-dev-only-secret-0123456789-abcdefghijklmnopqrstuvwxyz}
+      - BETTER_AUTH_URL=http://localhost:${PORT:-3000}
       - AUTH_TRUST_HOST=true
       - SMTP_HOST=mail
       - SMTP_PORT=1025

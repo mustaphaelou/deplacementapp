@@ -14,4 +14,4 @@ echo "=== logging config in current docker-compose.yaml ==="
 grep -n -E 'logging:|max-size|max-file' docker-compose.yaml || echo "(no logging: block present)"
 echo ""
 echo "=== secrets present in current docker-compose.yaml ==="
-grep -n -E 'POSTGRES_PASSWORD|NEXTAUTH_SECRET|DATABASE_URL' docker-compose.yaml | head -10
+grep -n -E 'POSTGRES_PASSWORD|BETTER_AUTH_SECRET|DATABASE_URL' docker-compose.yaml | head -10
