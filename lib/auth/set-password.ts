@@ -21,15 +21,15 @@ function credentialWhere(utilisateurId: string) {
  * The runtime writer/accessor of the credential (`account`,
  * `providerId: "credential"`) row for a Utilisateur: `setPassword` writes,
  * `verifyCredential` reads, and `syncCredentialIdentifier` keeps the row's
- * identifier aligned with the Utilisateur's current email.  Legacy hashes are
- * backfilled once by the one-off migration in `scripts/seed-credential-rows`.
+ * identifier aligned with the Utilisateur's current email.
  */
 
 /**
  * Upsert the credential row for a Utilisateur, pinning its `accountId` to the
  * Utilisateur's *current* email, so an email change is picked up on the next
- * write.  The plaintext is hashed with bcryptjs at cost 12, the same cost as
- * the legacy `motDePasse` hashes.
+ * write.  The plaintext is hashed with bcryptjs at cost 12 — the same cost the
+ * legacy `motDePasse` hashes used (they were copied as-is during the T3
+ * seeding, so they keep verifying).
  */
 export async function setPassword(
   db: CredentialDb,

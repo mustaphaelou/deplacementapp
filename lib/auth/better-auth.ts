@@ -22,9 +22,10 @@ export interface BetterAuthOptions {
  * The Drizzle adapter runs on the existing `db`; the Better Auth `user` model
  * is mapped onto the existing `utilisateurs` table (domain fields are
  * server-owned `additionalFields`).  Email+password is a closed pool whose
- * hashes are bcryptjs at cost 12 (the legacy `motDePasse` hashes keep
- * verifying); Google sign-in does not auto-provision and is vetoed by
- * `assertGoogleSignInAllowed`.  `nextCookies` is registered last.
+ * hashes are bcryptjs at cost 12 (hashes seeded from the legacy column during
+ * the T3 data migration keep verifying); Google sign-in does not auto-provision
+ * and is vetoed by `assertGoogleSignInAllowed`.  `nextCookies` is registered
+ * last.
  */
 export function createAuth(db: DrizzleDb, options: BetterAuthOptions = {}) {
   return betterAuth({

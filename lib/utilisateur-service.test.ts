@@ -37,7 +37,6 @@ function makeUser(overrides?: Record<string, unknown>) {
   return {
     id: crypto.randomUUID(),
     email: `${crypto.randomUUID()}@test.com`,
-    motDePasse: "$hashed$",
     nom: "Dupont",
     prenom: "Jean",
     poste: "Dev",
@@ -58,7 +57,6 @@ function makeActor() {
   return {
     id: crypto.randomUUID(),
     email: `${crypto.randomUUID()}@actor.com`,
-    motDePasse: null,
     nom: "Admin",
     prenom: "User",
     poste: "Admin",
@@ -301,7 +299,6 @@ describe("UtilisateurService", { timeout: TIMEOUT }, () => {
       targetUser = makeUser({
         societeId,
         departementId,
-        motDePasse: "$hashed$",
       })
       targetUser.email = `${crypto.randomUUID()}@target.com`
       await pgliteDb.insert(schema.utilisateurs).values(targetUser)
@@ -366,7 +363,6 @@ describe("UtilisateurService", { timeout: TIMEOUT }, () => {
       targetUser = makeUser({
         societeId,
         departementId,
-        motDePasse: "$hashed$",
       })
       targetUser.email = `${crypto.randomUUID()}@target.com`
       await pgliteDb.insert(schema.utilisateurs).values(targetUser)
