@@ -11,10 +11,10 @@ export const session = pgTable(
   "session",
   {
     id: text("id").primaryKey(),
-    expiresAt: timestamp("expiresAt").notNull(),
+    expiresAt: timestamp("expiresAt", { precision: 3 }).notNull(),
     token: text("token").notNull().unique(),
-    createdAt: timestamp("createdAt").notNull().defaultNow(),
-    updatedAt: timestamp("updatedAt")
+    createdAt: timestamp("createdAt", { precision: 3 }).notNull().defaultNow(),
+    updatedAt: timestamp("updatedAt", { precision: 3 })
       .notNull()
       .$onUpdate(() => new Date()),
     ipAddress: text("ipAddress"),
@@ -38,12 +38,12 @@ export const account = pgTable(
     accessToken: text("accessToken"),
     refreshToken: text("refreshToken"),
     idToken: text("idToken"),
-    accessTokenExpiresAt: timestamp("accessTokenExpiresAt"),
-    refreshTokenExpiresAt: timestamp("refreshTokenExpiresAt"),
+    accessTokenExpiresAt: timestamp("accessTokenExpiresAt", { precision: 3 }),
+    refreshTokenExpiresAt: timestamp("refreshTokenExpiresAt", { precision: 3 }),
     scope: text("scope"),
     password: text("password"),
-    createdAt: timestamp("createdAt").notNull().defaultNow(),
-    updatedAt: timestamp("updatedAt")
+    createdAt: timestamp("createdAt", { precision: 3 }).notNull().defaultNow(),
+    updatedAt: timestamp("updatedAt", { precision: 3 })
       .notNull()
       .$onUpdate(() => new Date()),
   },
@@ -56,9 +56,9 @@ export const verification = pgTable(
     id: text("id").primaryKey(),
     identifier: text("identifier").notNull(),
     value: text("value").notNull(),
-    expiresAt: timestamp("expiresAt").notNull(),
-    createdAt: timestamp("createdAt").notNull().defaultNow(),
-    updatedAt: timestamp("updatedAt")
+    expiresAt: timestamp("expiresAt", { precision: 3 }).notNull(),
+    createdAt: timestamp("createdAt", { precision: 3 }).notNull().defaultNow(),
+    updatedAt: timestamp("updatedAt", { precision: 3 })
       .notNull()
       .defaultNow()
       .$onUpdate(() => new Date()),

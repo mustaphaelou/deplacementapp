@@ -3,16 +3,10 @@ import { and, eq } from "drizzle-orm"
 import type { DrizzleDb } from "../../db"
 import { account } from "../../db/schema/auth-tables"
 import { utilisateurs } from "../../db/schema/utilisateurs"
+import { UtilisateurNotFoundError } from "../errors"
 import { BCRYPT_COST } from "./better-auth"
 
 export const CREDENTIAL_PROVIDER_ID = "credential"
-
-export class UtilisateurIntrouvableError extends Error {
-  constructor() {
-    super("Utilisateur introuvable")
-    this.name = "UtilisateurIntrouvableError"
-  }
-}
 
 /**
  * The single writer of credential rows for a Utilisateur.
@@ -33,7 +27,7 @@ export async function setPassword(
     .where(eq(utilisateurs.id, utilisateurId))
     .limit(1)
   if (!utilisateur) {
-    throw new UtilisateurIntrouvableError()
+    throw new UtilisateurNotFoundError()
   }
 
   const password = await bcryptHash(plaintext, BCRYPT_COST)

@@ -1,5 +1,5 @@
 {
-  "id": "ef8d4267-5f23-49c5-acf3-541c91f5e867",
+  "id": "df94b866-590e-41c0-bd12-4ce1110abcfa",
   "prevId": "65e43fb2-b367-4f20-8800-2407724d1d91",
   "version": "7",
   "dialect": "postgresql",
@@ -346,13 +346,13 @@
         },
         "accessTokenExpiresAt": {
           "name": "accessTokenExpiresAt",
-          "type": "timestamp",
+          "type": "timestamp (3)",
           "primaryKey": false,
           "notNull": false
         },
         "refreshTokenExpiresAt": {
           "name": "refreshTokenExpiresAt",
-          "type": "timestamp",
+          "type": "timestamp (3)",
           "primaryKey": false,
           "notNull": false
         },
@@ -370,14 +370,14 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "timestamp",
+          "type": "timestamp (3)",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
         },
         "updatedAt": {
           "name": "updatedAt",
-          "type": "timestamp",
+          "type": "timestamp (3)",
           "primaryKey": false,
           "notNull": true
         }
@@ -432,7 +432,7 @@
         },
         "expiresAt": {
           "name": "expiresAt",
-          "type": "timestamp",
+          "type": "timestamp (3)",
           "primaryKey": false,
           "notNull": true
         },
@@ -444,14 +444,14 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "timestamp",
+          "type": "timestamp (3)",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
         },
         "updatedAt": {
           "name": "updatedAt",
-          "type": "timestamp",
+          "type": "timestamp (3)",
           "primaryKey": false,
           "notNull": true
         },
@@ -544,20 +544,20 @@
         },
         "expiresAt": {
           "name": "expiresAt",
-          "type": "timestamp",
+          "type": "timestamp (3)",
           "primaryKey": false,
           "notNull": true
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "timestamp",
+          "type": "timestamp (3)",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
         },
         "updatedAt": {
           "name": "updatedAt",
-          "type": "timestamp",
+          "type": "timestamp (3)",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
