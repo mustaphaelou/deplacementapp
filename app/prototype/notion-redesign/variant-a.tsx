@@ -12,6 +12,19 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { formatCurrency, formatDate } from "@/lib/constants"
+import { StatusPill, statusOf } from "@/components/status-pill"
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import {
   brandVars,
   DEMANDES,
@@ -20,8 +33,6 @@ import {
   SOCIETE_NOM,
   UTILISATEUR,
   LogoMark,
-  StatusPill,
-  statusOf,
   type NavItem,
 } from "./mock-data"
 import type { Surface } from "./prototype-host"
@@ -161,12 +172,15 @@ function ASidebar({ activeNav }: { activeNav: string }) {
           {SOCIETE_NOM}
         </span>
         <ChevronDown className="size-3" style={{ color: INK_MUT }} />
-        <button
-          className="rounded-[3px] p-1 transition-colors hover:bg-[rgba(55,53,47,0.06)]"
-          title="Réduire la barre latérale"
-        >
-          <ChevronsLeft className="size-3.5" style={{ color: INK_SEC }} />
-        </button>
+        <Tooltip>
+          <TooltipTrigger
+            aria-label="Réduire la barre latérale"
+            className="rounded-[3px] p-1 transition-colors hover:bg-[rgba(55,53,47,0.06)]"
+          >
+            <ChevronsLeft className="size-3.5" style={{ color: INK_SEC }} />
+          </TooltipTrigger>
+          <TooltipContent side="right">Réduire la barre latérale</TooltipContent>
+        </Tooltip>
       </div>
       <nav className="flex-1 overflow-y-auto px-1.5 py-1">
         {NAV_GROUPS.map((group) => (
@@ -220,12 +234,15 @@ function ActionIcon({
   children: React.ReactNode
 }) {
   return (
-    <button
-      title={title}
-      className="flex size-8 items-center justify-center rounded-[3px] transition-colors hover:bg-[rgba(55,53,47,0.06)]"
-    >
-      {children}
-    </button>
+    <Tooltip>
+      <TooltipTrigger
+        aria-label={title}
+        className="flex size-8 items-center justify-center rounded-[3px] transition-colors hover:bg-[rgba(55,53,47,0.06)]"
+      >
+        {children}
+      </TooltipTrigger>
+      <TooltipContent>{title}</TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -245,26 +262,22 @@ function PageHeader({
   return (
     <div>
       <div className="flex items-center justify-between">
-        <div
-          className="flex items-center gap-1.5 text-sm"
-          style={{ color: INK_SEC }}
-        >
-          {breadcrumb.map((part, i) => (
-            <span key={part} className="flex items-center gap-1.5">
-              {i > 0 && (
-                <ChevronRight className="size-3" style={{ color: INK_MUT }} />
-              )}
-              <span
-                className={cn(
-                  i === breadcrumb.length - 1 && "font-medium",
-                  i === breadcrumb.length - 1 ? "text-[#37352F]" : ""
+        <Breadcrumb>
+          <BreadcrumbList>
+            {breadcrumb.map((part, i) => (
+              <BreadcrumbItem key={part}>
+                {i > 0 && <BreadcrumbSeparator />}
+                {i === breadcrumb.length - 1 ? (
+                  <BreadcrumbPage className="font-medium">
+                    {part}
+                  </BreadcrumbPage>
+                ) : (
+                  <span>{part}</span>
                 )}
-              >
-                {part}
-              </span>
-            </span>
-          ))}
-        </div>
+              </BreadcrumbItem>
+            ))}
+          </BreadcrumbList>
+        </Breadcrumb>
         <div className="flex items-center gap-1">
           <ActionIcon title="Notifications">
             <Bell className="size-4" />

@@ -12,10 +12,10 @@ brand-colored, layout free to change?
 npm run dev
 ```
 
-Navigate to `/prototype/notion-redesign`. Flip variants with the floating
-bottom bar or the `←` / `→` arrow keys; switch surface (Connexion / Liste /
-Formulaire) with the segmented control. State is in the URL:
-`?variant=A&surface=login` — reload-stable and shareable.
+Navigate to `/prototype/notion-redesign`. Switch surface (Connexion / Liste /
+Formulaire) with `?surface=login|liste|formulaire` in the URL — reload-stable
+and shareable. Variant A is the only variant left (B/C + switcher deleted in
+execution #189).
 
 ## Variants tested
 
@@ -61,6 +61,8 @@ All variants use the Societe's couleurPrimaire (placeholder `#0F766E` in
 
 - The prototype stays as the linked reference asset for the page-family
   tickets (per #171: "Link the prototype as an asset from this issue").
-- Variants B/C and the switcher may be deleted once A has been folded into
-  the real `/login` page and `(dashboard)` shell. Do not promote prototype
-  code directly — it has no tests and uses mock data.
+- Variants B/C and the switcher have been deleted (execution #189) once the
+  auth pages were folded into the real `/login` page — see
+  [Execute: restyle the auth pages](https://github.com/mustaphaelou/deplacementapp/issues/189).
+  The `(dashboard)` shell tickets are separate. Do not promote prototype code
+  directly — it has no tests and uses mock data.

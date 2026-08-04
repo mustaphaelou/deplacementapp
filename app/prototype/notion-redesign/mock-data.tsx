@@ -10,8 +10,7 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react"
-import { ETAPE_LABELS, formatCurrency } from "@/lib/constants"
-import { cn } from "@/lib/utils"
+import { formatCurrency } from "@/lib/constants"
 
 export const BRAND = "#0F766E"
 export const BRAND_DARK = "#0B5F55"
@@ -149,15 +148,24 @@ export const DEMANDES: MockDemande[] = [
   },
 ]
 
-export type StatusTone = "neutral" | "pending" | "success" | "danger"
+export { formatCurrency }
 
-export function statusOf(d: MockDemande): { label: string; tone: StatusTone } {
-  if (d.decision === "APPROVED") return { label: "Approuvée", tone: "success" }
-  if (d.decision === "REJECTED") return { label: "Rejetée", tone: "danger" }
-  if (d.decision === "WITHDRAWN") return { label: "Retirée", tone: "neutral" }
-  if (d.etape === "FINAL") return { label: "Finalisée", tone: "success" }
-  if (d.etape === "DRAFT") return { label: "Brouillon", tone: "neutral" }
-  return { label: ETAPE_LABELS[d.etape] ?? d.etape, tone: "pending" }
+export function LogoMark({ size, radius }: { size: number; radius: number }) {
+  return (
+    <div
+      className="flex shrink-0 items-center justify-center font-bold text-white"
+      style={{
+        width: size,
+        height: size,
+        borderRadius: radius,
+        backgroundColor: "var(--brand)",
+      }}
+    >
+      <span style={{ fontSize: Math.round(size * 0.45) }}>
+        {SOCIETE_NOM.charAt(0)}
+      </span>
+    </div>
+  )
 }
 
 export const TRANSPORT_OPTIONS = [
@@ -207,51 +215,3 @@ export const FORM_FIELDS = [
   { label: "Montant de l'avance (Dhs)", type: "number", placeholder: "0,00" },
 ]
 
-export { formatCurrency }
-
-export function LogoMark({ size, radius }: { size: number; radius: number }) {
-  return (
-    <div
-      className="flex shrink-0 items-center justify-center font-bold text-white"
-      style={{
-        width: size,
-        height: size,
-        borderRadius: radius,
-        backgroundColor: "var(--brand)",
-      }}
-    >
-      <span style={{ fontSize: Math.round(size * 0.45) }}>
-        {SOCIETE_NOM.charAt(0)}
-      </span>
-    </div>
-  )
-}
-
-const TONE_CLASSES: Record<StatusTone, string> = {
-  neutral: "bg-[#F1F1EF] text-[#37352F]",
-  pending: "bg-[#FBF0DB] text-[#8B5E0E]",
-  success: "bg-[#E5F3EE] text-[#0F6E4F]",
-  danger: "bg-[#FBE9E9] text-[#B42318]",
-}
-
-export function StatusPill({
-  label,
-  tone,
-  className,
-}: {
-  label: string
-  tone: StatusTone
-  className?: string
-}) {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap",
-        TONE_CLASSES[tone],
-        className
-      )}
-    >
-      {label}
-    </span>
-  )
-}
