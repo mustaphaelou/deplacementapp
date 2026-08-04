@@ -81,6 +81,38 @@ describe("Rapports page", () => {
     expect(html).toContain(formatCurrency(45000))
   })
 
+  it("renders the prototype header anatomy and home treatment: breadcrumb, ghost CSV action, borderless stat cards, hairline-ruled steps", async () => {
+    const { getAuthUser } = await import("@/lib/auth/server")
+    const {
+      countByEtape: mockCountByEtape,
+      aggregateBudget: mockAggregateBudget,
+    } = await import("@/lib/demande")
+
+    ;(getAuthUser as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser())
+    ;(mockCountByEtape as ReturnType<typeof vi.fn>).mockImplementation(
+      (etape: string) => Promise.resolve(ETAPE_COUNTS[etape] ?? 0)
+    )
+    ;(mockAggregateBudget as ReturnType<typeof vi.fn>).mockResolvedValue(45000)
+
+    const { default: RapportsPage } = await import("./page")
+    const html = renderToStaticMarkup(await RapportsPage())
+
+    expect(html).toContain('aria-label="breadcrumb"')
+    expect(html).toContain("Administration")
+    expect(html).toContain("text-[40px]")
+    expect(html).toContain("CSV")
+    expect(html).toContain('href="/api/csv"')
+    expect(html).toContain('data-slot="tooltip-trigger"')
+    expect(html).not.toContain('data-slot="card"')
+    expect(html).toContain("Total demandes")
+    expect(html).toContain("Approuvées")
+    expect(html).toContain("Rejetées")
+    expect(html).toContain("Budget total")
+    expect(html).toContain("Répartition par étape")
+    expect(html).toContain("border-y border-border")
+    expect(html).toContain("tabular-nums")
+  })
+
   it("redirects when role is not authorised", async () => {
     const { getAuthUser } = await import("@/lib/auth/server")
     const { redirect } = await import("next/navigation")

@@ -4,15 +4,25 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectItem } from "@/components/ui/select"
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
+import { StatusPill } from "@/components/status-pill"
 import { toast } from "sonner"
-import { Plus, Loader2, Pencil, Search } from "lucide-react"
+import { Plus, Loader2, Pencil, Search, Users } from "lucide-react"
 import { ROLE_LABELS } from "@/lib/auth"
+import { cn } from "@/lib/utils"
 
 interface Utilisateur {
   id: string
@@ -32,14 +42,130 @@ interface Departement {
   nom: string
 }
 
-const ROLE_COLORS: Record<string, string> = {
-  EMPLOYEE: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
-  MANAGER:
-    "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
-  FINANCE_ADMIN:
-    "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
-  GENERAL_DIRECTION:
-    "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300",
+const FIELD_INPUT =
+  "h-9 rounded-[3px] focus-visible:ring-1 focus-visible:ring-(--brand)"
+const rowHover =
+  "hover:bg-[rgba(55,53,47,0.024)] dark:hover:bg-sidebar-accent/40"
+
+function Field({
+  label,
+  htmlFor,
+  children,
+}: {
+  label: string
+  htmlFor?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div>
+      <Label htmlFor={htmlFor} className="mb-1.5 block text-sm font-medium">
+        {label}
+      </Label>
+      {children}
+    </div>
+  )
+}
+
+export function UtilisateursTable({
+  users,
+  onEdit,
+}: {
+  users: Utilisateur[]
+  onEdit: (user: Utilisateur) => void
+}) {
+  return (
+    <div className="overflow-x-auto border-y border-border text-sm">
+      <table className="w-full min-w-[500px]">
+        <thead>
+          <tr className="border-b border-border text-left">
+            <th className="px-2 py-2 font-normal text-muted-foreground">
+              Nom complet
+            </th>
+            <th className="hidden px-2 py-2 font-normal text-muted-foreground md:table-cell">
+              Email
+            </th>
+            <th className="hidden px-2 py-2 font-normal text-muted-foreground md:table-cell">
+              Poste
+            </th>
+            <th className="hidden px-2 py-2 font-normal text-muted-foreground lg:table-cell">
+              Département
+            </th>
+            <th className="px-2 py-2 font-normal text-muted-foreground">
+              Rôle
+            </th>
+            <th className="px-2 py-2 font-normal text-muted-foreground">
+              Statut
+            </th>
+            <th className="hidden px-2 py-2 font-normal text-muted-foreground lg:table-cell">
+              Auth
+            </th>
+            <th className="w-8 px-2 py-2 text-right font-normal text-muted-foreground">
+              Actions
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {users.map((u) => (
+            <tr
+              key={u.id}
+              className={cn(
+                "group border-b border-border transition-colors last:border-0",
+                rowHover
+              )}
+            >
+              <td className="px-2 py-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="flex size-7 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                    {u.prenom[0]}
+                    {u.nom[0]}
+                  </div>
+                  <span className="font-medium">
+                    {u.prenom} {u.nom}
+                  </span>
+                </div>
+              </td>
+              <td className="hidden px-2 py-2.5 text-xs md:table-cell">
+                {u.email}
+              </td>
+              <td className="hidden px-2 py-2.5 md:table-cell">{u.poste}</td>
+              <td className="hidden px-2 py-2.5 lg:table-cell">
+                {u.departement.nom}
+              </td>
+              <td className="px-2 py-2.5">
+                <StatusPill
+                  label={ROLE_LABELS[u.role] ?? u.role}
+                  tone="neutral"
+                />
+              </td>
+              <td className="px-2 py-2.5">
+                <StatusPill
+                  label={u.actif ? "Actif" : "Inactif"}
+                  tone={u.actif ? "success" : "danger"}
+                />
+              </td>
+              <td className="hidden px-2 py-2.5 lg:table-cell">
+                {u.googleAuthEnabled && (
+                  <StatusPill label="Google" tone="neutral" />
+                )}
+              </td>
+              <td className="w-8 px-2 py-2.5 text-right">
+                <div className="flex justify-end opacity-30 transition-opacity group-hover:opacity-100">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => onEdit(u)}
+                    aria-label={`Modifier ${u.prenom} ${u.nom}`}
+                  >
+                    <Pencil />
+                  </Button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
 }
 
 export default function UtilisateursPage() {
@@ -154,122 +280,67 @@ export default function UtilisateursPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Gestion des utilisateurs</h1>
+      <div>
+        <div className="flex items-center justify-between">
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <span>Administration</span>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage className="font-medium">
+                  Utilisateurs
+                </BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+          <Button onClick={openCreate}>
+            <Plus className="mr-2 size-4" />
+            Nouvel utilisateur
+          </Button>
+        </div>
+        <div className="mt-6 flex items-center gap-4">
+          <div className="flex size-12 shrink-0 items-center justify-center rounded-[3px] bg-primary/10">
+            <Users className="size-6 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-[40px] leading-tight font-bold tracking-[-0.01em]">
+              Utilisateurs
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {users.length} utilisateur(s)
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <div className="relative">
+          <Search className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Rechercher"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-8 w-60 pl-8"
+          />
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center p-8">
+          <p className="text-sm text-muted-foreground">Chargement...</p>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center gap-2 p-8">
+          <Users className="size-8 text-muted-foreground/50" />
           <p className="text-sm text-muted-foreground">
-            {users.length} utilisateur(s)
+            {search ? "Aucun résultat" : "Aucun utilisateur"}
           </p>
         </div>
-        <Button onClick={openCreate}>
-          <Plus className="mr-2 size-4" />
-          Nouvel utilisateur
-        </Button>
-      </div>
-
-      <div className="rounded-xl border bg-background">
-        <div className="border-b p-3">
-          <div className="relative">
-            <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Rechercher nom, email, département..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="p-8 text-center text-sm text-muted-foreground">
-            Chargement...
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="p-8 text-center text-sm text-muted-foreground">
-            {search ? "Aucun résultat" : "Aucun utilisateur"}
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[500px] text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50 text-left text-muted-foreground">
-                  <th className="p-3 font-medium">Nom complet</th>
-                  <th className="hidden p-3 font-medium md:table-cell">
-                    Email
-                  </th>
-                  <th className="hidden p-3 font-medium md:table-cell">
-                    Poste
-                  </th>
-                  <th className="hidden p-3 font-medium lg:table-cell">
-                    Département
-                  </th>
-                  <th className="p-3 font-medium">Rôle</th>
-                  <th className="p-3 font-medium">Statut</th>
-                  <th className="hidden p-3 font-medium lg:table-cell">Auth</th>
-                  <th className="p-3 font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((u) => (
-                  <tr
-                    key={u.id}
-                    className="border-b last:border-0 hover:bg-muted/30"
-                  >
-                    <td className="p-3">
-                      <div className="flex items-center gap-2">
-                        <div className="flex size-7 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                          {u.prenom[0]}
-                          {u.nom[0]}
-                        </div>
-                        <span className="font-medium">
-                          {u.prenom} {u.nom}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="hidden p-3 text-xs md:table-cell">
-                      {u.email}
-                    </td>
-                    <td className="hidden p-3 md:table-cell">{u.poste}</td>
-                    <td className="hidden p-3 lg:table-cell">
-                      {u.departement.nom}
-                    </td>
-                    <td className="p-3">
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${ROLE_COLORS[u.role]}`}
-                      >
-                        {ROLE_LABELS[u.role]}
-                      </span>
-                    </td>
-                    <td className="p-3">
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${u.actif ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300" : "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"}`}
-                      >
-                        {u.actif ? "Actif" : "Inactif"}
-                      </span>
-                    </td>
-                    <td className="p-3">
-                      {u.googleAuthEnabled && (
-                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
-                          Google
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-3">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openEdit(u)}
-                      >
-                        <Pencil className="size-4" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      ) : (
+        <UtilisateursTable users={filtered} onEdit={openEdit} />
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
@@ -278,90 +349,84 @@ export default function UtilisateursPage() {
               {editingUser ? "Modifier" : "Nouvel"} utilisateur
             </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Prénom</Label>
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
+              <Field label="Prénom">
                 <Input
                   value={form.prenom}
                   onChange={(e) => setForm({ ...form, prenom: e.target.value })}
                   required
+                  className={FIELD_INPUT}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label>Nom</Label>
+              </Field>
+              <Field label="Nom">
                 <Input
                   value={form.nom}
                   onChange={(e) => setForm({ ...form, nom: e.target.value })}
                   required
+                  className={FIELD_INPUT}
                 />
-              </div>
+              </Field>
             </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
+            <Field label="Email">
               <Input
                 type="email"
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 required
+                className={FIELD_INPUT}
               />
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Poste</Label>
+            </Field>
+            <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
+              <Field label="Poste">
                 <Input
                   value={form.poste}
                   onChange={(e) => setForm({ ...form, poste: e.target.value })}
                   required
+                  className={FIELD_INPUT}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label>Département</Label>
-                <select
-                  value={form.departementId}
-                  onChange={(e) =>
-                    setForm({ ...form, departementId: e.target.value })
-                  }
-                  className="flex h-8 w-full rounded-lg border border-input bg-transparent px-3 text-sm outline-none"
-                  required
-                >
-                  {departements.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.nom}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Rôle</Label>
-              <select
-                value={form.role}
-                onChange={(e) => setForm({ ...form, role: e.target.value })}
-                className="flex h-8 w-full rounded-lg border border-input bg-transparent px-3 text-sm outline-none"
+              </Field>
+              <Select
+                label="Département"
+                value={form.departementId}
+                onValueChange={(v) =>
+                  setForm({ ...form, departementId: v ?? "" })
+                }
               >
-                {Object.entries(ROLE_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
+                {departements.map((d) => (
+                  <SelectItem key={d.id} value={d.id}>
+                    {d.nom}
+                  </SelectItem>
                 ))}
-              </select>
+              </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Téléphone</Label>
+            <Select
+              label="Rôle"
+              value={form.role}
+              onValueChange={(v) => setForm({ ...form, role: v ?? "EMPLOYEE" })}
+            >
+              {Object.entries(ROLE_LABELS).map(([value, label]) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </Select>
+            <Field label="Téléphone">
               <Input
                 value={form.telephone}
                 onChange={(e) =>
                   setForm({ ...form, telephone: e.target.value })
                 }
+                className={FIELD_INPUT}
               />
-            </div>
-            <div className="space-y-2">
-              <Label>
-                {editingUser
+            </Field>
+            <Field
+              label={
+                editingUser
                   ? "Nouveau mot de passe (laisser vide pour conserver)"
-                  : "Mot de passe"}
-              </Label>
+                  : "Mot de passe"
+              }
+            >
               <Input
                 type="password"
                 value={form.motDePasse}
@@ -370,8 +435,9 @@ export default function UtilisateursPage() {
                 }
                 required={!editingUser && !form.googleAuthEnabled}
                 minLength={6}
+                className={FIELD_INPUT}
               />
-            </div>
+            </Field>
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
@@ -383,10 +449,24 @@ export default function UtilisateursPage() {
               />
               Connexion Google autorisée
             </label>
-            <Button type="submit" className="w-full" disabled={saving}>
-              {saving && <Loader2 className="mr-2 size-4 animate-spin" />}
-              {editingUser ? "Modifier" : "Créer"}
-            </Button>
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-9 rounded-[3px]"
+                onClick={() => setOpen(false)}
+              >
+                Annuler
+              </Button>
+              <Button
+                type="submit"
+                className="h-9 rounded-[3px]"
+                disabled={saving}
+              >
+                {saving && <Loader2 className="mr-2 size-4 animate-spin" />}
+                {editingUser ? "Modifier" : "Créer"}
+              </Button>
+            </div>
           </form>
         </DialogContent>
       </Dialog>

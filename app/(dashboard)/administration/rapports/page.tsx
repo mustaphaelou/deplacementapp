@@ -2,10 +2,30 @@
 import { redirect } from "next/navigation"
 import { countByEtape, aggregateBudget } from "@/lib/demande"
 import type { Etape } from "@/lib/workflow"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { formatCurrency, ETAPE_LABELS } from "@/lib/constants"
+import { DashboardCard } from "@/components/ui/dashboard-card"
+import { Button } from "@/components/ui/button"
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import Link from "next/link"
-import { FileText, TrendingUp, CheckCircle, XCircle } from "lucide-react"
+import {
+  Download,
+  FileText,
+  TrendingUp,
+  CheckCircle,
+  XCircle,
+  BarChart,
+} from "lucide-react"
 
 export default async function RapportsPage() {
   const user = await getAuthUser()
@@ -30,80 +50,86 @@ export default async function RapportsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Rapports</h1>
-        <p className="text-sm text-muted-foreground">
-          Vue d&apos;ensemble des demandes de déplacement
-        </p>
+        <div className="flex items-center justify-between">
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <span>Administration</span>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage className="font-medium">
+                  Rapports
+                </BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  render={<Link href="/api/csv" />}
+                  nativeButton={false}
+                >
+                  <Download className="size-4" />
+                  CSV
+                </Button>
+              }
+            />
+            <TooltipContent>Exporter en CSV</TooltipContent>
+          </Tooltip>
+        </div>
+        <div className="mt-6 flex items-center gap-4">
+          <div className="flex size-12 shrink-0 items-center justify-center rounded-[3px] bg-primary/10">
+            <BarChart className="size-6 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-[40px] leading-tight font-bold tracking-[-0.01em]">
+              Rapports
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Vue d&apos;ensemble des demandes de déplacement
+            </p>
+          </div>
+        </div>
       </div>
-      <div className="grid gap-4 md:grid-cols-4">
-        <StatCard
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <DashboardCard
           icon={FileText}
           label="Total demandes"
           value={totalDemandes}
         />
-        <StatCard
+        <DashboardCard
           icon={CheckCircle}
           label="Approuvées"
           value={totalApprouvees}
         />
-        <StatCard icon={XCircle} label="Rejetées" value={0} />
-        <StatCard
+        <DashboardCard icon={XCircle} label="Rejetées" value={0} />
+        <DashboardCard
           icon={TrendingUp}
           label="Budget total"
           value={formatCurrency(totalBudget)}
         />
       </div>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Répartition par étape</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {etapeCounts.map((s) => (
-              <div
-                key={s.etape}
-                className="flex items-center justify-between text-sm"
-              >
-                <span>{s.label}</span>
-                <span className="font-medium">{s.count}</span>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-      <div className="flex gap-3">
-        <Link
-          href="/api/csv"
-          className="inline-flex items-center rounded-lg border bg-background px-4 py-2 text-sm font-medium hover:bg-muted"
-        >
-          <FileText className="mr-2 size-4" />
-          Exporter en CSV
-        </Link>
-      </div>
-    </div>
-  )
-}
 
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: React.ComponentType<{ className?: string }>
-  label: string
-  value: string | number
-}) {
-  return (
-    <Card>
-      <CardContent className="flex items-center gap-4 p-5">
-        <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
-          <Icon className="size-5 text-primary" />
+      <section>
+        <h2 className="text-base font-semibold tracking-tight">
+          Répartition par étape
+        </h2>
+        <div className="mt-3 border-y border-border">
+          {etapeCounts.map((s) => (
+            <div
+              key={s.etape}
+              className="flex items-center justify-between border-b border-border py-2.5 text-sm last:border-0"
+            >
+              <span>{s.label}</span>
+              <span className="font-medium tabular-nums">{s.count}</span>
+            </div>
+          ))}
         </div>
-        <div>
-          <p className="text-2xl font-bold">{value}</p>
-          <p className="text-xs text-muted-foreground">{label}</p>
-        </div>
-      </CardContent>
-    </Card>
+      </section>
+    </div>
   )
 }

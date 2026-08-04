@@ -1,18 +1,18 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
 import { toast } from "sonner"
-import { Loader2, Save } from "lucide-react"
+import { Loader2, Settings } from "lucide-react"
 
 interface Societe {
   id: string
@@ -22,6 +22,183 @@ interface Societe {
   couleurPrimaire: string | null
   nomExpediteurEmail: string | null
   domaineEmail: string | null
+}
+
+const FIELD_INPUT =
+  "h-9 rounded-[3px] focus-visible:ring-1 focus-visible:ring-(--brand)"
+
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3">
+      <h2 className="text-xs font-medium tracking-[0.06em] text-muted-foreground uppercase">
+        {children}
+      </h2>
+      <span className="h-px flex-1 bg-border" />
+    </div>
+  )
+}
+
+function Field({
+  label,
+  htmlFor,
+  hint,
+  children,
+}: {
+  label: string
+  htmlFor?: string
+  hint?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div>
+      <Label htmlFor={htmlFor} className="mb-1.5 block text-sm font-medium">
+        {label}
+      </Label>
+      {children}
+      {hint && <p className="mt-1.5 text-xs text-muted-foreground">{hint}</p>}
+    </div>
+  )
+}
+
+function ColorField({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (value: string) => void
+}) {
+  const pickerRef = useRef<HTMLInputElement>(null)
+  const validHex = /^#[0-9a-fA-F]{6}$/.test(value) ? value : "#000000"
+
+  return (
+    <div className="flex gap-2">
+      <Input
+        id="couleurPrimaire"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="#0F766E"
+        className={FIELD_INPUT}
+      />
+      <button
+        type="button"
+        aria-label="Choisir une couleur"
+        onClick={() => pickerRef.current?.click()}
+        className="size-9 shrink-0 rounded-[3px] border border-input bg-transparent transition-[box-shadow] outline-none focus-visible:ring-1 focus-visible:ring-(--brand)"
+        style={{ backgroundColor: value }}
+      >
+        <input
+          ref={pickerRef}
+          type="color"
+          value={validHex}
+          onChange={(e) => onChange(e.target.value)}
+          className="sr-only"
+          tabIndex={-1}
+        />
+      </button>
+    </div>
+  )
+}
+
+export function SocieteSettings({
+  societe,
+  nom,
+  couleurPrimaire,
+  nomExpediteurEmail,
+  domaineEmail,
+  saving,
+  onNomChange,
+  onCouleurPrimaireChange,
+  onNomExpediteurEmailChange,
+  onDomaineEmailChange,
+  onSave,
+}: {
+  societe: Societe | null
+  nom: string
+  couleurPrimaire: string
+  nomExpediteurEmail: string
+  domaineEmail: string
+  saving: boolean
+  onNomChange: (value: string) => void
+  onCouleurPrimaireChange: (value: string) => void
+  onNomExpediteurEmailChange: (value: string) => void
+  onDomaineEmailChange: (value: string) => void
+  onSave: (e: React.FormEvent) => void
+}) {
+  return (
+    <form onSubmit={onSave} className="mt-10 space-y-10">
+      <section>
+        <SectionHeading>Identité visuelle</SectionHeading>
+        <div className="mt-5 space-y-5">
+          <Field label="Nom de la société" htmlFor="nom">
+            <Input
+              id="nom"
+              value={nom}
+              onChange={(e) => onNomChange(e.target.value)}
+              required
+              className={FIELD_INPUT}
+            />
+          </Field>
+          <Field label="Couleur primaire" htmlFor="couleurPrimaire">
+            <ColorField
+              value={couleurPrimaire}
+              onChange={onCouleurPrimaireChange}
+            />
+          </Field>
+          {societe?.logoUrl && (
+            <div>
+              <p className="mb-1.5 text-xs font-medium text-muted-foreground">
+                Logo actuel
+              </p>
+              <img
+                src={societe.logoUrl}
+                alt="Logo"
+                className="max-h-20 rounded-[3px] object-contain"
+              />
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section>
+        <SectionHeading>Email</SectionHeading>
+        <div className="mt-5 space-y-5">
+          <Field
+            label="Nom d'expéditeur email"
+            htmlFor="nomExpediteur"
+            hint='Apparaît comme expéditeur des emails (ex: "Ma Société")'
+          >
+            <Input
+              id="nomExpediteur"
+              value={nomExpediteurEmail}
+              onChange={(e) => onNomExpediteurEmailChange(e.target.value)}
+              placeholder="Ma Société"
+              className={FIELD_INPUT}
+            />
+          </Field>
+          <Field
+            label="Domaine email"
+            htmlFor="domaineEmail"
+            hint="Utilisé pour l'adresse d'envoi: noreply@domaine.ma"
+          >
+            <Input
+              id="domaineEmail"
+              value={domaineEmail}
+              onChange={(e) => onDomaineEmailChange(e.target.value)}
+              placeholder="masociete.ma"
+              className={FIELD_INPUT}
+            />
+          </Field>
+        </div>
+      </section>
+
+      <div className="flex justify-end">
+        <Button type="submit" className="h-9 rounded-[3px]" disabled={saving}>
+          {saving && <Loader2 className="mr-2 size-4 animate-spin" />}
+          Enregistrer
+        </Button>
+      </div>
+    </form>
+  )
 }
 
 export default function SocietePage() {
@@ -74,110 +251,55 @@ export default function SocietePage() {
     toast.success("Paramètres mis à jour")
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center p-12">
-        <Loader2 className="size-8 animate-spin text-muted-foreground" />
-      </div>
-    )
-  }
-
   return (
-    <div className="mx-auto max-w-2xl space-y-6 p-4 md:p-6">
+    <div className="mx-auto w-full max-w-[720px] pb-8">
       <div>
-        <h1 className="text-2xl font-bold">Paramètres de la société</h1>
-        <p className="text-sm text-muted-foreground">
-          Personnalisez le nom, le logo et les couleurs de votre instance
-        </p>
+        <div className="flex items-center justify-between">
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <span>Administration</span>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage className="font-medium">Société</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+        </div>
+        <div className="mt-6 flex items-center gap-4">
+          <div className="flex size-12 shrink-0 items-center justify-center rounded-[3px] bg-primary/10">
+            <Settings className="size-6 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-[40px] leading-tight font-bold tracking-[-0.01em]">
+              Société
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Personnalisez le nom, la couleur et les emails de votre instance
+            </p>
+          </div>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Identité visuelle</CardTitle>
-          <CardDescription>
-            Ces informations apparaissent dans l&apos;en-tête, les emails et les
-            PDFs
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSave} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="nom">Nom de la société</Label>
-              <Input
-                id="nom"
-                value={nom}
-                onChange={(e) => setNom(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="couleur">Couleur primaire</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="couleur"
-                  value={couleurPrimaire}
-                  onChange={(e) => setCouleurPrimaire(e.target.value)}
-                  placeholder="#1E40AF"
-                />
-                {couleurPrimaire && (
-                  <div
-                    className="size-10 shrink-0 rounded-md border"
-                    style={{ backgroundColor: couleurPrimaire }}
-                  />
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="nomExpediteur">Nom d&apos;expéditeur email</Label>
-              <Input
-                id="nomExpediteur"
-                value={nomExpediteurEmail}
-                onChange={(e) => setNomExpediteurEmail(e.target.value)}
-                placeholder="Ma Société"
-              />
-              <p className="text-xs text-muted-foreground">
-                Apparaît comme expéditeur des emails (ex: &quot;Ma
-                Société&quot;)
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="domaineEmail">Domaine email</Label>
-              <Input
-                id="domaineEmail"
-                value={domaineEmail}
-                onChange={(e) => setDomaineEmail(e.target.value)}
-                placeholder="masociete.ma"
-              />
-              <p className="text-xs text-muted-foreground">
-                Utilisé pour l&apos;adresse d&apos;envoi: noreply@domaine.ma
-              </p>
-            </div>
-
-            <Button type="submit" disabled={saving}>
-              {saving && <Loader2 className="mr-2 size-4 animate-spin" />}
-              <Save className="mr-2 size-4" />
-              Enregistrer
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-
-      {societe?.logoUrl && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Logo actuel</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <img
-              src={societe.logoUrl}
-              alt="Logo"
-              className="max-h-20 rounded-lg object-contain"
-            />
-          </CardContent>
-        </Card>
+      {loading ? (
+        <div className="flex items-center justify-center p-12">
+          <Loader2 className="size-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : (
+        <SocieteSettings
+          societe={societe}
+          nom={nom}
+          couleurPrimaire={couleurPrimaire}
+          nomExpediteurEmail={nomExpediteurEmail}
+          domaineEmail={domaineEmail}
+          saving={saving}
+          onNomChange={setNom}
+          onCouleurPrimaireChange={setCouleurPrimaire}
+          onNomExpediteurEmailChange={setNomExpediteurEmail}
+          onDomaineEmailChange={setDomaineEmail}
+          onSave={handleSave}
+        />
       )}
     </div>
   )
