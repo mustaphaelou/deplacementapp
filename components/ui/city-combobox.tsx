@@ -71,8 +71,8 @@ export function CityCombobox({
         <div className="relative flex items-center">
           <ComboboxPrimitive.Trigger
             className={cn(
-              "flex h-9 w-full items-center justify-between rounded-lg border border-input bg-transparent px-3 py-1.5 text-sm shadow-xs transition-[color,box-shadow] outline-none",
-              "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+              "flex h-9 w-full items-center justify-between rounded-[3px] border border-input bg-transparent px-3 py-1.5 text-sm transition-[box-shadow] outline-none",
+              "focus-visible:ring-1 focus-visible:ring-(--brand)",
               "aria-invalid:border-destructive aria-invalid:ring-destructive/20",
               "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
               error && "border-destructive"

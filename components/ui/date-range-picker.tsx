@@ -45,10 +45,10 @@ const classNames = {
   week: "flex",
   day: "flex-1 text-center p-px",
   day_button:
-    "size-8 border-none rounded-md bg-transparent cursor-pointer text-sm inline-flex items-center justify-center transition-colors hover:bg-muted",
-  today: "font-bold border border-border rounded-md",
+    "size-8 border-none rounded-[3px] bg-transparent cursor-pointer text-sm inline-flex items-center justify-center transition-colors hover:bg-muted",
+  today: "font-bold border border-border rounded-[3px]",
   selected:
-    "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground rounded-md",
+    "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground rounded-[3px]",
   disabled: "opacity-35 cursor-not-allowed hover:bg-transparent",
   outside: "opacity-30 pointer-events-none",
 }
@@ -71,9 +71,9 @@ export function DateRangePicker({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/20 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[3px] border p-3">
         <div className="flex flex-1 flex-col">
-          <span className="text-xs font-semibold text-muted-foreground uppercase">
+          <span className="text-xs font-medium text-muted-foreground uppercase">
             Départ
           </span>
           <span
@@ -99,7 +99,7 @@ export function DateRangePicker({
         )}
 
         <div className="flex flex-1 flex-col text-right">
-          <span className="text-xs font-semibold text-muted-foreground uppercase">
+          <span className="text-xs font-medium text-muted-foreground uppercase">
             Retour
           </span>
           <span
@@ -125,7 +125,7 @@ export function DateRangePicker({
         >
           <div
             className={cn(
-              "rounded-lg border p-3",
+              "rounded-[3px] border p-3",
               errorDepart && "border-destructive"
             )}
           >
@@ -154,7 +154,7 @@ export function DateRangePicker({
         >
           <div
             className={cn(
-              "rounded-lg border p-3",
+              "rounded-[3px] border p-3",
               errorRetour && "border-destructive"
             )}
           >
