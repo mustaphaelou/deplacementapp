@@ -11,14 +11,12 @@ import {
   CheckCircle,
   AlertCircle,
   Plus,
-  ArrowRight,
   ArrowUpRight,
   Building,
   type LucideIcon,
 } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { DashboardCard } from "@/components/ui/dashboard-card"
 import {
   Empty,
@@ -173,10 +171,10 @@ export function DashboardLayout({
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="group flex h-full flex-col gap-4 rounded-xl border bg-card p-5 shadow-sm transition-all hover:border-primary/40 hover:shadow-md"
+                  className="group flex h-full flex-col gap-4 rounded-xl border border-border bg-card p-5 transition-colors hover:bg-accent"
                 >
                   <div className="flex items-start justify-between">
-                    <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground [&_svg]:size-5">
+                    <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary [&_svg]:size-5">
                       <Icon />
                     </div>
                     <ArrowUpRight className="size-4 text-muted-foreground/40 transition-all group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-primary" />
@@ -193,59 +191,56 @@ export function DashboardLayout({
         </div>
       </section>
 
-      <Card>
-        <CardHeader className="flex-row items-center justify-between gap-4">
-          <CardTitle className="text-base">{config.table.title}</CardTitle>
-          <Button
-            variant="ghost"
-            size="sm"
-            render={<Link href={config.table.viewAllHref} />}
-            nativeButton={false}
+      <section>
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <h2 className="text-base font-semibold tracking-tight">
+            {config.table.title}
+          </h2>
+          <Link
+            href={config.table.viewAllHref}
+            className="text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             Voir toutes
-            <ArrowRight data-icon="inline-end" />
-          </Button>
-        </CardHeader>
-        <CardContent className="pt-0">
-          {demandes.length === 0 ? (
-            <Empty className="py-10">
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <ClipboardList />
-                </EmptyMedia>
-                <EmptyTitle>{config.table.title}</EmptyTitle>
-                <EmptyDescription>{config.table.emptyMessage}</EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
+          </Link>
+        </div>
+        {demandes.length === 0 ? (
+          <Empty className="py-10">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <ClipboardList />
+              </EmptyMedia>
+              <EmptyTitle>{config.table.title}</EmptyTitle>
+              <EmptyDescription>{config.table.emptyMessage}</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                {config.table.columns.map((col) => (
+                  <TableHead key={col.id} className={hideClassFor(col)}>
+                    {col.label}
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {demandes.map((d) => (
+                <TableRow key={d.id}>
                   {config.table.columns.map((col) => (
-                    <TableHead key={col.id} className={hideClassFor(col)}>
-                      {col.label}
-                    </TableHead>
+                    <TableCell
+                      key={col.id}
+                      className={cn(hideClassFor(col), "py-3")}
+                    >
+                      {cellRenderers[col.id](d)}
+                    </TableCell>
                   ))}
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {demandes.map((d) => (
-                  <TableRow key={d.id}>
-                    {config.table.columns.map((col) => (
-                      <TableCell
-                        key={col.id}
-                        className={cn(hideClassFor(col), "py-3")}
-                      >
-                        {cellRenderers[col.id](d)}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </section>
     </div>
   )
 }
