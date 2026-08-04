@@ -26,6 +26,7 @@ import { useAuthUser, signOut } from "@/lib/auth/client"
 import { ROLE_LABELS } from "@/lib/auth"
 import type { NavItem } from "@/lib/auth"
 import { NotificationBell } from "@/components/notification-bell"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 const iconMap: Record<string, LucideIcon> = {
   "bar-chart-3": BarChart3,
@@ -125,6 +126,7 @@ export function Sidebar({
           {societeNom}
         </span>
         <ChevronDown className="size-3 text-[#9B9A97]" />
+        <ThemeToggle />
         {closeNav ? (
           <button
             onClick={closeNav}

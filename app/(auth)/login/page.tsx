@@ -17,6 +17,7 @@ import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
 import { SetupWizard } from "./setup-wizard"
 import { DEFAULT_SOCIETE_NOM } from "@/lib/constants"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 interface Societe {
   nom: string
@@ -67,7 +68,8 @@ export default function LoginPage() {
 
   if (needsSetup === null) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-muted/30">
+      <div className="relative flex min-h-screen items-center justify-center bg-muted/30">
+        <ThemeToggle className="absolute top-4 right-4" />
         <Loader2 className="size-8 animate-spin text-muted-foreground" />
       </div>
     )
@@ -80,7 +82,8 @@ export default function LoginPage() {
   const initial = societe?.nom?.charAt(0)?.toUpperCase() ?? "?"
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
+    <div className="relative flex min-h-screen items-center justify-center bg-muted/30 p-4">
+      <ThemeToggle className="absolute top-4 right-4" />
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <div className="mb-2 flex justify-center">

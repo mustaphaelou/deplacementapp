@@ -6,6 +6,7 @@ import { NotificationProvider } from "@/components/notification-context"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import { Button } from "@/components/ui/button"
 import { Menu as MenuIcon } from "lucide-react"
+import { ThemeToggle } from "@/components/theme-toggle"
 import {
   readCollapsed,
   subscribeToCollapse,
@@ -86,7 +87,7 @@ export function DashboardShell({
 
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           {/* Mobile top bar — drawer toggle only; pages own the rest */}
-          <div className="flex h-14 shrink-0 items-center border-b bg-background px-4 md:hidden">
+          <div className="flex h-14 shrink-0 items-center justify-between border-b bg-background px-4 md:hidden">
             <Button
               variant="ghost"
               size="icon"
@@ -96,6 +97,7 @@ export function DashboardShell({
             >
               <MenuIcon className="size-5" />
             </Button>
+            <ThemeToggle />
           </div>
           <main className="flex-1 overflow-y-auto bg-background p-4 md:p-6">
             {children}
