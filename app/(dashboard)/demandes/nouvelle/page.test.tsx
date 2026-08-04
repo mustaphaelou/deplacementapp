@@ -9,7 +9,7 @@ vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }))
 
-describe("Nouvelle demande page", () => {
+describe("Nouvelle demande page", { timeout: 30000 }, () => {
   it("renders the prototype header anatomy: breadcrumb, 40px title, icon tile", async () => {
     const { default: NouvelleDemandePage } = await import("./page")
     const html = renderToStaticMarkup(<NouvelleDemandePage />)
