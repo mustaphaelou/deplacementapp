@@ -35,7 +35,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-Mmmm2005.}@db:5432/${POSTGRES_DB:-deplacementapp}
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-dev-only-secret-0123456789-abcdefghijklmnopqrstuvwxyz}
-      - BETTER_AUTH_URL=http://localhost:3000
+      - BETTER_AUTH_URL=${BETTER_AUTH_URL:-http://localhost:3000}
       - SMTP_HOST=${SMTP_HOST:-localhost}
       - SMTP_PORT=${SMTP_PORT:-1025}
       - SMTP_USER=${SMTP_USER:-}

@@ -31,6 +31,7 @@ error.log
 
 # env files
 .env
+.env.coolify
 .env*.local
 
 # typescript
