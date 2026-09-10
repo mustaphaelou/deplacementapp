@@ -220,6 +220,21 @@ export function DemandeDetail({
               </Badge>
             )}
           </div>
+          {/* Etape and Decision are distinct concepts (CONTEXT.md): where the
+              demande is in the pipeline vs what was decided there. They are
+              shown as separate values, never collapsed into one status. */}
+          <div className="mt-5 flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Étape</span>
+            <span className="text-right font-medium">
+              {ETAPE_LABELS[demande.etape] ?? demande.etape}
+            </span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Décision</span>
+            <span className="text-right font-medium">
+              {DECISION_LABELS[demande.decision] ?? demande.decision}
+            </span>
+          </div>
         </section>
 
         {/* Informations employé */}

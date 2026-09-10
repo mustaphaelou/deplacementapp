@@ -3,23 +3,24 @@ import type { DrizzleDb } from "../../db"
 import { db } from "../../db"
 import { societes } from "../../db/schema/societes"
 import { logAudit } from "../audit"
+import type { SocieteUpdate } from "../schemas"
 
 let cachedIdentity: SocieteIdentity | null = null
-let warnedOnce = false
+let warnedIdentityOnce = false
+let warnedBrandingOnce = false
 
 export interface SocieteIdentity {
   nomExpediteurEmail: string
   domaineEmail: string
 }
 
+/** Visual identity fields of the Societe (see IdentiteVisuelle in CONTEXT.md). */
 export interface SocieteBranding {
   id: string
   nom: string
   logoUrl: string | null
   faviconUrl: string | null
   couleurPrimaire: string | null
-  nomExpediteurEmail: string | null
-  domaineEmail: string | null
 }
 
 export async function getSocieteBranding(
@@ -37,16 +38,12 @@ export async function getSocieteBranding(
       .from(societes)
       .limit(1)
 
-    if (!result) return null
-
-    const identity = await loadSocieteIdentity(dbArg)
-
-    return {
-      ...result,
-      nomExpediteurEmail: identity.nomExpediteurEmail,
-      domaineEmail: identity.domaineEmail,
-    }
+    return result ?? null
   } catch {
+    if (!warnedBrandingOnce) {
+      console.warn("[SocieteBranding] Database unreachable — returning null")
+      warnedBrandingOnce = true
+    }
     return null
   }
 }
@@ -69,11 +66,11 @@ export async function loadSocieteIdentity(
 
     return getEnvFallback()
   } catch {
-    if (!warnedOnce) {
+    if (!warnedIdentityOnce) {
       console.warn(
         "[SocieteIdentity] Database unreachable — using SMTP env fallback"
       )
-      warnedOnce = true
+      warnedIdentityOnce = true
     }
     return getEnvFallback()
   }
@@ -89,55 +86,79 @@ function getEnvFallback(): SocieteIdentity {
 
 export function clearSocieteCache(): void {
   cachedIdentity = null
-  warnedOnce = false
+  warnedIdentityOnce = false
+  warnedBrandingOnce = false
 }
 
+/**
+ * Raw Societe row reader for the authenticated management surface
+ * (ADR-0012: the composed `noreply@<domain>` identity stays inside
+ * loadSocieteIdentity; the management page needs the stored column values).
+ */
+export async function getSocieteRow(
+  dbArg: DrizzleDb = db
+): Promise<
+  | (SocieteBranding & {
+      nomExpediteurEmail: string | null
+      domaineEmail: string | null
+    })
+  | null
+> {
+  const [row] = await dbArg.select().from(societes).limit(1)
+  if (!row) return null
+  return {
+    id: row.id,
+    nom: row.nom,
+    logoUrl: row.logoUrl,
+    faviconUrl: row.faviconUrl,
+    couleurPrimaire: row.couleurPrimaire,
+    nomExpediteurEmail: row.nomExpediteurEmail,
+    domaineEmail: row.domaineEmail,
+  }
+}
+
+/**
+ * Mutation writer for the Societe (ADR-0012): the row write and the
+ * JournalAudit entry run inside one `db.transaction` — JournalAudit records
+ * *committed* state changes — and the in-memory identity cache is cleared
+ * only after the transaction commits.
+ */
 export async function updateSociete(
-  changes: Record<string, unknown>,
+  changes: SocieteUpdate,
   actorId: string,
   dbArg: DrizzleDb = db
-): Promise<Record<string, unknown>> {
+): Promise<SocieteUpdate> {
   const [societe] = await dbArg.select().from(societes).limit(1)
   if (!societe) {
     throw new Error("Aucune société configurée")
   }
 
-  const allowed = [
-    "nom",
-    "logoUrl",
-    "faviconUrl",
-    "couleurPrimaire",
-    "nomExpediteurEmail",
-    "domaineEmail",
-  ]
-  const cleanChanges: Record<string, unknown> = {}
-  for (const key of allowed) {
-    if (key in changes) {
-      cleanChanges[key] = changes[key]
-    }
-  }
-
+  // Primary validation lives in societeUpdateSchema (route layer); this
+  // defensive check keeps the writer from issuing an empty UPDATE.
+  const cleanChanges: SocieteUpdate = { ...changes }
   if (Object.keys(cleanChanges).length === 0) {
     throw new Error("Aucune donnée à mettre à jour")
   }
 
-  await dbArg
-    .update(societes)
-    .set(cleanChanges)
-    .where(eq(societes.id, societe.id))
+  await dbArg.transaction(async (tx) => {
+    await tx
+      .update(societes)
+      .set(cleanChanges)
+      .where(eq(societes.id, societe.id))
+
+    await logAudit(
+      {
+        utilisateurId: actorId,
+        action: "MODIFIER_SOCIETE",
+        entite: "Societe",
+        entiteId: societe.id,
+        details: { changes: Object.keys(cleanChanges) },
+      },
+      tx
+    )
+  })
 
   clearSocieteCache()
-
-  await logAudit(
-    {
-      utilisateurId: actorId,
-      action: "MODIFIER_SOCIETE",
-      entite: "Societe",
-      entiteId: societe.id,
-      details: { changes: Object.keys(cleanChanges) },
-    },
-    dbArg
-  )
 
   return cleanChanges
 }

@@ -1,6 +1,35 @@
 import { z } from "zod"
 import { isValidCity } from "@/lib/cities-morocco"
 
+// ADR-0012 — Societe PATCH validation: unknown keys are a 400 (strict), and
+// at least one field must be present. `couleurPrimaire` accepts null so the
+// management form can clear an accidentally-set brand colour.
+export const societeUpdateSchema = z
+  .object({
+    nom: z.string().min(1, "Nom requis").optional(),
+    logoUrl: z.string().nullable().optional(),
+    faviconUrl: z.string().nullable().optional(),
+    couleurPrimaire: z
+      .string()
+      .regex(/^#[0-9a-fA-F]{6}$/, "Couleur invalide (format #RRGGBB)")
+      .nullable()
+      .optional(),
+    nomExpediteurEmail: z.string().min(1, "Nom d'expéditeur requis").optional(),
+    domaineEmail: z
+      .string()
+      .min(1, "Domaine email requis")
+      .regex(
+        /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$/,
+        "Domaine email invalide"
+      )
+      .optional(),
+  })
+  .strict()
+  .refine((d) => Object.keys(d).length > 0, {
+    message: "Aucune donnée à mettre à jour",
+  })
+export type SocieteUpdate = z.infer<typeof societeUpdateSchema>
+
 export const loginSchema = z.object({
   email: z.string().email("Email invalide"),
   password: z.string().min(1, "Mot de passe requis"),

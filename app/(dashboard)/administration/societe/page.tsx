@@ -211,14 +211,25 @@ export default function SocietePage() {
   const [domaineEmail, setDomaineEmail] = useState("")
 
   useEffect(() => {
-    fetch("/api/societe")
-      .then((r) => r.json())
-      .then((data) => {
-        setSociete(data)
-        setNom(data.nom ?? "")
-        setCouleurPrimaire(data.couleurPrimaire ?? "")
-        setNomExpediteurEmail(data.nomExpediteurEmail ?? "")
-        setDomaineEmail(data.domaineEmail ?? "")
+    // ADR-0012: the management page reads the visual fields from the public
+    // reader and the email identity from the authenticated raw-row reader, so
+    // the form round-trips the stored DomaineEmail (never the composed
+    // noreply@<domain> sender address).
+    Promise.all([
+      fetch("/api/societe").then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/societe/identity").then((r) => (r.ok ? r.json() : null)),
+    ])
+      .then(([visual, identity]) => {
+        const data = { ...(visual ?? {}), ...(identity ?? {}) } as Societe
+        if (!data.nom && !visual && !identity) {
+          setSociete(null)
+        } else {
+          setSociete(data)
+          setNom(data.nom ?? "")
+          setCouleurPrimaire(data.couleurPrimaire ?? "")
+          setNomExpediteurEmail(data.nomExpediteurEmail ?? "")
+          setDomaineEmail(data.domaineEmail ?? "")
+        }
       })
       .catch(() => toast.error("Erreur lors du chargement"))
       .finally(() => setLoading(false))

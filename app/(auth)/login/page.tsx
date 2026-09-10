@@ -112,7 +112,10 @@ function BrandPanel({ societe }: { societe: Societe | null }) {
             className="size-9 rounded-lg object-contain"
           />
         ) : (
-          <div className="flex size-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-cyan-400 font-bold">
+          // IdentiteVisuelle: the fallback mark takes the Societe's primary
+          // colour through the --brand custom property (BrandProvider), with
+          // the theme primary as fallback when no couleurPrimaire is set.
+          <div className="flex size-9 items-center justify-center rounded-lg bg-(--brand) font-bold">
             {initial}
           </div>
         )}
@@ -266,7 +269,7 @@ export function LoginForm({ societe }: { societe: Societe | null }) {
                   className="size-9 rounded-lg object-contain"
                 />
               ) : (
-                <div className="flex size-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-cyan-400 text-sm font-bold">
+                <div className="flex size-9 items-center justify-center rounded-lg bg-(--brand) text-sm font-bold">
                   {initial}
                 </div>
               )}

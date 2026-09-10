@@ -26,8 +26,6 @@ const branding: SocieteBranding = {
   logoUrl: "/logo.png",
   faviconUrl: "/favicon.ico",
   couleurPrimaire: "#0055aa",
-  nomExpediteurEmail: "Acme",
-  domaineEmail: "acme.ma",
 }
 
 function fakeRenderer(

@@ -7,6 +7,7 @@ import type { PgliteDb } from "../test/create-pglite-db"
 import { journalAudit } from "../../db/schema/journal-audit"
 import {
   getSocieteBranding,
+  getSocieteRow,
   loadSocieteIdentity,
   updateSociete,
   clearSocieteCache,
@@ -126,7 +127,7 @@ describe("Societe module", { timeout: TIMEOUT }, () => {
   })
 
   describe("getSocieteBranding", () => {
-    it("returns SocieteBranding from DB row", async () => {
+    it("returns the visual identity fields from the Societe row", async () => {
       await pgliteDb.insert(schema.societes).values({
         id: "b1",
         nom: "Brand Corp",
@@ -138,6 +139,8 @@ describe("Societe module", { timeout: TIMEOUT }, () => {
         modifieLe: new Date(),
       })
 
+      // ADR-0012: the public reader carries IdentiteVisuelle only — never the
+      // EmailSender identity fields.
       const branding = await getSocieteBranding()
       expect(branding).toEqual<SocieteBranding>({
         id: "b1",
@@ -145,8 +148,6 @@ describe("Societe module", { timeout: TIMEOUT }, () => {
         logoUrl: "/logo.png",
         faviconUrl: "/favicon.ico",
         couleurPrimaire: "#ff0000",
-        nomExpediteurEmail: "Brand Sender",
-        domaineEmail: "noreply@brand.ma",
       })
     })
 
@@ -155,23 +156,50 @@ describe("Societe module", { timeout: TIMEOUT }, () => {
       expect(branding).toBeNull()
     })
 
-    it("falls back to env defaults for identity fields when DB has null email fields", async () => {
+    it("does not include email identity fields even when set on the row", async () => {
       await pgliteDb.insert(schema.societes).values({
         id: "b2",
         nom: "Partial Brand",
         logoUrl: null,
         faviconUrl: null,
         couleurPrimaire: null,
+        nomExpediteurEmail: "Secret Sender",
+        domaineEmail: "secret.ma",
         modifieLe: new Date(),
       })
 
       const branding = await getSocieteBranding()
-      expect(branding).toMatchObject({
-        id: "b2",
-        nom: "Partial Brand",
-        nomExpediteurEmail: "Notification",
-        domaineEmail: "noreply@exemple.ma",
+      expect(branding).not.toHaveProperty("nomExpediteurEmail")
+      expect(branding).not.toHaveProperty("domaineEmail")
+    })
+  })
+
+  describe("getSocieteRow", () => {
+    it("returns the raw row including stored NomExpediteurEmail and DomaineEmail", async () => {
+      await pgliteDb.insert(schema.societes).values({
+        id: "r1",
+        nom: "Row Corp",
+        couleurPrimaire: "#00ff00",
+        nomExpediteurEmail: "Raw Sender",
+        domaineEmail: "raw.ma",
+        modifieLe: new Date(),
       })
+
+      const row = await getSocieteRow()
+      expect(row).toEqual({
+        id: "r1",
+        nom: "Row Corp",
+        logoUrl: null,
+        faviconUrl: null,
+        couleurPrimaire: "#00ff00",
+        // Raw stored values — NOT the composed noreply@<domain> identity.
+        nomExpediteurEmail: "Raw Sender",
+        domaineEmail: "raw.ma",
+      })
+    })
+
+    it("returns null when no Societe row exists", async () => {
+      expect(await getSocieteRow()).toBeNull()
     })
   })
 
@@ -232,6 +260,34 @@ describe("Societe module", { timeout: TIMEOUT }, () => {
       expect(row.nomExpediteurEmail).toBe("New Sender")
     })
 
+    it("writes the row and the JournalAudit entry in one transaction (both or neither)", async () => {
+      // ADR-0012: the audit row exists for a committed change…
+      await updateSociete({ nom: "Atomic Name" }, actorId)
+      const auditRows = await pgliteDb
+        .select()
+        .from(journalAudit)
+        .where(eq(journalAudit.entite, "Societe"))
+      expect(auditRows).toHaveLength(1)
+      expect(auditRows[0].utilisateurId).toBe(actorId)
+
+      // …and when the audit write fails, the row write rolls back with it.
+      // (`updateSociete` throws when the acting utilisateur no longer exists —
+      // the transaction aborts, so the row keeps its previous value.)
+      await pgliteDb.execute(sql`DELETE FROM journal_audit`)
+      await pgliteDb.execute(
+        sql`DELETE FROM utilisateurs WHERE id = ${actorId}`
+      )
+
+      await expect(
+        updateSociete({ nom: "Should Roll Back" }, actorId)
+      ).rejects.toThrow()
+      const [row] = await pgliteDb
+        .select()
+        .from(schema.societes)
+        .where(eq(schema.societes.id, societeId))
+      expect(row.nom).toBe("Atomic Name")
+    })
+
     it("invalidates cached identity after update", async () => {
       await loadSocieteIdentity()
       await updateSociete(
@@ -275,15 +331,15 @@ describe("Societe module", { timeout: TIMEOUT }, () => {
       ).rejects.toThrow("Aucune société configurée")
     })
 
-    it("throws when no allowed fields are provided", async () => {
-      await expect(
-        updateSociete({ unknownField: "value" }, actorId)
-      ).rejects.toThrow("Aucune donnée à mettre à jour")
+    it("rejects an empty change-set (route validation lives in societeUpdateSchema, ADR-0012)", async () => {
+      await expect(updateSociete({} as never, actorId)).rejects.toThrow(
+        "Aucune donnée à mettre à jour"
+      )
     })
 
-    it("only updates allowed fields", async () => {
+    it("ignores unknown keys instead of persisting them (defense in depth behind .strict())", async () => {
       await updateSociete(
-        { nom: "Updated", unknownField: "should be ignored" } as any,
+        { nom: "Updated", unknownField: "should be ignored" } as never,
         actorId
       )
 
