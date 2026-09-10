@@ -4,7 +4,10 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-Mmmm2005.}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev-only-change-me}
+    # NOTES.md watch-out: the previous default was a real-looking password.
+    # This placeholder is NOT a secret — set a strong POSTGRES_PASSWORD for any
+    # non-throwaway deployment (Coolify injects it via environment).
       POSTGRES_DB: ${POSTGRES_DB:-deplacementapp}
     volumes:
       - pgdata:/var/lib/postgresql/data

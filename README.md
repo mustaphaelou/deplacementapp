@@ -169,9 +169,13 @@ Uploads (such as avatars) persist automatically in named volumes.
 │   ├── demande/             # Hexagonal architecture (ports, adapters, state machine)
 │   │   ├── effets-transition.ts # Transition side-effects seam (JournalAudit + Notifications)
 │   │   └── ...
+│   ├── auth/                # Session, Better Auth wiring, Role definitions
+│   ├── workflow.ts          # Etape/Decision state machine & transition guards
+│   ├── notification/        # Notification module (rows-only dispatchRows, AccuseLecture)
+│   ├── societe/             # Societe module (IdentiteVisuelle, email identity)
 │   ├── email-sender.ts      # EmailSender module (SMTP transport & identity resolution)
 │   ├── audit.ts             # JournalAudit logger (logAudit)
-│   └── authorization.ts     # Role-based access control rules
+│   └── ...
 ├── db/                      # Drizzle ORM schema, migrations & seed scripts
 ├── CONTEXT.md               # Strict domain glossary & ubiquitous language
 └── Dockerfile               # Multi-stage container build (migrator, runner)
