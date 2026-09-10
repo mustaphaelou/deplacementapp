@@ -472,6 +472,105 @@ describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT }, () => {
       ).rejects.toThrow("Action non autorisee")
     })
 
+    // CONTEXT.md — Decision: APPROVED, REJECTED and WITHDRAWN are terminal.
+    // The frozen row must keep the Etape where the terminal Decision was
+    // recorded (no move to a new stage), and no role may transition it again.
+    it("a REJECTED demande freezes at the rejecting Etape and cannot be resubmitted", async () => {
+      const demande = await createDraftDemande()
+      await executeTransition({
+        demandeId: demande.id,
+        action: "submit",
+        actor: { id: employeeId, role: "EMPLOYEE" },
+      })
+      const rejected = await executeTransition({
+        demandeId: demande.id,
+        action: "rejeter",
+        actor: { id: managerId, role: "MANAGER" },
+        comment: "Budget indisponible",
+      })
+      expect(rejected.etape).toBe("MANAGER_REVIEW")
+      expect(rejected.decision).toBe("REJECTED")
+      expect(rejected.assigneAId).toBe(managerId)
+
+      await expect(
+        executeTransition({
+          demandeId: demande.id,
+          action: "submit",
+          actor: { id: employeeId, role: "EMPLOYEE" },
+        })
+      ).rejects.toThrow("Action non autorisee")
+      await expect(
+        executeTransition({
+          demandeId: demande.id,
+          action: "approuver",
+          actor: { id: managerId, role: "MANAGER" },
+        })
+      ).rejects.toThrow("Action non autorisee")
+      await expect(
+        executeTransition({
+          demandeId: demande.id,
+          action: "retirer",
+          actor: { id: employeeId, role: "EMPLOYEE" },
+        })
+      ).rejects.toThrow("Action non autorisee")
+    })
+
+    it("a finally-approved demande (FINAL + APPROVED) is frozen for every role", async () => {
+      const demande = await createDraftDemande()
+      await executeTransition({
+        demandeId: demande.id,
+        action: "submit",
+        actor: { id: employeeId, role: "EMPLOYEE" },
+      })
+      const finalDemande = await executeTransition({
+        demandeId: demande.id,
+        action: "approuver",
+        actor: { id: managerId, role: "MANAGER" },
+      })
+      expect(finalDemande.assigneAId).toBe(managerId)
+      await executeTransition({
+        demandeId: demande.id,
+        action: "approuver",
+        actor: { id: financeAdminId, role: "FINANCE_ADMIN" },
+      })
+      const approved = await executeTransition({
+        demandeId: demande.id,
+        action: "approuver",
+        actor: { id: directionId, role: "GENERAL_DIRECTION" },
+      })
+      expect(approved.etape).toBe("FINAL")
+      expect(approved.decision).toBe("APPROVED")
+      // Assignataire: the GENERAL_DIRECTION member who gave the final approval
+      expect(approved.assigneAId).toBe(directionId)
+
+      for (const attempt of [
+        {
+          action: "submit" as const,
+          actor: { id: employeeId, role: "EMPLOYEE" as const },
+        },
+        {
+          action: "retirer" as const,
+          actor: { id: employeeId, role: "EMPLOYEE" as const },
+        },
+        {
+          action: "approuver" as const,
+          actor: { id: managerId, role: "MANAGER" as const },
+        },
+        {
+          action: "rejeter" as const,
+          actor: { id: financeAdminId, role: "FINANCE_ADMIN" as const },
+        },
+        {
+          action: "approuver" as const,
+          actor: { id: directionId, role: "GENERAL_DIRECTION" as const },
+        },
+      ]) {
+        await expect(
+          executeTransition({ demandeId: demande.id, ...attempt })
+        ).rejects.toThrow("Action non autorisee")
+      }
+    })
+
     it("FINAL stage blocks all transitions", async () => {
       const demande = await createDraftDemande()
       await executeTransition({

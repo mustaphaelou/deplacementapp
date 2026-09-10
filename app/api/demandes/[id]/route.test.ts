@@ -141,4 +141,30 @@ describe("GET /api/demandes/[id]", () => {
     const body = await response.json()
     expect(body.error).toBe("Demande introuvable")
   })
+
+  // VisibiliteDemande: a foreign demande (outside visibility) and a missing
+  // demande must be indistinguishable at the API boundary — same status code
+  // and identical error payload, so existence is never leaked.
+  it("responds identically for a missing demande and a foreign demande", async () => {
+    const { requireAuth } = await import("@/lib/auth/server")
+    const { findById } = await import("@/lib/demande")
+
+    ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
+    ;(findById as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new DemandeNotFoundError()
+    )
+
+    const { GET } = await import("./route")
+
+    const missingResponse = await GET(mockRequest("does-not-exist"), {
+      params: Promise.resolve({ id: "does-not-exist" }),
+    })
+    const foreignResponse = await GET(mockRequest("d-foreign"), {
+      params: Promise.resolve({ id: "d-foreign" }),
+    })
+
+    expect(missingResponse.status).toBe(404)
+    expect(foreignResponse.status).toBe(404)
+    expect(await missingResponse.json()).toEqual(await foreignResponse.json())
+  })
 })

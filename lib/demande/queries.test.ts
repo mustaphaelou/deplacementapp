@@ -292,6 +292,31 @@ describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT }, () => {
       })
       expect(otherEmployeeDemande.id).toBe(secondEmployeeDraftId)
     })
+
+    // VisibiliteDemande: viewing a demande outside one's visibility must be
+    // indistinguishable from viewing a nonexistent demande (existence is
+    // never leaked) — same error class, same message.
+    it("EMPLOYEE cannot distinguish a foreign demande from a missing one", async () => {
+      const asError = (e: unknown): DemandeNotFoundError =>
+        e as DemandeNotFoundError
+
+      const foreignError = asError(
+        await findById(secondEmployeeDraftId, {
+          id: employeeId,
+          role: "EMPLOYEE",
+        }).catch((e: unknown) => e)
+      )
+      const missingError = asError(
+        await findById("no-such-demande", {
+          id: employeeId,
+          role: "EMPLOYEE",
+        }).catch((e: unknown) => e)
+      )
+
+      expect(foreignError).toBeInstanceOf(DemandeNotFoundError)
+      expect(missingError).toBeInstanceOf(DemandeNotFoundError)
+      expect(foreignError.message).toBe(missingError.message)
+    })
   })
 
   // ─── findMany ──────────────────────────────────────────────────────

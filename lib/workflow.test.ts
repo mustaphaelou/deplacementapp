@@ -203,6 +203,73 @@ describe("canTransition", () => {
       false
     )
   })
+
+  // CONTEXT.md — Decision: APPROVED, REJECTED, and WITHDRAWN are terminal;
+  // once recorded, the DemandeDeplacement cannot transition, be edited, or be
+  // resubmitted. A final-approved demande (Etape FINAL + Decision APPROVED)
+  // freezes for every role and every action.
+  it.each([
+    ["EMPLOYEE", "DRAFT", "submit"],
+    ["EMPLOYEE", "DRAFT", "retirer"],
+    ["MANAGER", "MANAGER_REVIEW", "approuver"],
+    ["FINANCE_ADMIN", "FINANCE_REVIEW", "rejeter"],
+    ["GENERAL_DIRECTION", "DIRECTION_REVIEW", "approuver"],
+  ] as const)(
+    "denies %s from acting with %s on a demande whose Decision is APPROVED",
+    (role, etape, action) => {
+      expect(canTransition(role, etape, action, "APPROVED")).toBe(false)
+      expect(
+        buildTransition(role, etape, action, { decision: "APPROVED" })
+      ).toBeNull()
+    }
+  )
+
+  it("reports TERMINAL for an APPROVED decision at a stage a role can act on", () => {
+    expect(
+      checkTransition("MANAGER", "MANAGER_REVIEW", "rejeter", "APPROVED")
+    ).toEqual({ ok: false, reason: "TERMINAL" })
+    expect(
+      checkTransition(
+        "GENERAL_DIRECTION",
+        "DIRECTION_REVIEW",
+        "approuver",
+        "APPROVED"
+      )
+    ).toEqual({ ok: false, reason: "TERMINAL" })
+  })
+
+  // At FINAL no role may act at all (stage has no roleCanAct), so the guard
+  // denies before the terminal check — but the outcome is the same: an
+  // APPROVED demande is never actionable, at any Etape, by any role.
+  it("never allows any action once the Decision is APPROVED, across the tuple space", () => {
+    const roles: Role[] = [
+      "EMPLOYEE",
+      "MANAGER",
+      "FINANCE_ADMIN",
+      "GENERAL_DIRECTION",
+    ]
+    const etapes: Etape[] = [
+      "DRAFT",
+      "MANAGER_REVIEW",
+      "FINANCE_REVIEW",
+      "DIRECTION_REVIEW",
+      "FINAL",
+    ]
+    const actions: WorkflowAction[] = [
+      "submit",
+      "approuver",
+      "rejeter",
+      "retirer",
+    ]
+    for (const role of roles) {
+      for (const etape of etapes) {
+        for (const action of actions) {
+          const result = checkTransition(role, etape, action, "APPROVED")
+          expect(result.ok).toBe(false)
+        }
+      }
+    }
+  })
 })
 
 // ─── buildTransition (Etape-based) ───────────────────────────────────────────
@@ -400,18 +467,18 @@ describe("getAllowedActions", () => {
 
 describe("checkTransition", () => {
   it("reports ok for an EMPLOYEE submitting from DRAFT", () => {
-    expect(checkTransition("EMPLOYEE", "DRAFT", "submit", "PENDING", true)).toEqual(
-      { ok: true }
-    )
+    expect(
+      checkTransition("EMPLOYEE", "DRAFT", "submit", "PENDING", true)
+    ).toEqual({ ok: true })
   })
 
   it("reports NOT_OWNER for a non-owner submit or retirer", () => {
-    expect(checkTransition("EMPLOYEE", "DRAFT", "submit", "PENDING", false)).toEqual(
-      { ok: false, reason: "NOT_OWNER" }
-    )
-    expect(checkTransition("EMPLOYEE", "DRAFT", "retirer", "PENDING", false)).toEqual(
-      { ok: false, reason: "NOT_OWNER" }
-    )
+    expect(
+      checkTransition("EMPLOYEE", "DRAFT", "submit", "PENDING", false)
+    ).toEqual({ ok: false, reason: "NOT_OWNER" })
+    expect(
+      checkTransition("EMPLOYEE", "DRAFT", "retirer", "PENDING", false)
+    ).toEqual({ ok: false, reason: "NOT_OWNER" })
   })
 
   it("reports TERMINAL for a terminal decision regardless of role", () => {
@@ -433,14 +500,26 @@ describe("checkTransition", () => {
   })
 
   it("reports WRONG_ROLE for a role that cannot act on the stage", () => {
-    expect(checkTransition("MANAGER", "DRAFT", "submit", "PENDING", true)).toEqual(
-      { ok: false, reason: "WRONG_ROLE" }
-    )
     expect(
-      checkTransition("EMPLOYEE", "MANAGER_REVIEW", "approuver", "PENDING", true)
+      checkTransition("MANAGER", "DRAFT", "submit", "PENDING", true)
     ).toEqual({ ok: false, reason: "WRONG_ROLE" })
     expect(
-      checkTransition("GENERAL_DIRECTION", "FINAL", "approuver", "PENDING", true)
+      checkTransition(
+        "EMPLOYEE",
+        "MANAGER_REVIEW",
+        "approuver",
+        "PENDING",
+        true
+      )
+    ).toEqual({ ok: false, reason: "WRONG_ROLE" })
+    expect(
+      checkTransition(
+        "GENERAL_DIRECTION",
+        "FINAL",
+        "approuver",
+        "PENDING",
+        true
+      )
     ).toEqual({ ok: false, reason: "WRONG_ROLE" })
   })
 })
@@ -461,7 +540,12 @@ describe("guard engine sweep", () => {
     "DIRECTION_REVIEW",
     "FINAL",
   ]
-  const actions: WorkflowAction[] = ["submit", "approuver", "rejeter", "retirer"]
+  const actions: WorkflowAction[] = [
+    "submit",
+    "approuver",
+    "rejeter",
+    "retirer",
+  ]
   const decisions: (Decision | undefined)[] = [
     "PENDING",
     "APPROVED",
@@ -506,19 +590,11 @@ describe("guard engine sweep", () => {
 
   it("both public functions are owner-neutral projections of checkTransition", () => {
     sweepTransitionSpace((role, etape, action, decision) => {
-      const ownerNeutral = checkTransition(
-        role,
-        etape,
-        action,
-        decision,
-        true
-      )
-      expect(canTransition(role, etape, action, decision)).toBe(
+      const ownerNeutral = checkTransition(role, etape, action, decision, true)
+      expect(canTransition(role, etape, action, decision)).toBe(ownerNeutral.ok)
+      expect(buildTransition(role, etape, action, { decision }) !== null).toBe(
         ownerNeutral.ok
       )
-      expect(
-        buildTransition(role, etape, action, { decision }) !== null
-      ).toBe(ownerNeutral.ok)
     })
   })
 
