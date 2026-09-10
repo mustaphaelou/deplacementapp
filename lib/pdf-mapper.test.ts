@@ -159,8 +159,6 @@ describe("toPdfRenderData", () => {
       logoUrl: "/logo.png",
       faviconUrl: "/favicon.ico",
       couleurPrimaire: "#0055aa",
-      nomExpediteurEmail: "Acme",
-      domaineEmail: "acme.ma",
     })
 
     expect(result.branding).toEqual({
@@ -177,8 +175,6 @@ describe("toPdfRenderData", () => {
       logoUrl: null,
       faviconUrl: null,
       couleurPrimaire: null,
-      nomExpediteurEmail: "Acme",
-      domaineEmail: "acme.ma",
     })
 
     expect(result.branding).toEqual({ nom: "Acme SARL", couleurPrimaire: null })
