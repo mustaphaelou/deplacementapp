@@ -87,6 +87,10 @@ _Avoid_: Approver, assigné, assignee, last-actor
 The rule determining which DemandesDeplacement a Utilisateur can view. An EMPLOYEE sees only the demandes they created; MANAGER, FINANCE_ADMIN, and GENERAL_DIRECTION see all demandes in the instance. The rule is owned by the demande query module and enforced in the WHERE clause of every read; viewing a demande outside one's visibility is indistinguishable from viewing a nonexistent demande (existence is never leaked).
 _Avoid_: row-level security, permissions matrix, access control list
 
+**DemandePresentation (Demande Presentation)**:
+The module (`lib/demande-presentation.ts`) that owns how a DemandeDeplacement's Etape and Decision are displayed. It is the single home of the Etape and Decision labels, the stage order (derived from `PIPELINE` in the workflow module, never re-declared), the Decision outcome (pending / approved / rejected / withdrawn), the semantic tone (neutral / pending / success / danger), the pipeline strip as steps with past / current / upcoming state, and the compact decision-first label — a rejection names the stage where it happened ("Rejetée (Manager)" / "Rejetée (Finance)" / "Rejetée (Direction)"), an approval reads "Approuvée", a withdrawal "Retirée", otherwise the Etape label. Every surface that shows a demande's Etape or Decision reads from `toDemandePresentation(demande)`.
+_Avoid_: Status, statut, per-surface status mappings
+
 **Notification**:
 A message sent to a Utilisateur about a DemandeDeplacement event, delivered via both an in-app alert and an email. MANAGER notifications are scoped to the employee's Departement; FINANCE_ADMIN and GENERAL_DIRECTION notifications are org-wide. The Notification module is the single writer of notification rows — via `dispatch` (rows + email) and the rows-only `dispatchRows` — no other module writes them directly.
 

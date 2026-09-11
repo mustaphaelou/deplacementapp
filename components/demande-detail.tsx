@@ -21,9 +21,8 @@ import {
   formatDate,
   formatDateTime,
   TRANSPORT_LABELS,
-  ETAPE_LABELS,
-  DECISION_LABELS,
 } from "@/lib/constants"
+import { ETAPE_LABELS, DECISION_LABELS } from "@/lib/demande-presentation"
 import { parseMotif } from "@/lib/demande-types"
 import type { DemandeDetail } from "@/lib/demande-types"
 import {
