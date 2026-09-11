@@ -159,6 +159,32 @@ describe("Imprimer page", () => {
     )
   })
 
+  it("renders explicit Étape and Décision lines for a terminal Decision", async () => {
+    const { getAuthUser } = await import("@/lib/auth/server")
+    const { findById: mockFindById } = await import("@/lib/demande")
+    const { getSocieteBranding } = await import("@/lib/societe")
+
+    ;(getAuthUser as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser())
+    ;(mockFindById as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ...mockDemande,
+      etape: "FINANCE_REVIEW",
+      decision: "REJECTED",
+    })
+    ;(getSocieteBranding as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockBranding()
+    )
+
+    const { default: ImprimerPage } = await import("./page")
+    const element = await ImprimerPage({
+      params: Promise.resolve({ id: "d-1" }),
+    })
+
+    const text = collectText(element)
+    // Where the demande is and what was decided there are two facts on paper.
+    expect(text).toMatch(/Étape\s*:\s*En attente \(Finance\)/)
+    expect(text).toMatch(/Décision\s*:\s*Rejetée/)
+  })
+
   it("renders the societe nom, logo, and couleurPrimaire accent in the header", async () => {
     const { getAuthUser } = await import("@/lib/auth/server")
     const { findById: mockFindById } = await import("@/lib/demande")
