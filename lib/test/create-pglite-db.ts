@@ -15,7 +15,12 @@ interface JournalEntry {
   tag: string
 }
 
-function migrationTags(): string[] {
+/**
+ * The migration tags in journal order — every `<tag>.sql` file the harness
+ * applies, exported so tests can drive a partial apply (e.g. applying a
+ * data-migration on top of a seeded pre-migration state).
+ */
+export function migrationTags(): string[] {
   const journalPath = path.join(DRIZZLE_DIR, "meta/_journal.json")
   const journal: { entries: JournalEntry[] } = JSON.parse(
     fs.readFileSync(journalPath, "utf-8")
@@ -23,7 +28,12 @@ function migrationTags(): string[] {
   return journal.entries.sort((a, b) => a.idx - b.idx).map((e) => e.tag)
 }
 
-function loadAndCleanSql(tag: string): string[] {
+/**
+ * The individual statements of a migration file, split on the drizzle
+ * statement separator.  Exported alongside {@link migrationTags} for tests
+ * that apply migrations step by step.
+ */
+export function loadAndCleanSql(tag: string): string[] {
   const sqlPath = path.join(DRIZZLE_DIR, `${tag}.sql`)
   const raw = fs.readFileSync(sqlPath, "utf-8")
   return raw

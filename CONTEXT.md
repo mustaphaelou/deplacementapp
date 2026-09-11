@@ -126,6 +126,14 @@ The function that performs the atomic transition out of Amorçage: writes the So
 _Wikis to_: Amorçage (Setup), NomExpediteurEmail
 _Cites_: ADR-0008 (deferral), ADR-0009
 
+**EmailVérifié**:
+The organisation's attestation that a Utilisateur's e-mail address genuinely belongs to them. Written as `emailVerified = true` by the service at provisioning — the amorçage first Utilisateur included — and backfilled for pre-existing rows by migration `0007_attestation_email_verified`; there is no self-service verification flow and no administrator toggle. It is the precondition Better Auth's default linking gate requires before a first Google sign-in may link the account.
+_Avoid_: Email confirmed, verified account, e-mail validation
+
+**ConnexionGoogle (Google Sign-In)**:
+An optional sign-in method: a Utilisateur signs in with their Google account instead of a password. Enabled per Utilisateur by an administrator and only for active accounts, and only offered when the deployment has Google credentials configured; it never provisions accounts — an unknown address is refused. Every sign-in revalidates existence, activity, and per-Utilisateur enablement, and a refused Google sign-in lands on the login page with a French message — never silently.
+_Avoid_: OAuth, social login, SSO
+
 ### Branding
 
 **IdentiteVisuelle (Visual Identity)**:

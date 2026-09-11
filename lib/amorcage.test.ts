@@ -92,6 +92,10 @@ describe("Amorcage module", { timeout: TIMEOUT }, () => {
       role: "GENERAL_DIRECTION",
       actif: true,
     })
+    // The administrator's provisioning act is the e-mail attestation: the
+    // amorçage first Utilisateur must carry it for a first Google sign-in to
+    // link instead of being refused.
+    expect(userRow.emailVerified).toBe(true)
 
     const [cred] = await pgliteDb
       .select()
@@ -99,7 +103,7 @@ describe("Amorcage module", { timeout: TIMEOUT }, () => {
       .where(eq(account.userId, userRow.id))
       .limit(1)
     expect(cred.providerId).toBe(CREDENTIAL_PROVIDER_ID)
-    expect(cred.accountId).toBe("admin@ma-societe.ma")
+    expect(cred.accountId).toBe(userRow.id)
     expect(cred.password).toBeDefined()
     expect(cred.password).not.toBe("securePassword123")
 

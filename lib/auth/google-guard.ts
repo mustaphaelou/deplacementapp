@@ -1,52 +1,68 @@
-import { APIError } from "better-auth/api"
-import { eq } from "drizzle-orm"
+import { sql } from "drizzle-orm"
+import type {
+  ValidateUserInfoResult,
+  ValidateUserInfoSource,
+} from "better-auth"
 import type { DrizzleDb } from "../../db"
 import { utilisateurs } from "../../db/schema/utilisateurs"
-
-export const GOOGLE_VETO_REASONS = {
-  UTILISATEUR_INTROUVABLE: "utilisateur_introuvable",
-  UTILISATEUR_DESACTIVE: "utilisateur_desactive",
-  GOOGLE_NON_ACTIVE: "google_non_active",
-} as const
-
-export type GoogleVetoReason =
-  (typeof GOOGLE_VETO_REASONS)[keyof typeof GOOGLE_VETO_REASONS]
+import { GOOGLE_REFUSAL_CODES, googleRefusalMessage } from "./google-refusals"
+import type { GoogleRefusalCode } from "./google-refusals"
 
 /**
- * Veto a Google social sign-in unless the Utilisateur exists, is active,
- * and has Google sign-in enabled.
- *
- * Throws a 403 APIError carrying the refusal reason as message.  This runs
- * server-side before Better Auth issues a session, so a vetoed sign-in never
- * produces a session.
+ * The part of the `validateUserInfo` payload the Google gate reads.
  */
-export async function assertGoogleSignInAllowed(
-  db: DrizzleDb,
-  email: string | null | undefined
-): Promise<void> {
-  if (!email) {
-    throw new APIError("FORBIDDEN", {
-      message: GOOGLE_VETO_REASONS.UTILISATEUR_INTROUVABLE,
-    })
+export interface GoogleGateInput {
+  user: {
+    email?: string | null | undefined
+    [key: string]: unknown
   }
-  const [utilisateur] = await db
-    .select()
-    .from(utilisateurs)
-    .where(eq(utilisateurs.email, email))
-    .limit(1)
-  if (!utilisateur) {
-    throw new APIError("FORBIDDEN", {
-      message: GOOGLE_VETO_REASONS.UTILISATEUR_INTROUVABLE,
-    })
+  source: ValidateUserInfoSource
+}
+
+/**
+ * The Google identity gate, wired into Better Auth as
+ * `user.validateUserInfo`.
+ *
+ * The engine calls it before a Utilisateur would be created, before a Google
+ * account would be linked and before a returning Utilisateur signs in; a
+ * refusal therefore never leaves a session behind.  Only Google OAuth sources
+ * are examined — anything else is allowed (return `undefined`).
+ *
+ * A refusal is **returned**, never thrown: returning `{ error, errorDescription }`
+ * makes the engine redirect with the code and the French message, while a throw
+ * collapses into the generic `validation_failed` engine error and loses the code.
+ */
+export function createGoogleGate(db: DrizzleDb) {
+  return async function validateGoogleUserInfo(
+    data: GoogleGateInput
+  ): Promise<ValidateUserInfoResult | undefined> {
+    if (data.source.oauth?.providerId !== "google") return
+
+    const email = typeof data.user.email === "string" ? data.user.email : null
+    // Refusal contract: the gate refuses only an identity it can match.  A
+    // missing / non-string e-mail keeps the engine's own codes
+    // (`email_not_found`, …) and is handled by the generic fallback message.
+    if (!email) return
+
+    const [utilisateur] = await db
+      .select()
+      .from(utilisateurs)
+      .where(sql`lower(${utilisateurs.email}) = lower(${email})`)
+      .limit(1)
+
+    if (utilisateur) {
+      if (!utilisateur.actif) {
+        return refuse(GOOGLE_REFUSAL_CODES.UTILISATEUR_DESACTIVE)
+      }
+      if (!utilisateur.googleAuthEnabled) {
+        return refuse(GOOGLE_REFUSAL_CODES.GOOGLE_NON_ACTIVE)
+      }
+      return
+    }
+    return refuse(GOOGLE_REFUSAL_CODES.UTILISATEUR_INTROUVABLE)
   }
-  if (!utilisateur.actif) {
-    throw new APIError("FORBIDDEN", {
-      message: GOOGLE_VETO_REASONS.UTILISATEUR_DESACTIVE,
-    })
-  }
-  if (!utilisateur.googleAuthEnabled) {
-    throw new APIError("FORBIDDEN", {
-      message: GOOGLE_VETO_REASONS.GOOGLE_NON_ACTIVE,
-    })
-  }
+}
+
+function refuse(code: GoogleRefusalCode): ValidateUserInfoResult {
+  return { error: code, errorDescription: googleRefusalMessage(code) }
 }

@@ -1,19 +1,19 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest"
 import { eq, sql } from "drizzle-orm"
 import { hash as bcryptHash, compare as bcryptCompare } from "bcryptjs"
+import { PGlite } from "@electric-sql/pglite"
+import { drizzle } from "drizzle-orm/pglite"
 import fs from "fs"
 import path from "path"
 import { createPgliteDb } from "../test/create-pglite-db"
 import type { PgliteDb } from "../test/create-pglite-db"
+import { migrationTags, loadAndCleanSql } from "../test/create-pglite-db"
 import * as schema from "../../db/schema"
 import { account, session } from "../../db/schema/auth-tables"
 import { utilisateurs } from "../../db/schema/utilisateurs"
 import { createAuth, BCRYPT_COST } from "./better-auth"
 import { setPassword, CREDENTIAL_PROVIDER_ID } from "./set-password"
-import {
-  assertGoogleSignInAllowed,
-  GOOGLE_VETO_REASONS,
-} from "./google-guard"
+import { GOOGLE_REFUSAL_CODES, googleRefusalMessage } from "./google-refusals"
 import type { DrizzleDb } from "../../db"
 
 const TIMEOUT = 30_000
@@ -59,6 +59,44 @@ async function signCookieValue(value: string, secret: string): Promise<string> {
 
 async function cookieFor(token: string, secret: string = TEST_SECRET): Promise<string> {
   return `${SESSION_COOKIE}=${await signCookieValue(token, secret)}`
+}
+
+/**
+ * Apply the migrations before `idx` (journal order) to a raw PGlite client,
+ * skipping statements that fail on a fresh database — the same semantics as
+ * the harness apply in `test/create-pglite-db.ts`.  Drives a partial apply on
+ * top of a seeded pre-migration state.
+ */
+async function applyMigrationsUpTo(client: PGlite, idx: number): Promise<void> {
+  for (const tag of migrationTags().slice(0, idx)) {
+    for (const stmt of loadAndCleanSql(tag)) {
+      try {
+        await client.exec(stmt)
+      } catch {
+        /* skip statements that fail on a fresh database */
+      }
+    }
+  }
+}
+
+/**
+ * Seed one Societe and one Departement through a raw PGlite client, returning
+ * the ids the seeded pre-migration rows hang off.
+ */
+async function seedSocieteDepartement(
+  client: PGlite
+): Promise<{ societeId: string; departementId: string }> {
+  const societeId = crypto.randomUUID()
+  const departementId = crypto.randomUUID()
+  await client.query(
+    `INSERT INTO "societes" ("id", "nom", "modifieLe") VALUES ($1, $2, now())`,
+    [societeId, "Acme"]
+  )
+  await client.query(
+    `INSERT INTO "departements" ("id", "nom", "societeId") VALUES ($1, $2, $3)`,
+    [departementId, "RH", societeId]
+  )
+  return { societeId, departementId }
 }
 
 describe("better-auth adapter (T1 #164)", { timeout: TIMEOUT }, () => {
@@ -119,7 +157,7 @@ describe("better-auth adapter (T1 #164)", { timeout: TIMEOUT }, () => {
       })
       await db.insert(account).values({
         id: crypto.randomUUID(),
-        accountId: email,
+        accountId: utilisateurId,
         providerId: CREDENTIAL_PROVIDER_ID,
         userId: utilisateurId,
         password: "$hashed$",
@@ -208,6 +246,129 @@ describe("better-auth adapter (T1 #164)", { timeout: TIMEOUT }, () => {
     })
   })
 
+  describe("credential re-key migration (#202)", { timeout: TIMEOUT }, () => {
+    it("re-keys legacy e-mail-keyed credential rows onto the Utilisateur id and keeps sign-in green", async () => {
+      const client = await PGlite.create()
+      const tags = migrationTags()
+      const rekeyTag = tags.find((tag) => tag.includes("rekey_credential"))
+      expect(rekeyTag).toBeDefined()
+      const rekeyIdx = tags.indexOf(rekeyTag!)
+
+      // Apply the migrations as they stood before the re-key (same apply
+      // semantics as the PGlite harness, including the skip of statements
+      // that fail on a fresh database).
+      await applyMigrationsUpTo(client, rekeyIdx)
+
+      // Seed the pre-migration state: a Utilisateur whose credential row still
+      // carries the sign-in e-mail as its account key, with a legacy bcrypt hash.
+      const { societeId, departementId } = await seedSocieteDepartement(client)
+      const utilisateurId = crypto.randomUUID()
+      const email = "legacy@acme.ma"
+      const legacyHash = await bcryptHash("motdepasse-herite", BCRYPT_COST)
+      await client.query(
+        `INSERT INTO "utilisateurs" ("id", "email", "emailVerified", "nom", "prenom", "poste", "role", "departementId", "societeId", "actif", "creeLe", "modifieLe")
+         VALUES ($1, $2, true, $3, $4, $5, 'EMPLOYEE', $6, $7, true, now(), now())`,
+        [utilisateurId, email, "Dupont", "Jean", "Développeur", departementId, societeId]
+      )
+      await client.query(
+        `INSERT INTO "account" ("id", "accountId", "providerId", "userId", "password", "createdAt", "updatedAt")
+         VALUES ($1, $2, 'credential', $3, $4, now(), now())`,
+        [crypto.randomUUID(), email, utilisateurId, legacyHash]
+      )
+
+      // Apply the new migration: re-key, then the unique identity index.
+      for (const tag of tags.slice(rekeyIdx)) {
+        for (const stmt of loadAndCleanSql(tag)) {
+          await client.exec(stmt)
+        }
+      }
+
+      const { rows } = await client.query<{ accountId: string }>(
+        `SELECT "accountId" FROM "account" WHERE "userId" = $1 AND "providerId" = 'credential'`,
+        [utilisateurId]
+      )
+      expect(rows).toHaveLength(1)
+      expect(rows[0].accountId).toBe(utilisateurId)
+
+      const { rows: indexRows } = await client.query<{ indexname: string }>(
+        `SELECT indexname FROM pg_indexes WHERE tablename = 'account' AND indexname = 'account_providerId_accountId_unique'`
+      )
+      expect(indexRows).toHaveLength(1)
+
+      // The migrated database still signs the Utilisateur in with the legacy hash.
+      const migratedDb = drizzle(client, { schema })
+      const migratedAuth = createAuth(migratedDb as unknown as DrizzleDb, {
+        secret: TEST_SECRET,
+      })
+      const result = await migratedAuth.api.signInEmail({
+        body: { email, password: "motdepasse-herite" },
+        headers: new Headers({ origin: "http://localhost:3000" }),
+      })
+      expect(result.user.id).toBe(utilisateurId)
+      expect(result.user.email).toBe(email)
+    })
+  })
+
+  describe("attestation backfill (#204)", { timeout: TIMEOUT }, () => {
+    it("marks every pre-existing Utilisateur row with the attestation", async () => {
+      const client = await PGlite.create()
+      const tags = migrationTags()
+      const backfillTag = tags.find((tag) =>
+        tag.includes("attestation_email_verified")
+      )
+      expect(backfillTag).toBe("0007_attestation_email_verified")
+      const backfillIdx = tags.indexOf(backfillTag!)
+
+      // Apply the migrations as they stood before the attestation backfill
+      // (same apply semantics as the PGlite harness).
+      await applyMigrationsUpTo(client, backfillIdx)
+
+      // Seed the pre-migration state: rows written before the attestation was
+      // part of provisioning carry emailVerified = false.  The inserts are raw
+      // — nothing backfills at insert time, so the migration is the only
+      // thing that can attest these rows.
+      const { societeId, departementId } = await seedSocieteDepartement(client)
+      const legacyEmails = ["legacy1@acme.ma", "legacy2@acme.ma"]
+      for (const email of legacyEmails) {
+        await client.query(
+          `INSERT INTO "utilisateurs" ("id", "email", "emailVerified", "nom", "prenom", "poste", "role", "departementId", "societeId", "actif", "creeLe", "modifieLe")
+           VALUES ($1, $2, false, $3, $4, $5, 'EMPLOYEE', $6, $7, true, now(), now())`,
+          [
+            crypto.randomUUID(),
+            email,
+            "Dupont",
+            "Jean",
+            "Développeur",
+            departementId,
+            societeId,
+          ]
+        )
+      }
+
+      const before = await client.query<{ atteste: boolean }>(
+        `SELECT "emailVerified" AS atteste FROM "utilisateurs"`
+      )
+      expect(before.rows).toHaveLength(legacyEmails.length)
+      expect(before.rows.every((row) => row.atteste === false)).toBe(true)
+
+      // Apply the attestation backfill (and anything after it).
+      for (const tag of tags.slice(backfillIdx)) {
+        for (const stmt of loadAndCleanSql(tag)) {
+          await client.exec(stmt)
+        }
+      }
+
+      const { rows } = await client.query<{
+        email: string
+        emailVerified: boolean
+      }>(`SELECT "email", "emailVerified" FROM "utilisateurs" ORDER BY "email"`)
+      expect(rows).toHaveLength(legacyEmails.length)
+      expect(rows.every((row) => row.emailVerified === true)).toBe(true)
+      // The backfill flips the attestation only — identities are untouched.
+      expect(rows.map((row) => row.email)).toEqual(legacyEmails)
+    })
+  })
+
   describe("adapter config (AC2)", () => {
     it("maps the user model onto the utilisateurs table", () => {
       expect(auth.options.user.modelName).toBe("utilisateurs")
@@ -226,6 +387,7 @@ describe("better-auth adapter (T1 #164)", { timeout: TIMEOUT }, () => {
         "poste",
         "role",
         "departementId",
+        "societeId",
         "actif",
         "googleAuthEnabled",
       ] as const) {
@@ -251,6 +413,13 @@ describe("better-auth adapter (T1 #164)", { timeout: TIMEOUT }, () => {
       expect(auth.options.socialProviders.google.disableImplicitSignUp).toBe(true)
     })
 
+    it("wires the Google gate as user.validateUserInfo (no profile-map veto)", () => {
+      expect(typeof auth.options.user.validateUserInfo).toBe("function")
+      expect(Object.keys(auth.options.socialProviders.google)).not.toContain(
+        "mapProfileToUser"
+      )
+    })
+
     it("registers nextCookies as the last plugin", () => {
       const plugins = auth.options.plugins ?? []
       expect(plugins.some((p) => p.id === "next-cookies")).toBe(true)
@@ -258,63 +427,115 @@ describe("better-auth adapter (T1 #164)", { timeout: TIMEOUT }, () => {
     })
   })
 
-  describe("Google veto (AC3)", () => {
-    it("refuses a sign-in for a missing Utilisateur", async () => {
-      await expect(
-        assertGoogleSignInAllowed(db as unknown as DrizzleDb, "inconnu@acme.ma")
-      ).rejects.toMatchObject({
-        statusCode: 403,
-        message: GOOGLE_VETO_REASONS.UTILISATEUR_INTROUVABLE,
-      })
+  describe("Google gate (AC3)", () => {
+    // The gate is exercised through the public options contract — the same
+    // entry point the engine calls — and the refusal payload is what a browser
+    // ends up seeing as `?error=…&error_description=…`.
+    function callGate(
+      email: string | null,
+      options: { providerId?: string | null; withOAuth?: boolean } = {}
+    ) {
+      const { providerId = "google", withOAuth = true } = options
+      const validate = auth.options.user.validateUserInfo
+      expect(typeof validate).toBe("function")
+      return validate!({
+        user: email === null ? {} : { email },
+        source: {
+          method: "oauth" as const,
+          action: "create-user" as const,
+          ...(withOAuth ? { oauth: { providerId: providerId! } } : {}),
+        },
+      }) as Promise<{ error: string; errorDescription?: string } | undefined>
+    }
+
+    it("refuses a Google sign-in for an unknown e-mail", async () => {
+      const refusal = await callGate("inconnu@acme.ma")
+      expect(refusal?.error).toBe(GOOGLE_REFUSAL_CODES.UTILISATEUR_INTROUVABLE)
+      expect(refusal?.errorDescription).toBe(
+        googleRefusalMessage(GOOGLE_REFUSAL_CODES.UTILISATEUR_INTROUVABLE)
+      )
     })
 
-    it("refuses a sign-in for a deactivated Utilisateur", async () => {
+    it("refuses a Google sign-in for a deactivated Utilisateur", async () => {
       await db
         .update(utilisateurs)
         .set({ actif: false })
         .where(eq(utilisateurs.id, utilisateurId))
-      await expect(
-        assertGoogleSignInAllowed(db as unknown as DrizzleDb, email)
-      ).rejects.toMatchObject({
-        statusCode: 403,
-        message: GOOGLE_VETO_REASONS.UTILISATEUR_DESACTIVE,
-      })
+
+      const refusal = await callGate(email)
+      expect(refusal?.error).toBe(GOOGLE_REFUSAL_CODES.UTILISATEUR_DESACTIVE)
+      expect(refusal?.errorDescription).toBe(
+        googleRefusalMessage(GOOGLE_REFUSAL_CODES.UTILISATEUR_DESACTIVE)
+      )
     })
 
-    it("refuses a sign-in for a Utilisateur without Google enabled", async () => {
+    it("refuses a Google sign-in for a Utilisateur without Google enabled", async () => {
       await db
         .update(utilisateurs)
         .set({ googleAuthEnabled: false })
         .where(eq(utilisateurs.id, utilisateurId))
-      await expect(
-        assertGoogleSignInAllowed(db as unknown as DrizzleDb, email)
-      ).rejects.toMatchObject({
-        statusCode: 403,
-        message: GOOGLE_VETO_REASONS.GOOGLE_NON_ACTIVE,
-      })
+
+      const refusal = await callGate(email)
+      expect(refusal?.error).toBe(GOOGLE_REFUSAL_CODES.GOOGLE_NON_ACTIVE)
+      expect(refusal?.errorDescription).toBe(
+        googleRefusalMessage(GOOGLE_REFUSAL_CODES.GOOGLE_NON_ACTIVE)
+      )
+    })
+
+    it("gives every refusal a non-empty description", async () => {
+      const unknown = await callGate("inconnu@acme.ma")
+
+      await db
+        .update(utilisateurs)
+        .set({ actif: false })
+        .where(eq(utilisateurs.id, utilisateurId))
+      const deactivated = await callGate(email)
+
+      await db
+        .update(utilisateurs)
+        .set({ actif: true, googleAuthEnabled: false })
+        .where(eq(utilisateurs.id, utilisateurId))
+      const notEnabled = await callGate(email)
+
+      for (const refusal of [unknown, deactivated, notEnabled]) {
+        expect(typeof refusal?.error).toBe("string")
+        expect(refusal!.errorDescription!.length).toBeGreaterThan(0)
+      }
     })
 
     it("allows an active, Google-enabled Utilisateur", async () => {
+      await expect(callGate(email)).resolves.toBeUndefined()
+    })
+
+    it("allows non-Google sources without consulting the utilisateurs", async () => {
       await expect(
-        assertGoogleSignInAllowed(db as unknown as DrizzleDb, email)
+        callGate("inconnu@acme.ma", { providerId: "github" })
+      ).resolves.toBeUndefined()
+      await expect(
+        callGate("inconnu@acme.ma", { withOAuth: false })
       ).resolves.toBeUndefined()
     })
 
-    it("wires the veto into the configured Google mapProfileToUser", async () => {
-      const mapProfile = auth.options.socialProviders.google.mapProfileToUser
-      expect(typeof mapProfile).toBe("function")
-      await expect(
-        mapProfile!({ email: "inconnu@acme.ma" } as never)
-      ).rejects.toMatchObject({
-        statusCode: 403,
-        message: GOOGLE_VETO_REASONS.UTILISATEUR_INTROUVABLE,
-      })
-      await expect(mapProfile!({ email } as never)).resolves.toBeDefined()
+    it("defers when there is no e-mail (engine keeps its own codes)", async () => {
+      // Refusal contract: the gate refuses only an identity it can match; a
+      // missing e-mail keeps the engine's codes (email_not_found, …), so the
+      // payload passes through and the generic fallback message speaks.
+      await expect(callGate(null)).resolves.toBeUndefined()
+    })
+
+    it("matches the stored e-mail case-insensitively", async () => {
+      await db
+        .update(utilisateurs)
+        .set({ email: "Jean.Dupont@Acme.ma" })
+        .where(eq(utilisateurs.id, utilisateurId))
+
+      await expect(callGate("jean.dupont@acme.ma")).resolves.toBeUndefined()
+      await expect(callGate("JEAN.DUPONT@ACME.MA")).resolves.toBeUndefined()
     })
   })
 
   describe("setPassword (AC4)", () => {
-    it("creates the credential row keyed on the current email", async () => {
+    it("creates the credential row keyed on the Utilisateur id", async () => {
       await setPassword(db as unknown as DrizzleDb, utilisateurId, "motdepasse-123")
 
       const rows = await db
@@ -323,7 +544,7 @@ describe("better-auth adapter (T1 #164)", { timeout: TIMEOUT }, () => {
         .where(eq(account.userId, utilisateurId))
       expect(rows).toHaveLength(1)
       expect(rows[0].providerId).toBe(CREDENTIAL_PROVIDER_ID)
-      expect(rows[0].accountId).toBe(email)
+      expect(rows[0].accountId).toBe(utilisateurId)
       await expect(
         bcryptCompare("motdepasse-123", rows[0].password!)
       ).resolves.toBe(true)
@@ -352,21 +573,24 @@ describe("better-auth adapter (T1 #164)", { timeout: TIMEOUT }, () => {
       ).resolves.toBe(false)
     })
 
-    it("keeps the row identifier in sync when the email changes", async () => {
-      const newEmail = "jean.renove@acme.ma"
-      await db
-        .update(utilisateurs)
-        .set({ email: newEmail })
-        .where(eq(utilisateurs.id, utilisateurId))
+    it("re-keys a legacy e-mail-keyed row on the upsert path", async () => {
+      await db.insert(account).values({
+        id: crypto.randomUUID(),
+        accountId: email,
+        providerId: CREDENTIAL_PROVIDER_ID,
+        userId: utilisateurId,
+        password: "$legacy$",
+        updatedAt: new Date(),
+      })
 
       await setPassword(db as unknown as DrizzleDb, utilisateurId, "motdepasse-123")
 
-      const [row] = await db
-        .select({ accountId: account.accountId })
+      const rows = await db
+        .select()
         .from(account)
         .where(eq(account.userId, utilisateurId))
-        .limit(1)
-      expect(row?.accountId).toBe(newEmail)
+      expect(rows).toHaveLength(1)
+      expect(rows[0].accountId).toBe(utilisateurId)
     })
 
     it("throws for an unknown Utilisateur", async () => {
@@ -381,7 +605,7 @@ describe("better-auth adapter (T1 #164)", { timeout: TIMEOUT }, () => {
       const migratedHash = await bcryptHash("motdepasse-herite", BCRYPT_COST)
       await db.insert(account).values({
         id: crypto.randomUUID(),
-        accountId: email,
+        accountId: utilisateurId,
         providerId: CREDENTIAL_PROVIDER_ID,
         userId: utilisateurId,
         password: migratedHash,

@@ -3,11 +3,7 @@ import type { DrizzleDb } from "../db"
 import { db } from "../db"
 import { utilisateurs } from "../db/schema/utilisateurs"
 import { logAudit } from "./audit"
-import {
-  setPassword,
-  verifyCredential,
-  syncCredentialIdentifier,
-} from "./auth/set-password"
+import { setPassword, verifyCredential } from "./auth/set-password"
 import {
   avatarStorage as defaultAvatarStorage,
   type AvatarStorage,
@@ -96,6 +92,9 @@ export class UtilisateurService {
         .values({
           id: userId,
           email: data.email,
+          // The administrator's provisioning act is the e-mail attestation:
+          // it is written here, by the service — never a toggle.
+          emailVerified: true,
           googleAuthEnabled: data.googleAuthEnabled ?? false,
           nom: data.nom,
           prenom: data.prenom,
@@ -162,9 +161,6 @@ export class UtilisateurService {
       if (motDePasse) {
         await setPassword(tx, id, motDePasse)
       }
-      if (email !== undefined) {
-        await syncCredentialIdentifier(tx, id)
-      }
 
       await logAudit(
         {
@@ -229,7 +225,6 @@ export class UtilisateurService {
     if (!user) throw new UtilisateurNotFoundError()
 
     const updateData: Record<string, unknown> = {}
-    let emailChanged = false
 
     if (data.telephone !== undefined) {
       updateData.telephone = data.telephone || null
@@ -246,7 +241,6 @@ export class UtilisateurService {
       const isValid = await verifyCredential(this._db, userId, data.currentPassword)
       if (!isValid) throw new MotDePasseIncorrectError()
       updateData.email = data.email
-      emailChanged = true
     }
 
     const previousAvatarUrl: string | null = user.avatarUrl
@@ -283,10 +277,6 @@ export class UtilisateurService {
           })
 
         if (!updated) throw new UtilisateurNotFoundError()
-
-        if (emailChanged) {
-          await syncCredentialIdentifier(tx, userId)
-        }
 
         await logAudit(
           {

@@ -61,9 +61,13 @@ export async function quitterAmorcage(input: {
     }
 
     const userId = crypto.randomUUID()
+    // The administrator's provisioning act is the e-mail attestation the
+    // Google linking gate requires: the amorçage first Utilisateur carries it
+    // so its first Google sign-in can link instead of being refused.
     await tx.insert(utilisateurs).values({
       id: userId,
       email: input.admin.email,
+      emailVerified: true,
       nom: input.admin.nom,
       prenom: input.admin.prenom,
       poste: input.admin.poste,
