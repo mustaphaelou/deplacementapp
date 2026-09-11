@@ -7,8 +7,9 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { StatusPill, statusOf } from "@/components/status-pill"
+import { StatusPill } from "@/components/status-pill"
 import { formatCurrency, formatDate } from "@/lib/constants"
+import { toDemandePresentation } from "@/lib/demande-presentation"
 import { queueEtapes } from "@/lib/workflow"
 import {
   Breadcrumb,
@@ -86,7 +87,7 @@ export function DemandesTable({
         </thead>
         <tbody>
           {demandes.map((d) => {
-            const status = statusOf(d)
+            const presentation = toDemandePresentation(d)
             return (
               <tr
                 key={d.id}
@@ -115,7 +116,10 @@ export function DemandesTable({
                   {formatCurrency(Number(d.totalEstime ?? 0))}
                 </td>
                 <td className="px-2 py-2.5">
-                  <StatusPill label={status.label} tone={status.tone} />
+                  <StatusPill
+                    label={presentation.compactLabel}
+                    tone={presentation.tone}
+                  />
                 </td>
                 <td className="px-2 py-2.5">
                   <ChevronRight className="size-3.5 text-muted-foreground opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100" />

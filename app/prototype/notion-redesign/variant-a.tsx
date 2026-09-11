@@ -12,7 +12,8 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { formatCurrency, formatDate } from "@/lib/constants"
-import { StatusPill, statusOf } from "@/components/status-pill"
+import { toDemandePresentation } from "@/lib/demande-presentation"
+import { StatusPill } from "@/components/status-pill"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -372,7 +373,7 @@ function AList() {
           </thead>
           <tbody>
             {DEMANDES.map((d) => {
-              const status = statusOf(d)
+              const presentation = toDemandePresentation(d)
               return (
                 <tr
                   key={d.numero}
@@ -390,7 +391,10 @@ function AList() {
                     {formatCurrency(d.totalEstime)}
                   </td>
                   <td className="px-2 py-2.5">
-                    <StatusPill label={status.label} tone={status.tone} />
+                    <StatusPill
+                      label={presentation.compactLabel}
+                      tone={presentation.tone}
+                    />
                   </td>
                   <td className="px-2 py-2.5">
                     <ChevronRight

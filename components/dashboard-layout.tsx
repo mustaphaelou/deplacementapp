@@ -115,7 +115,7 @@ const cellRenderers: Record<
       {formatCurrency(Number(d.totalEstime ?? 0))}
     </span>
   ),
-  etape: (d) => <DemandeStatusBadge etape={d.etape} />,
+  etape: (d) => <DemandeStatusBadge etape={d.etape} decision={d.decision} />,
 }
 
 export function DashboardLayout({
