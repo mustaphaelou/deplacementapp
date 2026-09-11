@@ -1,4 +1,10 @@
-import { index, pgTable, text, timestamp } from "drizzle-orm/pg-core"
+import {
+  index,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+} from "drizzle-orm/pg-core"
 import { utilisateurs } from "./utilisateurs"
 
 /**
@@ -6,6 +12,10 @@ import { utilisateurs } from "./utilisateurs"
  * `npx auth@latest generate` (better-auth@1.6.23, provider "pg"), with
  * camelCase column names matching the repo convention.  The `user` model maps
  * onto the existing `utilisateurs` table, so no `user` table is declared here.
+ *
+ * The `account` identity key is `(providerId, accountId)` — the pair the
+ * 1.7.x engine resolves accounts by (`findAccountOwnerByKey`) — and is
+ * enforced unique so duplicate identities cannot exist in the first place.
  */
 export const session = pgTable(
   "session",
@@ -47,7 +57,13 @@ export const account = pgTable(
       .notNull()
       .$onUpdate(() => new Date()),
   },
-  (table) => [index("account_userId_idx").on(table.userId)]
+  (table) => [
+    index("account_userId_idx").on(table.userId),
+    uniqueIndex("account_providerId_accountId_unique").on(
+      table.providerId,
+      table.accountId
+    ),
+  ]
 )
 
 export const verification = pgTable(

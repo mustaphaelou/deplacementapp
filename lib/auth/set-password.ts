@@ -19,17 +19,18 @@ function credentialWhere(utilisateurId: string) {
 
 /**
  * The runtime writer/accessor of the credential (`account`,
- * `providerId: "credential"`) row for a Utilisateur: `setPassword` writes,
- * `verifyCredential` reads, and `syncCredentialIdentifier` keeps the row's
- * identifier aligned with the Utilisateur's current email.
+ * `providerId: "credential"`) row for a Utilisateur: `setPassword` writes and
+ * `verifyCredential` reads.  The row is keyed on the Utilisateur's stable id
+ * (`accountId` = id) — the scheme the Better Auth 1.7.x credential sign-in
+ * resolves against.
  */
 
 /**
- * Upsert the credential row for a Utilisateur, pinning its `accountId` to the
- * Utilisateur's *current* email, so an email change is picked up on the next
- * write.  The plaintext is hashed with bcryptjs at cost 12 — the same cost the
- * legacy `motDePasse` hashes used (they were copied as-is during the T3
- * seeding, so they keep verifying).
+ * Upsert the credential row for a Utilisateur, keyed on the Utilisateur's
+ * stable id (a legacy e-mail-keyed row is re-keyed on the next write).  The
+ * plaintext is hashed with bcryptjs at cost 12 — the same cost the legacy
+ * `motDePasse` hashes used (they were copied as-is during the T3 seeding, so
+ * they keep verifying).
  */
 export async function setPassword(
   db: CredentialDb,
@@ -37,7 +38,7 @@ export async function setPassword(
   plaintext: string
 ): Promise<void> {
   const [utilisateur] = await db
-    .select({ email: utilisateurs.email })
+    .select({ id: utilisateurs.id })
     .from(utilisateurs)
     .where(eq(utilisateurs.id, utilisateurId))
     .limit(1)
@@ -57,7 +58,7 @@ export async function setPassword(
   if (existing) {
     await db
       .update(account)
-      .set({ accountId: utilisateur.email, password, updatedAt: now })
+      .set({ accountId: utilisateurId, password, updatedAt: now })
       .where(eq(account.id, existing.id))
     return
   }
@@ -65,7 +66,7 @@ export async function setPassword(
   await db.insert(account).values({
     id: crypto.randomUUID(),
     userId: utilisateurId,
-    accountId: utilisateur.email,
+    accountId: utilisateurId,
     providerId: CREDENTIAL_PROVIDER_ID,
     password,
     createdAt: now,
@@ -89,27 +90,4 @@ export async function verifyCredential(
     .limit(1)
   if (!row?.password) return false
   return bcryptCompare(plaintext, row.password)
-}
-
-/**
- * Point the credential row's identifier at the Utilisateur's current email.
- * No-op when the Utilisateur has no credential row yet.
- */
-export async function syncCredentialIdentifier(
-  db: CredentialDb,
-  utilisateurId: string
-): Promise<void> {
-  const [utilisateur] = await db
-    .select({ email: utilisateurs.email })
-    .from(utilisateurs)
-    .where(eq(utilisateurs.id, utilisateurId))
-    .limit(1)
-  if (!utilisateur) {
-    throw new UtilisateurNotFoundError()
-  }
-
-  await db
-    .update(account)
-    .set({ accountId: utilisateur.email, updatedAt: new Date() })
-    .where(credentialWhere(utilisateurId))
 }
