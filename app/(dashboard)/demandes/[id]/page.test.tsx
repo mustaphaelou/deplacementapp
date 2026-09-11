@@ -85,7 +85,12 @@ function mockUser(role = "MANAGER") {
 }
 
 async function renderPage(
-  overrides: { role?: string; etape?: string; employeId?: string } = {}
+  overrides: {
+    role?: string
+    etape?: string
+    employeId?: string
+    decision?: string
+  } = {}
 ) {
   const demande = { ...mockDemande, ...overrides } as DemandeDetail
   const { getAuthUser } = await import("@/lib/auth/server")
@@ -100,6 +105,29 @@ async function renderPage(
     params: Promise.resolve({ id: "d-1" }),
   })
   return renderToStaticMarkup(element)
+}
+
+function pillFor(html: string, label: string): string {
+  const labelIndex = html.indexOf(label)
+  const start = html.lastIndexOf("rounded-full", labelIndex)
+  const end = html.indexOf("</div>", labelIndex)
+  return html.slice(start, end)
+}
+
+function badgeFor(html: string, label: string): string {
+  const labelIndex = html.indexOf(label)
+  const start = html.lastIndexOf(
+    '<div class="inline-flex items-center rounded-md',
+    labelIndex
+  )
+  const end = html.indexOf("</div>", labelIndex)
+  return html.slice(start, end)
+}
+
+function factLine(html: string, label: string): string {
+  const labelIndex = html.indexOf(`>${label}</span>`)
+  const end = html.indexOf("</div>", labelIndex)
+  return html.slice(labelIndex, end)
 }
 
 describe("Demande detail page", () => {
@@ -171,6 +199,55 @@ describe("Demande detail page", () => {
     expect(html).toContain("bg-primary text-primary-foreground")
     expect(html).toContain("bg-primary/10 text-primary")
     expect(html).toContain("bg-muted text-muted-foreground")
+  })
+
+  it("marks earlier stages past and later stages upcoming around the current stage", async () => {
+    const html = await renderPage()
+
+    // True pipeline order, from the presentation module.
+    const stageOrder = [
+      "Brouillon",
+      "En attente (Manager)",
+      "En attente (Finance)",
+      "En attente (Direction)",
+      "Finalisé",
+    ]
+    const positions = stageOrder.map((s) => html.indexOf(s))
+    for (let i = 1; i < positions.length; i++) {
+      expect(positions[i], stageOrder[i]).toBeGreaterThan(positions[i - 1])
+    }
+
+    // Stages before FINANCE_REVIEW are past: brand tint + check icon.
+    for (const label of ["Brouillon", "En attente (Manager)"]) {
+      const past = pillFor(html, label)
+      expect(past, label).toContain("bg-primary/10 text-primary")
+      expect(past, label).toContain("lucide-circle-check-big")
+    }
+
+    // The current stage pill is the brand solid.
+    const current = pillFor(html, "En attente (Finance)")
+    expect(current).toContain("bg-primary text-primary-foreground")
+
+    // Stages after FINANCE_REVIEW are upcoming: muted, no check.
+    for (const label of ["En attente (Direction)", "Finalisé"]) {
+      const upcoming = pillFor(html, label)
+      expect(upcoming, label).toContain("bg-muted text-muted-foreground")
+      expect(upcoming, label).not.toContain("lucide-circle-check-big")
+    }
+  })
+
+  it("renders a rejected demande with the Rejetée decision badge, Étape kept distinct", async () => {
+    const html = await renderPage({ decision: "REJECTED" })
+
+    // The badge carries the presentation module's decision label.
+    const badge = badgeFor(html, "Rejetée")
+    expect(badge).toContain("bg-destructive/10 text-destructive")
+    expect(badge).toContain("Rejetée")
+
+    // Etape and Decision stay two distinct facts: the rejection does not move
+    // the Etape, which stays where the decision was recorded.
+    expect(factLine(html, "Étape")).toContain("En attente (Finance)")
+    expect(factLine(html, "Décision")).toContain("Rejetée")
   })
 
   it("keeps approve / reject actions inline for the role on the queue etape", async () => {

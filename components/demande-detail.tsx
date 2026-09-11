@@ -21,9 +21,8 @@ import {
   formatDate,
   formatDateTime,
   TRANSPORT_LABELS,
-  ETAPE_LABELS,
-  DECISION_LABELS,
 } from "@/lib/constants"
+import { toDemandePresentation } from "@/lib/demande-presentation"
 import { parseMotif } from "@/lib/demande-types"
 import type { DemandeDetail } from "@/lib/demande-types"
 import {
@@ -47,14 +46,6 @@ interface DemandeDetailProps {
   isOwner: boolean
   userRole: string
 }
-
-const stepOrder = [
-  "DRAFT",
-  "MANAGER_REVIEW",
-  "FINANCE_REVIEW",
-  "DIRECTION_REVIEW",
-  "FINAL",
-]
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
@@ -100,9 +91,9 @@ export function DemandeDetail({
 
   const motifs = parseMotif(demande.motif)
 
-  const currentStepIndex = stepOrder.indexOf(demande.etape)
-  const isRejected = demande.decision === "REJECTED"
-  const isWithdrawn = demande.decision === "WITHDRAWN"
+  const presentation = toDemandePresentation(demande)
+  const isRejected = presentation.decision.outcome === "rejected"
+  const isWithdrawn = presentation.decision.outcome === "withdrawn"
 
   return (
     <div className="mx-auto w-full max-w-[720px] pb-8">
@@ -182,28 +173,33 @@ export function DemandeDetail({
         <section>
           <SectionHeading>Statut</SectionHeading>
           <div className="mt-5 flex flex-wrap items-center gap-1">
-            {stepOrder.map((step, i) => {
-              const isDone = i <= currentStepIndex
-              const isCurrent = i === currentStepIndex
+            {presentation.steps.map((step, i) => {
+              const isPast = step.state === "past"
+              const isCurrent = step.state === "current"
+              const isLast = i === presentation.steps.length - 1
+              // The connector is brand-tinted once the stage it leads to
+              // has been reached (past or current).
+              const nextReached =
+                !isLast &&
+                (presentation.steps[i + 1].state === "past" ||
+                  presentation.steps[i + 1].state === "current")
               return (
-                <div key={step} className="flex items-center">
+                <div key={step.id} className="flex items-center">
                   <div
                     className={`flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${
-                      isDone
-                        ? isCurrent
+                      isPast
+                        ? "bg-primary/10 text-primary"
+                        : isCurrent
                           ? "bg-primary text-primary-foreground"
-                          : "bg-primary/10 text-primary"
-                        : "bg-muted text-muted-foreground"
+                          : "bg-muted text-muted-foreground"
                     }`}
                   >
-                    {i < currentStepIndex ? (
-                      <CheckCircle className="size-3" />
-                    ) : null}
-                    {ETAPE_LABELS[step]}
+                    {isPast ? <CheckCircle className="size-3" /> : null}
+                    {step.label}
                   </div>
-                  {i < stepOrder.length - 1 && (
+                  {!isLast && (
                     <ChevronRight
-                      className={`mx-1 size-4 ${i < currentStepIndex ? "text-primary" : "text-muted-foreground/30"}`}
+                      className={`mx-1 size-4 ${nextReached ? "text-primary" : "text-muted-foreground/30"}`}
                     />
                   )}
                 </div>
@@ -211,12 +207,12 @@ export function DemandeDetail({
             })}
             {isRejected && (
               <Badge variant="destructive" className="ml-2">
-                {DECISION_LABELS["REJECTED"]}
+                {presentation.decision.label}
               </Badge>
             )}
             {isWithdrawn && (
               <Badge variant="outline" className="ml-2">
-                {DECISION_LABELS["WITHDRAWN"]}
+                {presentation.decision.label}
               </Badge>
             )}
           </div>
@@ -226,13 +222,13 @@ export function DemandeDetail({
           <div className="mt-5 flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Étape</span>
             <span className="text-right font-medium">
-              {ETAPE_LABELS[demande.etape] ?? demande.etape}
+              {presentation.etape.label}
             </span>
           </div>
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Décision</span>
             <span className="text-right font-medium">
-              {DECISION_LABELS[demande.decision] ?? demande.decision}
+              {presentation.decision.label}
             </span>
           </div>
         </section>

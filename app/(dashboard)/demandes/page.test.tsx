@@ -144,4 +144,18 @@ describe("Demandes list page", () => {
     )
     expect(employeeHtml).not.toContain("Employé")
   })
+
+  it("renders the module's compact label for a rejected demande: Rejetée (Manager)", async () => {
+    const { DemandesTable } = await import("./page")
+    const html = renderToStaticMarkup(
+      <DemandesTable
+        demandes={[{ ...DEMANDE, etape: "MANAGER_REVIEW", decision: "REJECTED" }]}
+        role="MANAGER"
+      />
+    )
+
+    expect(html).toContain("Rejetée (Manager)")
+    expect(html).not.toContain("En attente")
+    expect(html).toContain("bg-[#FBE9E9]")
+  })
 })

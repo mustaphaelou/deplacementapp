@@ -8,9 +8,9 @@ import {
   formatCurrency,
   formatDate,
   TRANSPORT_LABELS,
-  ETAPE_LABELS,
   DEFAULT_SOCIETE_NOM,
 } from "@/lib/constants"
+import { toDemandePresentation } from "@/lib/demande-presentation"
 import { parseMotif, type DemandeWithRelations } from "@/lib/demande-types"
 
 export default async function ImprimerPage({
@@ -34,6 +34,7 @@ export default async function ImprimerPage({
   }
 
   const motifs = parseMotif(demande.motif)
+  const presentation = toDemandePresentation(demande)
   const societe = await getSocieteBranding()
   const societeNom = societe?.nom ?? DEFAULT_SOCIETE_NOM
   const societeLogoUrl = societe?.logoUrl ?? null
@@ -64,7 +65,8 @@ export default async function ImprimerPage({
 
       <section className="mb-6">
         <h2 className="mb-3 text-lg font-semibold">Statut</h2>
-        <p className="text-sm">{ETAPE_LABELS[demande.etape]}</p>
+        <p className="text-sm">Étape : {presentation.etape.label}</p>
+        <p className="text-sm">Décision : {presentation.decision.label}</p>
       </section>
 
       <section className="mb-6">
