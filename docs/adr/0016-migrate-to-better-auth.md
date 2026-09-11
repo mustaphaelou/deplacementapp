@@ -1,4 +1,4 @@
-# ADR 0015: Migrate authentication from next-auth@5 (beta) to Better Auth
+# ADR 0016: Migrate authentication from next-auth@5 (beta) to Better Auth
 
 **Date:** 2026-08-02
 
