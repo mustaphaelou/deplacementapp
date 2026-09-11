@@ -48,8 +48,8 @@ services:
       - AUTH_GOOGLE_SECRET=${AUTH_GOOGLE_SECRET:-}
     volumes:
       - uploads:/app/public/uploads
-    ports:
-      - "3000:3000"
+    expose:
+      - 3000
     restart: unless-stopped
 
 volumes:
