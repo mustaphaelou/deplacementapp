@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { pdfStatus, PDF_TONE_COLORS } from "./travel-request-pdf"
+import { pdfChip, PDF_TONE_COLORS } from "./travel-request-pdf"
 import {
   toDemandePresentation,
   type PresentationTone,
@@ -48,7 +48,7 @@ const CHIP_CASES: ChipCase[] = [
   },
 ]
 
-describe("pdfStatus", () => {
+describe("pdfChip", () => {
   it("maps every presentation tone to its hex colour", () => {
     expect(Object.keys(PDF_TONE_COLORS).sort()).toEqual([
       "danger",
@@ -68,28 +68,28 @@ describe("pdfStatus", () => {
     "$etape + $decision → $label ($tone → $color)",
     ({ tone, etape, decision, label, color }) => {
       expect(toDemandePresentation({ etape, decision }).tone).toBe(tone)
-      expect(pdfStatus({ etape, decision })).toEqual({ label, color })
+      expect(pdfChip({ etape, decision })).toEqual({ label, color })
     }
   )
 
   it("keeps today's visible colours for the common cases", () => {
     // Brouillon grey / in-review amber / Approuvée green / Rejetée red.
-    expect(pdfStatus({ etape: "DRAFT", decision: "PENDING" }).color).toBe(
+    expect(pdfChip({ etape: "DRAFT", decision: "PENDING" }).color).toBe(
       "#666666"
     )
     expect(
-      pdfStatus({ etape: "DIRECTION_REVIEW", decision: "PENDING" }).color
+      pdfChip({ etape: "DIRECTION_REVIEW", decision: "PENDING" }).color
     ).toBe("#d97706")
     expect(
-      pdfStatus({ etape: "DIRECTION_REVIEW", decision: "APPROVED" }).color
+      pdfChip({ etape: "DIRECTION_REVIEW", decision: "APPROVED" }).color
     ).toBe("#16a34a")
     expect(
-      pdfStatus({ etape: "MANAGER_REVIEW", decision: "REJECTED" }).color
+      pdfChip({ etape: "MANAGER_REVIEW", decision: "REJECTED" }).color
     ).toBe("#dc2626")
   })
 
   it("shows a withdrawn demande as neutral grey, not red", () => {
-    expect(pdfStatus({ etape: "DRAFT", decision: "WITHDRAWN" })).toEqual({
+    expect(pdfChip({ etape: "DRAFT", decision: "WITHDRAWN" })).toEqual({
       label: "Retirée",
       color: "#666666",
     })
@@ -97,13 +97,13 @@ describe("pdfStatus", () => {
 
   it("names the stage on a rejection at every review stage", () => {
     expect(
-      pdfStatus({ etape: "MANAGER_REVIEW", decision: "REJECTED" }).label
+      pdfChip({ etape: "MANAGER_REVIEW", decision: "REJECTED" }).label
     ).toBe("Rejetée (Manager)")
     expect(
-      pdfStatus({ etape: "FINANCE_REVIEW", decision: "REJECTED" }).label
+      pdfChip({ etape: "FINANCE_REVIEW", decision: "REJECTED" }).label
     ).toBe("Rejetée (Finance)")
     expect(
-      pdfStatus({ etape: "DIRECTION_REVIEW", decision: "REJECTED" }).label
+      pdfChip({ etape: "DIRECTION_REVIEW", decision: "REJECTED" }).label
     ).toBe("Rejetée (Direction)")
   })
 })
