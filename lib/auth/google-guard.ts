@@ -39,13 +39,16 @@ export function createGoogleGate(db: DrizzleDb) {
     if (data.source.oauth?.providerId !== "google") return
 
     const email = typeof data.user.email === "string" ? data.user.email : null
-    const [utilisateur] = email
-      ? await db
-          .select()
-          .from(utilisateurs)
-          .where(sql`lower(${utilisateurs.email}) = lower(${email})`)
-          .limit(1)
-      : []
+    // Refusal contract: the gate refuses only an identity it can match.  A
+    // missing / non-string e-mail keeps the engine's own codes
+    // (`email_not_found`, …) and is handled by the generic fallback message.
+    if (!email) return
+
+    const [utilisateur] = await db
+      .select()
+      .from(utilisateurs)
+      .where(sql`lower(${utilisateurs.email}) = lower(${email})`)
+      .limit(1)
 
     if (utilisateur) {
       if (!utilisateur.actif) {

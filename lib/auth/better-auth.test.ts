@@ -61,6 +61,44 @@ async function cookieFor(token: string, secret: string = TEST_SECRET): Promise<s
   return `${SESSION_COOKIE}=${await signCookieValue(token, secret)}`
 }
 
+/**
+ * Apply the migrations before `idx` (journal order) to a raw PGlite client,
+ * skipping statements that fail on a fresh database — the same semantics as
+ * the harness apply in `test/create-pglite-db.ts`.  Drives a partial apply on
+ * top of a seeded pre-migration state.
+ */
+async function applyMigrationsUpTo(client: PGlite, idx: number): Promise<void> {
+  for (const tag of migrationTags().slice(0, idx)) {
+    for (const stmt of loadAndCleanSql(tag)) {
+      try {
+        await client.exec(stmt)
+      } catch {
+        /* skip statements that fail on a fresh database */
+      }
+    }
+  }
+}
+
+/**
+ * Seed one Societe and one Departement through a raw PGlite client, returning
+ * the ids the seeded pre-migration rows hang off.
+ */
+async function seedSocieteDepartement(
+  client: PGlite
+): Promise<{ societeId: string; departementId: string }> {
+  const societeId = crypto.randomUUID()
+  const departementId = crypto.randomUUID()
+  await client.query(
+    `INSERT INTO "societes" ("id", "nom", "modifieLe") VALUES ($1, $2, now())`,
+    [societeId, "Acme"]
+  )
+  await client.query(
+    `INSERT INTO "departements" ("id", "nom", "societeId") VALUES ($1, $2, $3)`,
+    [departementId, "RH", societeId]
+  )
+  return { societeId, departementId }
+}
+
 describe("better-auth adapter (T1 #164)", { timeout: TIMEOUT }, () => {
   let db: PgliteDb
   let auth: TestAuth
@@ -219,31 +257,14 @@ describe("better-auth adapter (T1 #164)", { timeout: TIMEOUT }, () => {
       // Apply the migrations as they stood before the re-key (same apply
       // semantics as the PGlite harness, including the skip of statements
       // that fail on a fresh database).
-      for (const tag of tags.slice(0, rekeyIdx)) {
-        for (const stmt of loadAndCleanSql(tag)) {
-          try {
-            await client.exec(stmt)
-          } catch {
-            /* skip statements that fail on a fresh database */
-          }
-        }
-      }
+      await applyMigrationsUpTo(client, rekeyIdx)
 
       // Seed the pre-migration state: a Utilisateur whose credential row still
       // carries the sign-in e-mail as its account key, with a legacy bcrypt hash.
-      const societeId = crypto.randomUUID()
-      const departementId = crypto.randomUUID()
+      const { societeId, departementId } = await seedSocieteDepartement(client)
       const utilisateurId = crypto.randomUUID()
       const email = "legacy@acme.ma"
       const legacyHash = await bcryptHash("motdepasse-herite", BCRYPT_COST)
-      await client.query(
-        `INSERT INTO "societes" ("id", "nom", "modifieLe") VALUES ($1, $2, now())`,
-        [societeId, "Acme"]
-      )
-      await client.query(
-        `INSERT INTO "departements" ("id", "nom", "societeId") VALUES ($1, $2, $3)`,
-        [departementId, "RH", societeId]
-      )
       await client.query(
         `INSERT INTO "utilisateurs" ("id", "email", "emailVerified", "nom", "prenom", "poste", "role", "departementId", "societeId", "actif", "creeLe", "modifieLe")
          VALUES ($1, $2, true, $3, $4, $5, 'EMPLOYEE', $6, $7, true, now(), now())`,
@@ -300,30 +321,13 @@ describe("better-auth adapter (T1 #164)", { timeout: TIMEOUT }, () => {
 
       // Apply the migrations as they stood before the attestation backfill
       // (same apply semantics as the PGlite harness).
-      for (const tag of tags.slice(0, backfillIdx)) {
-        for (const stmt of loadAndCleanSql(tag)) {
-          try {
-            await client.exec(stmt)
-          } catch {
-            /* skip statements that fail on a fresh database */
-          }
-        }
-      }
+      await applyMigrationsUpTo(client, backfillIdx)
 
       // Seed the pre-migration state: rows written before the attestation was
       // part of provisioning carry emailVerified = false.  The inserts are raw
       // — nothing backfills at insert time, so the migration is the only
       // thing that can attest these rows.
-      const societeId = crypto.randomUUID()
-      const departementId = crypto.randomUUID()
-      await client.query(
-        `INSERT INTO "societes" ("id", "nom", "modifieLe") VALUES ($1, $2, now())`,
-        [societeId, "Acme"]
-      )
-      await client.query(
-        `INSERT INTO "departements" ("id", "nom", "societeId") VALUES ($1, $2, $3)`,
-        [departementId, "RH", societeId]
-      )
+      const { societeId, departementId } = await seedSocieteDepartement(client)
       const legacyEmails = ["legacy1@acme.ma", "legacy2@acme.ma"]
       for (const email of legacyEmails) {
         await client.query(
@@ -510,6 +514,13 @@ describe("better-auth adapter (T1 #164)", { timeout: TIMEOUT }, () => {
       await expect(
         callGate("inconnu@acme.ma", { withOAuth: false })
       ).resolves.toBeUndefined()
+    })
+
+    it("defers when there is no e-mail (engine keeps its own codes)", async () => {
+      // Refusal contract: the gate refuses only an identity it can match; a
+      // missing e-mail keeps the engine's codes (email_not_found, …), so the
+      // payload passes through and the generic fallback message speaks.
+      await expect(callGate(null)).resolves.toBeUndefined()
     })
 
     it("matches the stored e-mail case-insensitively", async () => {
