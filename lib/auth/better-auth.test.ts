@@ -288,6 +288,83 @@ describe("better-auth adapter (T1 #164)", { timeout: TIMEOUT }, () => {
     })
   })
 
+  describe("attestation backfill (#204)", { timeout: TIMEOUT }, () => {
+    it("marks every pre-existing Utilisateur row with the attestation", async () => {
+      const client = await PGlite.create()
+      const tags = migrationTags()
+      const backfillTag = tags.find((tag) =>
+        tag.includes("attestation_email_verified")
+      )
+      expect(backfillTag).toBe("0007_attestation_email_verified")
+      const backfillIdx = tags.indexOf(backfillTag!)
+
+      // Apply the migrations as they stood before the attestation backfill
+      // (same apply semantics as the PGlite harness).
+      for (const tag of tags.slice(0, backfillIdx)) {
+        for (const stmt of loadAndCleanSql(tag)) {
+          try {
+            await client.exec(stmt)
+          } catch {
+            /* skip statements that fail on a fresh database */
+          }
+        }
+      }
+
+      // Seed the pre-migration state: rows written before the attestation was
+      // part of provisioning carry emailVerified = false.  The inserts are raw
+      // — nothing backfills at insert time, so the migration is the only
+      // thing that can attest these rows.
+      const societeId = crypto.randomUUID()
+      const departementId = crypto.randomUUID()
+      await client.query(
+        `INSERT INTO "societes" ("id", "nom", "modifieLe") VALUES ($1, $2, now())`,
+        [societeId, "Acme"]
+      )
+      await client.query(
+        `INSERT INTO "departements" ("id", "nom", "societeId") VALUES ($1, $2, $3)`,
+        [departementId, "RH", societeId]
+      )
+      const legacyEmails = ["legacy1@acme.ma", "legacy2@acme.ma"]
+      for (const email of legacyEmails) {
+        await client.query(
+          `INSERT INTO "utilisateurs" ("id", "email", "emailVerified", "nom", "prenom", "poste", "role", "departementId", "societeId", "actif", "creeLe", "modifieLe")
+           VALUES ($1, $2, false, $3, $4, $5, 'EMPLOYEE', $6, $7, true, now(), now())`,
+          [
+            crypto.randomUUID(),
+            email,
+            "Dupont",
+            "Jean",
+            "Développeur",
+            departementId,
+            societeId,
+          ]
+        )
+      }
+
+      const before = await client.query<{ atteste: boolean }>(
+        `SELECT "emailVerified" AS atteste FROM "utilisateurs"`
+      )
+      expect(before.rows).toHaveLength(legacyEmails.length)
+      expect(before.rows.every((row) => row.atteste === false)).toBe(true)
+
+      // Apply the attestation backfill (and anything after it).
+      for (const tag of tags.slice(backfillIdx)) {
+        for (const stmt of loadAndCleanSql(tag)) {
+          await client.exec(stmt)
+        }
+      }
+
+      const { rows } = await client.query<{
+        email: string
+        emailVerified: boolean
+      }>(`SELECT "email", "emailVerified" FROM "utilisateurs" ORDER BY "email"`)
+      expect(rows).toHaveLength(legacyEmails.length)
+      expect(rows.every((row) => row.emailVerified === true)).toBe(true)
+      // The backfill flips the attestation only — identities are untouched.
+      expect(rows.map((row) => row.email)).toEqual(legacyEmails)
+    })
+  })
+
   describe("adapter config (AC2)", () => {
     it("maps the user model onto the utilisateurs table", () => {
       expect(auth.options.user.modelName).toBe("utilisateurs")

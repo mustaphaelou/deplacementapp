@@ -13,7 +13,7 @@
  * exists to catch.
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest"
-import { sql } from "drizzle-orm"
+import { eq, sql } from "drizzle-orm"
 import { createPgliteDb } from "../test/create-pglite-db"
 import type { PgliteDb } from "../test/create-pglite-db"
 import * as schema from "../../db/schema"
@@ -22,6 +22,7 @@ import type { DrizzleDb } from "../../db"
 import { account } from "../../db/schema/auth-tables"
 import { GOOGLE_REFUSAL_CODES, googleRefusalMessage } from "./google-refusals"
 import type { GoogleRefusalCode } from "./google-refusals"
+import { UtilisateurService } from "../utilisateur-service"
 
 const TIMEOUT = 30_000
 const TEST_SECRET = "test-secret-0123456789-abcdefghijklmnopqrstuvwxyz"
@@ -134,6 +135,7 @@ describe("Google callback seam (#203)", { timeout: TIMEOUT }, () => {
   })
 
   beforeEach(async () => {
+    await db.execute(sql`DELETE FROM journal_audit`)
     await db.execute(sql`DELETE FROM session`)
     await db.execute(sql`DELETE FROM account`)
     await db.execute(sql`DELETE FROM utilisateurs`)
@@ -199,6 +201,39 @@ describe("Google callback seam (#203)", { timeout: TIMEOUT }, () => {
       userId,
       updatedAt: new Date(),
     })
+  }
+
+  /** Provision a Utilisateur through the real service path — the same call the
+   * administration API makes.  The attestation these regressions rely on must
+   * come from provisioning itself; hand-setting `emailVerified` in a raw
+   * fixture would defeat the point.  The service's audit write needs an actor
+   * row, so one is seeded (the actor is not the sign-in subject). */
+  async function provisionUtilisateur({
+    email,
+    googleAuthEnabled = true,
+  }: {
+    email: string
+    googleAuthEnabled?: boolean
+  }): Promise<string> {
+    const actorId = await seedUtilisateur({
+      email: `actor-${crypto.randomUUID()}@acme.ma`,
+      googleAuthEnabled: false,
+    })
+    const service = new UtilisateurService(db as unknown as DrizzleDb)
+    const created = await service.create(
+      {
+        email,
+        nom: "Dupont",
+        prenom: "Jean",
+        poste: "Développeur",
+        role: "EMPLOYEE",
+        societeId,
+        departementId,
+        googleAuthEnabled,
+      },
+      actorId
+    )
+    return created.id
   }
 
   /** Mint OAuth state through the engine's sign-in endpoint, exactly as the
@@ -395,6 +430,101 @@ describe("Google callback seam (#203)", { timeout: TIMEOUT }, () => {
     expect(accounts).toHaveLength(1)
     expect(accounts[0].providerId).toBe("google")
     expect(accounts[0].accountId).toBe("google-sub-alice")
+  })
+
+  // ----------------- provisioned fixture: attested e-mails (#204)
+  it("links a Utilisateur provisioned through the real path — never account_not_linked", async () => {
+    const utilisateurId = await provisionUtilisateur({
+      email: "provisionnee@acme.ma",
+    })
+
+    // The attestation is provisioning's own write: if the service ever stops
+    // attesting, this fails before the callback gets a chance to.
+    const [subject] = await db
+      .select({ emailVerified: schema.utilisateurs.emailVerified })
+      .from(schema.utilisateurs)
+      .where(eq(schema.utilisateurs.id, utilisateurId))
+      .limit(1)
+    expect(subject.emailVerified).toBe(true)
+
+    idToken = makeIdToken({
+      sub: "google-sub-provisionnee",
+      email: "provisionnee@acme.ma",
+    })
+
+    const { state, cookie } = await mintState()
+    const res = await invokeCallback({
+      code: "provisioned-first-sign-in",
+      state,
+      cookie,
+    })
+
+    expect(res.status).toBe(302)
+    const redirect = redirectFrom(res)
+    expect(redirect.pathname).toBe("/")
+    expect(redirect.error).toBeNull()
+    // The enabled path can never end in the linking-gate refusal.
+    expect(redirect.error).not.toBe("account_not_linked")
+    expect(hasSessionCookie(res)).toBe(true)
+
+    // Provisioning writes the credential row; the callback adds the Google
+    // row.  Exactly one Google identity links to the Utilisateur.
+    const googleAccounts = (await db.query.account.findMany()).filter(
+      (row) => row.providerId === "google"
+    )
+    expect(googleAccounts).toHaveLength(1)
+    expect(googleAccounts[0].accountId).toBe("google-sub-provisionnee")
+    expect(googleAccounts[0].userId).toBe(utilisateurId)
+
+    const sessions = await db.query.session.findMany()
+    expect(sessions).toHaveLength(1)
+    expect(sessions[0].userId).toBe(utilisateurId)
+  })
+
+  it("signs a provisioned Utilisateur back in — linked once, session every time", async () => {
+    const utilisateurId = await provisionUtilisateur({
+      email: "provisionnee@acme.ma",
+    })
+    idToken = makeIdToken({
+      sub: "google-sub-provisionnee",
+      email: "provisionnee@acme.ma",
+    })
+
+    const first = await mintState()
+    const firstRes = await invokeCallback({
+      code: "provisioned-link",
+      state: first.state,
+      cookie: first.cookie,
+    })
+    expect(firstRes.status).toBe(302)
+    expect(redirectFrom(firstRes).pathname).toBe("/")
+
+    const second = await mintState()
+    const secondRes = await invokeCallback({
+      code: "provisioned-returning-sign-in",
+      state: second.state,
+      cookie: second.cookie,
+    })
+
+    expect(secondRes.status).toBe(302)
+    const redirect = redirectFrom(secondRes)
+    expect(redirect.pathname).toBe("/")
+    expect(redirect.error).toBeNull()
+    expect(redirect.error).not.toBe("account_not_linked")
+    expect(hasSessionCookie(secondRes)).toBe(true)
+
+    // The second sign-in adds a session; it never duplicates the link.
+    const googleAccounts = (await db.query.account.findMany()).filter(
+      (row) => row.providerId === "google"
+    )
+    expect(googleAccounts).toHaveLength(1)
+    expect(googleAccounts[0].accountId).toBe("google-sub-provisionnee")
+
+    const sessions = await db.query.session.findMany()
+    expect(sessions).toHaveLength(2)
+    expect(sessions.every((session) => session.userId === utilisateurId)).toBe(
+      true
+    )
   })
 
   // ------------------------------------------------------------ refusals

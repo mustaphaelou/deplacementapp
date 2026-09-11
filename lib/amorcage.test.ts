@@ -92,6 +92,10 @@ describe("Amorcage module", { timeout: TIMEOUT }, () => {
       role: "GENERAL_DIRECTION",
       actif: true,
     })
+    // The administrator's provisioning act is the e-mail attestation: the
+    // amorçage first Utilisateur must carry it for a first Google sign-in to
+    // link instead of being refused.
+    expect(userRow.emailVerified).toBe(true)
 
     const [cred] = await pgliteDb
       .select()
