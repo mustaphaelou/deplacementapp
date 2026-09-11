@@ -1,21 +1,7 @@
-import { ETAPE_LABELS } from "@/lib/demande-presentation"
+import type { PresentationTone } from "@/lib/demande-presentation"
 import { cn } from "@/lib/utils"
 
-export type StatusTone = "neutral" | "pending" | "success" | "danger"
-
-export function statusOf(d: {
-  etape: string
-  decision: string
-}): { label: string; tone: StatusTone } {
-  if (d.decision === "APPROVED") return { label: "Approuvée", tone: "success" }
-  if (d.decision === "REJECTED") return { label: "Rejetée", tone: "danger" }
-  if (d.decision === "WITHDRAWN") return { label: "Retirée", tone: "neutral" }
-  if (d.etape === "FINAL") return { label: "Finalisée", tone: "success" }
-  if (d.etape === "DRAFT") return { label: "Brouillon", tone: "neutral" }
-  return { label: ETAPE_LABELS[d.etape] ?? d.etape, tone: "pending" }
-}
-
-const TONE_CLASSES: Record<StatusTone, string> = {
+const TONE_CLASSES: Record<PresentationTone, string> = {
   neutral: "bg-[#F1F1EF] text-[#37352F] dark:bg-zinc-800/60 dark:text-zinc-300",
   pending: "bg-[#FBF0DB] text-[#8B5E0E] dark:bg-amber-900/30 dark:text-amber-400",
   success:
@@ -29,7 +15,7 @@ export function StatusPill({
   className,
 }: {
   label: string
-  tone: StatusTone
+  tone: PresentationTone
   className?: string
 }) {
   return (
