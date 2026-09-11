@@ -92,6 +92,9 @@ export class UtilisateurService {
         .values({
           id: userId,
           email: data.email,
+          // The administrator's provisioning act is the e-mail attestation:
+          // it is written here, by the service — never a toggle.
+          emailVerified: true,
           googleAuthEnabled: data.googleAuthEnabled ?? false,
           nom: data.nom,
           prenom: data.prenom,

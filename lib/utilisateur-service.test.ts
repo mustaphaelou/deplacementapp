@@ -175,6 +175,9 @@ describe("UtilisateurService", { timeout: TIMEOUT }, () => {
         .where(eq(utilisateurs.id, result.id))
       expect(row).toBeDefined()
       expect(row.email).toBe("new@test.com")
+      // The administrator's provisioning act is the e-mail attestation: it is
+      // written by the service, never hand-set and never a toggle.
+      expect(row.emailVerified).toBe(true)
 
       const [auditRow] = await pgliteDb
         .select()
