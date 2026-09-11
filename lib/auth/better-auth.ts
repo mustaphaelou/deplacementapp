@@ -4,7 +4,7 @@ import { drizzleAdapter } from "@better-auth/drizzle-adapter"
 import { hash as bcryptHash, compare as bcryptCompare } from "bcryptjs"
 import type { DrizzleDb } from "../../db"
 import { db } from "../../db"
-import { assertGoogleSignInAllowed } from "./google-guard"
+import { createGoogleGate } from "./google-guard"
 
 export const BCRYPT_COST = 12
 
@@ -24,8 +24,9 @@ export interface BetterAuthOptions {
  * server-owned `additionalFields`).  Email+password is a closed pool whose
  * hashes are bcryptjs at cost 12 (hashes seeded from the legacy column during
  * the T3 data migration keep verifying); Google sign-in does not auto-provision
- * and is vetoed by `assertGoogleSignInAllowed`.  `nextCookies` is registered
- * last.
+ * and is gated by `user.validateUserInfo` (see `google-guard.ts`), which refuses
+ * a non-matching identity by returning a coded refusal the engine redirects
+ * with.  `nextCookies` is registered last.
  */
 export function createAuth(db: DrizzleDb, options: BetterAuthOptions = {}) {
   return betterAuth({
@@ -48,10 +49,6 @@ export function createAuth(db: DrizzleDb, options: BetterAuthOptions = {}) {
         clientSecret:
           options.google?.clientSecret ?? process.env.AUTH_GOOGLE_SECRET ?? "",
         disableImplicitSignUp: true,
-        mapProfileToUser: async (profile) => {
-          await assertGoogleSignInAllowed(db, profile.email)
-          return {}
-        },
       },
     },
     user: {
@@ -71,6 +68,7 @@ export function createAuth(db: DrizzleDb, options: BetterAuthOptions = {}) {
         actif: { type: "boolean", input: false },
         googleAuthEnabled: { type: "boolean", input: false },
       },
+      validateUserInfo: createGoogleGate(db),
     },
     plugins: [nextCookies()],
   })

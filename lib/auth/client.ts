@@ -31,7 +31,14 @@ export async function signInWithCredentials(email: string, password: string) {
 }
 
 export async function signInWithGoogle() {
-  await authClient.signIn.social({ provider: "google", callbackURL: "/" })
+  await authClient.signIn.social({
+    provider: "google",
+    callbackURL: "/",
+    // `disableImplicitSignUp` is set on the provider, so the engine refuses an
+    // unknown e-mail before the gate unless the request asks for sign-up; the
+    // request carries the ask and the gate (user.validateUserInfo) decides.
+    requestSignUp: true,
+  })
 }
 
 export async function signOut(redirectTo = "/login") {

@@ -13,10 +13,7 @@ import { account, session } from "../../db/schema/auth-tables"
 import { utilisateurs } from "../../db/schema/utilisateurs"
 import { createAuth, BCRYPT_COST } from "./better-auth"
 import { setPassword, CREDENTIAL_PROVIDER_ID } from "./set-password"
-import {
-  assertGoogleSignInAllowed,
-  GOOGLE_VETO_REASONS,
-} from "./google-guard"
+import { GOOGLE_REFUSAL_CODES, googleRefusalMessage } from "./google-refusals"
 import type { DrizzleDb } from "../../db"
 
 const TIMEOUT = 30_000
@@ -335,6 +332,13 @@ describe("better-auth adapter (T1 #164)", { timeout: TIMEOUT }, () => {
       expect(auth.options.socialProviders.google.disableImplicitSignUp).toBe(true)
     })
 
+    it("wires the Google gate as user.validateUserInfo (no profile-map veto)", () => {
+      expect(typeof auth.options.user.validateUserInfo).toBe("function")
+      expect(Object.keys(auth.options.socialProviders.google)).not.toContain(
+        "mapProfileToUser"
+      )
+    })
+
     it("registers nextCookies as the last plugin", () => {
       const plugins = auth.options.plugins ?? []
       expect(plugins.some((p) => p.id === "next-cookies")).toBe(true)
@@ -342,58 +346,103 @@ describe("better-auth adapter (T1 #164)", { timeout: TIMEOUT }, () => {
     })
   })
 
-  describe("Google veto (AC3)", () => {
-    it("refuses a sign-in for a missing Utilisateur", async () => {
-      await expect(
-        assertGoogleSignInAllowed(db as unknown as DrizzleDb, "inconnu@acme.ma")
-      ).rejects.toMatchObject({
-        statusCode: 403,
-        message: GOOGLE_VETO_REASONS.UTILISATEUR_INTROUVABLE,
-      })
+  describe("Google gate (AC3)", () => {
+    // The gate is exercised through the public options contract — the same
+    // entry point the engine calls — and the refusal payload is what a browser
+    // ends up seeing as `?error=…&error_description=…`.
+    function callGate(
+      email: string | null,
+      options: { providerId?: string | null; withOAuth?: boolean } = {}
+    ) {
+      const { providerId = "google", withOAuth = true } = options
+      const validate = auth.options.user.validateUserInfo
+      expect(typeof validate).toBe("function")
+      return validate!({
+        user: email === null ? {} : { email },
+        source: {
+          method: "oauth" as const,
+          action: "create-user" as const,
+          ...(withOAuth ? { oauth: { providerId: providerId! } } : {}),
+        },
+      }) as Promise<{ error: string; errorDescription?: string } | undefined>
+    }
+
+    it("refuses a Google sign-in for an unknown e-mail", async () => {
+      const refusal = await callGate("inconnu@acme.ma")
+      expect(refusal?.error).toBe(GOOGLE_REFUSAL_CODES.UTILISATEUR_INTROUVABLE)
+      expect(refusal?.errorDescription).toBe(
+        googleRefusalMessage(GOOGLE_REFUSAL_CODES.UTILISATEUR_INTROUVABLE)
+      )
     })
 
-    it("refuses a sign-in for a deactivated Utilisateur", async () => {
+    it("refuses a Google sign-in for a deactivated Utilisateur", async () => {
       await db
         .update(utilisateurs)
         .set({ actif: false })
         .where(eq(utilisateurs.id, utilisateurId))
-      await expect(
-        assertGoogleSignInAllowed(db as unknown as DrizzleDb, email)
-      ).rejects.toMatchObject({
-        statusCode: 403,
-        message: GOOGLE_VETO_REASONS.UTILISATEUR_DESACTIVE,
-      })
+
+      const refusal = await callGate(email)
+      expect(refusal?.error).toBe(GOOGLE_REFUSAL_CODES.UTILISATEUR_DESACTIVE)
+      expect(refusal?.errorDescription).toBe(
+        googleRefusalMessage(GOOGLE_REFUSAL_CODES.UTILISATEUR_DESACTIVE)
+      )
     })
 
-    it("refuses a sign-in for a Utilisateur without Google enabled", async () => {
+    it("refuses a Google sign-in for a Utilisateur without Google enabled", async () => {
       await db
         .update(utilisateurs)
         .set({ googleAuthEnabled: false })
         .where(eq(utilisateurs.id, utilisateurId))
-      await expect(
-        assertGoogleSignInAllowed(db as unknown as DrizzleDb, email)
-      ).rejects.toMatchObject({
-        statusCode: 403,
-        message: GOOGLE_VETO_REASONS.GOOGLE_NON_ACTIVE,
-      })
+
+      const refusal = await callGate(email)
+      expect(refusal?.error).toBe(GOOGLE_REFUSAL_CODES.GOOGLE_NON_ACTIVE)
+      expect(refusal?.errorDescription).toBe(
+        googleRefusalMessage(GOOGLE_REFUSAL_CODES.GOOGLE_NON_ACTIVE)
+      )
+    })
+
+    it("gives every refusal a non-empty description", async () => {
+      const unknown = await callGate("inconnu@acme.ma")
+
+      await db
+        .update(utilisateurs)
+        .set({ actif: false })
+        .where(eq(utilisateurs.id, utilisateurId))
+      const deactivated = await callGate(email)
+
+      await db
+        .update(utilisateurs)
+        .set({ actif: true, googleAuthEnabled: false })
+        .where(eq(utilisateurs.id, utilisateurId))
+      const notEnabled = await callGate(email)
+
+      for (const refusal of [unknown, deactivated, notEnabled]) {
+        expect(typeof refusal?.error).toBe("string")
+        expect(refusal!.errorDescription!.length).toBeGreaterThan(0)
+      }
     })
 
     it("allows an active, Google-enabled Utilisateur", async () => {
+      await expect(callGate(email)).resolves.toBeUndefined()
+    })
+
+    it("allows non-Google sources without consulting the utilisateurs", async () => {
       await expect(
-        assertGoogleSignInAllowed(db as unknown as DrizzleDb, email)
+        callGate("inconnu@acme.ma", { providerId: "github" })
+      ).resolves.toBeUndefined()
+      await expect(
+        callGate("inconnu@acme.ma", { withOAuth: false })
       ).resolves.toBeUndefined()
     })
 
-    it("wires the veto into the configured Google mapProfileToUser", async () => {
-      const mapProfile = auth.options.socialProviders.google.mapProfileToUser
-      expect(typeof mapProfile).toBe("function")
-      await expect(
-        mapProfile!({ email: "inconnu@acme.ma" } as never)
-      ).rejects.toMatchObject({
-        statusCode: 403,
-        message: GOOGLE_VETO_REASONS.UTILISATEUR_INTROUVABLE,
-      })
-      await expect(mapProfile!({ email } as never)).resolves.toBeDefined()
+    it("matches the stored e-mail case-insensitively", async () => {
+      await db
+        .update(utilisateurs)
+        .set({ email: "Jean.Dupont@Acme.ma" })
+        .where(eq(utilisateurs.id, utilisateurId))
+
+      await expect(callGate("jean.dupont@acme.ma")).resolves.toBeUndefined()
+      await expect(callGate("JEAN.DUPONT@ACME.MA")).resolves.toBeUndefined()
     })
   })
 
