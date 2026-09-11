@@ -1,26 +1,3 @@
-export const ETAPE_LABELS: Record<string, string> = {
-  DRAFT: "Brouillon",
-  MANAGER_REVIEW: "En attente (Manager)",
-  FINANCE_REVIEW: "En attente (Finance)",
-  DIRECTION_REVIEW: "En attente (Direction)",
-  FINAL: "Finalisé",
-}
-
-export const DECISION_LABELS: Record<string, string> = {
-  PENDING: "En cours",
-  APPROVED: "Approuvée",
-  REJECTED: "Rejetée",
-  WITHDRAWN: "Retirée",
-}
-
-export const ETAPE_VARIANTS: Record<string, string> = {
-  DRAFT: "outline",
-  MANAGER_REVIEW: "secondary",
-  FINANCE_REVIEW: "secondary",
-  DIRECTION_REVIEW: "secondary",
-  FINAL: "default",
-}
-
 export const TRANSPORT_LABELS: Record<string, string> = {
   VOITURE_PERSONNELLE: "Voiture personnelle",
   VOITURE_SOCIETE: "Voiture de la société",

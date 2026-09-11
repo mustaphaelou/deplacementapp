@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { renderToStaticMarkup } from "react-dom/server"
-import { ETAPE_LABELS, formatCurrency } from "@/lib/constants"
+import { formatCurrency } from "@/lib/constants"
+import { ETAPE_LABELS } from "@/lib/demande-presentation"
 
 const { mockHasAnyRole } = vi.hoisted(() => ({
   mockHasAnyRole: (role: string, allowed: readonly string[]) =>

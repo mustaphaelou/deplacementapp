@@ -1,7 +1,7 @@
 "use client"
 
 import { Badge } from "@/components/ui/badge"
-import { ETAPE_LABELS } from "@/lib/constants"
+import { ETAPE_LABELS } from "@/lib/demande-presentation"
 
 const variantMap: Record<
   string,

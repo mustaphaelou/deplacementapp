@@ -1,4 +1,4 @@
-import { ETAPE_LABELS } from "@/lib/constants"
+import { ETAPE_LABELS } from "@/lib/demande-presentation"
 import { cn } from "@/lib/utils"
 
 export type StatusTone = "neutral" | "pending" | "success" | "danger"

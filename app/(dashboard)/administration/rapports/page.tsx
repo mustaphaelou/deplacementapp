@@ -2,7 +2,8 @@
 import { redirect } from "next/navigation"
 import { countByEtape, aggregateBudget } from "@/lib/demande"
 import type { Etape } from "@/lib/workflow"
-import { formatCurrency, ETAPE_LABELS } from "@/lib/constants"
+import { formatCurrency } from "@/lib/constants"
+import { ETAPE_LABELS } from "@/lib/demande-presentation"
 import { DashboardCard } from "@/components/ui/dashboard-card"
 import { Button } from "@/components/ui/button"
 import {

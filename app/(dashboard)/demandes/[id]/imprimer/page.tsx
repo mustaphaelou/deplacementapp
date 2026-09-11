@@ -8,9 +8,9 @@ import {
   formatCurrency,
   formatDate,
   TRANSPORT_LABELS,
-  ETAPE_LABELS,
   DEFAULT_SOCIETE_NOM,
 } from "@/lib/constants"
+import { ETAPE_LABELS } from "@/lib/demande-presentation"
 import { parseMotif, type DemandeWithRelations } from "@/lib/demande-types"
 
 export default async function ImprimerPage({
