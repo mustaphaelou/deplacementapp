@@ -167,7 +167,7 @@ export const PDF_TONE_COLORS: Record<PresentationTone, string> = {
   danger: "#dc2626",
 }
 
-export function pdfStatus(data: {
+export function pdfChip(data: {
   etape: string
   decision: string
 }): { label: string; color: string } {
@@ -180,7 +180,7 @@ export function pdfStatus(data: {
 
 export function TravelRequestPdf({ data }: { data: PdfRenderData }) {
   const isDraft = data.etape === "DRAFT"
-  const { label: statusLabel, color: statusColor } = pdfStatus(data)
+  const { label: statusLabel, color: statusColor } = pdfChip(data)
   const societeNom = data.branding?.nom ?? DEFAULT_SOCIETE_NOM
   const accentColor = data.branding?.couleurPrimaire
   const transportLabel =
