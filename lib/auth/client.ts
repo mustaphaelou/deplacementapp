@@ -34,6 +34,10 @@ export async function signInWithGoogle() {
   await authClient.signIn.social({
     provider: "google",
     callbackURL: "/",
+    // A refused sign-in must land where the refusal vocabulary is rendered,
+    // not on a raw engine error page: the engine redirects it to the login
+    // page carrying the code and the French message (google-refusals.ts).
+    errorCallbackURL: "/login",
     // `disableImplicitSignUp` is set on the provider, so the engine refuses an
     // unknown e-mail before the gate unless the request asks for sign-up; the
     // request carries the ask and the gate (user.validateUserInfo) decides.
