@@ -99,7 +99,7 @@ describe("Amorcage module", { timeout: TIMEOUT }, () => {
       .where(eq(account.userId, userRow.id))
       .limit(1)
     expect(cred.providerId).toBe(CREDENTIAL_PROVIDER_ID)
-    expect(cred.accountId).toBe("admin@ma-societe.ma")
+    expect(cred.accountId).toBe(userRow.id)
     expect(cred.password).toBeDefined()
     expect(cred.password).not.toBe("securePassword123")
 

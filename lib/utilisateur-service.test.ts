@@ -304,7 +304,7 @@ describe("UtilisateurService", { timeout: TIMEOUT }, () => {
       await pgliteDb.insert(schema.utilisateurs).values(targetUser)
       await pgliteDb.insert(account).values({
         id: crypto.randomUUID(),
-        accountId: targetUser.email,
+        accountId: targetUser.id,
         providerId: CREDENTIAL_PROVIDER_ID,
         userId: targetUser.id,
         password: "$hashed$",

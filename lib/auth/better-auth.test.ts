@@ -1,10 +1,13 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest"
 import { eq, sql } from "drizzle-orm"
 import { hash as bcryptHash, compare as bcryptCompare } from "bcryptjs"
+import { PGlite } from "@electric-sql/pglite"
+import { drizzle } from "drizzle-orm/pglite"
 import fs from "fs"
 import path from "path"
 import { createPgliteDb } from "../test/create-pglite-db"
 import type { PgliteDb } from "../test/create-pglite-db"
+import { migrationTags, loadAndCleanSql } from "../test/create-pglite-db"
 import * as schema from "../../db/schema"
 import { account, session } from "../../db/schema/auth-tables"
 import { utilisateurs } from "../../db/schema/utilisateurs"
@@ -119,7 +122,7 @@ describe("better-auth adapter (T1 #164)", { timeout: TIMEOUT }, () => {
       })
       await db.insert(account).values({
         id: crypto.randomUUID(),
-        accountId: email,
+        accountId: utilisateurId,
         providerId: CREDENTIAL_PROVIDER_ID,
         userId: utilisateurId,
         password: "$hashed$",
@@ -208,6 +211,86 @@ describe("better-auth adapter (T1 #164)", { timeout: TIMEOUT }, () => {
     })
   })
 
+  describe("credential re-key migration (#202)", { timeout: TIMEOUT }, () => {
+    it("re-keys legacy e-mail-keyed credential rows onto the Utilisateur id and keeps sign-in green", async () => {
+      const client = await PGlite.create()
+      const tags = migrationTags()
+      const rekeyTag = tags.find((tag) => tag.includes("rekey_credential"))
+      expect(rekeyTag).toBeDefined()
+      const rekeyIdx = tags.indexOf(rekeyTag!)
+
+      // Apply the migrations as they stood before the re-key (same apply
+      // semantics as the PGlite harness, including the skip of statements
+      // that fail on a fresh database).
+      for (const tag of tags.slice(0, rekeyIdx)) {
+        for (const stmt of loadAndCleanSql(tag)) {
+          try {
+            await client.exec(stmt)
+          } catch {
+            /* skip statements that fail on a fresh database */
+          }
+        }
+      }
+
+      // Seed the pre-migration state: a Utilisateur whose credential row still
+      // carries the sign-in e-mail as its account key, with a legacy bcrypt hash.
+      const societeId = crypto.randomUUID()
+      const departementId = crypto.randomUUID()
+      const utilisateurId = crypto.randomUUID()
+      const email = "legacy@acme.ma"
+      const legacyHash = await bcryptHash("motdepasse-herite", BCRYPT_COST)
+      await client.query(
+        `INSERT INTO "societes" ("id", "nom", "modifieLe") VALUES ($1, $2, now())`,
+        [societeId, "Acme"]
+      )
+      await client.query(
+        `INSERT INTO "departements" ("id", "nom", "societeId") VALUES ($1, $2, $3)`,
+        [departementId, "RH", societeId]
+      )
+      await client.query(
+        `INSERT INTO "utilisateurs" ("id", "email", "emailVerified", "nom", "prenom", "poste", "role", "departementId", "societeId", "actif", "creeLe", "modifieLe")
+         VALUES ($1, $2, true, $3, $4, $5, 'EMPLOYEE', $6, $7, true, now(), now())`,
+        [utilisateurId, email, "Dupont", "Jean", "Développeur", departementId, societeId]
+      )
+      await client.query(
+        `INSERT INTO "account" ("id", "accountId", "providerId", "userId", "password", "createdAt", "updatedAt")
+         VALUES ($1, $2, 'credential', $3, $4, now(), now())`,
+        [crypto.randomUUID(), email, utilisateurId, legacyHash]
+      )
+
+      // Apply the new migration: re-key, then the unique identity index.
+      for (const tag of tags.slice(rekeyIdx)) {
+        for (const stmt of loadAndCleanSql(tag)) {
+          await client.exec(stmt)
+        }
+      }
+
+      const { rows } = await client.query<{ accountId: string }>(
+        `SELECT "accountId" FROM "account" WHERE "userId" = $1 AND "providerId" = 'credential'`,
+        [utilisateurId]
+      )
+      expect(rows).toHaveLength(1)
+      expect(rows[0].accountId).toBe(utilisateurId)
+
+      const { rows: indexRows } = await client.query<{ indexname: string }>(
+        `SELECT indexname FROM pg_indexes WHERE tablename = 'account' AND indexname = 'account_providerId_accountId_unique'`
+      )
+      expect(indexRows).toHaveLength(1)
+
+      // The migrated database still signs the Utilisateur in with the legacy hash.
+      const migratedDb = drizzle(client, { schema })
+      const migratedAuth = createAuth(migratedDb as unknown as DrizzleDb, {
+        secret: TEST_SECRET,
+      })
+      const result = await migratedAuth.api.signInEmail({
+        body: { email, password: "motdepasse-herite" },
+        headers: new Headers({ origin: "http://localhost:3000" }),
+      })
+      expect(result.user.id).toBe(utilisateurId)
+      expect(result.user.email).toBe(email)
+    })
+  })
+
   describe("adapter config (AC2)", () => {
     it("maps the user model onto the utilisateurs table", () => {
       expect(auth.options.user.modelName).toBe("utilisateurs")
@@ -226,6 +309,7 @@ describe("better-auth adapter (T1 #164)", { timeout: TIMEOUT }, () => {
         "poste",
         "role",
         "departementId",
+        "societeId",
         "actif",
         "googleAuthEnabled",
       ] as const) {
@@ -314,7 +398,7 @@ describe("better-auth adapter (T1 #164)", { timeout: TIMEOUT }, () => {
   })
 
   describe("setPassword (AC4)", () => {
-    it("creates the credential row keyed on the current email", async () => {
+    it("creates the credential row keyed on the Utilisateur id", async () => {
       await setPassword(db as unknown as DrizzleDb, utilisateurId, "motdepasse-123")
 
       const rows = await db
@@ -323,7 +407,7 @@ describe("better-auth adapter (T1 #164)", { timeout: TIMEOUT }, () => {
         .where(eq(account.userId, utilisateurId))
       expect(rows).toHaveLength(1)
       expect(rows[0].providerId).toBe(CREDENTIAL_PROVIDER_ID)
-      expect(rows[0].accountId).toBe(email)
+      expect(rows[0].accountId).toBe(utilisateurId)
       await expect(
         bcryptCompare("motdepasse-123", rows[0].password!)
       ).resolves.toBe(true)
@@ -352,21 +436,24 @@ describe("better-auth adapter (T1 #164)", { timeout: TIMEOUT }, () => {
       ).resolves.toBe(false)
     })
 
-    it("keeps the row identifier in sync when the email changes", async () => {
-      const newEmail = "jean.renove@acme.ma"
-      await db
-        .update(utilisateurs)
-        .set({ email: newEmail })
-        .where(eq(utilisateurs.id, utilisateurId))
+    it("re-keys a legacy e-mail-keyed row on the upsert path", async () => {
+      await db.insert(account).values({
+        id: crypto.randomUUID(),
+        accountId: email,
+        providerId: CREDENTIAL_PROVIDER_ID,
+        userId: utilisateurId,
+        password: "$legacy$",
+        updatedAt: new Date(),
+      })
 
       await setPassword(db as unknown as DrizzleDb, utilisateurId, "motdepasse-123")
 
-      const [row] = await db
-        .select({ accountId: account.accountId })
+      const rows = await db
+        .select()
         .from(account)
         .where(eq(account.userId, utilisateurId))
-        .limit(1)
-      expect(row?.accountId).toBe(newEmail)
+      expect(rows).toHaveLength(1)
+      expect(rows[0].accountId).toBe(utilisateurId)
     })
 
     it("throws for an unknown Utilisateur", async () => {
@@ -381,7 +468,7 @@ describe("better-auth adapter (T1 #164)", { timeout: TIMEOUT }, () => {
       const migratedHash = await bcryptHash("motdepasse-herite", BCRYPT_COST)
       await db.insert(account).values({
         id: crypto.randomUUID(),
-        accountId: email,
+        accountId: utilisateurId,
         providerId: CREDENTIAL_PROVIDER_ID,
         userId: utilisateurId,
         password: migratedHash,

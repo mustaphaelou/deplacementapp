@@ -42,6 +42,13 @@
       "when": 1785785382277,
       "tag": "0005_parallel_omega_flight",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789147036470,
+      "tag": "0006_rekey_credential_accounts",
+      "breakpoints": true
     }
   ]
 }

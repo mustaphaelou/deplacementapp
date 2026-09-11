@@ -67,6 +67,7 @@ export function createAuth(db: DrizzleDb, options: BetterAuthOptions = {}) {
         poste: { type: "string", input: false },
         role: { type: "string", input: false },
         departementId: { type: "string", input: false },
+        societeId: { type: "string", input: false },
         actif: { type: "boolean", input: false },
         googleAuthEnabled: { type: "boolean", input: false },
       },
