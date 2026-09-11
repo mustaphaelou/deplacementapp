@@ -1,6 +1,10 @@
 import ReactPDF from "@react-pdf/renderer"
 import type { PdfRenderData } from "@/lib/pdf-types"
 import {
+  toDemandePresentation,
+  type PresentationTone,
+} from "@/lib/demande-presentation"
+import {
   TRANSPORT_LABELS,
   formatCurrency,
   formatDate,
@@ -152,18 +156,31 @@ const watermarkStyles = StyleSheet.create({
   },
 })
 
-function getStatusColor(etape: string, decision: string): string {
-  if (decision === "REJECTED" || decision === "WITHDRAWN") return "#dc2626"
-  if (decision === "APPROVED") return "#16a34a"
-  if (etape === "DRAFT") return borders.medium
-  if (etape !== "FINAL") return "#d97706"
-  return borders.medium
+// Styling stays per surface (the Pill has its tone → classes map, the Badge its
+// tone → variants): the PDF keeps its own tone → hex map, while the tone
+// itself comes from the presentation module, so documents and screen can never
+// disagree about an outcome's meaning.
+export const PDF_TONE_COLORS: Record<PresentationTone, string> = {
+  neutral: "#666666",
+  pending: "#d97706",
+  success: "#16a34a",
+  danger: "#dc2626",
+}
+
+export function pdfStatus(data: {
+  etape: string
+  decision: string
+}): { label: string; color: string } {
+  const presentation = toDemandePresentation(data)
+  return {
+    label: presentation.compactLabel,
+    color: PDF_TONE_COLORS[presentation.tone],
+  }
 }
 
 export function TravelRequestPdf({ data }: { data: PdfRenderData }) {
   const isDraft = data.etape === "DRAFT"
-  const statusLabel = data.etape
-  const statusColor = getStatusColor(data.etape, data.decision)
+  const { label: statusLabel, color: statusColor } = pdfStatus(data)
   const societeNom = data.branding?.nom ?? DEFAULT_SOCIETE_NOM
   const accentColor = data.branding?.couleurPrimaire
   const transportLabel =

@@ -1,7 +1,7 @@
 ﻿import { getAuthUser, hasAnyRole } from "@/lib/auth/server"
 import { redirect } from "next/navigation"
 import { countByEtape, aggregateBudget } from "@/lib/demande"
-import type { Etape } from "@/lib/workflow"
+import { PIPELINE } from "@/lib/workflow"
 import { formatCurrency } from "@/lib/constants"
 import { ETAPE_LABELS } from "@/lib/demande-presentation"
 import { DashboardCard } from "@/components/ui/dashboard-card"
@@ -34,7 +34,9 @@ export default async function RapportsPage() {
     redirect("/")
   }
 
-  const etapes = Object.keys(ETAPE_LABELS) as Etape[]
+  // Stage order is the pipeline definition — never a label map's insertion
+  // order.
+  const etapes = PIPELINE.map((stage) => stage.id)
   const etapeCounts = await Promise.all(
     etapes.map(async (etape) => ({
       etape,

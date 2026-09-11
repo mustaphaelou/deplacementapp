@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { renderToStaticMarkup } from "react-dom/server"
 import { formatCurrency } from "@/lib/constants"
+import { PIPELINE } from "@/lib/workflow"
 import { ETAPE_LABELS } from "@/lib/demande-presentation"
 
 const { mockHasAnyRole } = vi.hoisted(() => ({
@@ -67,10 +68,11 @@ describe("Rapports page", () => {
     const element = await RapportsPage()
     const html = renderToStaticMarkup(element)
 
-    const etapes = Object.keys(ETAPE_LABELS)
+    const etapes = PIPELINE.map((stage) => stage.id)
     expect(mockCountByEtape).toHaveBeenCalledTimes(etapes.length)
-    etapes.forEach((s) => {
-      expect(mockCountByEtape).toHaveBeenCalledWith(s)
+    // The stages are queried in pipeline order, stage by stage.
+    etapes.forEach((s, i) => {
+      expect(mockCountByEtape).toHaveBeenNthCalledWith(i + 1, s)
     })
 
     expect(mockAggregateBudget).toHaveBeenCalledWith(["FINAL"])
@@ -80,6 +82,39 @@ describe("Rapports page", () => {
     expect(html).toContain(String(total))
     expect(html).toContain(String(ETAPE_COUNTS["FINAL"]))
     expect(html).toContain(formatCurrency(45000))
+  })
+
+  it("renders the stage rows in PIPELINE order, not label-map insertion order", async () => {
+    const { getAuthUser } = await import("@/lib/auth/server")
+    const {
+      countByEtape: mockCountByEtape,
+      aggregateBudget: mockAggregateBudget,
+    } = await import("@/lib/demande")
+
+    ;(getAuthUser as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser())
+    ;(mockCountByEtape as ReturnType<typeof vi.fn>).mockImplementation(
+      (etape: string) => Promise.resolve(ETAPE_COUNTS[etape] ?? 0)
+    )
+    ;(mockAggregateBudget as ReturnType<typeof vi.fn>).mockResolvedValue(45000)
+
+    const { default: RapportsPage } = await import("./page")
+    const html = renderToStaticMarkup(await RapportsPage())
+
+    const pipelineOrder = PIPELINE.map((stage) => ETAPE_LABELS[stage.id])
+    expect(pipelineOrder).toEqual([
+      "Brouillon",
+      "En attente (Manager)",
+      "En attente (Finance)",
+      "En attente (Direction)",
+      "Finalisé",
+    ])
+
+    let previousIndex = -1
+    for (const label of pipelineOrder) {
+      const index = html.indexOf(label)
+      expect(index).toBeGreaterThan(previousIndex)
+      previousIndex = index
+    }
   })
 
   it("renders the prototype header anatomy and home treatment: breadcrumb, ghost CSV action, borderless stat cards, hairline-ruled steps", async () => {
