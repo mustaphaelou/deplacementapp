@@ -10,7 +10,8 @@ import {
   findMany,
   findByEmployeeId,
   findByEtapes,
-  countByEtape,
+  findPendingByEtapes,
+  countDemandes,
   aggregateBudget,
   findAllForExport,
 } from "./queries"
@@ -32,6 +33,8 @@ describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT }, () => {
   let submittedId: string
   let managerApprovedId: string
   let secondEmployeeDraftId: string
+  let rejectedReviewId: string
+  let withdrawnDraftId: string
 
   const sampleData = {
     motif: ["mission_client"],
@@ -112,6 +115,35 @@ describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT }, () => {
       { id: secondEmployeeId, role: "EMPLOYEE" }
     )
     secondEmployeeDraftId = secondDraft.id
+
+    // What production writes: a REJECTED demande keeps its review-stage Etape,
+    // and a WITHDRAWN draft stays at DRAFT with a terminal Decision.
+    const rejectedReview = await createAndSubmit(
+      { ...sampleData, destination: "Oujda" },
+      { id: employeeId, role: "EMPLOYEE" }
+    )
+    await executeTransition({
+      demandeId: rejectedReview.id,
+      action: "approuver",
+      actor: { id: managerId, role: "MANAGER" },
+    })
+    await executeTransition({
+      demandeId: rejectedReview.id,
+      action: "rejeter",
+      actor: { id: financeAdminId, role: "FINANCE_ADMIN" },
+    })
+    rejectedReviewId = rejectedReview.id
+
+    const withdrawnDraft = await createDraft(
+      { ...sampleData, destination: "El Jadida" },
+      { id: employeeId, role: "EMPLOYEE" }
+    )
+    await executeTransition({
+      demandeId: withdrawnDraft.id,
+      action: "retirer",
+      actor: { id: employeeId, role: "EMPLOYEE" },
+    })
+    withdrawnDraftId = withdrawnDraft.id
   }
 
   beforeAll(async () => {
@@ -356,6 +388,35 @@ describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT }, () => {
       }
     })
 
+    it("filters by decision", async () => {
+      const rejected = await findMany(
+        { id: managerId, role: "MANAGER" },
+        { page: 1, limit: 20, decision: "REJECTED" }
+      )
+
+      expect(rejected.total).toBe(1)
+      expect(rejected.demandes.map((d) => d.id)).toEqual([rejectedReviewId])
+
+      const pending = await findMany(
+        { id: managerId, role: "MANAGER" },
+        { page: 1, limit: 100, decision: "PENDING" }
+      )
+      const ids = pending.demandes.map((d) => d.id)
+      expect(ids).not.toContain(rejectedReviewId)
+      expect(ids).not.toContain(withdrawnDraftId)
+      expect(pending.total).toBe(pending.demandes.length)
+    })
+
+    it("composes the etape and decision filters", async () => {
+      const result = await findMany(
+        { id: managerId, role: "MANAGER" },
+        { page: 1, limit: 20, etape: "FINANCE_REVIEW", decision: "PENDING" }
+      )
+
+      expect(result.total).toBe(1)
+      expect(result.demandes[0].id).toBe(managerApprovedId)
+    })
+
     it("searches destination case-insensitively", async () => {
       const result = await findMany(
         { id: managerId, role: "MANAGER" },
@@ -509,31 +570,120 @@ describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT }, () => {
       const found = result.find((d) => d.id === draftId)
       expect(found).toBeUndefined()
     })
+
+    // findByEtapes stays decision-agnostic: the pending read is the one that
+    // filters decided rows out.
+    it("keeps a decided row at its stage visible", async () => {
+      const result = await findByEtapes(["FINANCE_REVIEW"], { limit: 100 })
+      expect(result.map((d) => d.id)).toContain(rejectedReviewId)
+    })
   })
 
-  // ─── countByEtape ──────────────────────────────────────────────────
+  // ─── findPendingByEtapes ───────────────────────────────────────────
 
-  describe("countByEtape", () => {
-    it("counts demandes at a given etape globally", async () => {
-      const managerReviewCount = await countByEtape("MANAGER_REVIEW")
-      expect(managerReviewCount).toBeGreaterThanOrEqual(1)
+  describe("findPendingByEtapes", () => {
+    it("returns the pending rows at the requested etapes", async () => {
+      const result = await findPendingByEtapes([
+        "FINANCE_REVIEW",
+        "DIRECTION_REVIEW",
+      ])
+
+      expect(result.map((d) => d.id)).toContain(managerApprovedId)
+      for (const d of result) {
+        expect(["FINANCE_REVIEW", "DIRECTION_REVIEW"]).toContain(d.etape)
+        expect(d.decision).toBe("PENDING")
+      }
     })
 
-    it("counts demandes at a given etape for a specific user", async () => {
-      const employeeCount = await countByEtape("MANAGER_REVIEW", employeeId)
-      expect(employeeCount).toBeGreaterThanOrEqual(1)
+    it("excludes the REJECTED row sitting at the queue stage", async () => {
+      const result = await findPendingByEtapes(["FINANCE_REVIEW"])
 
-      const otherCount = await countByEtape("MANAGER_REVIEW", secondEmployeeId)
-      expect(otherCount).toBe(0)
+      const ids = result.map((d) => d.id)
+      expect(ids).toContain(managerApprovedId)
+      expect(ids).not.toContain(rejectedReviewId)
+    })
+
+    it("excludes the WITHDRAWN draft from the pending DRAFT queue", async () => {
+      const result = await findPendingByEtapes(["DRAFT"], { limit: 100 })
+
+      expect(result.map((d) => d.id)).not.toContain(withdrawnDraftId)
+    })
+
+    it("respects the limit parameter", async () => {
+      const result = await findPendingByEtapes(
+        ["DRAFT", "MANAGER_REVIEW", "FINANCE_REVIEW", "DIRECTION_REVIEW"],
+        { limit: 2 }
+      )
+      expect(result).toHaveLength(2)
     })
 
     it("excludes soft-deleted demandes", async () => {
-      const countBefore = await countByEtape("DRAFT")
+      const result = await findPendingByEtapes(["DRAFT"], { limit: 100 })
+      const found = result.find((d) => d.id === draftId)
+      expect(found).toBeUndefined()
+    })
+  })
+
+  // ─── countDemandes ─────────────────────────────────────────────────
+
+  describe("countDemandes", () => {
+    it("counts demandes at a given etape globally", async () => {
+      const managerReviewCount = await countDemandes({
+        etape: "MANAGER_REVIEW",
+      })
+      expect(managerReviewCount).toBeGreaterThanOrEqual(1)
+    })
+
+    it("counts demandes at a given etape for a specific employee", async () => {
+      const employeeCount = await countDemandes({
+        etape: "MANAGER_REVIEW",
+        employeId: employeeId,
+      })
+      expect(employeeCount).toBeGreaterThanOrEqual(1)
+
+      const otherCount = await countDemandes({
+        etape: "MANAGER_REVIEW",
+        employeId: secondEmployeeId,
+      })
+      expect(otherCount).toBe(0)
+    })
+
+    // FINANCE_REVIEW holds one pending row and the REJECTED one: the bare
+    // stage count includes both, the PENDING filter must not.
+    it("a stage count includes the decided row; a PENDING filter excludes it", async () => {
+      expect(await countDemandes({ etape: "FINANCE_REVIEW" })).toBe(2)
+      expect(
+        await countDemandes({ etape: "FINANCE_REVIEW", decision: "PENDING" })
+      ).toBe(1)
+    })
+
+    it("reaches the REJECTED review row through its decision", async () => {
+      expect(await countDemandes({ decision: "REJECTED" })).toBe(1)
+      expect(
+        await countDemandes({
+          etape: "FINANCE_REVIEW",
+          decision: "REJECTED",
+          employeId: employeeId,
+        })
+      ).toBe(1)
+    })
+
+    it("reaches the WITHDRAWN draft through its decision", async () => {
+      expect(
+        await countDemandes({ etape: "DRAFT", decision: "WITHDRAWN" })
+      ).toBe(1)
+      expect(await countDemandes({ etape: "DRAFT", decision: "PENDING" })).toBe(
+        1
+      )
+    })
+
+    it("excludes soft-deleted demandes", async () => {
+      const countBefore = await countDemandes({ etape: "DRAFT" })
       await pgliteDb
         .update(schema.demandesDeplacement)
         .set({ deletedAt: new Date() })
         .where(eq(schema.demandesDeplacement.id, secondEmployeeDraftId))
-      const countAfter = await countByEtape("DRAFT")
+      const countAfter = await countDemandes({ etape: "DRAFT" })
       expect(countAfter).toBe(countBefore - 1)
     })
   })
@@ -544,6 +694,19 @@ describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT }, () => {
     it("returns the sum of totalEstime for the given etapes", async () => {
       const total = await aggregateBudget(["MANAGER_REVIEW"])
       expect(total).toBeGreaterThan(0)
+    })
+
+    // Every seeded demande totals 4600: FINAL (Agadir) plus the two pending
+    // review rows (Tanger at FINANCE_REVIEW, Fes at DIRECTION_REVIEW) — the
+    // REJECTED finance row (Oujda) must not contribute.
+    it("excludes the rejected review row while FINAL stays counted", async () => {
+      expect(await aggregateBudget(["FINAL"])).toBe(4600)
+      expect(
+        await aggregateBudget(["FINANCE_REVIEW", "DIRECTION_REVIEW"])
+      ).toBe(9200)
+      expect(
+        await aggregateBudget(["FINAL", "FINANCE_REVIEW", "DIRECTION_REVIEW"])
+      ).toBe(13800)
     })
 
     it("returns 0 when no demandes match the etapes", async () => {

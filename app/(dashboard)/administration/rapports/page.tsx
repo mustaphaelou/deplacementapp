@@ -1,6 +1,6 @@
 ﻿import { getAuthUser, hasAnyRole } from "@/lib/auth/server"
 import { redirect } from "next/navigation"
-import { countByEtape, aggregateBudget } from "@/lib/demande"
+import { countDemandes, aggregateBudget } from "@/lib/demande"
 import { PIPELINE } from "@/lib/workflow"
 import { formatCurrency } from "@/lib/constants"
 import { ETAPE_LABELS } from "@/lib/demande-presentation"
@@ -41,7 +41,7 @@ export default async function RapportsPage() {
     etapes.map(async (etape) => ({
       etape,
       label: ETAPE_LABELS[etape],
-      count: await countByEtape(etape),
+      count: await countDemandes({ etape }),
     }))
   )
 

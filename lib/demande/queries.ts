@@ -7,6 +7,7 @@ import {
   desc,
   asc,
   inArray,
+  notInArray,
   count,
   sum,
   type SQL,
@@ -15,7 +16,12 @@ import { db } from "../../db"
 import { demandesDeplacement } from "../../db/schema/demandes-deplacement"
 import type { DemandeWithRelations } from "../demande-types"
 import type { DashboardDemandeSummary } from "../dashboard"
-import type { Etape, TimestampColumn } from "../workflow"
+import {
+  TERMINAL_DECISIONS,
+  type Decision,
+  type Etape,
+  type TimestampColumn,
+} from "../workflow"
 import type { Actor } from "../demande-types"
 import { DemandeNotFoundError } from "../errors"
 
@@ -66,6 +72,7 @@ export interface DemandeQueryParams {
   page: number
   limit: number
   etape?: string
+  decision?: Decision
   recherche?: string
 }
 
@@ -152,7 +159,7 @@ export async function findMany(
   actor: Actor,
   params: DemandeQueryParams
 ): Promise<{ demandes: DashboardDemandeSummary[]; total: number }> {
-  const { page, limit, etape, recherche } = params
+  const { page, limit, etape, decision, recherche } = params
   const conditions: (SQL | undefined)[] = [
     isNull(demandesDeplacement.deletedAt),
     visibilityCondition(actor),
@@ -160,6 +167,10 @@ export async function findMany(
 
   if (etape) {
     conditions.push(eq(demandesDeplacement.etape, etape as Etape))
+  }
+
+  if (decision) {
+    conditions.push(eq(demandesDeplacement.decision, decision))
   }
 
   if (recherche) {
@@ -210,13 +221,22 @@ export async function findByEmployeeId(
   return demandes.map((d) => mapToDemandeSummary(d))
 }
 
-export async function findByEtapes(
+// The « pending » SQL condition: the read model's expression of the workflow
+// module's isPendingDecision — never a re-rolled decision literal.
+function pendingDecisionCondition(): SQL {
+  return notInArray(demandesDeplacement.decision, [...TERMINAL_DECISIONS])
+}
+
+type EtapesQueryOptions = {
+  limit?: number
+  includeEmployee?: boolean
+  orderBy?: OrderByTimestamp
+}
+
+async function findEtapes(
   etapes: Etape[],
-  opts: {
-    limit?: number
-    includeEmployee?: boolean
-    orderBy?: OrderByTimestamp
-  } = {}
+  opts: EtapesQueryOptions,
+  extraCondition?: SQL
 ): Promise<DashboardDemandeSummary[]> {
   const {
     limit: take = 10,
@@ -225,11 +245,13 @@ export async function findByEtapes(
   const col =
     demandesDeplacement[orderBy.column as keyof typeof demandesDeplacement]
   const orderFn = orderBy.direction === "desc" ? desc : asc
+  const conditions: (SQL | undefined)[] = [
+    inArray(demandesDeplacement.etape, etapes),
+    isNull(demandesDeplacement.deletedAt),
+  ]
+  if (extraCondition) conditions.push(extraCondition)
   const demandes = await db.query.demandesDeplacement.findMany({
-    where: and(
-      inArray(demandesDeplacement.etape, etapes),
-      isNull(demandesDeplacement.deletedAt)
-    ),
+    where: and(...conditions),
     orderBy: [orderFn(col as typeof demandesDeplacement.creeLe)],
     limit: take,
     with: { employe: { columns: { prenom: true, nom: true } } },
@@ -237,15 +259,40 @@ export async function findByEtapes(
   return demandes.map((d) => mapToDemandeSummary(d))
 }
 
-export async function countByEtape(
-  etape: Etape,
-  userId?: string
+export async function findByEtapes(
+  etapes: Etape[],
+  opts: EtapesQueryOptions = {}
+): Promise<DashboardDemandeSummary[]> {
+  return findEtapes(etapes, opts)
+}
+
+// The queue read: pending rows only — a decided demande keeps its Etape
+// (CONTEXT.md), so an Etape filter alone would list rejected rows.
+export async function findPendingByEtapes(
+  etapes: Etape[],
+  opts: EtapesQueryOptions = {}
+): Promise<DashboardDemandeSummary[]> {
+  return findEtapes(etapes, opts, pendingDecisionCondition())
+}
+
+export interface CountDemandesParams {
+  etape?: Etape
+  decision?: Decision
+  employeId?: string
+}
+
+// The one counting home: lane counts, decision-aware counts and per-employee
+// counts all compose here.
+export async function countDemandes(
+  params: CountDemandesParams
 ): Promise<number> {
+  const { etape, decision, employeId } = params
   const conditions: (SQL | undefined)[] = [
-    eq(demandesDeplacement.etape, etape),
     isNull(demandesDeplacement.deletedAt),
   ]
-  if (userId) conditions.push(eq(demandesDeplacement.employeId, userId))
+  if (etape) conditions.push(eq(demandesDeplacement.etape, etape))
+  if (decision) conditions.push(eq(demandesDeplacement.decision, decision))
+  if (employeId) conditions.push(eq(demandesDeplacement.employeId, employeId))
   const result = await db
     .select({ value: count() })
     .from(demandesDeplacement)
@@ -260,6 +307,9 @@ export async function aggregateBudget(etapes: Etape[]): Promise<number> {
     .where(
       and(
         inArray(demandesDeplacement.etape, etapes),
+        // FINAL rows always count; review-lane rows count only while pending,
+        // so rejected rows leave the engaged budget.
+        or(eq(demandesDeplacement.etape, "FINAL"), pendingDecisionCondition()),
         isNull(demandesDeplacement.deletedAt)
       )
     )
