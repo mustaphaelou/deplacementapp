@@ -47,7 +47,7 @@ _Avoid_: Step, phase, status
 The outcome recorded at a given Etape. One of: PENDING, APPROVED, REJECTED, WITHDRAWN. APPROVED, REJECTED, and WITHDRAWN are **terminal** — once recorded, the DemandeDeplacement cannot transition any further and cannot be edited or resubmitted. To pursue the trip after a REJECTED or WITHDRAWN outcome, the Employee creates a *new* DemandeDeplacement; the rejected/withdrawn record is retained unchanged for history.
 
 PENDING is the non-terminal Decision, and the « pending » rule is defined once — beside the Etape/Decision unions in the workflow module (`TERMINAL_DECISIONS` + `isPendingDecision`). Surfaces that mean « waiting » ask for it, never for a lane alone: a decided DemandeDeplacement keeps its Etape, so an Etape filter on its own cannot mean waiting.
-_Avoid_: reading a lane alone as « waiting »; re-deriving « pending » or the terminal set per surface
+_Avoid_: reading a lane alone as « waiting », re-deriving « pending » or the terminal set per surface
 
 ### Pipeline actors
 

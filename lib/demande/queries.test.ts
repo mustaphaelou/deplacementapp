@@ -9,7 +9,6 @@ import {
   findById,
   findMany,
   findByEmployeeId,
-  findByEtapes,
   findPendingByEtapes,
   countDemandes,
   aggregateBudget,
@@ -519,63 +518,6 @@ describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT }, () => {
     it("returns results in a stable order", async () => {
       const result = await findByEmployeeId(employeeId, 100)
       expect(result.length).toBeGreaterThanOrEqual(4)
-    })
-  })
-
-  // ─── findByEtapes ──────────────────────────────────────────────────
-
-  describe("findByEtapes", () => {
-    it("returns demandes matching the specified etapes", async () => {
-      const result = await findByEtapes(["MANAGER_REVIEW"])
-
-      expect(result.length).toBeGreaterThanOrEqual(1)
-      for (const d of result) {
-        expect(d.etape).toBe("MANAGER_REVIEW")
-      }
-    })
-
-    it("supports multiple etapes", async () => {
-      const result = await findByEtapes(["DRAFT", "MANAGER_REVIEW"])
-
-      for (const d of result) {
-        expect(["DRAFT", "MANAGER_REVIEW"]).toContain(d.etape)
-      }
-    })
-
-    it("respects the limit parameter", async () => {
-      const result = await findByEtapes(
-        ["MANAGER_REVIEW", "FINANCE_REVIEW", "DIRECTION_REVIEW"],
-        {
-          limit: 2,
-        }
-      )
-      expect(result).toHaveLength(2)
-    })
-
-    it("respects orderBy timestamp direction", async () => {
-      const resultAsc = await findByEtapes(["MANAGER_REVIEW"], {
-        orderBy: { column: "soumiseLe", direction: "asc" },
-      })
-      const resultDesc = await findByEtapes(["MANAGER_REVIEW"], {
-        orderBy: { column: "soumiseLe", direction: "desc" },
-      })
-
-      if (resultAsc.length >= 2) {
-        expect(resultAsc[0].id).not.toBe(resultDesc[0].id)
-      }
-    })
-
-    it("excludes soft-deleted demandes", async () => {
-      const result = await findByEtapes(["DRAFT"], { limit: 100 })
-      const found = result.find((d) => d.id === draftId)
-      expect(found).toBeUndefined()
-    })
-
-    // findByEtapes stays decision-agnostic: the pending read is the one that
-    // filters decided rows out.
-    it("keeps a decided row at its stage visible", async () => {
-      const result = await findByEtapes(["FINANCE_REVIEW"], { limit: 100 })
-      expect(result.map((d) => d.id)).toContain(rejectedReviewId)
     })
   })
 

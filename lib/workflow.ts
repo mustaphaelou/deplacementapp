@@ -132,29 +132,24 @@ export type TimestampColumn =
 export interface PipelineView {
   queue: Etape[]
   committed: Etape[]
-  rollup: Etape[]
 }
 
 export const PIPELINE_VIEWS: Record<Role, PipelineView> = {
   EMPLOYEE: {
     queue: ["DRAFT"],
     committed: ["FINAL"],
-    rollup: ["DRAFT", "MANAGER_REVIEW", "FINAL"],
   },
   MANAGER: {
     queue: ["MANAGER_REVIEW"],
     committed: ["FINAL"],
-    rollup: ["MANAGER_REVIEW"],
   },
   FINANCE_ADMIN: {
     queue: ["FINANCE_REVIEW"],
     committed: ["FINAL"],
-    rollup: ["FINANCE_REVIEW"],
   },
   GENERAL_DIRECTION: {
     queue: ["DIRECTION_REVIEW"],
     committed: ["FINAL", "DIRECTION_REVIEW", "FINANCE_REVIEW"],
-    rollup: ["DIRECTION_REVIEW"],
   },
 }
 
@@ -164,10 +159,6 @@ export function queueEtapes(role: Role): Etape[] {
 
 export function committedEtapes(role: Role): Etape[] {
   return PIPELINE_VIEWS[role].committed
-}
-
-export function rollupEtapes(role: Role): Etape[] {
-  return PIPELINE_VIEWS[role].rollup
 }
 
 export function enteringEffect<E extends readonly TransitionEffect[]>(

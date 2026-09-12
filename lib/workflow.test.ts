@@ -6,7 +6,6 @@ import {
   getAllowedActions,
   queueEtapes,
   committedEtapes,
-  rollupEtapes,
   laneOrderByColumn,
   enteringEffect,
   TRANSITION_EFFECTS,
@@ -111,30 +110,6 @@ describe("committedEtapes", () => {
       "DIRECTION_REVIEW",
       "FINANCE_REVIEW",
     ])
-  })
-})
-
-// ─── Read-model: rollupEtapes (Etape-based) ───────────────────────────────────
-
-describe("rollupEtapes", () => {
-  it("returns DRAFT + MANAGER_REVIEW + FINAL for EMPLOYEE", () => {
-    expect(rollupEtapes("EMPLOYEE")).toEqual([
-      "DRAFT",
-      "MANAGER_REVIEW",
-      "FINAL",
-    ])
-  })
-
-  it("returns MANAGER_REVIEW for MANAGER", () => {
-    expect(rollupEtapes("MANAGER")).toEqual(["MANAGER_REVIEW"])
-  })
-
-  it("returns FINANCE_REVIEW for FINANCE_ADMIN", () => {
-    expect(rollupEtapes("FINANCE_ADMIN")).toEqual(["FINANCE_REVIEW"])
-  })
-
-  it("returns DIRECTION_REVIEW for GENERAL_DIRECTION", () => {
-    expect(rollupEtapes("GENERAL_DIRECTION")).toEqual(["DIRECTION_REVIEW"])
   })
 })
 

@@ -259,13 +259,6 @@ async function findEtapes(
   return demandes.map((d) => mapToDemandeSummary(d))
 }
 
-export async function findByEtapes(
-  etapes: Etape[],
-  opts: EtapesQueryOptions = {}
-): Promise<DashboardDemandeSummary[]> {
-  return findEtapes(etapes, opts)
-}
-
 // The queue read: pending rows only — a decided demande keeps its Etape
 // (CONTEXT.md), so an Etape filter alone would list rejected rows.
 export async function findPendingByEtapes(

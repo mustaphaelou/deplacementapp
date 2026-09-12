@@ -20,7 +20,6 @@ export {
   findById,
   findMany,
   findByEmployeeId,
-  findByEtapes,
   findPendingByEtapes,
   countDemandes,
   aggregateBudget,
