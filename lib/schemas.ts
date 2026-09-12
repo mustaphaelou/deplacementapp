@@ -114,7 +114,6 @@ export const utilisateurSchema = z.object({
   prenom: z.string().min(1, "Prénom requis"),
   poste: z.string().min(1, "Poste requis"),
   role: z.enum(["EMPLOYEE", "MANAGER", "FINANCE_ADMIN", "GENERAL_DIRECTION"]),
-  societeId: z.string().min(1, "Société requise"),
   departementId: z.string().min(1, "Département requis"),
   telephone: z.string().optional(),
   motDePasse: z

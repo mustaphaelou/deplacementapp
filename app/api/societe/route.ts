@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { requireRole } from "@/lib/auth/server"
-import { handleServiceError } from "@/lib/errors"
+import { AUCUNE_SOCIETE_CONFIGUREE, handleServiceError } from "@/lib/errors"
 import { getSocieteBranding, updateSociete } from "@/lib/societe"
 import { societeUpdateSchema } from "@/lib/schemas"
 import { withValidation } from "@/lib/api-utils"
@@ -13,7 +13,7 @@ export async function GET() {
     const branding = await getSocieteBranding()
     if (!branding) {
       return NextResponse.json(
-        { error: "Aucune société configurée" },
+        { error: AUCUNE_SOCIETE_CONFIGUREE },
         { status: 404 }
       )
     }

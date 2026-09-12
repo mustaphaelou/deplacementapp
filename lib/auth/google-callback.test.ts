@@ -227,7 +227,6 @@ describe("Google callback seam (#203)", { timeout: TIMEOUT }, () => {
         prenom: "Jean",
         poste: "Développeur",
         role: "EMPLOYEE",
-        societeId,
         departementId,
         googleAuthEnabled,
       },

@@ -160,7 +160,6 @@ describe("UtilisateurService", { timeout: TIMEOUT }, () => {
           prenom: "User",
           poste: "QA",
           role: "EMPLOYEE",
-          societeId,
           departementId,
         },
         actor.id
@@ -178,6 +177,10 @@ describe("UtilisateurService", { timeout: TIMEOUT }, () => {
       // The administrator's provisioning act is the e-mail attestation: it is
       // written by the service, never hand-set and never a toggle.
       expect(row.emailVerified).toBe(true)
+
+      // The deployment's Societe is resolved behind the seam (ADR-0018):
+      // the input carried no societeId.
+      expect(row.societeId).toBe(societeId)
 
       const [auditRow] = await pgliteDb
         .select()
@@ -201,7 +204,6 @@ describe("UtilisateurService", { timeout: TIMEOUT }, () => {
             prenom: "Test",
             poste: "QA",
             role: "EMPLOYEE",
-            societeId,
             departementId,
           },
           actor.id
@@ -226,13 +228,34 @@ describe("UtilisateurService", { timeout: TIMEOUT }, () => {
           prenom: "User",
           poste: "QA",
           role: "EMPLOYEE",
-          societeId,
           departementId,
         },
         actor.id
       )
 
       expect(hash).toHaveBeenCalledWith("secret123", 12)
+    })
+
+    it("refuses when no Societe exists (unreachable after Amorçage)", async () => {
+      await pgliteDb.execute(sql`DELETE FROM account`)
+      await pgliteDb.execute(sql`DELETE FROM journal_audit`)
+      await pgliteDb.execute(sql`DELETE FROM utilisateurs`)
+      await pgliteDb.execute(sql`DELETE FROM departements`)
+      await pgliteDb.execute(sql`DELETE FROM societes`)
+
+      await expect(
+        svc.create(
+          {
+            email: "no-societe@test.com",
+            nom: "Test",
+            prenom: "User",
+            poste: "QA",
+            role: "EMPLOYEE",
+            departementId,
+          },
+          actor.id
+        )
+      ).rejects.toThrow("Aucune société configurée")
     })
   })
 

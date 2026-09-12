@@ -1,8 +1,9 @@
 import { eq } from "drizzle-orm"
-import type { DrizzleDb } from "../../db"
+import type { DrizzleDb, DrizzleTransactionClient } from "../../db"
 import { db } from "../../db"
 import { societes } from "../../db/schema/societes"
 import { logAudit } from "../audit"
+import { AUCUNE_SOCIETE_CONFIGUREE } from "../errors"
 import type { SocieteUpdate } from "../schemas"
 
 let cachedIdentity: SocieteIdentity | null = null
@@ -91,12 +92,14 @@ export function clearSocieteCache(): void {
 }
 
 /**
- * Raw Societe row reader for the authenticated management surface
- * (ADR-0012: the composed `noreply@<domain>` identity stays inside
- * loadSocieteIdentity; the management page needs the stored column values).
+ * Raw Societe row reader for the authenticated management surface and
+ * Utilisateur provisioning (ADR-0012: the composed `noreply@<domain>` identity
+ * stays inside loadSocieteIdentity; readers need the stored column values).
+ * Accepts a transaction client so provisioning can resolve the deployment's
+ * Societe inside its own transaction (ADR-0018).
  */
 export async function getSocieteRow(
-  dbArg: DrizzleDb = db
+  dbArg: DrizzleTransactionClient = db
 ): Promise<
   | (SocieteBranding & {
       nomExpediteurEmail: string | null
@@ -130,7 +133,7 @@ export async function updateSociete(
 ): Promise<SocieteUpdate> {
   const [societe] = await dbArg.select().from(societes).limit(1)
   if (!societe) {
-    throw new Error("Aucune société configurée")
+    throw new Error(AUCUNE_SOCIETE_CONFIGUREE)
   }
 
   // Primary validation lives in societeUpdateSchema (route layer); this

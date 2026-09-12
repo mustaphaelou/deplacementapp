@@ -23,6 +23,7 @@ import { toast } from "sonner"
 import { Plus, Loader2, Pencil, Search, Users } from "lucide-react"
 import { ROLE_LABELS } from "@/lib/auth"
 import { cn } from "@/lib/utils"
+import { buildUtilisateurPayload } from "./submit-payload"
 
 interface Utilisateur {
   id: string
@@ -256,7 +257,7 @@ export default function UtilisateursPage() {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
-          editingUser ? { ...form, id: editingUser.id } : form
+          buildUtilisateurPayload(form, editingUser?.id ?? null)
         ),
       })
       if (!res.ok) throw new Error()

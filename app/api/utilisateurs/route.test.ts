@@ -61,7 +61,6 @@ const validUserPayload = {
   prenom: "Jean",
   poste: "Dev",
   role: "EMPLOYEE",
-  societeId: "soc-1",
   departementId: "d-1",
 }
 
@@ -137,5 +136,57 @@ describe("utilisateurs route", () => {
     expect(response.status).toBe(404)
     const body = await response.json()
     expect(body.error).toBe("Utilisateur introuvable")
+  })
+
+  it("POST accepts a payload without societeId and delegates to the service", async () => {
+    const { requireAuth } = await import("@/lib/auth/server")
+    const { utilisateurService } = await import("@/lib/utilisateur-service")
+    ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
+    ;(utilisateurService.create as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: "u-2",
+      email: "user@example.com",
+    })
+
+    const { POST } = await import("./route")
+    const response = await POST(mockRequest(validUserPayload, "POST"), {
+      params: Promise.resolve({}),
+    })
+
+    expect(response.status).toBe(200)
+    const body = await response.json()
+    expect(body).toEqual({ user: { id: "u-2", email: "user@example.com" } })
+
+    const create = utilisateurService.create as ReturnType<typeof vi.fn>
+    expect(create).toHaveBeenCalledOnce()
+    const [data, actorId] = create.mock.calls[0]
+    expect(data).not.toHaveProperty("societeId")
+    expect(data).toMatchObject({
+      email: "user@example.com",
+      departementId: "d-1",
+    })
+    expect(actorId).toBe("u-1")
+  })
+
+  it("PUT accepts the edit payload without societeId", async () => {
+    const { requireAuth } = await import("@/lib/auth/server")
+    const { utilisateurService } = await import("@/lib/utilisateur-service")
+    ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
+    ;(utilisateurService.update as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: "u-2",
+      email: "user@example.com",
+    })
+
+    const { PUT } = await import("./route")
+    const response = await PUT(
+      mockRequest({ id: "u-2", ...validUserPayload }, "PUT"),
+      { params: Promise.resolve({}) }
+    )
+
+    expect(response.status).toBe(200)
+    const update = utilisateurService.update as ReturnType<typeof vi.fn>
+    expect(update).toHaveBeenCalledOnce()
+    const [id, data] = update.mock.calls[0]
+    expect(id).toBe("u-2")
+    expect(data).not.toHaveProperty("societeId")
   })
 })
