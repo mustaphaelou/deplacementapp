@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm"
-import type { DrizzleDb } from "../../db"
+import type { DrizzleDb, DrizzleTransactionClient } from "../../db"
 import { db } from "../../db"
 import { societes } from "../../db/schema/societes"
 import { logAudit } from "../audit"
@@ -91,12 +91,14 @@ export function clearSocieteCache(): void {
 }
 
 /**
- * Raw Societe row reader for the authenticated management surface
- * (ADR-0012: the composed `noreply@<domain>` identity stays inside
- * loadSocieteIdentity; the management page needs the stored column values).
+ * Raw Societe row reader for the authenticated management surface and
+ * Utilisateur provisioning (ADR-0012: the composed `noreply@<domain>` identity
+ * stays inside loadSocieteIdentity; readers need the stored column values).
+ * Accepts a transaction client so provisioning can resolve the deployment's
+ * Societe inside its own transaction (ADR-0018).
  */
 export async function getSocieteRow(
-  dbArg: DrizzleDb = db
+  dbArg: DrizzleTransactionClient = db
 ): Promise<
   | (SocieteBranding & {
       nomExpediteurEmail: string | null

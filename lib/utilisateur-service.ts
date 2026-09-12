@@ -8,6 +8,7 @@ import {
   avatarStorage as defaultAvatarStorage,
   type AvatarStorage,
 } from "./avatar-storage"
+import { getSocieteRow } from "./societe"
 import {
   UtilisateurNotFoundError,
   MotDePasseIncorrectError,
@@ -76,7 +77,6 @@ export class UtilisateurService {
       prenom: string
       poste: string
       role: string
-      societeId: string
       departementId: string
       telephone?: string
       googleAuthEnabled?: boolean
@@ -87,6 +87,15 @@ export class UtilisateurService {
     const userId = crypto.randomUUID()
 
     return this._db.transaction(async (tx) => {
+      // The deployment has exactly one Societe, with an id no caller can know
+      // (ADR-0018): resolve it behind the seam, inside the same transaction.
+      const societe = await getSocieteRow(tx)
+      if (!societe) {
+        // Unreachable after Amorçage — same impossible-state contract as
+        // updateSociete.
+        throw new Error("Aucune société configurée")
+      }
+
       const [user] = await tx
         .insert(utilisateurs)
         .values({
@@ -104,7 +113,7 @@ export class UtilisateurService {
             | "MANAGER"
             | "FINANCE_ADMIN"
             | "GENERAL_DIRECTION",
-          societeId: data.societeId,
+          societeId: societe.id,
           departementId: data.departementId,
           telephone: data.telephone || null,
           modifieLe: new Date(),
