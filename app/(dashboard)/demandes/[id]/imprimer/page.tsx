@@ -7,10 +7,12 @@ import type { Role } from "@/lib/auth"
 import {
   formatCurrency,
   formatDate,
-  TRANSPORT_LABELS,
   DEFAULT_SOCIETE_NOM,
 } from "@/lib/constants"
-import { toDemandePresentation } from "@/lib/demande-presentation"
+import {
+  toDemandePresentation,
+  TRANSPORT_LABELS,
+} from "@/lib/demande-presentation"
 import { parseMotif, type DemandeWithRelations } from "@/lib/demande-types"
 
 export default async function ImprimerPage({

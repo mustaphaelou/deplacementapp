@@ -16,13 +16,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 
+import { formatCurrency, formatDate, formatDateTime } from "@/lib/constants"
 import {
-  formatCurrency,
-  formatDate,
-  formatDateTime,
+  toDemandePresentation,
   TRANSPORT_LABELS,
-} from "@/lib/constants"
-import { toDemandePresentation } from "@/lib/demande-presentation"
+} from "@/lib/demande-presentation"
 import { parseMotif } from "@/lib/demande-types"
 import type { DemandeDetail } from "@/lib/demande-types"
 import {

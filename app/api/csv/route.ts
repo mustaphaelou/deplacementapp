@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { requireAuth, requireAnyRole, type Role } from "@/lib/auth/server"
 import { findAllForExport } from "@/lib/demande"
+import { toDemandeDocumentView } from "@/lib/demande-presentation"
 import { handleServiceError } from "@/lib/errors"
 
 const EXPORT_ROLES: Role[] = ["FINANCE_ADMIN", "GENERAL_DIRECTION"]
@@ -21,10 +22,10 @@ export async function GET() {
   const header =
     "Numero,Employe,Destination,DateDepart,DateRetour,Transport,Total,Statut,CreeLe\n"
   const rows = demandes
-    .map(
-      (d) =>
-        `"${d.numero}","${d.employe ? `${d.employe.prenom} ${d.employe.nom}` : ""}","${d.destination}","${d.dateDepart.toISOString().split("T")[0]}","${d.dateRetour.toISOString().split("T")[0]}","${d.typeTransport}","${d.totalEstime ?? 0}","${d.etape}","${d.creeLe.toISOString()}"`
-    )
+    .map((d) => {
+      const view = toDemandeDocumentView(d)
+      return `"${d.numero}","${d.employe ? `${d.employe.prenom} ${d.employe.nom}` : ""}","${d.destination}","${d.dateDepart.toISOString().split("T")[0]}","${d.dateRetour.toISOString().split("T")[0]}","${view.transport}","${d.totalEstime ?? 0}","${view.presentation.compactLabel}","${d.creeLe.toISOString()}"`
+    })
     .join("\n")
 
   const csv = `\uFEFF${header}${rows}`

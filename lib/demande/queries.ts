@@ -54,6 +54,7 @@ export interface DemandeExportRow {
   dateDepart: Date
   dateRetour: Date
   typeTransport: string
+  motif: string
   totalEstime: number | null
   etape: string
   decision: string
@@ -279,6 +280,7 @@ export async function findAllForExport(): Promise<DemandeExportRow[]> {
     dateDepart: d.dateDepart,
     dateRetour: d.dateRetour,
     typeTransport: d.typeTransport,
+    motif: d.motif,
     totalEstime: d.totalEstime != null ? Number(d.totalEstime) : null,
     etape: d.etape,
     decision: d.decision,
