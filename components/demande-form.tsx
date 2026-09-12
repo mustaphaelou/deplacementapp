@@ -26,12 +26,19 @@ import {
   Send,
   MapPin,
 } from "lucide-react"
-import { PURPOSE_OPTIONS, TRANSPORT_LABELS } from "@/lib/constants"
+import { MOTIF_LABELS, TRANSPORT_LABELS } from "@/lib/demande-presentation"
 import { useDemandeForm } from "@/hooks/use-demande-form"
 import { demandeSchema, type DemandeFormValues } from "@/lib/schemas"
 import type { Vehicule } from "@/lib/demande-types"
 
 type FormValues = DemandeFormValues
+
+// The form and the documents share one Motif vocabulary: the options derive
+// from MOTIF_LABELS, in its insertion order.
+const MOTIF_OPTIONS = Object.entries(MOTIF_LABELS).map(([value, label]) => ({
+  value,
+  label,
+}))
 
 const FIELD_INPUT =
   "h-9 rounded-[3px] focus-visible:ring-1 focus-visible:ring-(--brand)"
@@ -164,7 +171,7 @@ export function DemandeForm() {
             <div>
               <Label className="mb-1.5 block text-sm font-medium">Motifs</Label>
               <div className="grid gap-3 sm:grid-cols-2">
-                {PURPOSE_OPTIONS.map((opt) => {
+                {MOTIF_OPTIONS.map((opt) => {
                   const checked = selectedMotifs?.includes(opt.value)
                   return (
                     <label

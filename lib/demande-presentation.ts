@@ -1,9 +1,13 @@
+import { parseMotif } from "./demande-types"
 import { PIPELINE } from "./workflow"
 
-// The single home of the Etape and Decision display vocabulary. Every surface
-// that shows where a DemandeDeplacement sits in the pipeline, or what was
-// decided there, reads from toDemandePresentation. The stage order is derived
-// from PIPELINE — never re-declared here.
+// The single home of the whole DemandeDeplacement display vocabulary — the
+// Etape, the Decision, the Motif(s) and the TypeTransport — plus the document
+// projection (toDemandeDocumentView) every document surface serializes from.
+// Every surface that shows where a DemandeDeplacement sits in the pipeline,
+// what was decided there, or which Motif / TypeTransport it carries, reads
+// from this module. The stage order is derived from PIPELINE — never
+// re-declared here.
 
 export const ETAPE_LABELS: Record<string, string> = {
   DRAFT: "Brouillon",
@@ -18,6 +22,28 @@ export const DECISION_LABELS: Record<string, string> = {
   APPROVED: "Approuvée",
   REJECTED: "Rejetée",
   WITHDRAWN: "Retirée",
+}
+
+// The stored Motif values are slugs; insertion order is the creation form's
+// Motif option order — the form derives its options from this map, so the form
+// and the documents share one source and cannot drift apart.
+export const MOTIF_LABELS: Record<string, string> = {
+  mission_client: "Mission client",
+  formation: "Formation",
+  reunion: "Réunion",
+  livraison: "Livraison",
+  maintenance: "Maintenance / Intervention",
+  administratif: "Démarche administrative",
+  autre: "Autre",
+}
+
+export const TRANSPORT_LABELS: Record<string, string> = {
+  VOITURE_PERSONNELLE: "Voiture personnelle",
+  VOITURE_SOCIETE: "Voiture de la société",
+  BUS: "Bus / Car",
+  AVION: "Avion",
+  TRAIN: "Train",
+  AUTRE: "Autre",
 }
 
 const STAGE_IDS: readonly string[] = PIPELINE.map((stage) => stage.id)
@@ -123,5 +149,54 @@ export function toDemandePresentation(demande: {
       state: i < index ? "past" : i === index ? "current" : "upcoming",
     })),
     compactLabel: compactLabelOf(demande.etape, demande.decision),
+  }
+}
+
+// ─── Document projection ─────────────────────────────────────────────────────
+//
+// toDemandeDocumentView turns a stored DemandeDeplacement into the labelled,
+// document-shaped facts the PDF, the printable page and the CSV export all
+// serialize. The input is a structural slice so every one of them can feed it.
+// The fallback rule is uniform: a value with no label is presented as its
+// stored value verbatim — never blank, never prettified.
+
+export interface DemandeDocumentInput {
+  /** The stored JSON-encoded Motif array (slugs and/or stored literals). */
+  motif: string
+  typeTransport: string
+  etape: string
+  decision: string
+  assigneA?: { prenom: string; nom: string } | null
+}
+
+export interface DemandeDocumentView {
+  /** Each stored entry → its Motif label; an unmapped entry verbatim. */
+  motifs: string[]
+  /** The TypeTransport label; an unmapped value verbatim. */
+  transport: string
+  /** Exactly toDemandePresentation({ etape, decision }) — same shape. */
+  presentation: DemandePresentation
+  /** The Assignataire as a display value for « Traité par »; null when unset. */
+  traitePar: string | null
+  /** The document-state marking the documents share: etape === "DRAFT". */
+  isDraft: boolean
+}
+
+export function toDemandeDocumentView(
+  demande: DemandeDocumentInput
+): DemandeDocumentView {
+  return {
+    motifs: parseMotif(demande.motif).map(
+      (motif) => MOTIF_LABELS[motif] ?? motif
+    ),
+    transport: TRANSPORT_LABELS[demande.typeTransport] ?? demande.typeTransport,
+    presentation: toDemandePresentation({
+      etape: demande.etape,
+      decision: demande.decision,
+    }),
+    traitePar: demande.assigneA
+      ? `${demande.assigneA.prenom} ${demande.assigneA.nom}`
+      : null,
+    isDraft: demande.etape === "DRAFT",
   }
 }
