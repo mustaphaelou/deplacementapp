@@ -15,7 +15,7 @@ vi.mock("@/lib/auth/server", () => ({
 }))
 
 vi.mock("@/lib/demande", () => ({
-  countByEtape: vi.fn(),
+  countDemandes: vi.fn(),
   aggregateBudget: vi.fn(),
 }))
 
@@ -54,13 +54,14 @@ describe("Rapports page", () => {
   it("reads counts and budget through the queries port and renders them", async () => {
     const { getAuthUser } = await import("@/lib/auth/server")
     const {
-      countByEtape: mockCountByEtape,
+      countDemandes: mockCountDemandes,
       aggregateBudget: mockAggregateBudget,
     } = await import("@/lib/demande")
 
     ;(getAuthUser as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser())
-    ;(mockCountByEtape as ReturnType<typeof vi.fn>).mockImplementation(
-      (etape: string) => Promise.resolve(ETAPE_COUNTS[etape] ?? 0)
+    ;(mockCountDemandes as ReturnType<typeof vi.fn>).mockImplementation(
+      ({ etape }: { etape?: string }) =>
+        Promise.resolve(ETAPE_COUNTS[etape ?? ""] ?? 0)
     )
     ;(mockAggregateBudget as ReturnType<typeof vi.fn>).mockResolvedValue(45000)
 
@@ -69,10 +70,10 @@ describe("Rapports page", () => {
     const html = renderToStaticMarkup(element)
 
     const etapes = PIPELINE.map((stage) => stage.id)
-    expect(mockCountByEtape).toHaveBeenCalledTimes(etapes.length)
+    expect(mockCountDemandes).toHaveBeenCalledTimes(etapes.length)
     // The stages are queried in pipeline order, stage by stage.
     etapes.forEach((s, i) => {
-      expect(mockCountByEtape).toHaveBeenNthCalledWith(i + 1, s)
+      expect(mockCountDemandes).toHaveBeenNthCalledWith(i + 1, { etape: s })
     })
 
     expect(mockAggregateBudget).toHaveBeenCalledWith(["FINAL"])
@@ -87,13 +88,14 @@ describe("Rapports page", () => {
   it("renders the stage rows in PIPELINE order, not label-map insertion order", async () => {
     const { getAuthUser } = await import("@/lib/auth/server")
     const {
-      countByEtape: mockCountByEtape,
+      countDemandes: mockCountDemandes,
       aggregateBudget: mockAggregateBudget,
     } = await import("@/lib/demande")
 
     ;(getAuthUser as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser())
-    ;(mockCountByEtape as ReturnType<typeof vi.fn>).mockImplementation(
-      (etape: string) => Promise.resolve(ETAPE_COUNTS[etape] ?? 0)
+    ;(mockCountDemandes as ReturnType<typeof vi.fn>).mockImplementation(
+      ({ etape }: { etape?: string }) =>
+        Promise.resolve(ETAPE_COUNTS[etape ?? ""] ?? 0)
     )
     ;(mockAggregateBudget as ReturnType<typeof vi.fn>).mockResolvedValue(45000)
 
@@ -120,13 +122,14 @@ describe("Rapports page", () => {
   it("renders the prototype header anatomy and home treatment: breadcrumb, ghost CSV action, borderless stat cards, hairline-ruled steps", async () => {
     const { getAuthUser } = await import("@/lib/auth/server")
     const {
-      countByEtape: mockCountByEtape,
+      countDemandes: mockCountDemandes,
       aggregateBudget: mockAggregateBudget,
     } = await import("@/lib/demande")
 
     ;(getAuthUser as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser())
-    ;(mockCountByEtape as ReturnType<typeof vi.fn>).mockImplementation(
-      (etape: string) => Promise.resolve(ETAPE_COUNTS[etape] ?? 0)
+    ;(mockCountDemandes as ReturnType<typeof vi.fn>).mockImplementation(
+      ({ etape }: { etape?: string }) =>
+        Promise.resolve(ETAPE_COUNTS[etape ?? ""] ?? 0)
     )
     ;(mockAggregateBudget as ReturnType<typeof vi.fn>).mockResolvedValue(45000)
 

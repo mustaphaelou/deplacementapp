@@ -21,11 +21,13 @@ export {
   findMany,
   findByEmployeeId,
   findByEtapes,
-  countByEtape,
+  findPendingByEtapes,
+  countDemandes,
   aggregateBudget,
   findAllForExport,
 } from "./queries"
 export type {
+  CountDemandesParams,
   DemandeFindByIdInclude,
   DemandeFindByIdExtra,
   DemandeExportRow,

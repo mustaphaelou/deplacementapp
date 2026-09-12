@@ -1,7 +1,7 @@
 import { formatCurrency } from "@/lib/constants"
 import {
-  findByEtapes,
-  countByEtape,
+  findPendingByEtapes,
+  countDemandes,
   findByEmployeeId,
   aggregateBudget,
 } from "./demande"
@@ -72,8 +72,12 @@ async function fetchQueueDemandes(
   const queue = queueEtapes(role)
   const order = laneOrderByColumn(lane)
   const [demandes, queueCounts] = await Promise.all([
-    findByEtapes(queue, { includeEmployee: true, limit: 10, orderBy: order }),
-    Promise.all(queue.map((s) => countByEtape(s))),
+    findPendingByEtapes(queue, {
+      includeEmployee: true,
+      limit: 10,
+      orderBy: order,
+    }),
+    Promise.all(queue.map((s) => countDemandes({ etape: s }))),
   ])
   return { demandes, enAttente: queueCounts.reduce((a, b) => a + b, 0) }
 }
@@ -92,7 +96,9 @@ export async function getDashboardPayload(
 
       const [demandes, rollupCounts] = await Promise.all([
         findByEmployeeId(userId, 5),
-        Promise.all(rollup.map((s) => countByEtape(s, userId))),
+        Promise.all(
+          rollup.map((s) => countDemandes({ etape: s, employeId: userId }))
+        ),
       ])
 
       const countMap = Object.fromEntries(
