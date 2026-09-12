@@ -2,10 +2,10 @@ import ReactPDF from "@react-pdf/renderer"
 import type { PdfRenderData } from "@/lib/pdf-types"
 import {
   toDemandePresentation,
+  TRANSPORT_LABELS,
   type PresentationTone,
 } from "@/lib/demande-presentation"
 import {
-  TRANSPORT_LABELS,
   formatCurrency,
   formatDate,
   formatDateTime,
