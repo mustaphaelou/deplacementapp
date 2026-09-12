@@ -6,6 +6,19 @@ export type Etape =
 
 export type Decision = "PENDING" | "APPROVED" | "REJECTED" | "WITHDRAWN"
 
+// The terminal Decisions: once recorded, the DemandeDeplacement cannot
+// transition any further (CONTEXT.md — Decision). The « pending » predicate
+// is the one definition of waiting: PENDING ⟺ non-terminal.
+export const TERMINAL_DECISIONS: readonly Decision[] = [
+  "APPROVED",
+  "REJECTED",
+  "WITHDRAWN",
+] as const
+
+export function isPendingDecision(decision: Decision): boolean {
+  return !TERMINAL_DECISIONS.includes(decision)
+}
+
 export const PIPELINE: readonly StageDefinition[] = [
   { id: "DRAFT", roleCanAct: "EMPLOYEE" },
   { id: "MANAGER_REVIEW", roleCanAct: "MANAGER" },
@@ -119,29 +132,24 @@ export type TimestampColumn =
 export interface PipelineView {
   queue: Etape[]
   committed: Etape[]
-  rollup: Etape[]
 }
 
 export const PIPELINE_VIEWS: Record<Role, PipelineView> = {
   EMPLOYEE: {
     queue: ["DRAFT"],
     committed: ["FINAL"],
-    rollup: ["DRAFT", "MANAGER_REVIEW", "FINAL"],
   },
   MANAGER: {
     queue: ["MANAGER_REVIEW"],
     committed: ["FINAL"],
-    rollup: ["MANAGER_REVIEW"],
   },
   FINANCE_ADMIN: {
     queue: ["FINANCE_REVIEW"],
     committed: ["FINAL"],
-    rollup: ["FINANCE_REVIEW"],
   },
   GENERAL_DIRECTION: {
     queue: ["DIRECTION_REVIEW"],
     committed: ["FINAL", "DIRECTION_REVIEW", "FINANCE_REVIEW"],
-    rollup: ["DIRECTION_REVIEW"],
   },
 }
 
@@ -151,10 +159,6 @@ export function queueEtapes(role: Role): Etape[] {
 
 export function committedEtapes(role: Role): Etape[] {
   return PIPELINE_VIEWS[role].committed
-}
-
-export function rollupEtapes(role: Role): Etape[] {
-  return PIPELINE_VIEWS[role].rollup
 }
 
 export function enteringEffect<E extends readonly TransitionEffect[]>(
@@ -227,11 +231,7 @@ export function checkTransition(
   }
 
   // Terminal decisions block all further transitions
-  if (
-    decision === "REJECTED" ||
-    decision === "WITHDRAWN" ||
-    decision === "APPROVED"
-  ) {
+  if (decision && !isPendingDecision(decision)) {
     return { ok: false, reason: "TERMINAL" }
   }
 

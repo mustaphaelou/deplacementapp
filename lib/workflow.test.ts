@@ -6,13 +6,68 @@ import {
   getAllowedActions,
   queueEtapes,
   committedEtapes,
-  rollupEtapes,
   laneOrderByColumn,
   enteringEffect,
   TRANSITION_EFFECTS,
+  TERMINAL_DECISIONS,
+  isPendingDecision,
 } from "./workflow"
 import type { Etape, Decision, WorkflowAction } from "./workflow"
 import type { Role } from "./auth"
+
+// ─── The « pending » predicate: the one definition of waiting ───────────────
+
+describe("isPendingDecision / TERMINAL_DECISIONS", () => {
+  it("pins the terminal set literally", () => {
+    expect(TERMINAL_DECISIONS).toEqual(["APPROVED", "REJECTED", "WITHDRAWN"])
+  })
+
+  it("treats PENDING as pending", () => {
+    expect(isPendingDecision("PENDING")).toBe(true)
+  })
+
+  it.each(["APPROVED", "REJECTED", "WITHDRAWN"] as const)(
+    "treats %s as terminal",
+    (decision) => {
+      expect(isPendingDecision(decision)).toBe(false)
+    }
+  )
+
+  // Every Decision value partitions into exactly one side: PENDING is the
+  // only pending one, and the terminal set is exactly the rest.
+  it("partitions all four Decision values", () => {
+    const decisions: Decision[] = [
+      "PENDING",
+      "APPROVED",
+      "REJECTED",
+      "WITHDRAWN",
+    ]
+
+    expect(decisions.filter(isPendingDecision)).toEqual(["PENDING"])
+    expect(decisions.filter((d) => !isPendingDecision(d))).toEqual(
+      TERMINAL_DECISIONS
+    )
+  })
+
+  // The guard reads the predicate: terminal ⟺ a live action is denied.
+  it("agrees with the guard on every Decision value", () => {
+    const decisions: Decision[] = [
+      "PENDING",
+      "APPROVED",
+      "REJECTED",
+      "WITHDRAWN",
+    ]
+    for (const decision of decisions) {
+      const result = checkTransition(
+        "MANAGER",
+        "MANAGER_REVIEW",
+        "rejeter",
+        decision
+      )
+      expect(!result.ok).toBe(!isPendingDecision(decision))
+    }
+  })
+})
 
 // ─── Read-model: queueEtapes (Etape-based) ─────────────────────────────────────
 
@@ -55,30 +110,6 @@ describe("committedEtapes", () => {
       "DIRECTION_REVIEW",
       "FINANCE_REVIEW",
     ])
-  })
-})
-
-// ─── Read-model: rollupEtapes (Etape-based) ───────────────────────────────────
-
-describe("rollupEtapes", () => {
-  it("returns DRAFT + MANAGER_REVIEW + FINAL for EMPLOYEE", () => {
-    expect(rollupEtapes("EMPLOYEE")).toEqual([
-      "DRAFT",
-      "MANAGER_REVIEW",
-      "FINAL",
-    ])
-  })
-
-  it("returns MANAGER_REVIEW for MANAGER", () => {
-    expect(rollupEtapes("MANAGER")).toEqual(["MANAGER_REVIEW"])
-  })
-
-  it("returns FINANCE_REVIEW for FINANCE_ADMIN", () => {
-    expect(rollupEtapes("FINANCE_ADMIN")).toEqual(["FINANCE_REVIEW"])
-  })
-
-  it("returns DIRECTION_REVIEW for GENERAL_DIRECTION", () => {
-    expect(rollupEtapes("GENERAL_DIRECTION")).toEqual(["DIRECTION_REVIEW"])
   })
 })
 

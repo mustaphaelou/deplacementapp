@@ -47,7 +47,7 @@ export const NAV_ITEMS: Record<string, NavItem[]> = {
     },
     {
       label: "En Attente",
-      href: "/demandes?etape=MANAGER_REVIEW",
+      href: "/demandes?etape=MANAGER_REVIEW&decision=PENDING",
       icon: "clock",
       description: "Demandes en attente d'action",
     },
@@ -87,7 +87,7 @@ export const NAV_ITEMS: Record<string, NavItem[]> = {
   GENERAL_DIRECTION: [
     {
       label: "Approbations Finales",
-      href: "/demandes?etape=DIRECTION_REVIEW",
+      href: "/demandes?etape=DIRECTION_REVIEW&decision=PENDING",
       icon: "check-circle",
       description: "Validation finale des demandes",
     },

@@ -169,6 +169,32 @@ describe(
         action: "approuver",
         actor: { id: directionId, role: "GENERAL_DIRECTION" },
       })
+
+      const rejectedAtFinance = await createAndSubmit(
+        { ...sampleData, destination: "Oujda" },
+        { id: employeeId, role: "EMPLOYEE" }
+      )
+      await executeTransition({
+        demandeId: rejectedAtFinance.id,
+        action: "approuver",
+        actor: { id: managerId, role: "MANAGER" },
+      })
+      await executeTransition({
+        demandeId: rejectedAtFinance.id,
+        action: "rejeter",
+        actor: { id: financeAdminId, role: "FINANCE_ADMIN" },
+        comment: "Budget insuffisant",
+      })
+
+      const withdrawnDraft = await createDraft(
+        { ...sampleData, destination: "Nador" },
+        { id: employeeId, role: "EMPLOYEE" }
+      )
+      await executeTransition({
+        demandeId: withdrawnDraft.id,
+        action: "retirer",
+        actor: { id: employeeId, role: "EMPLOYEE" },
+      })
     })
 
     it("returns correct payload for EMPLOYEE role", async () => {
@@ -178,9 +204,9 @@ describe(
         "Bienvenue sur votre espace personnel"
       )
       expect(payload.config.statPills).toEqual([
-        { icon: "file-text", label: "Total", value: 3, color: "blue" },
+        { icon: "file-text", label: "Total", value: 7, color: "blue" },
         { icon: "clock", label: "Brouillons", value: 1, color: "amber" },
-        { icon: "alert-circle", label: "Soumises", value: 1, color: "orange" },
+        { icon: "alert-circle", label: "Soumises", value: 3, color: "orange" },
         { icon: "check-circle", label: "Approuvées", value: 1, color: "green" },
       ])
       expect(payload.config.cta?.icon).toBe("plus")
@@ -204,6 +230,7 @@ describe(
       )
       for (const d of payload.demandes) {
         expect(d.etape).toBe("MANAGER_REVIEW")
+        expect(d.decision).toBe("PENDING")
         expect(d.employe).toBeDefined()
       }
     })
@@ -228,6 +255,7 @@ describe(
       )
       for (const d of payload.demandes) {
         expect(d.etape).toBe("FINANCE_REVIEW")
+        expect(d.decision).toBe("PENDING")
         expect(d.employe).toBeDefined()
       }
     })
@@ -258,6 +286,7 @@ describe(
       )
       for (const d of payload.demandes) {
         expect(d.etape).toBe("DIRECTION_REVIEW")
+        expect(d.decision).toBe("PENDING")
         expect(d.employe).toBeDefined()
       }
     })
