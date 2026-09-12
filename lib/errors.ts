@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server"
 
+/**
+ * The impossible-state refusal shared by the Societe writer and Utilisateur
+ * provisioning: no Societe row exists — unreachable after Amorçage (ADR-0018).
+ */
+export const AUCUNE_SOCIETE_CONFIGUREE = "Aucune société configurée"
+
 export class DemandeNotFoundError extends Error {
   status = 404
   constructor() {

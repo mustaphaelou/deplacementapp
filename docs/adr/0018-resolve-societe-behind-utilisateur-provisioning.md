@@ -17,8 +17,8 @@ Meanwhile: the deployment has exactly one Societe (CONTEXT.md), the service's `u
 ### What this means in practice
 
 - **Intake schema.** `utilisateurSchema` loses only `societeId`; its extension for updates inherits the fix, so the administration surface's real payloads are accepted on both POST and PUT. Every other field keeps its current optionality. No migration — the column and its data are untouched.
-- **Service.** `create(data, actorId)` drops the `societeId` parameter; inside `db.transaction` it reads the deployment's Societe row and writes its id on the insert. Credential and JournalAudit writes are unchanged.
-- **Missing-Societe refusal.** `Error("Aucune société configurée")` — the same impossible-state contract as `updateSociete`, already pinned by the Societe suite.
+- **Service.** `create(data, actorId)` no longer accepts a `societeId` in its input; inside `db.transaction` it reads the deployment's Societe row — through the Societe module's reader, whose parameter type widens to accept a transaction client — and writes its id on the insert. Credential and JournalAudit writes are unchanged.
+- **Missing-Societe refusal.** `Error("Aucune société configurée")` — one shared message constant, the same impossible-state contract as `updateSociete`, already pinned by the Societe suite.
 - **Page-side guard.** The admin page's submit-body construction is extracted into a small pure function, unit-tested against `utilisateurSchema`: the exact payload the form produces must pass the guard that protects the route. The route suite exercises the real payload shape (no injected Société id); the service suite asserts the created row carries the deployment's Societe id.
 
 ### What this does not mean
@@ -28,7 +28,7 @@ Meanwhile: the deployment has exactly one Societe (CONTEXT.md), the service's `u
 - **Not gating `/api/departements`** — separate candidate from the same review.
 - **Not narrowing `AuthUser.role` to `Role`** — separate candidate.
 - **Not adding browser-test infrastructure** — the payload-builder unit test carries the guard; RTL/jsdom remain out.
-- **Does not re-litigate ADR-0012** — `getSocieteRow` stays the raw-row reader; its docstring widens to name provisioning as a consumer. Nor ADR-0009 — Amorçage is untouched.
+- **Does not re-litigate ADR-0012** — `getSocieteRow` stays the raw-row reader; its docstring widens to name provisioning as a consumer, and its signature type widens to accept a transaction client. Nor ADR-0009 — Amorçage is untouched.
 
 ## Rationale
 

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { requireAuth, requireRole } from "@/lib/auth/server"
-import { handleServiceError } from "@/lib/errors"
+import { AUCUNE_SOCIETE_CONFIGUREE, handleServiceError } from "@/lib/errors"
 import { getSocieteRow } from "@/lib/societe"
 
 // Authenticated Societe management reader (ADR-0012): returns the full Societe
@@ -18,7 +18,7 @@ export async function GET() {
     const row = await getSocieteRow()
     if (!row) {
       return NextResponse.json(
-        { error: "Aucune société configurée" },
+        { error: AUCUNE_SOCIETE_CONFIGUREE },
         { status: 404 }
       )
     }

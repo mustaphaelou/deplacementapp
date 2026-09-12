@@ -10,6 +10,7 @@ import {
 } from "./avatar-storage"
 import { getSocieteRow } from "./societe"
 import {
+  AUCUNE_SOCIETE_CONFIGUREE,
   UtilisateurNotFoundError,
   MotDePasseIncorrectError,
   EmailChangeRequiresPasswordError,
@@ -93,7 +94,7 @@ export class UtilisateurService {
       if (!societe) {
         // Unreachable after Amorçage — same impossible-state contract as
         // updateSociete.
-        throw new Error("Aucune société configurée")
+        throw new Error(AUCUNE_SOCIETE_CONFIGUREE)
       }
 
       const [user] = await tx

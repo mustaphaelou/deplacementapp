@@ -3,6 +3,7 @@ import type { DrizzleDb, DrizzleTransactionClient } from "../../db"
 import { db } from "../../db"
 import { societes } from "../../db/schema/societes"
 import { logAudit } from "../audit"
+import { AUCUNE_SOCIETE_CONFIGUREE } from "../errors"
 import type { SocieteUpdate } from "../schemas"
 
 let cachedIdentity: SocieteIdentity | null = null
@@ -132,7 +133,7 @@ export async function updateSociete(
 ): Promise<SocieteUpdate> {
   const [societe] = await dbArg.select().from(societes).limit(1)
   if (!societe) {
-    throw new Error("Aucune société configurée")
+    throw new Error(AUCUNE_SOCIETE_CONFIGUREE)
   }
 
   // Primary validation lives in societeUpdateSchema (route layer); this
