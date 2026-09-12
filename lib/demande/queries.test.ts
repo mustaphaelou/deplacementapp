@@ -575,6 +575,7 @@ describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT }, () => {
         expect(row).toHaveProperty("dateDepart")
         expect(row).toHaveProperty("dateRetour")
         expect(row).toHaveProperty("typeTransport")
+        expect(row).toHaveProperty("motif")
         expect(row).toHaveProperty("totalEstime")
         expect(row).toHaveProperty("etape")
         expect(row).toHaveProperty("decision")
