@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { renderToStaticMarkup } from "react-dom/server"
 
 const { mockSearchParams, mockUseAuthUser } = vi.hoisted(() => ({
-  mockSearchParams: { etape: "" },
+  mockSearchParams: { etape: "", decision: "" },
   mockUseAuthUser: vi.fn(),
 }))
 
@@ -12,7 +12,11 @@ vi.mock("@/lib/auth/client", () => ({
 
 vi.mock("next/navigation", () => ({
   useSearchParams: () => ({
-    get: (key: string) => (key === "etape" ? mockSearchParams.etape : null),
+    get: (key: string) => {
+      if (key === "etape") return mockSearchParams.etape
+      if (key === "decision") return mockSearchParams.decision
+      return null
+    },
   }),
   useRouter: () => ({ push: vi.fn() }),
 }))
@@ -50,6 +54,7 @@ const DEMANDE = {
 describe("Demandes list page", () => {
   beforeEach(() => {
     mockSearchParams.etape = ""
+    mockSearchParams.decision = ""
     mockUseAuthUser.mockReturnValue({ user: mockUser("MANAGER") })
   })
 
@@ -74,7 +79,10 @@ describe("Demandes list page", () => {
     expect(html).toContain("Toutes")
     expect(html).toContain("En attente")
     expect(html).toContain("Finalisées")
-    expect(html).toContain("?etape=MANAGER_REVIEW")
+    // renderToStaticMarkup escapes `&` as `&amp;`; decode to pin the href itself.
+    expect(html.replace(/&amp;/g, "&")).toContain(
+      "?etape=MANAGER_REVIEW&decision=PENDING"
+    )
     expect(html).toContain("?etape=FINAL")
     expect(html).not.toContain("Brouillons")
   })
@@ -87,6 +95,7 @@ describe("Demandes list page", () => {
 
     expect(html).toContain("Brouillons")
     expect(html).toContain("?etape=DRAFT")
+    expect(html).not.toContain("&decision=")
     expect(html).toContain("Nouvelle demande")
     expect(html).not.toContain("CSV")
   })
