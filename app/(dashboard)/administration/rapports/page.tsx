@@ -48,6 +48,7 @@ export default async function RapportsPage() {
   const totalDemandes = etapeCounts.reduce((sum, s) => sum + s.count, 0)
   const totalApprouvees =
     etapeCounts.find((s) => s.etape === "FINAL")?.count ?? 0
+  const totalRejetees = await countDemandes({ decision: "REJECTED" })
   const totalBudget = await aggregateBudget(["FINAL"])
 
   return (
@@ -109,7 +110,7 @@ export default async function RapportsPage() {
           label="Approuvées"
           value={totalApprouvees}
         />
-        <DashboardCard icon={XCircle} label="Rejetées" value={0} />
+        <DashboardCard icon={XCircle} label="Rejetées" value={totalRejetees} />
         <DashboardCard
           icon={TrendingUp}
           label="Budget total"

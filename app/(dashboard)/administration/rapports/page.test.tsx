@@ -46,6 +46,22 @@ const ETAPE_COUNTS: Record<string, number> = {
   FINAL: 5,
 }
 
+// Distinct from every stage count and from the derived totals, so the
+// « Rejetées » pin cannot match another card's value.
+const REJECTED_COUNT = 7
+
+function resolveCount({
+  etape,
+  decision,
+}: {
+  etape?: string
+  decision?: string
+}) {
+  return Promise.resolve(
+    decision === "REJECTED" ? REJECTED_COUNT : (ETAPE_COUNTS[etape ?? ""] ?? 0)
+  )
+}
+
 describe("Rapports page", () => {
   beforeEach(() => {
     vi.resetAllMocks()
@@ -60,8 +76,7 @@ describe("Rapports page", () => {
 
     ;(getAuthUser as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser())
     ;(mockCountDemandes as ReturnType<typeof vi.fn>).mockImplementation(
-      ({ etape }: { etape?: string }) =>
-        Promise.resolve(ETAPE_COUNTS[etape ?? ""] ?? 0)
+      resolveCount
     )
     ;(mockAggregateBudget as ReturnType<typeof vi.fn>).mockResolvedValue(45000)
 
@@ -70,10 +85,14 @@ describe("Rapports page", () => {
     const html = renderToStaticMarkup(element)
 
     const etapes = PIPELINE.map((stage) => stage.id)
-    expect(mockCountDemandes).toHaveBeenCalledTimes(etapes.length)
-    // The stages are queried in pipeline order, stage by stage.
+    expect(mockCountDemandes).toHaveBeenCalledTimes(etapes.length + 1)
+    // The stages are queried in pipeline order, stage by stage,
     etapes.forEach((s, i) => {
       expect(mockCountDemandes).toHaveBeenNthCalledWith(i + 1, { etape: s })
+    })
+    // then the « Rejetées » card reads the computed REJECTED count.
+    expect(mockCountDemandes).toHaveBeenNthCalledWith(etapes.length + 1, {
+      decision: "REJECTED",
     })
 
     expect(mockAggregateBudget).toHaveBeenCalledWith(["FINAL"])
@@ -83,6 +102,7 @@ describe("Rapports page", () => {
     expect(html).toContain(String(total))
     expect(html).toContain(String(ETAPE_COUNTS["FINAL"]))
     expect(html).toContain(formatCurrency(45000))
+    expect(html).toContain(`>${REJECTED_COUNT}</p>`)
   })
 
   it("renders the stage rows in PIPELINE order, not label-map insertion order", async () => {
@@ -94,8 +114,7 @@ describe("Rapports page", () => {
 
     ;(getAuthUser as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser())
     ;(mockCountDemandes as ReturnType<typeof vi.fn>).mockImplementation(
-      ({ etape }: { etape?: string }) =>
-        Promise.resolve(ETAPE_COUNTS[etape ?? ""] ?? 0)
+      resolveCount
     )
     ;(mockAggregateBudget as ReturnType<typeof vi.fn>).mockResolvedValue(45000)
 
@@ -128,8 +147,7 @@ describe("Rapports page", () => {
 
     ;(getAuthUser as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser())
     ;(mockCountDemandes as ReturnType<typeof vi.fn>).mockImplementation(
-      ({ etape }: { etape?: string }) =>
-        Promise.resolve(ETAPE_COUNTS[etape ?? ""] ?? 0)
+      resolveCount
     )
     ;(mockAggregateBudget as ReturnType<typeof vi.fn>).mockResolvedValue(45000)
 
