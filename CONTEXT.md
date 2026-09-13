@@ -26,8 +26,12 @@ An organizational unit within the company (e.g. HR, IT, Finance).
 _Avoid_: Division, team, unit
 
 **Role**:
-The set of permissions and responsibilities assigned to a Utilisateur. One of EMPLOYEE, MANAGER, FINANCE_ADMIN, GENERAL_DIRECTION.
+The set of permissions and responsibilities assigned to a Utilisateur. One of EMPLOYEE, MANAGER, FINANCE_ADMIN, GENERAL_DIRECTION, ADMIN.
 _Avoid_: Position, title, permission level
+
+**Administrateur**:
+The deployment's application administrator — a fifth Role beside the four organisational ones. Manages the application itself (Utilisateurs, Société, Véhicules, Rapports) and sees every DemandeDeplacement, but is never an actor in the validation pipeline. Designated by e-mail at the deployment (the `ADMIN_EMAILS` environment list): a designated address is provisioned on its first ConnexionGoogle and has that standing re-asserted at every sign-in; it signs in with Google alone — no password. Additional Administrateurs are granted — and removed — only by an existing Administrateur; removing an address from `ADMIN_EMAILS` stops the guarantee — revocation is demoting or disabling the account in Utilisateurs.
+_Avoid_: Admin, super-admin, owner
 
 **VehiculeEntreprise**:
 A company-owned vehicle that can be assigned to a DemandeDeplacement.
@@ -87,7 +91,7 @@ The Utilisateur who last recorded an approve or reject Decision on a DemandeDepl
 _Avoid_: Approver, assigné, assignee, last-actor
 
 **VisibiliteDemande (Demande Visibility)**:
-The rule determining which DemandesDeplacement a Utilisateur can view. An EMPLOYEE sees only the demandes they created; MANAGER, FINANCE_ADMIN, and GENERAL_DIRECTION see all demandes in the instance. The rule is owned by the demande read model (`lib/demande`) and enforced in the WHERE clause of every read; viewing a demande outside one's visibility is indistinguishable from viewing a nonexistent demande (existence is never leaked).
+The rule determining which DemandesDeplacement a Utilisateur can view. An EMPLOYEE sees only the demandes they created; MANAGER, FINANCE_ADMIN, GENERAL_DIRECTION, and ADMIN see all demandes in the instance. The rule is owned by the demande read model (`lib/demande`) and enforced in the WHERE clause of every read; viewing a demande outside one's visibility is indistinguishable from viewing a nonexistent demande (existence is never leaked).
 _Avoid_: row-level security, permissions matrix, access control list
 
 **DemandeReadModel (Demande Read Model)**:
@@ -134,11 +138,11 @@ _Wikis to_: Amorçage (Setup), NomExpediteurEmail
 _Cites_: ADR-0008 (deferral), ADR-0009
 
 **EmailVérifié**:
-The organisation's attestation that a Utilisateur's e-mail address genuinely belongs to them. Written as `emailVerified = true` by the service at provisioning — the amorçage first Utilisateur included — and backfilled for pre-existing rows by migration `0007_attestation_email_verified`; there is no self-service verification flow and no administrator toggle. It is the precondition Better Auth's default linking gate requires before a first Google sign-in may link the account.
+The organisation's attestation that a Utilisateur's e-mail address genuinely belongs to them. Written as `emailVerified = true` by the service at provisioning — the amorçage first Utilisateur and the e-mail-designated Administrateur included — and backfilled for pre-existing rows by migration `0007_attestation_email_verified`; there is no self-service verification flow and no administrator toggle. It is the precondition Better Auth's default linking gate requires before a first Google sign-in may link the account.
 _Avoid_: Email confirmed, verified account, e-mail validation
 
 **ConnexionGoogle (Google Sign-In)**:
-An optional sign-in method: a Utilisateur signs in with their Google account instead of a password. Enabled per Utilisateur by an administrator and only for active accounts, and only offered when the deployment has Google credentials configured; it never provisions accounts — an unknown address is refused. Every sign-in revalidates existence, activity, and per-Utilisateur enablement, and a refused Google sign-in lands on the login page with a French message — never silently.
+An optional sign-in method: a Utilisateur signs in with their Google account instead of a password. Enabled per Utilisateur by an administrator and only for active accounts, and only offered when the deployment has Google credentials configured; it never provisions accounts — an unknown address is refused, with one exception: an address designated as the deployment's Administrateur (see Administrateur) is provisioned on its first sign-in. Every sign-in revalidates existence, activity, and per-Utilisateur enablement — a designated Administrateur's sign-in re-asserts their standing instead — and a refused Google sign-in lands on the login page with a French message — never silently.
 _Avoid_: OAuth, social login, SSO
 
 ### Branding
@@ -182,7 +186,7 @@ _Avoid_: Email suffix, mail domain
 The deployment choice for Nemotron model inference. Decided in ADR-0013: **hosted NIM**, targeting `nvidia/nemotron-3-nano-30b-a3b` on `integrate.api.nvidia.com/v1` via the OpenAI-compatible SDK. Employee past-demandes (snapshots of name, department, position, travel history) egress to NVIDIA's NIM endpoint during propose-from-history calls. This is accepted under the Societe's data-protection posture and is the gate for the data-residency/consent compliance. Self-host is available as a future escape hatch if requirements change.
 
 **Provenance**:
-Per-field metadata on a DemandeDeplacement indicating how a value was sourced. One of `ai_proposed` (value came from an AI proposal, accepted by the employee) or `employee_entered` (value typed directly by the employee). Applies to each AI-proposable field: Ville, Motif, TypeTransport, avanceRequise. Written to JournalAudit at acceptance time as a single event per field (`field X set to value Y (provenance: ai_proposed, accepted by employee Z)`). Provenance is returned by the API for all roles (EMPLOYEE, MANAGER, FINANCE_ADMIN, GENERAL_DIRECTION) and may be displayed in the UI at every pipeline stage. Downstream rejection audit entries are silent on AI involvement — accountability rests with the employee per the `employee stays accountable` principle.
+Per-field metadata on a DemandeDeplacement indicating how a value was sourced. One of `ai_proposed` (value came from an AI proposal, accepted by the employee) or `employee_entered` (value typed directly by the employee). Applies to each AI-proposable field: Ville, Motif, TypeTransport, avanceRequise. Written to JournalAudit at acceptance time as a single event per field (`field X set to value Y (provenance: ai_proposed, accepted by employee Z)`). Provenance is returned by the API for all roles (EMPLOYEE, MANAGER, FINANCE_ADMIN, GENERAL_DIRECTION, ADMIN) and may be displayed in the UI at every pipeline stage. Downstream rejection audit entries are silent on AI involvement — accountability rests with the employee per the `employee stays accountable` principle.
 _Avoid_: Source, origin, AI flag, assisted
 
 ### Deployment
@@ -200,3 +204,4 @@ _Cites_: ADR-0004
 - "approved" was used to mean both a stage-level outcome (manager said yes) and a terminal outcome (whole pipeline complete). Resolved by splitting into **Etape** (where we are) and **Decision** (what happened there). Terminal approval is `Etape: FINAL, Decision: APPROVED`.
 - "status" / "statut" was previously a single-column legacy enum resolved to **StatutDemande**. As of ADR-0005, the column is split into two persisted columns: **Etape + Decision**. The old `fromLegacyStatus`/`toLegacyStatus` bridging layer is removed.
 - "retirée" (withdrawn) was initially treated as a separate StatutDemande value. Resolved: withdrawal is a **Decision** (`WITHDRAWN`) and a terminal outcome, not a stage.
+- "administrateur" was used loosely, notably for the amorçage wizard's « Compte administrateur ». Resolved: **Administrateur** is the deployment's fifth Role (see above); the wizard's first Utilisateur keeps Role GENERAL_DIRECTION.
