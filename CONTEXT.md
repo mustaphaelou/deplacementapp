@@ -46,6 +46,9 @@ _Avoid_: Step, phase, status
 **Decision**:
 The outcome recorded at a given Etape. One of: PENDING, APPROVED, REJECTED, WITHDRAWN. APPROVED, REJECTED, and WITHDRAWN are **terminal** — once recorded, the DemandeDeplacement cannot transition any further and cannot be edited or resubmitted. To pursue the trip after a REJECTED or WITHDRAWN outcome, the Employee creates a *new* DemandeDeplacement; the rejected/withdrawn record is retained unchanged for history.
 
+PENDING is the non-terminal Decision, and the « pending » rule is defined once — beside the Etape/Decision unions in the workflow module (`TERMINAL_DECISIONS` + `isPendingDecision`). Surfaces that mean « waiting » ask for it, never for a lane alone: a decided DemandeDeplacement keeps its Etape, so an Etape filter on its own cannot mean waiting.
+_Avoid_: reading a lane alone as « waiting », re-deriving « pending » or the terminal set per surface
+
 ### Pipeline actors
 
 At each Etape exactly one Role is permitted to act. The pairing is fixed:
@@ -84,8 +87,12 @@ The Utilisateur who last recorded an approve or reject Decision on a DemandeDepl
 _Avoid_: Approver, assigné, assignee, last-actor
 
 **VisibiliteDemande (Demande Visibility)**:
-The rule determining which DemandesDeplacement a Utilisateur can view. An EMPLOYEE sees only the demandes they created; MANAGER, FINANCE_ADMIN, and GENERAL_DIRECTION see all demandes in the instance. The rule is owned by the demande query module and enforced in the WHERE clause of every read; viewing a demande outside one's visibility is indistinguishable from viewing a nonexistent demande (existence is never leaked).
+The rule determining which DemandesDeplacement a Utilisateur can view. An EMPLOYEE sees only the demandes they created; MANAGER, FINANCE_ADMIN, and GENERAL_DIRECTION see all demandes in the instance. The rule is owned by the demande read model (`lib/demande`) and enforced in the WHERE clause of every read; viewing a demande outside one's visibility is indistinguishable from viewing a nonexistent demande (existence is never leaked).
 _Avoid_: row-level security, permissions matrix, access control list
+
+**DemandeReadModel (Demande Read Model)**:
+The demande query module (`lib/demande`) as the one home of the read surfaces' lane counts. It owns `countDemandes({ etape?, decision?, employeId? })` — the single counting home (`countByEtape` is gone); the queue reads — `findPendingByEtapes` returns the pending rows at the queue stages; the `decision?` filter on the list's query params, threaded through `GET /api/demandes` as an additive optional query param; and the engaged budget (`aggregateBudget`) — FINAL rows always count, review-lane rows count only while pending. Every count surface — dashboard queues and pills, Rapports cards, « Répartition par étape » — asks it.
+_Avoid_: per-surface lane counting, re-hardcoded Rapports values, recreating `countByEtape`-style single-column counts
 
 **DemandePresentation (Demande Presentation)**:
 The module (`lib/demande-presentation.ts`) that owns how a DemandeDeplacement's Etape and Decision are displayed. It is the single home of the Etape and Decision labels, the stage order (derived from `PIPELINE` in the workflow module, never re-declared), the Decision outcome (pending / approved / rejected / withdrawn), the semantic tone (neutral / pending / success / danger), the pipeline strip as steps with past / current / upcoming state, and the compact decision-first label — a rejection names the stage where it happened ("Rejetée (Manager)" / "Rejetée (Finance)" / "Rejetée (Direction)"), an approval reads "Approuvée", a withdrawal "Retirée", otherwise the Etape label. Every surface that shows a demande's **current** Etape or Decision reads from `toDemandePresentation(demande)`.

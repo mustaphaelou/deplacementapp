@@ -209,6 +209,7 @@ export const demandeQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(10),
   etape: z.string().optional(),
+  decision: z.enum(["PENDING", "APPROVED", "REJECTED", "WITHDRAWN"]).optional(),
   recherche: z.string().optional(),
 })
 

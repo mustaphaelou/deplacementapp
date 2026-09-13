@@ -143,6 +143,7 @@ export default function DemandesListPage() {
   const [search, setSearch] = useState("")
 
   const etapeFilter = searchParams.get("etape") || ""
+  const decisionFilter = searchParams.get("decision") || ""
   const perPage = 10
   const role = user?.role
 
@@ -163,7 +164,7 @@ export default function DemandesListPage() {
             ? [
                 {
                   label: "En attente",
-                  href: `/demandes?etape=${queueEtape}`,
+                  href: `/demandes?etape=${queueEtape}&decision=PENDING`,
                   match: queueEtape,
                 },
               ]
@@ -177,6 +178,7 @@ export default function DemandesListPage() {
     params.set("page", page.toString())
     params.set("limit", perPage.toString())
     if (etapeFilter) params.set("etape", etapeFilter)
+    if (decisionFilter) params.set("decision", decisionFilter)
     if (search) params.set("recherche", search)
 
     try {
@@ -190,7 +192,7 @@ export default function DemandesListPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, search, etapeFilter])
+  }, [page, search, etapeFilter, decisionFilter])
 
   useEffect(() => {
     ;(async () => {

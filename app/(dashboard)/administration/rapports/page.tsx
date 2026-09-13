@@ -1,6 +1,6 @@
 ﻿import { getAuthUser, hasAnyRole } from "@/lib/auth/server"
 import { redirect } from "next/navigation"
-import { countByEtape, aggregateBudget } from "@/lib/demande"
+import { countDemandes, aggregateBudget } from "@/lib/demande"
 import { PIPELINE } from "@/lib/workflow"
 import { formatCurrency } from "@/lib/constants"
 import { ETAPE_LABELS } from "@/lib/demande-presentation"
@@ -41,13 +41,14 @@ export default async function RapportsPage() {
     etapes.map(async (etape) => ({
       etape,
       label: ETAPE_LABELS[etape],
-      count: await countByEtape(etape),
+      count: await countDemandes({ etape }),
     }))
   )
 
   const totalDemandes = etapeCounts.reduce((sum, s) => sum + s.count, 0)
   const totalApprouvees =
     etapeCounts.find((s) => s.etape === "FINAL")?.count ?? 0
+  const totalRejetees = await countDemandes({ decision: "REJECTED" })
   const totalBudget = await aggregateBudget(["FINAL"])
 
   return (
@@ -109,7 +110,7 @@ export default async function RapportsPage() {
           label="Approuvées"
           value={totalApprouvees}
         />
-        <DashboardCard icon={XCircle} label="Rejetées" value={0} />
+        <DashboardCard icon={XCircle} label="Rejetées" value={totalRejetees} />
         <DashboardCard
           icon={TrendingUp}
           label="Budget total"
