@@ -4,7 +4,10 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev-only-change-me}
+      # No default: the prod overlay (compose.prod.yml) gates this with ${VAR:?}
+      # and the dev overlay (compose.dev.yml) supplies the throwaway default.
+      # Never put a real-looking password here.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     # NOTES.md watch-out: the previous default was a real-looking password.
     # This placeholder is NOT a secret — set a strong POSTGRES_PASSWORD for any
     # non-throwaway deployment (Coolify injects it via environment).
@@ -22,7 +25,9 @@ services:
       context: .
       target: migrator
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-Mmmm2005.}@db:5432/${POSTGRES_DB:-deplacementapp}
+      # Secrets have no defaults here: compose.prod.yml gates them with ${VAR:?}
+      # (fail closed), compose.dev.yml supplies throwaway dev defaults.
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-deplacementapp}
     depends_on:
       db:
         condition: service_healthy
@@ -36,8 +41,10 @@ services:
       migrate:
         condition: service_completed_successfully
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-Mmmm2005.}@db:5432/${POSTGRES_DB:-deplacementapp}
-      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-dev-only-secret-0123456789-abcdefghijklmnopqrstuvwxyz}
+      # Secrets have no defaults here: compose.prod.yml gates them with ${VAR:?}
+      # (fail closed), compose.dev.yml supplies throwaway dev defaults.
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-deplacementapp}
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
       - BETTER_AUTH_URL=${BETTER_AUTH_URL:-${SERVICE_URL_APP:-http://localhost:3000}}
       - SMTP_HOST=${SMTP_HOST:-localhost}
       - SMTP_PORT=${SMTP_PORT:-1025}

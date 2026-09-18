@@ -5,6 +5,7 @@ import { hash as bcryptHash, compare as bcryptCompare } from "bcryptjs"
 import type { DrizzleDb } from "../../db"
 import { db } from "../../db"
 import { createGoogleGate } from "./google-guard"
+import { resolveAuthSecret } from "./secret-guard"
 
 export const BCRYPT_COST = 12
 
@@ -30,7 +31,9 @@ export interface BetterAuthOptions {
  */
 export function createAuth(db: DrizzleDb, options: BetterAuthOptions = {}) {
   return betterAuth({
-    secret: options.secret ?? process.env.BETTER_AUTH_SECRET,
+    // resolveAuthSecret fails closed in production: missing, dev-only, or
+    // short secrets throw instead of booting with a worthless secret.
+    secret: resolveAuthSecret(options.secret),
     baseURL: process.env.BETTER_AUTH_URL,
     database: drizzleAdapter(db, { provider: "pg", camelCase: true }),
     emailAndPassword: {

@@ -1,0 +1,23 @@
+# Production overlay — merged on top of docker-compose.yaml via:
+#   docker compose -f docker-compose.yaml -f compose.prod.yml up --build
+# (see `npm run docker:prod`).
+#
+# Fail-closed: every secret uses a ${VAR:?} gate, so compose refuses to start
+# when the variable is unset or empty. There are deliberately NO dev defaults
+# here — dev defaults live in compose.dev.yml only, which is never used in
+# production.
+services:
+  db:
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — set a strong password in the environment (see .env.example).}
+      POSTGRES_DB: ${POSTGRES_DB:-deplacementapp}
+
+  migrate:
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — set a strong password in the environment (see .env.example).}@db:5432/${POSTGRES_DB:-deplacementapp}
+
+  app:
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — set a strong password in the environment (see .env.example).}@db:5432/${POSTGRES_DB:-deplacementapp}
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET is required — generate one with `openssl rand -base64 32` (see .env.example).}
