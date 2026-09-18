@@ -1,4 +1,5 @@
 import { hash as bcryptHash, compare as bcryptCompare } from "bcryptjs"
+import { randomBytes } from "node:crypto"
 import { and, eq } from "drizzle-orm"
 import type { DrizzleDb, DrizzleTransactionClient } from "../../db"
 import { account } from "../../db/schema/auth-tables"
@@ -7,6 +8,17 @@ import { UtilisateurNotFoundError } from "../errors"
 import { BCRYPT_COST } from "./better-auth"
 
 export const CREDENTIAL_PROVIDER_ID = "credential"
+
+/**
+ * A one-time credential for provisioned accounts (#238): 144 bits of
+ * entropy, base64url-encoded (24 characters, no padding). It always satisfies
+ * the provisioning floor (`utilisateurSchema.motDePasse`, 12 min) and is
+ * never constant — the caller delivers it out of band and flags the account
+ * for forced rotation.
+ */
+export function generateTemporaryPassword(): string {
+  return randomBytes(18).toString("base64url")
+}
 
 type CredentialDb = DrizzleDb | DrizzleTransactionClient
 

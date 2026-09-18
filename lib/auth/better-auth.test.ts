@@ -12,7 +12,11 @@ import * as schema from "../../db/schema"
 import { account, session } from "../../db/schema/auth-tables"
 import { utilisateurs } from "../../db/schema/utilisateurs"
 import { createAuth, BCRYPT_COST } from "./better-auth"
-import { setPassword, CREDENTIAL_PROVIDER_ID } from "./set-password"
+import {
+  generateTemporaryPassword,
+  setPassword,
+  CREDENTIAL_PROVIDER_ID,
+} from "./set-password"
 import { GOOGLE_REFUSAL_CODES, googleRefusalMessage } from "./google-refusals"
 import type { DrizzleDb } from "../../db"
 
@@ -390,6 +394,7 @@ describe("better-auth adapter (T1 #164)", { timeout: TIMEOUT }, () => {
         "societeId",
         "actif",
         "googleAuthEnabled",
+        "doitChangerMotDePasse",
       ] as const) {
         expect(additional?.[field]?.input).toBe(false)
       }
@@ -535,6 +540,15 @@ describe("better-auth adapter (T1 #164)", { timeout: TIMEOUT }, () => {
   })
 
   describe("setPassword (AC4)", () => {
+    it("generates a non-constant 24-char temporary credential (#238)", async () => {
+      const first = generateTemporaryPassword()
+      const second = generateTemporaryPassword()
+      for (const temp of [first, second]) {
+        expect(temp).toMatch(/^[A-Za-z0-9_-]{24}$/)
+      }
+      expect(first).not.toBe(second)
+    })
+
     it("creates the credential row keyed on the Utilisateur id", async () => {
       await setPassword(db as unknown as DrizzleDb, utilisateurId, "motdepasse-123")
 

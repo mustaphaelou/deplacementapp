@@ -116,11 +116,11 @@ export const utilisateurSchema = z.object({
   role: z.enum(["EMPLOYEE", "MANAGER", "FINANCE_ADMIN", "GENERAL_DIRECTION"]),
   departementId: z.string().min(1, "Département requis"),
   telephone: z.string().optional(),
-  motDePasse: z
-    .string()
-    .min(6, "Minimum 6 caractères")
-    .optional()
-    .or(z.literal("")),
+  // #238 — provisioning never falls back to a constant: the field is optional
+  // (omitted → the service provisions a random one-time credential with
+  // forced rotation), but a supplied password must clear the 12-char floor.
+  // Empty string is rejected — callers send `undefined` for "no password".
+  motDePasse: z.string().min(12, "Minimum 12 caractères").optional(),
   googleAuthEnabled: z.boolean().optional(),
 })
 

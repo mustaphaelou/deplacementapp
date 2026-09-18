@@ -143,8 +143,8 @@ describe("utilisateurs route", () => {
     const { utilisateurService } = await import("@/lib/utilisateur-service")
     ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
     ;(utilisateurService.create as ReturnType<typeof vi.fn>).mockResolvedValue({
-      id: "u-2",
-      email: "user@example.com",
+      user: { id: "u-2", email: "user@example.com" },
+      temporaryPassword: "temporaire-genere-24-chars-x",
     })
 
     const { POST } = await import("./route")
@@ -154,7 +154,10 @@ describe("utilisateurs route", () => {
 
     expect(response.status).toBe(200)
     const body = await response.json()
-    expect(body).toEqual({ user: { id: "u-2", email: "user@example.com" } })
+    expect(body).toEqual({
+      user: { id: "u-2", email: "user@example.com" },
+      temporaryPassword: "temporaire-genere-24-chars-x",
+    })
 
     const create = utilisateurService.create as ReturnType<typeof vi.fn>
     expect(create).toHaveBeenCalledOnce()

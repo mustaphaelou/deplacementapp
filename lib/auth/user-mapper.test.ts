@@ -13,6 +13,7 @@ describe("toAuthUser", () => {
       departementId: "dep-1",
       poste: "Développeur",
       image: "/avatars/jean.png",
+      doitChangerMotDePasse: true,
     }
 
     const result = toAuthUser(sessionUser)
@@ -26,6 +27,7 @@ describe("toAuthUser", () => {
       departement: "",
       poste: "Développeur",
       avatarUrl: "/avatars/jean.png",
+      doitChangerMotDePasse: true,
     }
     expect(result).toEqual(expected)
   })
@@ -42,6 +44,7 @@ describe("toAuthUser", () => {
         "departement",
         "poste",
         "avatarUrl",
+        "doitChangerMotDePasse",
       ].sort()
     )
   })
@@ -63,6 +66,7 @@ describe("toAuthUser", () => {
       departement: "",
       poste: "",
       avatarUrl: null,
+      doitChangerMotDePasse: false,
     })
   })
 })

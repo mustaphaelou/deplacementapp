@@ -67,6 +67,9 @@ export function createAuth(db: DrizzleDb, options: BetterAuthOptions = {}) {
         societeId: { type: "string", input: false },
         actif: { type: "boolean", input: false },
         googleAuthEnabled: { type: "boolean", input: false },
+        // #238 — forced-rotation flag: read from the utilisateurs row into the
+        // session so the dashboard gate can block until the holder rotates.
+        doitChangerMotDePasse: { type: "boolean", input: false },
       },
       validateUserInfo: createGoogleGate(db),
     },

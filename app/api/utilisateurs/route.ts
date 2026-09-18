@@ -28,7 +28,10 @@ export const POST = withValidation(
     if (!authorized.ok) return authorized.response
 
     try {
-      const user = await utilisateurService.create(
+      // #238 — the service returns the generated one-time credential (when the
+      // password was omitted) so the administrator can deliver it out of band.
+      // It is shown once by the UI and never stored in plaintext.
+      const { user, temporaryPassword } = await utilisateurService.create(
         {
           ...data,
           motDePasse: data.motDePasse || undefined,
@@ -36,7 +39,7 @@ export const POST = withValidation(
         },
         auth.id
       )
-      return NextResponse.json({ user })
+      return NextResponse.json({ user, temporaryPassword })
     } catch (e) {
       return handleServiceError(e)
     }

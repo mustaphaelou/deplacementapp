@@ -140,6 +140,48 @@ describe("utilisateurSchema", () => {
     })
     expect(result.success).toBe(false)
   })
+
+  it("accepts an explicit password of 12+ characters", async () => {
+    const { utilisateurSchema } = await getSchemas()
+    const result = utilisateurSchema.safeParse({
+      email: "a@b.com",
+      nom: "Dupont",
+      prenom: "Jean",
+      poste: "Dev",
+      role: "EMPLOYEE",
+      departementId: "dep-1",
+      motDePasse: "secret123456",
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it("rejects an empty password (omitted means a generated temporary)", async () => {
+    const { utilisateurSchema } = await getSchemas()
+    const result = utilisateurSchema.safeParse({
+      email: "a@b.com",
+      nom: "Dupont",
+      prenom: "Jean",
+      poste: "Dev",
+      role: "EMPLOYEE",
+      departementId: "dep-1",
+      motDePasse: "",
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it("rejects a supplied password shorter than 12 characters", async () => {
+    const { utilisateurSchema } = await getSchemas()
+    const result = utilisateurSchema.safeParse({
+      email: "a@b.com",
+      nom: "Dupont",
+      prenom: "Jean",
+      poste: "Dev",
+      role: "EMPLOYEE",
+      departementId: "dep-1",
+      motDePasse: "secret123",
+    })
+    expect(result.success).toBe(false)
+  })
 })
 
 describe("updateUtilisateurSchema", () => {

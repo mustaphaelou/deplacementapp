@@ -1,0 +1,1 @@
+ALTER TABLE "utilisateurs" ADD COLUMN "doitChangerMotDePasse" boolean DEFAULT false NOT NULL;

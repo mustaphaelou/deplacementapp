@@ -3,7 +3,11 @@ import type { DrizzleDb } from "../db"
 import { db } from "../db"
 import { utilisateurs } from "../db/schema/utilisateurs"
 import { logAudit } from "./audit"
-import { setPassword, verifyCredential } from "./auth/set-password"
+import {
+  generateTemporaryPassword,
+  setPassword,
+  verifyCredential,
+} from "./auth/set-password"
 import {
   avatarStorage as defaultAvatarStorage,
   type AvatarStorage,
@@ -41,7 +45,18 @@ export {
   AvatarError,
 }
 
-const DEFAULT_PASSWORD = "password123"
+export interface ProvisioningResult {
+  user: {
+    id: string
+    email: string
+  } & Record<string, unknown>
+  /**
+   * The generated one-time credential, present only when the caller supplied
+   * no password. The provisioning UI shows it once so the administrator can
+   * deliver it out of band; it is never stored in plaintext.
+   */
+  temporaryPassword: string | null
+}
 
 export class UtilisateurService {
   constructor(
@@ -83,8 +98,14 @@ export class UtilisateurService {
       googleAuthEnabled?: boolean
     },
     actorId: string
-  ) {
-    const password = data.motDePasse || DEFAULT_PASSWORD
+  ): Promise<ProvisioningResult> {
+    // #238 — no constant default: an omitted (or blank) password provisions a
+    // random one-time credential and flags the account for forced rotation on
+    // first sign-in. An explicitly supplied password stays administrator-known
+    // and carries no rotation flag.
+    const temporaryPassword = data.motDePasse ? null : generateTemporaryPassword()
+    const password = data.motDePasse || temporaryPassword!
+    const mustRotate = temporaryPassword !== null
     const userId = crypto.randomUUID()
 
     return this._db.transaction(async (tx) => {
@@ -105,6 +126,9 @@ export class UtilisateurService {
           // The administrator's provisioning act is the e-mail attestation:
           // it is written here, by the service — never a toggle.
           emailVerified: true,
+          // #238 — a generated one-time credential forces rotation on first
+          // sign-in; only the holder can clear it, by choosing their own.
+          doitChangerMotDePasse: mustRotate,
           googleAuthEnabled: data.googleAuthEnabled ?? false,
           nom: data.nom,
           prenom: data.prenom,
@@ -134,7 +158,7 @@ export class UtilisateurService {
         tx
       )
 
-      return user
+      return { user, temporaryPassword }
     })
   }
 
@@ -157,6 +181,13 @@ export class UtilisateurService {
     const updateData: Record<string, unknown> = { ...rest }
     if (email !== undefined) {
       updateData.email = email
+    }
+    if (motDePasse) {
+      // #238 — an administrator-set credential is known to someone other
+      // than the holder: force rotation at next sign-in.  Folded into the
+      // row write (not a second query) so a password-only update still sets
+      // a non-empty SET clause.
+      updateData.doitChangerMotDePasse = true
     }
 
     return this._db.transaction(async (tx) => {
@@ -204,6 +235,12 @@ export class UtilisateurService {
 
     await this._db.transaction(async (tx) => {
       await setPassword(tx, userId, newPassword)
+      // #238 — the holder chose their own credential: the forced rotation
+      // (provisioning temporary or admin reset) is satisfied.
+      await tx
+        .update(utilisateurs)
+        .set({ doitChangerMotDePasse: false })
+        .where(eq(utilisateurs.id, userId))
 
       await logAudit(
         {

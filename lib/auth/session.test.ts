@@ -61,6 +61,7 @@ function makeUser(role: string): AuthUser {
     departement: "IT",
     poste: "Développeur",
     avatarUrl: null,
+    doitChangerMotDePasse: false,
   }
 }
 
@@ -129,6 +130,7 @@ describe("requireAuth", () => {
         departement: "",
         poste: "Développeur",
         avatarUrl: "/avatars/jean.png",
+        doitChangerMotDePasse: false,
       })
     }
   })
@@ -188,6 +190,7 @@ describe("getAuthUser", () => {
       departement: "",
       poste: "Chef de projet",
       avatarUrl: null,
+      doitChangerMotDePasse: false,
     })
   })
 })

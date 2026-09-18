@@ -22,5 +22,12 @@ export function buildUtilisateurPayload(
   form: UtilisateurFormValues,
   editingUserId: string | null = null
 ) {
-  return editingUserId ? { ...form, id: editingUserId } : form
+  // #238 — an empty password field means "no password": omit it so the schema
+  // (which rejects "") validates.  On create the service provisions a random
+  // one-time credential with forced rotation; on edit the password is left
+  // untouched.
+  const { motDePasse, ...rest } = form
+  const payload: Record<string, unknown> = { ...rest }
+  if (motDePasse) payload.motDePasse = motDePasse
+  return editingUserId ? { ...payload, id: editingUserId } : payload
 }

@@ -56,6 +56,13 @@
       "when": 1789149393686,
       "tag": "0007_attestation_email_verified",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789729281384,
+      "tag": "0008_rotation_mot_de_passe",
+      "breakpoints": true
     }
   ]
 }

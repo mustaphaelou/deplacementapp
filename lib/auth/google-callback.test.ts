@@ -232,7 +232,7 @@ describe("Google callback seam (#203)", { timeout: TIMEOUT }, () => {
       },
       actorId
     )
-    return created.id
+    return created.user.id
   }
 
   /** Mint OAuth state through the engine's sign-in endpoint, exactly as the

@@ -16,6 +16,14 @@ export const utilisateurs = pgTable(
     email: text("email").notNull(),
     emailVerified: boolean("emailVerified").notNull().default(false),
     googleAuthEnabled: boolean("googleAuthEnabled").notNull().default(false),
+    // Forced rotation after an administrator-provisioned credential (#238):
+    // true when the account's password was set by someone else (generated
+    // temporary at provisioning, admin reset) and the holder has not chosen
+    // their own yet. The dashboard gate blocks on it until changePassword
+    // clears it.
+    doitChangerMotDePasse: boolean("doitChangerMotDePasse")
+      .notNull()
+      .default(false),
     nom: text("nom").notNull(),
     prenom: text("prenom").notNull(),
     poste: text("poste").notNull(),

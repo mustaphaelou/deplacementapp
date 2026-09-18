@@ -13,6 +13,9 @@ export interface AuthUser {
   departement: string
   poste: string
   avatarUrl: string | null
+  // #238 — true while the holder still authenticates with an
+  // administrator-issued temporary credential (forced rotation pending).
+  doitChangerMotDePasse: boolean
 }
 
 export interface BetterAuthSessionUser {
@@ -24,6 +27,7 @@ export interface BetterAuthSessionUser {
   role?: string | null
   departementId?: string | null
   image?: string | null
+  doitChangerMotDePasse?: boolean | null
 }
 
 export function toAuthUser(user: BetterAuthSessionUser): AuthUser {
@@ -38,5 +42,6 @@ export function toAuthUser(user: BetterAuthSessionUser): AuthUser {
     departement: "",
     poste: user.poste ?? "",
     avatarUrl: user.image ?? null,
+    doitChangerMotDePasse: user.doitChangerMotDePasse ?? false,
   }
 }

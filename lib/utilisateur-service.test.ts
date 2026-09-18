@@ -152,7 +152,7 @@ describe("UtilisateurService", { timeout: TIMEOUT }, () => {
   })
 
   describe("create", () => {
-    it("inserts a user row and writes journal_audit", async () => {
+    it("provisions a random one-time credential with forced rotation when no password is supplied", async () => {
       const result = await svc.create(
         {
           email: "new@test.com",
@@ -165,15 +165,19 @@ describe("UtilisateurService", { timeout: TIMEOUT }, () => {
         actor.id
       )
 
-      expect(result.email).toBe("new@test.com")
-      expect(hash).toHaveBeenCalledWith("password123", 12)
+      // #238 — no constant default: the credential is random per account…
+      expect(result.temporaryPassword).toMatch(/^[A-Za-z0-9_-]{24}$/)
+      expect(result.temporaryPassword).not.toBe("password123")
+      expect(hash).toHaveBeenCalledWith(result.temporaryPassword, 12)
 
       const [row] = await pgliteDb
         .select()
         .from(utilisateurs)
-        .where(eq(utilisateurs.id, result.id))
+        .where(eq(utilisateurs.id, result.user.id))
       expect(row).toBeDefined()
       expect(row.email).toBe("new@test.com")
+      // …and the account is rotation-gated until the holder chooses their own.
+      expect(row.doitChangerMotDePasse).toBe(true)
       // The administrator's provisioning act is the e-mail attestation: it is
       // written by the service, never hand-set and never a toggle.
       expect(row.emailVerified).toBe(true)
@@ -185,10 +189,29 @@ describe("UtilisateurService", { timeout: TIMEOUT }, () => {
       const [auditRow] = await pgliteDb
         .select()
         .from(journalAudit)
-        .where(eq(journalAudit.entiteId, result.id))
+        .where(eq(journalAudit.entiteId, result.user.id))
       expect(auditRow).toBeDefined()
       expect(auditRow.utilisateurId).toBe(actor.id)
       expect(auditRow.action).toBe("CREATION_UTILISATEUR")
+    })
+
+    it("generates a distinct temporary credential per provisioned account", async () => {
+      const base = {
+        nom: "Test",
+        prenom: "User",
+        poste: "QA",
+        role: "EMPLOYEE",
+        departementId,
+      } as const
+      const first = await svc.create({ ...base, email: "a@test.com" }, actor.id)
+      const second = await svc.create(
+        { ...base, email: "b@test.com" },
+        actor.id
+      )
+
+      expect(first.temporaryPassword).not.toBeNull()
+      expect(second.temporaryPassword).not.toBeNull()
+      expect(first.temporaryPassword).not.toBe(second.temporaryPassword)
     })
 
     it("rolls back when logAudit fails (no rows inserted)", async () => {
@@ -219,11 +242,11 @@ describe("UtilisateurService", { timeout: TIMEOUT }, () => {
       spy.mockRestore()
     })
 
-    it("hashes provided password", async () => {
-      await svc.create(
+    it("uses an explicitly supplied password with no rotation flag", async () => {
+      const result = await svc.create(
         {
           email: "pw@test.com",
-          motDePasse: "secret123",
+          motDePasse: "secret123456",
           nom: "Test",
           prenom: "User",
           poste: "QA",
@@ -233,7 +256,14 @@ describe("UtilisateurService", { timeout: TIMEOUT }, () => {
         actor.id
       )
 
-      expect(hash).toHaveBeenCalledWith("secret123", 12)
+      expect(hash).toHaveBeenCalledWith("secret123456", 12)
+      expect(result.temporaryPassword).toBeNull()
+
+      const [row] = await pgliteDb
+        .select()
+        .from(utilisateurs)
+        .where(eq(utilisateurs.id, result.user.id))
+      expect(row.doitChangerMotDePasse).toBe(false)
     })
 
     it("refuses when no Societe exists (unreachable after Amorçage)", async () => {
@@ -316,6 +346,22 @@ describe("UtilisateurService", { timeout: TIMEOUT }, () => {
         svc.update("u-missing", { nom: "Ghost" }, actor.id)
       ).rejects.toThrow(UtilisateurNotFoundError)
     })
+
+    it("flags forced rotation when an administrator sets the password", async () => {
+      await svc.update(
+        targetUser.id,
+        { motDePasse: "nouveau-mot-de-passe-12" },
+        actor.id
+      )
+
+      expect(hash).toHaveBeenCalledWith("nouveau-mot-de-passe-12", 12)
+
+      const [row] = await pgliteDb
+        .select()
+        .from(utilisateurs)
+        .where(eq(utilisateurs.id, targetUser.id))
+      expect(row.doitChangerMotDePasse).toBe(true)
+    })
   })
 
   describe("changePassword", () => {
@@ -358,6 +404,24 @@ describe("UtilisateurService", { timeout: TIMEOUT }, () => {
         .where(eq(journalAudit.entiteId, targetUser.id))
       expect(auditRow).toBeDefined()
       expect(auditRow.action).toBe("CHANGEMENT_MOT_DE_PASSE")
+    })
+
+    it("clears the forced-rotation flag when the holder chooses their own password", async () => {
+      ;(compare as ReturnType<typeof vi.fn>).mockResolvedValue(true)
+      ;(hash as ReturnType<typeof vi.fn>).mockResolvedValue("$newhash$")
+
+      await pgliteDb
+        .update(utilisateurs)
+        .set({ doitChangerMotDePasse: true })
+        .where(eq(utilisateurs.id, targetUser.id))
+
+      await svc.changePassword(targetUser.id, "correctpass", "newpass")
+
+      const [row] = await pgliteDb
+        .select()
+        .from(utilisateurs)
+        .where(eq(utilisateurs.id, targetUser.id))
+      expect(row.doitChangerMotDePasse).toBe(false)
     })
 
     it("rolls back when logAudit fails (credential row unchanged)", async () => {

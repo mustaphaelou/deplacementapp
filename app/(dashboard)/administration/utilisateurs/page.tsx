@@ -188,6 +188,13 @@ export default function UtilisateursPage() {
     googleAuthEnabled: false,
   })
   const [search, setSearch] = useState("")
+  // #238 — one-time handoff of a generated temporary credential: shown once
+  // after provisioning so the administrator can deliver it out of band.  It
+  // lives only in this state (never persisted) and is dismissed explicitly.
+  const [tempCredential, setTempCredential] = useState<{
+    email: string
+    password: string
+  } | null>(null)
 
   async function fetchData() {
     setLoading(true)
@@ -261,6 +268,18 @@ export default function UtilisateursPage() {
         ),
       })
       if (!res.ok) throw new Error()
+      if (!editingUser) {
+        const data = await res.json()
+        if (data.temporaryPassword) {
+          // #238 — a random one-time credential was provisioned: surface it
+          // once for out-of-band delivery.  The account stays rotation-gated
+          // until the holder chooses their own password.
+          setTempCredential({
+            email: data.user?.email ?? form.email,
+            password: data.temporaryPassword,
+          })
+        }
+      }
       toast.success(editingUser ? "Utilisateur modifié" : "Utilisateur créé")
       setOpen(false)
       fetchData()
@@ -327,6 +346,37 @@ export default function UtilisateursPage() {
           />
         </div>
       </div>
+
+      {tempCredential && (
+        <div
+          role="alert"
+          className="rounded-[3px] border border-amber-300 bg-amber-50 p-4 text-sm"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="font-semibold">
+                Mot de passe temporaire — à transmettre hors bande
+              </p>
+              <p className="mt-1 text-muted-foreground">
+                {tempCredential.email} devra choisir son propre mot de passe à
+                la première connexion. Ce secret ne s&apos;affiche
+                qu&apos;une fois.
+              </p>
+              <p className="mt-2 font-mono text-base font-bold tracking-wide">
+                {tempCredential.password}
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-9 rounded-[3px]"
+              onClick={() => setTempCredential(null)}
+            >
+              Masquer
+            </Button>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center p-8">
@@ -425,7 +475,7 @@ export default function UtilisateursPage() {
               label={
                 editingUser
                   ? "Nouveau mot de passe (laisser vide pour conserver)"
-                  : "Mot de passe"
+                  : "Mot de passe (vide = temporaire généré, 12 caractères min.)"
               }
             >
               <Input
@@ -434,8 +484,8 @@ export default function UtilisateursPage() {
                 onChange={(e) =>
                   setForm({ ...form, motDePasse: e.target.value })
                 }
-                required={!editingUser && !form.googleAuthEnabled}
-                minLength={6}
+                minLength={12}
+                autoComplete="new-password"
                 className={FIELD_INPUT}
               />
             </Field>
