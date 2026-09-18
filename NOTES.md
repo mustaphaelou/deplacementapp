@@ -13,7 +13,7 @@
 - Each lesson ends with one concrete thing to inspect or do in the real repo.
 
 ## Watch-outs in the repo
-- `.env` contains what looks like a real DB password (`Mmmm2005.`) and a placeholder `NEXTAUTH_SECRET`. Flag to user: rotate before deploy. Do NOT commit secrets.
+- `.env` can contain sensitive credentials plus a placeholder `NEXTAUTH_SECRET`. Flag to user: rotate before deploy. Do NOT commit secrets.
 - `next.config.mjs` uses `output: 'standalone'` — this is why the Dockerfile copies `.next/standalone` and runs `node server.js` (not `next start`). Worth a dedicated mini-lesson; many deploy guides miss it.
 - Drizzle is used as the ORM. Migrations run via `npx drizzle-kit migrate` in the Docker entrypoint. The `db/` directory contains schema definitions and migration output.
 
