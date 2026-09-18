@@ -35,6 +35,15 @@ describe("departement queries", { timeout: TIMEOUT }, () => {
       expect(result[1].nom).toBe("Commercial")
       expect(result[2].nom).toBe("Technique")
     })
+
+    it("exposes only id and nom (no societeId or timestamps)", async () => {
+      const result = await listDepartements(pgliteDb as any)
+
+      expect(result).toHaveLength(3)
+      for (const row of result) {
+        expect(Object.keys(row).sort()).toEqual(["id", "nom"])
+      }
+    })
   })
 
   describe("with empty table", () => {
