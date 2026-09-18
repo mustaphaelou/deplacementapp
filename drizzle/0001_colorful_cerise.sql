@@ -1,5 +1,17 @@
-CREATE TYPE "public"."decision" AS ENUM('PENDING', 'APPROVED', 'REJECTED', 'WITHDRAWN');--> statement-breakpoint
-CREATE TYPE "public"."etape" AS ENUM('DRAFT', 'MANAGER_REVIEW', 'FINANCE_REVIEW', 'DIRECTION_REVIEW', 'FINAL');--> statement-breakpoint
+DO $$
+BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'decision') THEN
+		CREATE TYPE "public"."decision" AS ENUM('PENDING', 'APPROVED', 'REJECTED', 'WITHDRAWN');
+	END IF;
+END $$;
+--> statement-breakpoint
+DO $$
+BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'etape') THEN
+		CREATE TYPE "public"."etape" AS ENUM('DRAFT', 'MANAGER_REVIEW', 'FINANCE_REVIEW', 'DIRECTION_REVIEW', 'FINAL');
+	END IF;
+END $$;
+--> statement-breakpoint
 CREATE TYPE "public"."roles" AS ENUM('EMPLOYEE', 'MANAGER', 'FINANCE_ADMIN', 'GENERAL_DIRECTION');--> statement-breakpoint
 CREATE TYPE "public"."statuts_demande" AS ENUM('BROUILLON', 'SOUMISE', 'APPROUVEE_MANAGER', 'APPROUVEE_FINANCE', 'APPROUVEE', 'REJETEE_MANAGER', 'REJETEE_FINANCE', 'REJETEE_DIRECTION', 'RETIREE');--> statement-breakpoint
 CREATE TYPE "public"."types_transport" AS ENUM('VOITURE_PERSONNELLE', 'VOITURE_SOCIETE', 'BUS', 'AVION', 'TRAIN', 'AUTRE');--> statement-breakpoint
