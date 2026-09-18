@@ -181,3 +181,55 @@ describe("CSV export route", () => {
     expect(response.status).toBe(500)
   })
 })
+
+describe("CSV formula-injection guard (#237)", () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  it("csvCell neutralizes formula triggers but leaves plain text alone", async () => {
+    const { csvCell } = await import("./route")
+
+    // Trigger first-chars (after leading spaces) get a single-quote prefix.
+    expect(csvCell("=1+1")).toBe("\"'=1+1\"")
+    expect(csvCell("+33123456789")).toBe("\"'+33123456789\"")
+    expect(csvCell("-2+3")).toBe("\"'-2+3\"")
+    expect(csvCell("@evil")).toBe("\"'@evil\"")
+    expect(csvCell("\tcmd|' /c calc'!A0")).toBe("\"'\tcmd|' /c calc'!A0\"")
+    expect(csvCell("\r\ncmd")).toBe("\"'\r\ncmd\"")
+    expect(csvCell("  =HYPERLINK(\"http://evil\",\"x\")")).toBe(
+      "\"'  =HYPERLINK(\"\"http://evil\"\",\"\"x\"\")\""
+    )
+    // Plain text, numbers, null: untouched apart from quoting.
+    expect(csvCell("Casablanca")).toBe('"Casablanca"')
+    expect(csvCell(380)).toBe('"380"')
+    expect(csvCell(null)).toBe('""')
+    expect(csvCell(undefined)).toBe('""')
+    // RFC 4180: embedded quotes still double, with no spurious prefix.
+    expect(csvCell('say "hi"')).toBe('"say ""hi"""')
+  })
+
+  it("GET exports a formula-payload destination as inert text", async () => {
+    const { requireAuth } = await import("@/lib/auth/server")
+    const { findAllForExport } = await import("@/lib/demande")
+
+    ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
+    ;(findAllForExport as ReturnType<typeof vi.fn>).mockResolvedValue([
+      {
+        ...mockExportRows[0],
+        destination: '=HYPERLINK("http://evil","click")',
+      },
+    ])
+
+    const { GET } = await import("./route")
+    const response = await GET()
+
+    expect(response.status).toBe(200)
+    const csv = await response.text()
+    // Inert-text cell: leading single quote, embedded quotes still doubled
+    // so the field parses as one cell.
+    expect(csv).toContain(`"'=HYPERLINK(""http://evil"",""click"")"`)
+    // The raw payload must never appear as a live formula cell.
+    expect(csv).not.toContain(`"=HYPERLINK(`)
+  })
+})
