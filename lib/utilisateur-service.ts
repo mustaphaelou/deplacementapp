@@ -16,6 +16,7 @@ import {
   EmailChangeRequiresPasswordError,
   NoProfileUpdateDataError,
   AvatarError,
+  UnauthorizedActionError,
 } from "./errors"
 
 export interface ProfileResult {
@@ -39,9 +40,73 @@ export {
   EmailChangeRequiresPasswordError,
   NoProfileUpdateDataError,
   AvatarError,
+  UnauthorizedActionError,
 }
 
 const DEFAULT_PASSWORD = "password123"
+
+// Grant rules for role administration (#236): the route gate
+// (FINANCE_ADMIN / GENERAL_DIRECTION) stays, and the service enforces who
+// may assign which role. FINANCE_ADMIN manages EMPLOYEE / MANAGER only — it
+// may neither create a GENERAL_DIRECTION (nor a peer FINANCE_ADMIN) nor
+// touch an existing one — and nobody may change their own role (a
+// self-promotion to GENERAL_DIRECTION would capture DIRECTION_REVIEW final
+// approval).
+const ROLES_GERABLES_PAR_FINANCE_ADMIN: readonly string[] = [
+  "EMPLOYEE",
+  "MANAGER",
+]
+const ROLES_ADMINISTRATION: readonly string[] = [
+  "FINANCE_ADMIN",
+  "GENERAL_DIRECTION",
+]
+
+function assertGrantAdministration(
+  actor: { id: string; role: string } | undefined,
+  cibleRoleActuel: string | null,
+  roleDemande: string | undefined,
+  cibleId: string | null,
+  actorId: string
+): void {
+  if (!actor || !ROLES_ADMINISTRATION.includes(actor.role)) {
+    throw new UnauthorizedActionError("Action non autorisée")
+  }
+  if (
+    cibleId !== null &&
+    cibleId === actorId &&
+    roleDemande !== undefined &&
+    roleDemande !== cibleRoleActuel
+  ) {
+    throw new UnauthorizedActionError(
+      "Vous ne pouvez pas modifier votre propre rôle"
+    )
+  }
+  if (actor.role === "FINANCE_ADMIN") {
+    // Self-edits are exempt from the tier check below: they may only touch
+    // non-role fields (any actual role change was already refused above), so
+    // an admin can still update their own profile through the full-schema
+    // PUT without resubmitting their role becoming a 403.
+    const isSelf = cibleId !== null && cibleId === actorId
+    if (!isSelf) {
+      if (
+        cibleRoleActuel !== null &&
+        !ROLES_GERABLES_PAR_FINANCE_ADMIN.includes(cibleRoleActuel)
+      ) {
+        throw new UnauthorizedActionError(
+          "Vous ne pouvez pas gérer un utilisateur de ce rôle"
+        )
+      }
+      if (
+        roleDemande !== undefined &&
+        !ROLES_GERABLES_PAR_FINANCE_ADMIN.includes(roleDemande)
+      ) {
+        throw new UnauthorizedActionError(
+          "Vous ne pouvez pas attribuer ce rôle"
+        )
+      }
+    }
+  }
+}
 
 export class UtilisateurService {
   constructor(
@@ -97,6 +162,15 @@ export class UtilisateurService {
         throw new Error(AUCUNE_SOCIETE_CONFIGUREE)
       }
 
+      // Grant rules (#236): resolve the actor's role behind the seam and
+      // refuse cross-tier / self grants before writing anything.
+      const [actor] = await tx
+        .select({ id: utilisateurs.id, role: utilisateurs.role })
+        .from(utilisateurs)
+        .where(eq(utilisateurs.id, actorId))
+        .limit(1)
+      assertGrantAdministration(actor, null, data.role, null, actorId)
+
       const [user] = await tx
         .insert(utilisateurs)
         .values({
@@ -129,7 +203,7 @@ export class UtilisateurService {
           action: "CREATION_UTILISATEUR",
           entite: "Utilisateur",
           entiteId: user.id,
-          details: { email: user.email },
+          details: { email: user.email, role: user.role },
         },
         tx
       )
@@ -160,6 +234,22 @@ export class UtilisateurService {
     }
 
     return this._db.transaction(async (tx) => {
+      const [cible] = await tx
+        .select({ id: utilisateurs.id, role: utilisateurs.role })
+        .from(utilisateurs)
+        .where(eq(utilisateurs.id, id))
+        .limit(1)
+      if (!cible) throw new UtilisateurNotFoundError()
+
+      // Grant rules (#236): refuse cross-tier / self role grants before
+      // writing anything.
+      const [actor] = await tx
+        .select({ id: utilisateurs.id, role: utilisateurs.role })
+        .from(utilisateurs)
+        .where(eq(utilisateurs.id, actorId))
+        .limit(1)
+      assertGrantAdministration(actor, cible.role, data.role, id, actorId)
+
       const [user] = await tx
         .update(utilisateurs)
         .set(updateData)
@@ -178,7 +268,10 @@ export class UtilisateurService {
           action: "MODIFICATION_UTILISATEUR",
           entite: "Utilisateur",
           entiteId: user.id,
-          details: { email: user.email },
+          details:
+            data.role !== undefined && data.role !== cible.role
+              ? { email: user.email, rolePrecedent: cible.role, role: user.role }
+              : { email: user.email },
         },
         tx
       )

@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { NextRequest } from "next/server"
-import { UtilisateurNotFoundError } from "@/lib/utilisateur-service"
+import {
+  UtilisateurNotFoundError,
+  UnauthorizedActionError,
+} from "@/lib/utilisateur-service"
 
 const { mockRequireAnyRole } = vi.hoisted(() => ({
   mockRequireAnyRole: (user: { role: string }, roles: readonly string[]) => {
@@ -188,5 +191,48 @@ describe("utilisateurs route", () => {
     const [id, data] = update.mock.calls[0]
     expect(id).toBe("u-2")
     expect(data).not.toHaveProperty("societeId")
+  })
+
+  it("POST returns 403 when the service refuses the grant (#236)", async () => {
+    const { requireAuth } = await import("@/lib/auth/server")
+    const { utilisateurService } = await import("@/lib/utilisateur-service")
+    ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
+    ;(utilisateurService.create as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new UnauthorizedActionError("Vous ne pouvez pas attribuer ce rôle")
+    )
+
+    const { POST } = await import("./route")
+    const response = await POST(
+      mockRequest({ ...validUserPayload, role: "GENERAL_DIRECTION" }, "POST"),
+      { params: Promise.resolve({}) }
+    )
+
+    expect(response.status).toBe(403)
+    const body = await response.json()
+    expect(body.error).toBe("Vous ne pouvez pas attribuer ce rôle")
+  })
+
+  it("PUT returns 403 when the service refuses a self role-change (#236)", async () => {
+    const { requireAuth } = await import("@/lib/auth/server")
+    const { utilisateurService } = await import("@/lib/utilisateur-service")
+    ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
+    ;(utilisateurService.update as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new UnauthorizedActionError(
+        "Vous ne pouvez pas modifier votre propre rôle"
+      )
+    )
+
+    const { PUT } = await import("./route")
+    const response = await PUT(
+      mockRequest(
+        { id: "u-1", ...validUserPayload, role: "GENERAL_DIRECTION" },
+        "PUT"
+      ),
+      { params: Promise.resolve({}) }
+    )
+
+    expect(response.status).toBe(403)
+    const body = await response.json()
+    expect(body.error).toBe("Vous ne pouvez pas modifier votre propre rôle")
   })
 })

@@ -12,6 +12,7 @@ import type { AvatarStorage } from "./avatar-storage"
 import {
   UtilisateurService,
   UtilisateurNotFoundError,
+  UnauthorizedActionError,
 } from "./utilisateur-service"
 
 vi.mock("bcryptjs", () => ({
@@ -315,6 +316,223 @@ describe("UtilisateurService", { timeout: TIMEOUT }, () => {
       await expect(
         svc.update("u-missing", { nom: "Ghost" }, actor.id)
       ).rejects.toThrow(UtilisateurNotFoundError)
+    })
+  })
+
+  describe("grant rules (#236)", () => {
+    async function makeDirector() {
+      const base = makeActor()
+      const director = {
+        ...base,
+        id: crypto.randomUUID(),
+        email: `${crypto.randomUUID()}@direction.com`,
+        role: "GENERAL_DIRECTION" as const,
+        societeId,
+        departementId,
+      }
+      await pgliteDb.insert(schema.utilisateurs).values(director)
+      return director
+    }
+
+    async function roleOf(id: string) {
+      const [row] = await pgliteDb
+        .select({ role: utilisateurs.role })
+        .from(utilisateurs)
+        .where(eq(utilisateurs.id, id))
+      return row?.role
+    }
+
+    it("refuses FINANCE_ADMIN creating GENERAL_DIRECTION (403, no row)", async () => {
+      const promise = svc.create(
+        {
+          email: "cross-tier@test.com",
+          nom: "Test",
+          prenom: "User",
+          poste: "QA",
+          role: "GENERAL_DIRECTION",
+          departementId,
+        },
+        actor.id
+      )
+      await expect(promise).rejects.toThrow(UnauthorizedActionError)
+      await expect(promise).rejects.toMatchObject({ status: 403 })
+
+      const rows = await pgliteDb
+        .select()
+        .from(utilisateurs)
+        .where(eq(utilisateurs.email, "cross-tier@test.com"))
+      expect(rows).toHaveLength(0)
+    })
+
+    it("refuses FINANCE_ADMIN creating a peer FINANCE_ADMIN", async () => {
+      const promise = svc.create(
+        {
+          email: "peer@test.com",
+          nom: "Test",
+          prenom: "User",
+          poste: "QA",
+          role: "FINANCE_ADMIN",
+          departementId,
+        },
+        actor.id
+      )
+      await expect(promise).rejects.toThrow(UnauthorizedActionError)
+      await expect(promise).rejects.toMatchObject({ status: 403 })
+    })
+
+    it("allows FINANCE_ADMIN creating EMPLOYEE and MANAGER", async () => {
+      for (const role of ["EMPLOYEE", "MANAGER"] as const) {
+        const result = await svc.create(
+          {
+            email: `${crypto.randomUUID()}@test.com`,
+            nom: "Test",
+            prenom: "User",
+            poste: "QA",
+            role,
+            departementId,
+          },
+          actor.id
+        )
+        expect(result.role).toBe(role)
+      }
+    })
+
+    it("allows GENERAL_DIRECTION creating GENERAL_DIRECTION", async () => {
+      const director = await makeDirector()
+      const result = await svc.create(
+        {
+          email: `${crypto.randomUUID()}@test.com`,
+          nom: "Test",
+          prenom: "User",
+          poste: "Direction",
+          role: "GENERAL_DIRECTION",
+          departementId,
+        },
+        director.id
+      )
+      expect(result.role).toBe("GENERAL_DIRECTION")
+    })
+
+    it("refuses a non-admin actor creating a user", async () => {
+      const employee = makeUser({ societeId, departementId })
+      await pgliteDb.insert(schema.utilisateurs).values(employee)
+
+      const promise = svc.create(
+        {
+          email: "bypass@test.com",
+          nom: "Test",
+          prenom: "User",
+          poste: "QA",
+          role: "EMPLOYEE",
+          departementId,
+        },
+        employee.id!
+      )
+      await expect(promise).rejects.toThrow(UnauthorizedActionError)
+      await expect(promise).rejects.toMatchObject({ status: 403 })
+    })
+
+    it("refuses FINANCE_ADMIN promoting EMPLOYEE to GENERAL_DIRECTION (role unchanged, no audit)", async () => {
+      const target = makeUser({ societeId, departementId })
+      await pgliteDb.insert(schema.utilisateurs).values(target)
+
+      const promise = svc.update(
+        target.id!,
+        { role: "GENERAL_DIRECTION" },
+        actor.id
+      )
+      await expect(promise).rejects.toThrow(UnauthorizedActionError)
+      await expect(promise).rejects.toMatchObject({ status: 403 })
+
+      expect(await roleOf(target.id!)).toBe("EMPLOYEE")
+
+      const audits = await pgliteDb
+        .select()
+        .from(journalAudit)
+        .where(eq(journalAudit.entiteId, target.id!))
+      expect(audits).toHaveLength(0)
+    })
+
+    it("refuses FINANCE_ADMIN self-promotion (role unchanged)", async () => {
+      const promise = svc.update(
+        actor.id,
+        { role: "GENERAL_DIRECTION" },
+        actor.id
+      )
+      await expect(promise).rejects.toThrow(UnauthorizedActionError)
+      await expect(promise).rejects.toMatchObject({ status: 403 })
+
+      expect(await roleOf(actor.id)).toBe("FINANCE_ADMIN")
+    })
+
+    it("refuses FINANCE_ADMIN modifying a GENERAL_DIRECTION user", async () => {
+      const director = await makeDirector()
+
+      const promise = svc.update(director.id, { nom: "Hijacked" }, actor.id)
+      await expect(promise).rejects.toThrow(UnauthorizedActionError)
+      await expect(promise).rejects.toMatchObject({ status: 403 })
+
+      const [row] = await pgliteDb
+        .select()
+        .from(utilisateurs)
+        .where(eq(utilisateurs.id, director.id))
+      expect(row.nom).toBe(director.nom)
+    })
+
+    it("allows FINANCE_ADMIN promoting EMPLOYEE to MANAGER", async () => {
+      const target = makeUser({ societeId, departementId })
+      await pgliteDb.insert(schema.utilisateurs).values(target)
+
+      const result = await svc.update(
+        target.id!,
+        { role: "MANAGER" },
+        actor.id
+      )
+      expect(result.role).toBe("MANAGER")
+      expect(await roleOf(target.id!)).toBe("MANAGER")
+    })
+
+    it("allows FINANCE_ADMIN editing their own non-role fields", async () => {
+      const result = await svc.update(
+        actor.id,
+        { telephone: "0612345678" },
+        actor.id
+      )
+      expect(result.telephone).toBe("0612345678")
+      expect(await roleOf(actor.id)).toBe("FINANCE_ADMIN")
+    })
+
+    it("allows resubmitting the unchanged own role (full-schema PUT)", async () => {
+      const result = await svc.update(
+        actor.id,
+        { nom: "Admin2", role: "FINANCE_ADMIN" },
+        actor.id
+      )
+      expect(result.nom).toBe("Admin2")
+      expect(await roleOf(actor.id)).toBe("FINANCE_ADMIN")
+    })
+
+    it("allows GENERAL_DIRECTION promoting to GENERAL_DIRECTION", async () => {
+      const director = await makeDirector()
+      const target = makeUser({ societeId, departementId })
+      await pgliteDb.insert(schema.utilisateurs).values(target)
+
+      const result = await svc.update(
+        target.id!,
+        { role: "GENERAL_DIRECTION" },
+        director.id
+      )
+      expect(result.role).toBe("GENERAL_DIRECTION")
+    })
+
+    it("refuses GENERAL_DIRECTION self-demotion", async () => {
+      const director = await makeDirector()
+
+      const promise = svc.update(director.id, { role: "EMPLOYEE" }, director.id)
+      await expect(promise).rejects.toThrow(UnauthorizedActionError)
+      await expect(promise).rejects.toMatchObject({ status: 403 })
+
+      expect(await roleOf(director.id)).toBe("GENERAL_DIRECTION")
     })
   })
 

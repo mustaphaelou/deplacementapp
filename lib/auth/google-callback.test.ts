@@ -165,11 +165,13 @@ describe("Google callback seam (#203)", { timeout: TIMEOUT }, () => {
     emailVerified = true,
     actif = true,
     googleAuthEnabled = true,
+    role = "EMPLOYEE",
   }: {
     email: string
     emailVerified?: boolean
     actif?: boolean
     googleAuthEnabled?: boolean
+    role?: string
   }): Promise<string> {
     const id = crypto.randomUUID()
     await db.insert(schema.utilisateurs).values({
@@ -181,7 +183,7 @@ describe("Google callback seam (#203)", { timeout: TIMEOUT }, () => {
       nom: "Dupont",
       prenom: "Jean",
       poste: "Développeur",
-      role: "EMPLOYEE",
+      role: role as "EMPLOYEE" | "MANAGER" | "FINANCE_ADMIN" | "GENERAL_DIRECTION",
       departementId,
       societeId,
       creeLe: new Date("2026-01-01"),
@@ -207,7 +209,9 @@ describe("Google callback seam (#203)", { timeout: TIMEOUT }, () => {
    * administration API makes.  The attestation these regressions rely on must
    * come from provisioning itself; hand-setting `emailVerified` in a raw
    * fixture would defeat the point.  The service's audit write needs an actor
-   * row, so one is seeded (the actor is not the sign-in subject). */
+   * row, so one is seeded (the actor is not the sign-in subject): a
+   * FINANCE_ADMIN, matching the administration API's route gate and the
+   * service grant rules (#236). */
   async function provisionUtilisateur({
     email,
     googleAuthEnabled = true,
@@ -218,6 +222,7 @@ describe("Google callback seam (#203)", { timeout: TIMEOUT }, () => {
     const actorId = await seedUtilisateur({
       email: `actor-${crypto.randomUUID()}@acme.ma`,
       googleAuthEnabled: false,
+      role: "FINANCE_ADMIN",
     })
     const service = new UtilisateurService(db as unknown as DrizzleDb)
     const created = await service.create(
