@@ -22,7 +22,7 @@ COPY drizzle.config.ts ./drizzle.config.ts
 COPY db ./db
 COPY drizzle ./drizzle
 ENV NODE_ENV=production
-CMD ["npx", "drizzle-kit", "push"]
+CMD ["npx", "drizzle-kit", "migrate"]
 
 # --- builder stage: build Next.js standalone output ---
 FROM build-env AS builder
