@@ -32,14 +32,24 @@ export type GoogleRefusalCode =
 
 /**
  * The engine-originated codes, each naming a **Google-side or deployment**
- * condition rather than a Utilisateur's standing.  Pinned to the codes observed
- * in Better Auth 1.7.4 (`dist/oauth2/errors.mjs`, `dist/api/routes/callback.mjs`,
- * `dist/state.mjs`); that list is not a stable public API, so anything outside
- * it still takes the generic fallback below.
+ * condition rather than a Utilisateur's standing.
+ *
+ * Two provenances, deliberately distinguished:
+ *
+ * - **Google passthrough** — `access_denied` is Google's own OAuth error code,
+ *   forwarded verbatim by the engine's callback (`if (error) redirectOnError
+ *   (error, error_description)`).  It belongs to no engine list, and neither
+ *   would any other code Google may add: this one is an open passthrough, not a
+ *   pinned member.
+ * - **Engine codes** — the rest are read from the installed engine:
+ *   `dist/oauth2/errors.mjs` (`OAUTH_CALLBACK_ERROR_CODES`), `dist/state.mjs`
+ *   (the `StateError` codes) and `dist/api/routes/callback.mjs` (the codes it
+ *   redirects with inline).  `google-refusals.test.ts` re-reads those files and
+ *   fails when a code this map names is no longer emitted, so an upgrade that
+ *   renames one cannot silently revert it to the generic message.
  */
 export const GOOGLE_ENGINE_REFUSAL_MESSAGES = {
-  // Google's own refusal, forwarded by the engine's callback
-  // (`if (error) redirectOnError(error, error_description)`).  On a consent
+  // Google's own refusal, forwarded by the engine's callback.  On a consent
   // screen left in *Testing*, Google refuses any address that is not a test
   // user — a one-line console fix that used to read as an app failure.
   access_denied:
@@ -48,22 +58,24 @@ export const GOOGLE_ENGINE_REFUSAL_MESSAGES = {
   // rejected.  The OAuth round trip did not complete; retrying starts a new one.
   invalid_code:
     "Le code d'autorisation renvoyé par Google est invalide ou a expiré. Réessayez de vous connecter avec Google.",
-  // The stored OAuth state does not match the one that started the round trip
-  // (or its cookie was replaced by another sign-in in another tab).
+  // The stored OAuth state could not be matched, or was already gone (the
+  // engine's `StateError` code `state_mismatch`): the state cookie did not
+  // come back, the verification row was consumed by another sign-in, or the
+  // round trip outran the state's 10-minute life.  The engine also folds its
+  // stricter `state_security_mismatch` into this code at the redirect, so a
+  // genuine mismatch arrives here too.
   state_mismatch:
-    "La session de connexion Google ne correspond pas à celle qui a été ouverte. Relancez la connexion Google.",
-  // No state at all: it expired (10 minutes), or the state cookie did not make
-  // the round trip back to this deployment.
+    "La session de connexion Google a expiré ou a été remplacée par une autre tentative. Relancez la connexion Google.",
+  // The callback arrived with no `state` parameter at all — the provider
+  // dropped it, or the request never came from a sign-in this deployment
+  // started.  (An *expired* state is `state_mismatch`, not this.)
   state_not_found:
-    "La session de connexion Google est introuvable ou a expiré. Relancez la connexion Google.",
+    "La connexion Google n'a pas pu être vérifiée : aucune session de connexion n'a été reçue. Relancez la connexion Google.",
   // The callback request itself was malformed or the redirect URI is not
   // accepted — a deployment misconfiguration, not a Utilisateur's doing.
   invalid_callback_request:
     "L'adresse de retour de la connexion Google est mal configurée sur ce serveur. Contactez votre administrateur.",
 } as const
-
-export type GoogleEngineRefusalCode =
-  keyof typeof GOOGLE_ENGINE_REFUSAL_MESSAGES
 
 /** The French message shown for each refusal code. */
 export const GOOGLE_REFUSAL_MESSAGES = {

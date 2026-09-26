@@ -107,7 +107,12 @@ export function stripRefusalParams(href: string): string {
     url.searchParams.delete("error_description")
     return `${url.pathname}${url.search}${url.hash}`
   }
-  // An unmapped code is the one thing that carries the diagnosis — keep it.
+  // An unmapped code is the one thing that carries the diagnosis — keep it,
+  // `error_description` and every other parameter with it.  Google's own
+  // description is part of the same report ("Access denied" names the consent
+  // screen; an error text names the failed exchange), so it is preserved
+  // rather than stripped: the report is the artefact, and this is the only
+  // place it exists.
   if (!isMappedGoogleRefusalCode(code)) return href
 
   url.searchParams.delete("error")

@@ -29,7 +29,11 @@ import * as schema from "../../db/schema"
 import { createAuth } from "./better-auth"
 import type { DrizzleDb } from "../../db"
 import { account } from "../../db/schema/auth-tables"
-import { GOOGLE_REFUSAL_CODES, googleRefusalMessage } from "./google-refusals"
+import {
+  GOOGLE_REFUSAL_CODES,
+  GOOGLE_REFUSAL_FALLBACK_MESSAGE,
+  googleRefusalMessage,
+} from "./google-refusals"
 import type { GoogleRefusalCode } from "./google-refusals"
 import { withRefusalLog } from "./refusal-log"
 import { UtilisateurService } from "../utilisateur-service"
@@ -626,8 +630,9 @@ describe("Google callback seam (#203)", { timeout: TIMEOUT }, () => {
   // ----------------- the refusal log (#247)
   // Asserted here, on the real engine's own redirects, because the unit suite
   // can only prove the seam reads what a hand-built Response says.  A wiring
-  // the engine's actual redirect shape never reaches would pass that suite and
-  // log nothing in production.
+  // that the engine's actual redirect shape never reaches would pass that
+  // suite and log nothing in production — which is why the route module has
+  // its own test too (`app/api/auth/[...all]/route.test.ts`).
   describe("the refusal log (#247)", () => {
     // Restored after every test, not at the end of each: a failing assertion
     // would otherwise skip the restore and leak this test's calls (and a live
@@ -707,6 +712,55 @@ describe("Google callback seam (#203)", { timeout: TIMEOUT }, () => {
 
       expect(redirectFrom(res).pathname).toBe("/")
       expect(refusalLines(warn)).toHaveLength(0)
+    })
+  })
+
+  // ----------------- refusals raised before the state parses (#247)
+  // The engine honours `errorCallbackURL` only once the state has parsed; a
+  // failure before that goes to `onAPIError.errorURL`, which the engine
+  // defaults to its own error page.  These two codes are therefore invisible
+  // unless that default is set to the login page — and their mapped French
+  // messages are unreachable code without it.  Pinned here, because the
+  // message-mapping tests call `googleRefusalFromSearch` directly and would
+  // pass either way.
+  describe("pre-state refusals reach the login page (#247)", () => {
+    async function invokeBare(query: string): Promise<Response> {
+      return auth.handler(
+        new Request(`${BASE_URL}/api/auth/callback/google?${query}`, {
+          headers: { origin: BASE_URL },
+          redirect: "manual",
+        })
+      )
+    }
+
+    it("redirects a callback with no state to /login with state_not_found", async () => {
+      const res = await invokeBare("code=some-code")
+
+      expect(res.status).toBe(302)
+      const redirect = redirectFrom(res)
+      expect(redirect.pathname).toBe("/login")
+      expect(redirect.error).toBe("state_not_found")
+      // The message the login page will render for it is the mapped one.
+      expect(redirect.errorDescription ?? "").not.toContain("Error")
+    })
+
+    it("redirects a callback whose state does not match to /login with state_mismatch", async () => {
+      const res = await invokeBare("code=some-code&state=not-a-real-state")
+
+      expect(res.status).toBe(302)
+      const redirect = redirectFrom(res)
+      expect(redirect.pathname).toBe("/login")
+      expect(redirect.error).toBe("state_mismatch")
+    })
+
+    it("lands the login page on the mapped message for both codes", async () => {
+      // The seam's own contract: the code the engine emitted is one the
+      // vocabulary can name, so the user sees a cause and not the fallback.
+      for (const code of ["state_not_found", "state_mismatch"]) {
+        expect(googleRefusalMessage(code)).not.toBe(
+          GOOGLE_REFUSAL_FALLBACK_MESSAGE
+        )
+      }
     })
   })
 })

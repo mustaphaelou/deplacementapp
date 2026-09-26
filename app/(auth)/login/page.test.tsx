@@ -42,9 +42,9 @@ const ENGINE_MESSAGES = {
   invalid_code:
     "Le code d'autorisation renvoyé par Google est invalide ou a expiré. Réessayez de vous connecter avec Google.",
   state_mismatch:
-    "La session de connexion Google ne correspond pas à celle qui a été ouverte. Relancez la connexion Google.",
+    "La session de connexion Google a expiré ou a été remplacée par une autre tentative. Relancez la connexion Google.",
   state_not_found:
-    "La session de connexion Google est introuvable ou a expiré. Relancez la connexion Google.",
+    "La connexion Google n'a pas pu être vérifiée : aucune session de connexion n'a été reçue. Relancez la connexion Google.",
   invalid_callback_request:
     "L'adresse de retour de la connexion Google est mal configurée sur ce serveur. Contactez votre administrateur.",
 }
@@ -476,7 +476,10 @@ describe("the raw code in the UI (#247)", () => {
       refusalCode: "access_denied",
     })
 
-    // A developer must be able to read the code verbatim…
+    // A developer must be able to read the code verbatim.  The debug hook is
+    // asserted, not the bare string: a reworded French message could stop
+    // containing the code for reasons that have nothing to do with this.
+    expect(html).toContain('data-refusal-code="true"')
     expect(renderedText(html)).toContain("access_denied")
     expect(renderedText(html)).toContain(ENGINE_MESSAGES.access_denied)
     vi.unstubAllEnvs()
@@ -491,7 +494,9 @@ describe("the raw code in the UI (#247)", () => {
       refusalCode: "access_denied",
     })
 
-    // …and an end user sees the French copy alone.
+    // …and an end user sees the French copy alone: no debug hook at all, and
+    // the code nowhere in the markup.
+    expect(html).not.toContain('data-refusal-code="true"')
     expect(renderedText(html)).not.toContain("access_denied")
     expect(renderedText(html)).toContain(ENGINE_MESSAGES.access_denied)
     vi.unstubAllEnvs()
