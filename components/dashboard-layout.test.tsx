@@ -336,3 +336,71 @@ describe("DashboardLayout — the row chevron is reachable without a pointer", (
     expect(html).not.toContain('href="/demandes/d-1" class="font-medium"')
   })
 })
+
+// #185 decided the responsive header but never landed it: every page rendered a
+// fixed 40px title and a fixed 48px tile, so the header grew on a phone. This
+// page is the reference implementation #258 copies to the other seven.
+// The pair is the point — the tile shrinks as the title shrinks, so the header
+// does not grow below md. A pin on either class alone would not catch a
+// half-applied rule, and a substring pin on "text-[40px]" would also pass on
+// "md:text-[40px]", so these assert the full class attribute both sides.
+describe("DashboardLayout — the #254 responsive page header", () => {
+  const header = () =>
+    renderToStaticMarkup(
+      <DashboardLayout config={CONFIG} navItems={NAV_ITEMS} demandes={[]} />
+    )
+
+  it("scales the title 24px below md: and 40px from md: up", () => {
+    expect(header()).toContain(
+      '<h1 class="text-[24px] leading-tight font-bold tracking-[-0.01em] md:text-[40px]">'
+    )
+  })
+
+  it("scales the icon tile 40px below md: and 48px from md: up", () => {
+    const html = header()
+
+    expect(html).toContain(
+      'class="flex size-10 shrink-0 items-center justify-center rounded-[3px] bg-primary/10 md:size-12"'
+    )
+    // The single-breakpoint rule: no other breakpoint variant may creep in.
+    expect(html).not.toContain("sm:text-[")
+    expect(html).not.toContain("lg:text-[")
+    expect(html).not.toMatch(/(?:sm|lg):size-\d/)
+  })
+
+  it("truncates the breadcrumb to one line instead of wrapping it", () => {
+    const html = header()
+
+    // flex-nowrap on the list — twMerge drops the primitive's flex-wrap for it,
+    // so `flex-nowrap` lands last and `flex-wrap` is gone from the output.
+    expect(html).toContain(
+      'class="flex items-center gap-1.5 text-sm wrap-break-word text-muted-foreground flex-nowrap"'
+    )
+    expect(html).not.toContain("flex-wrap")
+    // min-w-0 on the nav and the last item: a flex item's default min-width:auto
+    // refuses to shrink below its content, so without these the ellipsis can
+    // never engage.
+    expect(html).toContain('data-slot="breadcrumb" class="min-w-0"')
+    expect(html).toContain(
+      'data-slot="breadcrumb-item" class="inline-flex items-center gap-1 min-w-0"'
+    )
+    // truncate on the page itself, which is what renders the ellipsis.
+    expect(html).toContain(
+      'class="text-foreground min-w-0 truncate font-medium"'
+    )
+  })
+
+  it("keeps the desktop anatomy and the action exactly where they were", () => {
+    const html = header()
+
+    // The action stays top-right in the breadcrumb row, label intact, and the
+    // breadcrumb sits above the title rather than beside it.
+    expect(html).toContain("Nouvelle demande")
+    expect(html.indexOf("Nouvelle demande")).toBeLessThan(
+      html.indexOf("Tableau de bord</h1>")
+    )
+    // Untouched by #254: the 44px mobile touch targets and the mt-6 rhythm.
+    expect(html).toContain('class="mt-6 flex items-center gap-4"')
+    expect(html).toContain("size-6 text-primary")
+  })
+})

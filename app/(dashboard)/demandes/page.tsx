@@ -226,8 +226,11 @@ export default function DemandesListPage() {
     <div className="space-y-6">
       <div>
         <div className="flex items-center justify-between">
-          <Breadcrumb>
-            <BreadcrumbList>
+          {/* #254: the breadcrumb truncates to a single line — min-w-0 on the
+              nav and the last item, flex-nowrap on the list, truncate on the
+              page. twMerge drops the primitive's flex-wrap for flex-nowrap. */}
+          <Breadcrumb className="min-w-0">
+            <BreadcrumbList className="flex-nowrap">
               <BreadcrumbItem>
                 <span>Espace</span>
               </BreadcrumbItem>
@@ -236,8 +239,10 @@ export default function DemandesListPage() {
                 <span>Demandes de déplacement</span>
               </BreadcrumbItem>
               <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbPage className="font-medium">{title}</BreadcrumbPage>
+              <BreadcrumbItem className="min-w-0">
+                <BreadcrumbPage className="min-w-0 truncate font-medium">
+                  {title}
+                </BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
@@ -266,11 +271,12 @@ export default function DemandesListPage() {
           </div>
         </div>
         <div className="mt-6 flex items-center gap-4">
-          <div className="flex size-12 shrink-0 items-center justify-center rounded-[3px] bg-primary/10">
+          {/* #254: 40px tile on a phone, 48px from md: up; title 24px → 40px. */}
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-[3px] bg-primary/10 md:size-12">
             <FileText className="size-6 text-primary" />
           </div>
           <div className="min-w-0">
-            <h1 className="text-[40px] leading-tight font-bold tracking-[-0.01em]">
+            <h1 className="text-[24px] leading-tight font-bold tracking-[-0.01em] md:text-[40px]">
               {title}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">

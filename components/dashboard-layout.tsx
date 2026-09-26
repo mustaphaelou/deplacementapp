@@ -120,14 +120,22 @@ export function DashboardLayout({
           row with the primary action top-right, then the icon tile + title. */}
       <div>
         <div className="flex items-center justify-between gap-4">
-          <Breadcrumb>
-            <BreadcrumbList>
+          {/* #254: the breadcrumb is the one header element that can run out of
+              room, so it truncates to a single line instead of wrapping. It
+              needs three things together, none of which the shadcn primitive
+              gives us: min-w-0 on the nav and on the last item (a flex item's
+              default min-width:auto refuses to shrink below its content),
+              flex-nowrap to stop the list breaking across lines, and truncate
+              on the page itself to ellipsise. twMerge drops the primitive's
+              flex-wrap when it sees flex-nowrap, so this is a real override. */}
+          <Breadcrumb className="min-w-0">
+            <BreadcrumbList className="flex-nowrap">
               <BreadcrumbItem>
                 <span>Espace</span>
               </BreadcrumbItem>
               <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbPage className="font-medium">
+              <BreadcrumbItem className="min-w-0">
+                <BreadcrumbPage className="min-w-0 truncate font-medium">
                   Tableau de bord
                 </BreadcrumbPage>
               </BreadcrumbItem>
@@ -145,11 +153,13 @@ export function DashboardLayout({
           )}
         </div>
         <div className="mt-6 flex items-center gap-4">
-          <div className="flex size-12 shrink-0 items-center justify-center rounded-[3px] bg-primary/10">
+          {/* #254: 40px tile on a phone, 48px from md: up. The tile shrinks as
+              the title shrinks, so the header never grows on a small screen. */}
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-[3px] bg-primary/10 md:size-12">
             <BarChart3 className="size-6 text-primary" />
           </div>
           <div className="min-w-0">
-            <h1 className="text-[40px] leading-tight font-bold tracking-[-0.01em]">
+            <h1 className="text-[24px] leading-tight font-bold tracking-[-0.01em] md:text-[40px]">
               Tableau de bord
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
