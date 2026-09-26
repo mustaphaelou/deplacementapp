@@ -11,3 +11,7 @@ Canonical role names are used as-is for GitHub labels. See `docs/agents/triage-l
 ### Domain docs
 
 Single-context repo — one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+### Testing
+
+The suite count is only meaningful on a clean tree. See `docs/agents/testing.md`.
