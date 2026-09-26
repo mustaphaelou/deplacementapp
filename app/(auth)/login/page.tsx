@@ -2,7 +2,10 @@
 
 import { useState, useEffect } from "react"
 import { signInWithCredentials, signInWithGoogle } from "@/lib/auth/client"
-import { googleRefusalMessage } from "@/lib/auth/google-refusals"
+import {
+  googleRefusalMessage,
+  isMappedGoogleRefusalCode,
+} from "@/lib/auth/google-refusals"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -69,17 +72,44 @@ export function googleRefusalFromSearch(search: string): string | null {
 }
 
 /**
+ * The raw refusal code carried by a URL search string — the diagnostic half of
+ * #247.  `null` when the page was not reached through a refusal.  Pure, and
+ * read once at mount beside the message, while the URL still carries it.
+ */
+export function googleRefusalCodeFromSearch(search: string): string | null {
+  return new URLSearchParams(search).get("error")
+}
+
+/**
  * Remove the refusal parameters (`error`, `error_description`) from an href so
  * a refresh shows a clean page — the "no zombie parameter" rule.  Every other
  * parameter and the hash are preserved; the result is a relative URL
  * (`pathname + search + hash`, the shape `history.replaceState` accepts) and
  * the input is returned unchanged when it carries no refusal parameter.
+ *
+ * #247: the rule now keys on whether the code was **rendered**, not on whether
+ * a refusal arrived.  A code the app has a message for is a zombie parameter —
+ * its message is on screen, the parameter is noise.  A code with no message
+ * renders the generic fallback, which names nothing, and destroying the
+ * parameter at mount would leave the only diagnostic artefact unrecoverable
+ * without probing the deployment by hand.  That code therefore stays in the
+ * URL, so it can be pasted into a bug report; the code is also logged
+ * server-side on every refusal (`lib/auth/refusal-log.ts`).  The cost of keeping
+ * it is deliberate: a refresh re-renders the fallback alert rather than a clean
+ * page, which is the lesser evil against a diagnosis that needs a live probe.
  */
 export function stripRefusalParams(href: string): string {
   const url = new URL(href, "http://localhost")
-  const carriesRefusal =
-    url.searchParams.has("error") || url.searchParams.has("error_description")
-  if (!carriesRefusal) return href
+  const code = url.searchParams.get("error")
+  // No code at all: only `error_description` (an engine oddity) — strip it.
+  if (code === null) {
+    if (!url.searchParams.has("error_description")) return href
+    url.searchParams.delete("error_description")
+    return `${url.pathname}${url.search}${url.hash}`
+  }
+  // An unmapped code is the one thing that carries the diagnosis — keep it.
+  if (!isMappedGoogleRefusalCode(code)) return href
+
   url.searchParams.delete("error")
   url.searchParams.delete("error_description")
   return `${url.pathname}${url.search}${url.hash}`
@@ -112,10 +142,13 @@ export function LoginForm({
   societe,
   connexionGoogle,
   refusalMessage,
+  refusalCode,
 }: {
   societe: Societe | null
   connexionGoogle: boolean
   refusalMessage?: string | null
+  /** The raw refusal code, shown outside production only (#247). */
+  refusalCode?: string | null
 }) {
   const router = useRouter()
   const [email, setEmail] = useState("")
@@ -189,6 +222,18 @@ export function LoginForm({
             className="mt-6 rounded-[5px] border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-[13px] leading-relaxed text-destructive"
           >
             {refusalMessage}
+            {/* #247: the raw code is the diagnostic, and a production end user
+                must never see it — the French message is their copy.  Read at
+                render time from NODE_ENV, which Next inlines at build time, so
+                the production bundle carries no debug line at all. */}
+            {refusalCode && process.env.NODE_ENV !== "production" && (
+              <p
+                data-refusal-code="true"
+                className="mt-1 font-mono text-[11px] opacity-70"
+              >
+                {refusalCode}
+              </p>
+            )}
           </div>
         )}
 
@@ -333,13 +378,20 @@ export default function LoginPage() {
   const [societe, setSociete] = useState<Societe | null>(null)
   const [connexionGoogle, setConnexionGoogle] = useState(false)
   // A refusal arrives in the URL (`?error=…&error_description=…`): read its
-  // message once, while the URL still carries it — the strip effect below
-  // removes the parameters right after mount.  `typeof window` keeps the
+  // message — and, for the developer-only debug line, its raw code — once,
+  // while the URL still carries them.  The strip effect below removes the
+  // parameters right after mount, but only for a code that was rendered
+  // (#247): an unmapped code stays in the URL.  `typeof window` keeps the
   // server prerender (which only ever shows the loader) clean.
   const [refusalMessage] = useState<string | null>(() =>
     typeof window === "undefined"
       ? null
       : googleRefusalFromSearch(window.location.search)
+  )
+  const [refusalCode] = useState<string | null>(() =>
+    typeof window === "undefined"
+      ? null
+      : googleRefusalCodeFromSearch(window.location.search)
   )
 
   useEffect(() => {
@@ -389,6 +441,7 @@ export default function LoginPage() {
           societe={societe}
           connexionGoogle={connexionGoogle}
           refusalMessage={refusalMessage}
+          refusalCode={refusalCode}
         />
       </BrandProvider>
     </div>

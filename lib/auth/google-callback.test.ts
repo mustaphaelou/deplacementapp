@@ -12,7 +12,16 @@
  * be a redirect carrying its code; a 200 JSON body is the defect this suite
  * exists to catch.
  */
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest"
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  afterAll,
+  afterEach,
+  beforeEach,
+  vi,
+} from "vitest"
 import { eq, sql } from "drizzle-orm"
 import { createPgliteDb } from "../test/create-pglite-db"
 import type { PgliteDb } from "../test/create-pglite-db"
@@ -22,6 +31,7 @@ import type { DrizzleDb } from "../../db"
 import { account } from "../../db/schema/auth-tables"
 import { GOOGLE_REFUSAL_CODES, googleRefusalMessage } from "./google-refusals"
 import type { GoogleRefusalCode } from "./google-refusals"
+import { withRefusalLog } from "./refusal-log"
 import { UtilisateurService } from "../utilisateur-service"
 
 const TIMEOUT = 30_000
@@ -611,5 +621,92 @@ describe("Google callback seam (#203)", { timeout: TIMEOUT }, () => {
     expect(await db.query.session.findMany()).toHaveLength(0)
     expect(await db.query.utilisateurs.findMany()).toHaveLength(1)
     expect(await db.query.account.findMany()).toHaveLength(1)
+  })
+
+  // ----------------- the refusal log (#247)
+  // Asserted here, on the real engine's own redirects, because the unit suite
+  // can only prove the seam reads what a hand-built Response says.  A wiring
+  // the engine's actual redirect shape never reaches would pass that suite and
+  // log nothing in production.
+  describe("the refusal log (#247)", () => {
+    // Restored after every test, not at the end of each: a failing assertion
+    // would otherwise skip the restore and leak this test's calls (and a live
+    // console.warn) into the next one.
+    afterEach(() => {
+      vi.restoreAllMocks()
+    })
+
+    /** The real auth handler behind the log seam, as the route wires it. */
+    function loggedHandler(): (request: Request) => Promise<Response> {
+      return withRefusalLog((request) => auth.handler(request))
+    }
+
+    async function invokeLogged(args: {
+      code: string
+      state: string
+      cookie: string
+    }): Promise<Response> {
+      const query = new URLSearchParams({ code: args.code, state: args.state })
+      return loggedHandler()(
+        new Request(`${BASE_URL}/api/auth/callback/google?${query}`, {
+          headers: { origin: BASE_URL, cookie: args.cookie },
+          redirect: "manual",
+        })
+      )
+    }
+
+    function refusalLines(warn: ReturnType<typeof vi.spyOn>) {
+      return warn.mock.calls.filter(
+        (call: unknown[]) =>
+          typeof call[0] === "string" && call[0].includes("GoogleRefusal")
+      )
+    }
+
+    it("logs one line carrying the raw code of a gate refusal", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+      idToken = makeIdToken({
+        sub: "google-sub-stranger",
+        email: "stranger@example.com",
+      })
+
+      const { state, cookie } = await mintState()
+      const res = await invokeLogged({ code: "unknown", state, cookie })
+
+      expect(redirectFrom(res).error).toBe(
+        GOOGLE_REFUSAL_CODES.UTILISATEUR_INTROUVABLE
+      )
+      const lines = refusalLines(warn)
+      expect(lines).toHaveLength(1)
+      expect(lines[0][1]).toMatchObject({
+        code: GOOGLE_REFUSAL_CODES.UTILISATEUR_INTROUVABLE,
+      })
+    })
+
+    it("logs one line for an engine code the app does not map", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+      // The stub serves a token response carrying no id_token, so the engine's
+      // own user-info step fails and it answers with its own code.  Nothing in
+      // the app maps `unable_to_get_user_info` — the exact occurrence #247
+      // exists to make greppable.
+      const { state, cookie } = await mintState()
+      const res = await invokeLogged({ code: "no-token", state, cookie })
+
+      expect(redirectFrom(res).error).toBe("unable_to_get_user_info")
+      const lines = refusalLines(warn)
+      expect(lines).toHaveLength(1)
+      expect(lines[0][1]).toMatchObject({ code: "unable_to_get_user_info" })
+    })
+
+    it("logs nothing on a successful sign-in", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+      await seedUtilisateur({ email: "alice@acme.ma" })
+      idToken = makeIdToken({ sub: "google-sub-alice", email: "alice@acme.ma" })
+
+      const { state, cookie } = await mintState()
+      const res = await invokeLogged({ code: "ok", state, cookie })
+
+      expect(redirectFrom(res).pathname).toBe("/")
+      expect(refusalLines(warn)).toHaveLength(0)
+    })
   })
 })
