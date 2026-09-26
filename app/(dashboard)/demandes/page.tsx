@@ -11,13 +11,7 @@ import { StatusPill } from "@/components/status-pill"
 import { formatCurrency, formatDate } from "@/lib/constants"
 import { toDemandePresentation } from "@/lib/demande-presentation"
 import { queueEtapes } from "@/lib/workflow"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
+import { PageHeader } from "@/components/page-header"
 import {
   Tooltip,
   TooltipContent,
@@ -224,28 +218,16 @@ export default function DemandesListPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <div className="flex items-center justify-between">
-          {/* #254: the breadcrumb truncates to a single line — min-w-0 on the
-              nav and the last item, flex-nowrap on the list, truncate on the
-              page. twMerge drops the primitive's flex-wrap for flex-nowrap. */}
-          <Breadcrumb className="min-w-0">
-            <BreadcrumbList className="flex-nowrap">
-              <BreadcrumbItem>
-                <span>Espace</span>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <span>Demandes de déplacement</span>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem className="min-w-0">
-                <BreadcrumbPage className="min-w-0 truncate font-medium">
-                  {title}
-                </BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
+      {/* #261: the header geometry and the breadcrumb markup live in the
+          shared module; the page passes only what varies. The trail is three
+          deep here and two on the administration pages — a longer array, not a
+          variant of the module. */}
+      <PageHeader
+        crumbs={["Espace", "Demandes de déplacement", title]}
+        title={title}
+        subtitle={<>{total} demande(s)</>}
+        icon={FileText}
+        action={
           <div className="flex items-center gap-2">
             {canExportCsv && (
               <Tooltip>
@@ -269,22 +251,8 @@ export default function DemandesListPage() {
               </Link>
             )}
           </div>
-        </div>
-        <div className="mt-6 flex items-center gap-4">
-          {/* #254: 40px tile on a phone, 48px from md: up; title 24px → 40px. */}
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-[3px] bg-primary/10 md:size-12">
-            <FileText className="size-6 text-primary" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-[24px] leading-tight font-bold tracking-[-0.01em] md:text-[40px]">
-              {title}
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {total} demande(s)
-            </p>
-          </div>
-        </div>
-      </div>
+        }
+      />
 
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-1">

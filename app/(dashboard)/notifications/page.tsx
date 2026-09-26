@@ -9,13 +9,7 @@ import { cn } from "@/lib/utils"
 import { formatDateTime } from "@/lib/constants"
 import { Button } from "@/components/ui/button"
 import { useNotificationContext } from "@/components/notification-context"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
+import { PageHeader } from "@/components/page-header"
 
 type Notification = {
   id: string
@@ -167,41 +161,16 @@ export default function NotificationsPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div>
-        <div className="flex items-center justify-between">
-          {/* #258: the #254 reference block, verbatim — min-w-0 on the nav and
-              the last item, flex-nowrap so the list cannot break across lines,
-              truncate on the page to ellipsise. twMerge drops the primitive's
-              flex-wrap for flex-nowrap. */}
-          <Breadcrumb className="min-w-0">
-            <BreadcrumbList className="flex-nowrap">
-              <BreadcrumbItem>
-                <span>Espace</span>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem className="min-w-0">
-                <BreadcrumbPage className="min-w-0 truncate font-medium">
-                  Notifications
-                </BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
-        </div>
-        <div className="mt-6 flex items-center gap-4">
-          {/* #258: 40px tile on a phone, 48px from md: up. */}
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-[3px] bg-primary/10 md:size-12">
-            <Bell className="size-6 text-primary" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-[24px] leading-tight font-bold tracking-[-0.01em] md:text-[40px]">
-              Notifications
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {unreadCount} non lue(s)
-            </p>
-          </div>
-        </div>
-      </div>
+      {/* #261: the header geometry and the breadcrumb markup live in the
+          shared module; the page passes only what varies. No action here —
+          the module's optional slot renders no action region at all, which is
+          the case this page has always been. */}
+      <PageHeader
+        crumbs={["Espace", "Notifications"]}
+        title="Notifications"
+        subtitle={<>{unreadCount} non lue(s)</>}
+        icon={Bell}
+      />
 
       {loading ? (
         <div className="flex items-center justify-center p-8">
