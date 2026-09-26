@@ -122,7 +122,11 @@ export default function ProfileEdit({ user }: { user: UserData }) {
           />
         </div>
         <div className="min-w-0 flex-1">
-          <h1 className="text-[40px] leading-tight font-bold tracking-[-0.01em]">
+          {/* #258: the #254 title classes. This header is the odd one out — it
+              has no icon tile (the avatar above plays that role) and no
+              breadcrumb, so only the title scales. The avatar block is left
+              alone deliberately: it is not the #254 icon tile. */}
+          <h1 className="text-[24px] leading-tight font-bold tracking-[-0.01em] md:text-[40px]">
             {user.prenom} {user.nom}
           </h1>
           {profile.editing ? (

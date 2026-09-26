@@ -57,9 +57,9 @@ async function renderPage() {
   const { getAuthUser } = await import("@/lib/auth/server")
   const { utilisateurService } = await import("@/lib/utilisateur-service")
   ;(getAuthUser as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser())
-  ;(utilisateurService.findProfile as ReturnType<typeof vi.fn>).mockResolvedValue(
-    mockProfile
-  )
+  ;(
+    utilisateurService.findProfile as ReturnType<typeof vi.fn>
+  ).mockResolvedValue(mockProfile)
 
   const { default: ProfilPage } = await import("./page")
   const element = await ProfilPage()
@@ -84,7 +84,7 @@ describe("Profil page", () => {
     expect(html).toContain("text-[40px]")
     expect(html).toContain("Yasmine Benali")
     expect(html).toContain("Développeuse")
-    expect(html).toContain("data-slot=\"avatar\"")
+    expect(html).toContain('data-slot="avatar"')
     expect(html).toContain('aria-label="Modifier le profil"')
   })
 
@@ -119,5 +119,57 @@ describe("Profil page", () => {
     expect(html).toContain("Mot de passe actuel")
     expect(html).toContain("h-9 rounded-[3px]")
     expect(html).toContain("focus-visible:ring-1 focus-visible:ring-(--brand)")
+  })
+})
+
+// #258: the responsive header class set copied verbatim from the #254
+// reference. The pins assert the FULL class attribute, not a substring: a
+// bare `toContain("text-[40px]")` would also pass on `md:text-[40px]` alone
+// and so could not catch a half-applied rule. A green test proves the class
+// string is present, never how it looks.
+describe("Profil page — the #258 responsive page header", () => {
+  it("scales the title 24px below md: and 40px from md: up", async () => {
+    const html = await renderPage()
+
+    expect(html).toContain(
+      '<h1 class="text-[24px] leading-tight font-bold tracking-[-0.01em] md:text-[40px]">'
+    )
+  })
+
+  it("has no icon tile, and deliberately no breadcrumb — the #254 asymmetry", async () => {
+    const html = await renderPage()
+
+    // This is the one header of the seven that is NOT the #254 anatomy: the
+    // round `size-16` avatar above plays the role the square icon tile plays
+    // elsewhere, and there is no breadcrumb row. #258 applies the title
+    // classes only. A tile or breadcrumb appearing here would be drift — a
+    // tile that does not exist today, invented to make the page look uniform.
+    expect(html).not.toContain('aria-label="breadcrumb"')
+    expect(html).not.toContain("rounded-[3px] bg-primary/10")
+    // The avatar is untouched: still 64px, still round, still left of the title.
+    expect(html).toContain(
+      'data-slot="avatar" class="relative flex shrink-0 overflow-hidden rounded-full size-16"'
+    )
+    expect(html.indexOf('data-slot="avatar"')).toBeLessThan(
+      html.indexOf("Yasmine Benali</h1>")
+    )
+    // md: is the single shell breakpoint — no other variant may creep into
+    // the header row. Scoped to the header: the page body below legitimately
+    // carries `sm:grid-cols-2` and `text-2xl`.
+    const start = html.indexOf('class="flex items-center gap-4"')
+    const block = html.slice(start, html.indexOf("</h1>", start))
+    expect(block).not.toContain("sm:text-[")
+    expect(block).not.toContain("lg:text-[")
+    expect(block).not.toMatch(/(?:sm|lg):size-\d/)
+  })
+
+  it("keeps the header anatomy: min-w-0 flex-1 title block and the ghost pencil", async () => {
+    const html = await renderPage()
+
+    // The title's wrapper is the pre-existing `min-w-0 flex-1` block, so the
+    // long name truncates instead of pushing the actions off the row.
+    expect(html).toContain('class="min-w-0 flex-1"')
+    // The top-right action keeps its label.
+    expect(html).toContain('aria-label="Modifier le profil"')
   })
 })

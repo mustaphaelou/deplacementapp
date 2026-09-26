@@ -283,14 +283,18 @@ export default function UtilisateursPage() {
     <div className="space-y-6">
       <div>
         <div className="flex items-center justify-between">
-          <Breadcrumb>
-            <BreadcrumbList>
+          {/* #258: the #254 reference block, verbatim — min-w-0 on the nav and
+              the last item, flex-nowrap so the list cannot break across lines,
+              truncate on the page to ellipsise. twMerge drops the primitive's
+              flex-wrap for flex-nowrap. */}
+          <Breadcrumb className="min-w-0">
+            <BreadcrumbList className="flex-nowrap">
               <BreadcrumbItem>
                 <span>Administration</span>
               </BreadcrumbItem>
               <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbPage className="font-medium">
+              <BreadcrumbItem className="min-w-0">
+                <BreadcrumbPage className="min-w-0 truncate font-medium">
                   Utilisateurs
                 </BreadcrumbPage>
               </BreadcrumbItem>
@@ -302,11 +306,12 @@ export default function UtilisateursPage() {
           </Button>
         </div>
         <div className="mt-6 flex items-center gap-4">
-          <div className="flex size-12 shrink-0 items-center justify-center rounded-[3px] bg-primary/10">
+          {/* #258: 40px tile on a phone, 48px from md: up. */}
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-[3px] bg-primary/10 md:size-12">
             <Users className="size-6 text-primary" />
           </div>
           <div className="min-w-0">
-            <h1 className="text-[40px] leading-tight font-bold tracking-[-0.01em]">
+            <h1 className="text-[24px] leading-tight font-bold tracking-[-0.01em] md:text-[40px]">
               Utilisateurs
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
