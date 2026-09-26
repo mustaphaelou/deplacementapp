@@ -168,3 +168,64 @@ describe("Demandes list page", () => {
     expect(html).toContain("bg-[#FBE9E9]")
   })
 })
+
+// #254: the demandes list page is the second half of the reference
+// implementation #258 copies to the remaining seven pages. Same rule as the
+// home page — title 24px → 40px at md, tile 40px → 48px at md, breadcrumb
+// truncated to one line — so the class set is asserted in full on both sides
+// of the breakpoint. A bare toContain("text-[40px]") would also match
+// "md:text-[40px]", so it cannot tell the two apart.
+describe("Demandes list page — the #254 responsive page header", () => {
+  it("scales the title 24px below md: and 40px from md: up", async () => {
+    const { default: DemandesListPage } = await import("./page")
+    const html = renderToStaticMarkup(<DemandesListPage />)
+
+    expect(html).toContain(
+      '<h1 class="text-[24px] leading-tight font-bold tracking-[-0.01em] md:text-[40px]">'
+    )
+  })
+
+  it("scales the icon tile 40px below md: and 48px from md: up", async () => {
+    const { default: DemandesListPage } = await import("./page")
+    const html = renderToStaticMarkup(<DemandesListPage />)
+
+    expect(html).toContain(
+      'class="flex size-10 shrink-0 items-center justify-center rounded-[3px] bg-primary/10 md:size-12"'
+    )
+    // md: is the single shell breakpoint — no other variant may creep in.
+    expect(html).not.toMatch(/(?:sm|lg):(?:text-\[|size-)\d/)
+  })
+
+  it("truncates the breadcrumb to one line instead of wrapping it", async () => {
+    const { default: DemandesListPage } = await import("./page")
+    const html = renderToStaticMarkup(<DemandesListPage />)
+
+    // twMerge drops the primitive's flex-wrap for flex-nowrap, so the override
+    // lands last and `flex-wrap` is absent from the output entirely.
+    expect(html).toContain(
+      'class="flex items-center gap-1.5 text-sm wrap-break-word text-muted-foreground flex-nowrap"'
+    )
+    expect(html).not.toContain("flex-wrap")
+    expect(html).toContain('data-slot="breadcrumb" class="min-w-0"')
+    expect(html).toContain(
+      'data-slot="breadcrumb-item" class="inline-flex items-center gap-1 min-w-0"'
+    )
+    expect(html).toContain(
+      'class="text-foreground min-w-0 truncate font-medium"'
+    )
+  })
+
+  it("keeps the row's actions on the right with their labels", async () => {
+    // The action is role-gated, so render as the role that actually gets it.
+    mockUseAuthUser.mockReturnValue({ user: mockUser("EMPLOYEE") })
+
+    const { default: DemandesListPage } = await import("./page")
+    const html = renderToStaticMarkup(<DemandesListPage />)
+
+    // The breadcrumb row is still justify-between, so the action block stays
+    // top-right of the title, and the mt-6 rhythm is unchanged.
+    expect(html).toContain('class="flex items-center justify-between"')
+    expect(html).toContain('class="mt-6 flex items-center gap-4"')
+    expect(html).toContain("Nouvelle demande")
+  })
+})
