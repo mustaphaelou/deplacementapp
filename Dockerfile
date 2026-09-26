@@ -22,7 +22,11 @@ COPY drizzle.config.ts ./drizzle.config.ts
 COPY db ./db
 COPY drizzle ./drizzle
 ENV NODE_ENV=production
-CMD ["npx", "drizzle-kit", "push"]
+# Versioned migrations, not `push`. `push` diffs the live database against the
+# schema and applies whatever it finds missing, which is a destructive
+# operation on a non-TTY deploy container and bypasses migration review. The
+# committed chain in drizzle/ is the reviewable, ordered record (#241, ADR-0005).
+CMD ["npx", "drizzle-kit", "migrate"]
 
 # --- builder stage: build Next.js standalone output ---
 FROM build-env AS builder
