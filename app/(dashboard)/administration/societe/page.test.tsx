@@ -87,6 +87,16 @@ describe("Société administration page — the shared page header", () => {
     const { default: SocietePage } = await import("./page")
     const html = renderToStaticMarkup(<SocietePage />)
 
-    expect(html).toContain("Société</h1>")
+    // This asserts the page's OWN trail rendered through the module, not that
+    // an <h1> exists somewhere: a hand-inlined header satisfies a title
+    // assertion and is exactly the regression #261 removed. The breadcrumb
+    // truncation contract (nowrap list, shrinkable last item, truncate on the
+    // page element) is the module's marker — a copy would have to reproduce
+    // all three to pass.
+    expect(html).toContain(">Administration</span>")
+    expect(html).toContain(
+      'class="text-foreground min-w-0 truncate font-medium">Société</span>'
+    )
+    expect(html.match(/data-slot="breadcrumb-separator"/g)).toHaveLength(1)
   })
 })

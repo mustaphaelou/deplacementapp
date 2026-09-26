@@ -106,6 +106,17 @@ describe("Utilisateurs administration page — the shared page header", () => {
     const { default: UtilisateursPage } = await import("./page")
     const html = renderToStaticMarkup(<UtilisateursPage />)
 
-    expect(html).toContain("Utilisateurs</h1>")
+    // This asserts the page's OWN trail rendered through the module, not that
+    // an <h1> exists somewhere: a hand-inlined header satisfies a title
+    // assertion and is exactly the regression #261 removed. The breadcrumb
+    // truncation contract (nowrap list, shrinkable last item, truncate on the
+    // page element) is the module's marker — a copy would have to reproduce
+    // all three to pass.
+    expect(html).toContain(">Administration</span>")
+    expect(html).toContain(
+      'class="text-foreground min-w-0 truncate font-medium">Utilisateurs</span>'
+    )
+    // The subtitle is this page's own live count, passed as a node.
+    expect(html).toContain("utilisateur(s)</p>")
   })
 })

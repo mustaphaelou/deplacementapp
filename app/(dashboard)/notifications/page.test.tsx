@@ -100,6 +100,16 @@ describe("Notifications page — the shared page header", () => {
     const { default: NotificationsPage } = await import("./page")
     const html = renderToStaticMarkup(<NotificationsPage />)
 
-    expect(html).toContain("Notifications</h1>")
+    // This asserts the page's OWN trail rendered through the module, not that
+    // an <h1> exists somewhere: a hand-inlined header satisfies a title
+    // assertion and is exactly the regression #261 removed. The breadcrumb
+    // truncation contract (nowrap list, shrinkable last item, truncate on the
+    // page element) is the module's marker — a copy would have to reproduce
+    // all three to pass.
+    expect(html).toContain(">Espace</span>")
+    expect(html).toContain(
+      'class="text-foreground min-w-0 truncate font-medium">Notifications</span>'
+    )
+    expect(html).toContain("non lue(s)</p>")
   })
 })

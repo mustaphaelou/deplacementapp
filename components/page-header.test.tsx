@@ -27,19 +27,40 @@ const header = (props: Partial<Parameters<typeof PageHeader>[0]> = {}) =>
     />
   )
 
-// The header block only. The negative assertions below are scoped to it on
-// purpose: a page's body below legitimately carries its own breakpoint classes.
-const headerBlock = (html: string) =>
-  html.slice(
-    html.indexOf('<div class="mt-6 flex items-center gap-4">'),
-    html.indexOf("</p>", html.indexOf('<div class="mt-6 flex items-center gap-4">'))
-  )
+// Slice the header out of the rendered markup so the negative assertions below
+// are scoped to it: a page's body below legitimately carries its own breakpoint
+// classes, and a page-wide `not.toContain` cannot tell the two apart.
+//
+// The anchor is asserted, not assumed. `String.indexOf` returns -1 for a miss
+// and `slice(-1, -1)` is the empty string — so a drifted anchor would leave
+// every NEGATIVE assertion below passing on "" while the positive ones, which
+// read the full markup, carried on failing loudly. That is the worst shape a
+// guard can have: green, and proving nothing. `region` turns the drift into a
+// failure that names the anchor.
+const HEADER_ANCHOR = '<div class="mt-6 flex items-center gap-4">'
+const CRUMB_ANCHOR = 'aria-label="breadcrumb"'
+
+const region = (html: string, from: string, to: string) => {
+  const start = html.indexOf(from)
+  const end = html.indexOf(to, start === -1 ? 0 : start)
+
+  expect(
+    start,
+    `the slice anchor ${JSON.stringify(from)} is absent from the rendered header — ` +
+      `the markup moved, so every negative assertion scoped to it would pass on an empty string`
+  ).toBeGreaterThanOrEqual(0)
+  expect(
+    end,
+    `the slice end ${JSON.stringify(to)} is absent from the rendered header`
+  ).toBeGreaterThan(start)
+
+  return html.slice(start, end)
+}
+
+const headerBlock = (html: string) => region(html, HEADER_ANCHOR, "</p>")
 
 const breadcrumbBlock = (html: string) =>
-  html.slice(
-    html.indexOf('aria-label="breadcrumb"'),
-    html.indexOf('<div class="mt-6 flex items-center gap-4">')
-  )
+  region(html, CRUMB_ANCHOR, HEADER_ANCHOR)
 
 describe("PageHeader — the title scale", () => {
   it("scales the title 24px below md: and 40px from md: up", () => {
@@ -169,10 +190,12 @@ describe("PageHeader — the desktop anatomy", () => {
 
 describe("PageHeader — the optional props", () => {
   it("renders no action region when the action is absent", () => {
-    const html = header()
-    const row = html.slice(
-      html.indexOf('<div class="flex items-center justify-between gap-4">'),
-      html.indexOf('<div class="mt-6 flex items-center gap-4">')
+    // Same slicing discipline as the helpers above: a drifted row anchor would
+    // leave these negatives passing on an empty string.
+    const row = region(
+      header(),
+      '<div class="flex items-center justify-between gap-4">',
+      HEADER_ANCHOR
     )
 
     // The row holds the breadcrumb and nothing else: no wrapper, no gap
