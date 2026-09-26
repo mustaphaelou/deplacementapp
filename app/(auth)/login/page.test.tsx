@@ -29,6 +29,26 @@ const MESSAGES = {
     "La connexion avec Google a échoué. Réessayez ou contactez votre administrateur.",
 }
 
+/**
+ * The engine-originated codes #247 maps: a Google-side or deployment condition,
+ * each with its own message, pinned as literals.  Before #247 every one of them
+ * rendered the generic fallback — the live `access_denied` (consent screen in
+ * Testing, signing-in address not a test user) was indistinguishable from a bug
+ * in the app.
+ */
+const ENGINE_MESSAGES = {
+  access_denied:
+    "Google a refusé l'autorisation de connexion. Si vous n'avez pas été autorisé dans la configuration Google de l'application, contactez votre administrateur.",
+  invalid_code:
+    "Le code d'autorisation renvoyé par Google est invalide ou a expiré. Réessayez de vous connecter avec Google.",
+  state_mismatch:
+    "La session de connexion Google a expiré ou a été remplacée par une autre tentative. Relancez la connexion Google.",
+  state_not_found:
+    "La connexion Google n'a pas pu être vérifiée : aucune session de connexion n'a été reçue. Relancez la connexion Google.",
+  invalid_callback_request:
+    "L'adresse de retour de la connexion Google est mal configurée sur ce serveur. Contactez votre administrateur.",
+}
+
 /** The refusal outcomes with the search string the engine redirects with. */
 const REFUSALS = [
   {
@@ -72,6 +92,7 @@ function renderedText(html: string): string {
 async function renderLoginForm(props: {
   connexionGoogle: boolean
   refusalMessage?: string | null
+  refusalCode?: string | null
 }) {
   const { LoginForm } = await import("./page")
   return renderToStaticMarkup(<LoginForm societe={SOCIETE} {...props} />)
@@ -347,5 +368,145 @@ describe("stripRefusalParams (no zombie parameter, pure)", () => {
     const { stripRefusalParams } = await import("./page")
 
     expect(stripRefusalParams("/login?error_description=orphan")).toBe("/login")
+  })
+
+  // ---- #247: the code survives exactly when the app could not name it
+  it("strips a mapped engine code, which has already been rendered", async () => {
+    const { stripRefusalParams } = await import("./page")
+
+    expect(
+      stripRefusalParams(
+        "/login?error=access_denied&error_description=Access+denied&next=%2Fdemandes"
+      )
+    ).toBe("/login?next=%2Fdemandes")
+  })
+
+  it("keeps an unmapped code in the URL, so it can be pasted into a bug report", async () => {
+    const { stripRefusalParams } = await import("./page")
+
+    // The fallback message is the only thing an end user could see for this
+    // code, and it names nothing.  Destroying the parameter at mount would
+    // leave the one diagnostic artefact unrecoverable without a live probe.
+    expect(
+      stripRefusalParams(
+        "/login?error=unable_to_get_user_info&error_description=boom&next=%2Fdemandes"
+      )
+    ).toBe(
+      "/login?error=unable_to_get_user_info&error_description=boom&next=%2Fdemandes"
+    )
+  })
+
+  it("keeps a bare unmapped code even without a description", async () => {
+    const { stripRefusalParams } = await import("./page")
+
+    expect(stripRefusalParams("/login?error=some_future_engine_code")).toBe(
+      "/login?error=some_future_engine_code"
+    )
+  })
+
+  it("keeps an unmapped code even when it arrives as an absolute href", async () => {
+    const { stripRefusalParams } = await import("./page")
+
+    expect(
+      stripRefusalParams("https://app.exemple.ma/login?error=weird_code#form")
+    ).toBe("https://app.exemple.ma/login?error=weird_code#form")
+  })
+
+  it("keeps a mapped-code decision independent of the description", async () => {
+    const { stripRefusalParams } = await import("./page")
+
+    // The code is the decision: recognised → rendered → zombie, stripped.
+    expect(
+      stripRefusalParams("/login?error=state_not_found&error_description=x")
+    ).toBe("/login")
+  })
+})
+
+describe("googleRefusalFromSearch (engine vocabulary, #247)", () => {
+  it.each(Object.entries(ENGINE_MESSAGES))(
+    "maps %s to its own message, never the fallback",
+    async (code, message) => {
+      const { googleRefusalFromSearch } = await import("./page")
+
+      expect(googleRefusalFromSearch(`?error=${code}`)).toBe(message)
+      expect(googleRefusalFromSearch(`?error=${code}`)).not.toBe(
+        MESSAGES.fallback
+      )
+    }
+  )
+
+  it("gives each engine code a distinct message", async () => {
+    const { googleRefusalFromSearch } = await import("./page")
+    const messages = Object.keys(ENGINE_MESSAGES).map((code) =>
+      googleRefusalFromSearch(`?error=${code}`)
+    )
+
+    expect(new Set(messages).size).toBe(messages.length)
+  })
+
+  it("still falls back for a genuinely unknown code", async () => {
+    const { googleRefusalFromSearch } = await import("./page")
+
+    expect(googleRefusalFromSearch("?error=some_future_engine_code")).toBe(
+      MESSAGES.fallback
+    )
+    expect(googleRefusalFromSearch("?error=")).toBe(MESSAGES.fallback)
+  })
+
+  it("reads the engine's own access_denied straight from a real refusal", async () => {
+    const { googleRefusalFromSearch } = await import("./page")
+
+    // Reproduced live on 2026-09-26: the consent screen in Testing rejects a
+    // non-test-user address, and the engine forwards Google's own code.
+    expect(
+      googleRefusalFromSearch(
+        "?error=access_denied&error_description=The+user+denied+the+request."
+      )
+    ).toBe(ENGINE_MESSAGES.access_denied)
+  })
+})
+
+describe("the raw code in the UI (#247)", () => {
+  it("shows the raw code next to the message outside production", async () => {
+    vi.stubEnv("NODE_ENV", "development")
+    const { googleRefusalFromSearch } = await import("./page")
+    const html = await renderLoginForm({
+      connexionGoogle: true,
+      refusalMessage: googleRefusalFromSearch("?error=access_denied"),
+      refusalCode: "access_denied",
+    })
+
+    // A developer must be able to read the code verbatim.  The debug hook is
+    // asserted, not the bare string: a reworded French message could stop
+    // containing the code for reasons that have nothing to do with this.
+    expect(html).toContain('data-refusal-code="true"')
+    expect(renderedText(html)).toContain("access_denied")
+    expect(renderedText(html)).toContain(ENGINE_MESSAGES.access_denied)
+    vi.unstubAllEnvs()
+  })
+
+  it("never shows the raw code in production", async () => {
+    vi.stubEnv("NODE_ENV", "production")
+    const { googleRefusalFromSearch } = await import("./page")
+    const html = await renderLoginForm({
+      connexionGoogle: true,
+      refusalMessage: googleRefusalFromSearch("?error=access_denied"),
+      refusalCode: "access_denied",
+    })
+
+    // …and an end user sees the French copy alone: no debug hook at all, and
+    // the code nowhere in the markup.
+    expect(html).not.toContain('data-refusal-code="true"')
+    expect(renderedText(html)).not.toContain("access_denied")
+    expect(renderedText(html)).toContain(ENGINE_MESSAGES.access_denied)
+    vi.unstubAllEnvs()
+  })
+
+  it("renders no debug line when the page was not reached through a refusal", async () => {
+    vi.stubEnv("NODE_ENV", "development")
+    const html = await renderLoginForm({ connexionGoogle: true })
+
+    expect(html).not.toContain('role="alert"')
+    vi.unstubAllEnvs()
   })
 })

@@ -142,8 +142,9 @@ The organisation's attestation that a Utilisateur's e-mail address genuinely bel
 _Avoid_: Email confirmed, verified account, e-mail validation
 
 **ConnexionGoogle (Google Sign-In)**:
-An optional sign-in method: a Utilisateur signs in with their Google account instead of a password. Enabled per Utilisateur by an administrator and only for active accounts, and only offered when the deployment has Google credentials configured; it never provisions accounts — an unknown address is refused, with one exception: an address designated as the deployment's Administrateur (see Administrateur) is provisioned on its first sign-in. Every sign-in revalidates existence, activity, and per-Utilisateur enablement — a designated Administrateur's sign-in re-asserts their standing instead — and a refused Google sign-in lands on the login page with a French message — never silently.
+An optional sign-in method: a Utilisateur signs in with their Google account instead of a password. Enabled per Utilisateur by an administrator and only for active accounts, and only offered when the deployment has Google credentials configured; it never provisions accounts — an unknown address is refused, with one exception: an address designated as the deployment's Administrateur (see Administrateur) is provisioned on its first sign-in. Every sign-in revalidates existence, activity, and per-Utilisateur enablement — a designated Administrateur's sign-in re-asserts their standing instead — and a refused Google sign-in lands on the login page with a French message — never silently. A refusal always names its cause: the gate's own codes and the engine's Google-side codes each carry a message, and the raw code is logged server-side on every refusal (ADR-0022). A code the app has no message for is the one exception to the no-zombie-parameter rule — it stays in the URL, because it is the only diagnostic the generic message does not carry.
 _Avoid_: OAuth, social login, SSO
+_Cites_: ADR-0017, ADR-0022
 
 ### Branding
 

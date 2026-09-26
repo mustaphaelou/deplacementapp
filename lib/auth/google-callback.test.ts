@@ -12,7 +12,16 @@
  * be a redirect carrying its code; a 200 JSON body is the defect this suite
  * exists to catch.
  */
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest"
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  afterAll,
+  afterEach,
+  beforeEach,
+  vi,
+} from "vitest"
 import { eq, sql } from "drizzle-orm"
 import { createPgliteDb } from "../test/create-pglite-db"
 import type { PgliteDb } from "../test/create-pglite-db"
@@ -20,8 +29,13 @@ import * as schema from "../../db/schema"
 import { createAuth } from "./better-auth"
 import type { DrizzleDb } from "../../db"
 import { account } from "../../db/schema/auth-tables"
-import { GOOGLE_REFUSAL_CODES, googleRefusalMessage } from "./google-refusals"
+import {
+  GOOGLE_REFUSAL_CODES,
+  GOOGLE_REFUSAL_FALLBACK_MESSAGE,
+  googleRefusalMessage,
+} from "./google-refusals"
 import type { GoogleRefusalCode } from "./google-refusals"
+import { withRefusalLog } from "./refusal-log"
 import { UtilisateurService } from "../utilisateur-service"
 
 const TIMEOUT = 30_000
@@ -611,5 +625,142 @@ describe("Google callback seam (#203)", { timeout: TIMEOUT }, () => {
     expect(await db.query.session.findMany()).toHaveLength(0)
     expect(await db.query.utilisateurs.findMany()).toHaveLength(1)
     expect(await db.query.account.findMany()).toHaveLength(1)
+  })
+
+  // ----------------- the refusal log (#247)
+  // Asserted here, on the real engine's own redirects, because the unit suite
+  // can only prove the seam reads what a hand-built Response says.  A wiring
+  // that the engine's actual redirect shape never reaches would pass that
+  // suite and log nothing in production — which is why the route module has
+  // its own test too (`app/api/auth/[...all]/route.test.ts`).
+  describe("the refusal log (#247)", () => {
+    // Restored after every test, not at the end of each: a failing assertion
+    // would otherwise skip the restore and leak this test's calls (and a live
+    // console.warn) into the next one.
+    afterEach(() => {
+      vi.restoreAllMocks()
+    })
+
+    /** The real auth handler behind the log seam, as the route wires it. */
+    function loggedHandler(): (request: Request) => Promise<Response> {
+      return withRefusalLog((request) => auth.handler(request))
+    }
+
+    async function invokeLogged(args: {
+      code: string
+      state: string
+      cookie: string
+    }): Promise<Response> {
+      const query = new URLSearchParams({ code: args.code, state: args.state })
+      return loggedHandler()(
+        new Request(`${BASE_URL}/api/auth/callback/google?${query}`, {
+          headers: { origin: BASE_URL, cookie: args.cookie },
+          redirect: "manual",
+        })
+      )
+    }
+
+    function refusalLines(warn: ReturnType<typeof vi.spyOn>) {
+      return warn.mock.calls.filter(
+        (call: unknown[]) =>
+          typeof call[0] === "string" && call[0].includes("GoogleRefusal")
+      )
+    }
+
+    it("logs one line carrying the raw code of a gate refusal", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+      idToken = makeIdToken({
+        sub: "google-sub-stranger",
+        email: "stranger@example.com",
+      })
+
+      const { state, cookie } = await mintState()
+      const res = await invokeLogged({ code: "unknown", state, cookie })
+
+      expect(redirectFrom(res).error).toBe(
+        GOOGLE_REFUSAL_CODES.UTILISATEUR_INTROUVABLE
+      )
+      const lines = refusalLines(warn)
+      expect(lines).toHaveLength(1)
+      expect(lines[0][1]).toMatchObject({
+        code: GOOGLE_REFUSAL_CODES.UTILISATEUR_INTROUVABLE,
+      })
+    })
+
+    it("logs one line for an engine code the app does not map", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+      // The stub serves a token response carrying no id_token, so the engine's
+      // own user-info step fails and it answers with its own code.  Nothing in
+      // the app maps `unable_to_get_user_info` — the exact occurrence #247
+      // exists to make greppable.
+      const { state, cookie } = await mintState()
+      const res = await invokeLogged({ code: "no-token", state, cookie })
+
+      expect(redirectFrom(res).error).toBe("unable_to_get_user_info")
+      const lines = refusalLines(warn)
+      expect(lines).toHaveLength(1)
+      expect(lines[0][1]).toMatchObject({ code: "unable_to_get_user_info" })
+    })
+
+    it("logs nothing on a successful sign-in", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+      await seedUtilisateur({ email: "alice@acme.ma" })
+      idToken = makeIdToken({ sub: "google-sub-alice", email: "alice@acme.ma" })
+
+      const { state, cookie } = await mintState()
+      const res = await invokeLogged({ code: "ok", state, cookie })
+
+      expect(redirectFrom(res).pathname).toBe("/")
+      expect(refusalLines(warn)).toHaveLength(0)
+    })
+  })
+
+  // ----------------- refusals raised before the state parses (#247)
+  // The engine honours `errorCallbackURL` only once the state has parsed; a
+  // failure before that goes to `onAPIError.errorURL`, which the engine
+  // defaults to its own error page.  These two codes are therefore invisible
+  // unless that default is set to the login page — and their mapped French
+  // messages are unreachable code without it.  Pinned here, because the
+  // message-mapping tests call `googleRefusalFromSearch` directly and would
+  // pass either way.
+  describe("pre-state refusals reach the login page (#247)", () => {
+    async function invokeBare(query: string): Promise<Response> {
+      return auth.handler(
+        new Request(`${BASE_URL}/api/auth/callback/google?${query}`, {
+          headers: { origin: BASE_URL },
+          redirect: "manual",
+        })
+      )
+    }
+
+    it("redirects a callback with no state to /login with state_not_found", async () => {
+      const res = await invokeBare("code=some-code")
+
+      expect(res.status).toBe(302)
+      const redirect = redirectFrom(res)
+      expect(redirect.pathname).toBe("/login")
+      expect(redirect.error).toBe("state_not_found")
+      // The message the login page will render for it is the mapped one.
+      expect(redirect.errorDescription ?? "").not.toContain("Error")
+    })
+
+    it("redirects a callback whose state does not match to /login with state_mismatch", async () => {
+      const res = await invokeBare("code=some-code&state=not-a-real-state")
+
+      expect(res.status).toBe(302)
+      const redirect = redirectFrom(res)
+      expect(redirect.pathname).toBe("/login")
+      expect(redirect.error).toBe("state_mismatch")
+    })
+
+    it("lands the login page on the mapped message for both codes", async () => {
+      // The seam's own contract: the code the engine emitted is one the
+      // vocabulary can name, so the user sees a cause and not the fallback.
+      for (const code of ["state_not_found", "state_mismatch"]) {
+        expect(googleRefusalMessage(code)).not.toBe(
+          GOOGLE_REFUSAL_FALLBACK_MESSAGE
+        )
+      }
+    })
   })
 })
