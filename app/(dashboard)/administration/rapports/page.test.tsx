@@ -196,3 +196,86 @@ describe("Rapports page", () => {
     expect(redirect).toHaveBeenCalledWith("/")
   })
 })
+
+// #258: the responsive header class set copied verbatim from the #254
+// reference. The pins assert the FULL class attribute, not a substring: a
+// bare `toContain("text-[40px]")` would also pass on `md:text-[40px]` alone
+// and so could not catch a half-applied rule. A green test proves the class
+// string is present, never how it looks.
+describe("Rapports page — the #258 responsive page header", () => {
+  const header = async () => {
+    const { getAuthUser } = await import("@/lib/auth/server")
+    const {
+      countDemandes: mockCountDemandes,
+      aggregateBudget: mockAggregateBudget,
+    } = await import("@/lib/demande")
+
+    ;(getAuthUser as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser())
+    ;(mockCountDemandes as ReturnType<typeof vi.fn>).mockImplementation(
+      resolveCount
+    )
+    ;(mockAggregateBudget as ReturnType<typeof vi.fn>).mockResolvedValue(45000)
+
+    const { default: RapportsPage } = await import("./page")
+    return renderToStaticMarkup(await RapportsPage())
+  }
+
+  it("scales the title 24px below md: and 40px from md: up", async () => {
+    expect(await header()).toContain(
+      '<h1 class="text-[24px] leading-tight font-bold tracking-[-0.01em] md:text-[40px]">'
+    )
+  })
+
+  it("scales the icon tile 40px below md: and 48px from md: up", async () => {
+    const html = await header()
+    const start = html.indexOf('<div class="mt-6 flex items-center gap-4">')
+    const block = html.slice(start, html.indexOf("</p>", start))
+
+    expect(block).toContain(
+      'class="flex size-10 shrink-0 items-center justify-center rounded-[3px] bg-primary/10 md:size-12"'
+    )
+    // md: is the single shell breakpoint — no other variant may creep in.
+    expect(block).not.toContain("sm:text-[")
+    expect(block).not.toContain("lg:text-[")
+    expect(block).not.toMatch(/(?:sm|lg):size-\d/)
+  })
+
+  it("truncates the breadcrumb to one line instead of wrapping it", async () => {
+    const html = await header()
+    const crumbs = html.slice(
+      html.indexOf('aria-label="breadcrumb"'),
+      html.indexOf('<div class="mt-6 flex items-center gap-4">')
+    )
+
+    // flex-nowrap on the list — twMerge drops the primitive's flex-wrap, so
+    // `flex-nowrap` lands last and `flex-wrap` is gone from the output.
+    expect(crumbs).toContain(
+      'class="flex items-center gap-1.5 text-sm wrap-break-word text-muted-foreground flex-nowrap"'
+    )
+    expect(crumbs).not.toContain("flex-wrap")
+    // min-w-0 on the nav and the last item: a flex item's default min-width:auto
+    // refuses to shrink below its content, so without these the ellipsis can
+    // never engage.
+    expect(crumbs).toContain('data-slot="breadcrumb" class="min-w-0"')
+    expect(crumbs).toContain(
+      'data-slot="breadcrumb-item" class="inline-flex items-center gap-1 min-w-0"'
+    )
+    // truncate on the page itself, which is what renders the ellipsis.
+    expect(crumbs).toContain(
+      'class="text-foreground min-w-0 truncate font-medium"'
+    )
+  })
+
+  it("keeps the desktop anatomy and the CSV action exactly where they were", async () => {
+    const html = await header()
+    const start = html.indexOf('<div class="mt-6 flex items-center gap-4">')
+    const block = html.slice(start, html.indexOf("</p>", start))
+
+    // Untouched by #258: the mt-6 rhythm, the icon, and the top-right ghost
+    // action with its label.
+    expect(block).toContain('class="mt-6 flex items-center gap-4"')
+    expect(block).toContain("size-6 text-primary")
+    expect(html).toContain("CSV")
+    expect(html.indexOf("CSV")).toBeLessThan(html.indexOf("Rapports</h1>"))
+  })
+})
