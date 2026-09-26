@@ -145,7 +145,14 @@ describe("Profil page — the #258 responsive page header", () => {
     // classes only. A tile or breadcrumb appearing here would be drift — a
     // tile that does not exist today, invented to make the page look uniform.
     expect(html).not.toContain('aria-label="breadcrumb"')
-    expect(html).not.toContain("rounded-[3px] bg-primary/10")
+    // Scoped to the header block, like the breakpoint negatives below. The
+    // stat row further down the page legitimately carries
+    // `rounded-[3px] bg-primary/10` since #255, so a page-wide negative here
+    // would fail on the wrong element.
+    const headerStart = html.indexOf('class="flex items-center gap-4"')
+    const headerBlock = html.slice(headerStart, html.indexOf("</h1>", headerStart))
+    expect(headerBlock).not.toContain("rounded-[3px] bg-primary/10")
+    expect(headerBlock).not.toContain("bg-primary/10")
     // The avatar is untouched: still 64px, still round, still left of the title.
     expect(html).toContain(
       'data-slot="avatar" class="relative flex shrink-0 overflow-hidden rounded-full size-16"'
@@ -156,11 +163,9 @@ describe("Profil page — the #258 responsive page header", () => {
     // md: is the single shell breakpoint — no other variant may creep into
     // the header row. Scoped to the header: the page body below legitimately
     // carries `sm:grid-cols-2` and `text-2xl`.
-    const start = html.indexOf('class="flex items-center gap-4"')
-    const block = html.slice(start, html.indexOf("</h1>", start))
-    expect(block).not.toContain("sm:text-[")
-    expect(block).not.toContain("lg:text-[")
-    expect(block).not.toMatch(/(?:sm|lg):size-\d/)
+    expect(headerBlock).not.toContain("sm:text-[")
+    expect(headerBlock).not.toContain("lg:text-[")
+    expect(headerBlock).not.toMatch(/(?:sm|lg):size-\d/)
   })
 
   it("keeps the header anatomy: min-w-0 flex-1 title block and the ghost pencil", async () => {
