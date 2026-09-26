@@ -17,13 +17,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DashboardCard } from "@/components/ui/dashboard-card"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
+import { PageHeader } from "@/components/page-header"
 import { StatusPill } from "@/components/status-pill"
 import { toDemandePresentation } from "@/lib/demande-presentation"
 import { formatCurrency, formatDate } from "@/lib/constants"
@@ -116,32 +110,15 @@ export function DashboardLayout({
 
   return (
     <div className="space-y-6">
-      {/* Page header — the geometry every sibling page already uses: breadcrumb
-          row with the primary action top-right, then the icon tile + title. */}
-      <div>
-        <div className="flex items-center justify-between gap-4">
-          {/* #254: the breadcrumb is the one header element that can run out of
-              room, so it truncates to a single line instead of wrapping. It
-              needs three things together, none of which the shadcn primitive
-              gives us: min-w-0 on the nav and on the last item (a flex item's
-              default min-width:auto refuses to shrink below its content),
-              flex-nowrap to stop the list breaking across lines, and truncate
-              on the page itself to ellipsise. twMerge drops the primitive's
-              flex-wrap when it sees flex-nowrap, so this is a real override. */}
-          <Breadcrumb className="min-w-0">
-            <BreadcrumbList className="flex-nowrap">
-              <BreadcrumbItem>
-                <span>Espace</span>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem className="min-w-0">
-                <BreadcrumbPage className="min-w-0 truncate font-medium">
-                  Tableau de bord
-                </BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
-          {config.cta && CtaIcon && (
+      {/* The header, and nothing else, comes from the shared module: this row
+          is the one call site that already carried the row's `gap-4`. */}
+      <PageHeader
+        crumbs={["Espace", "Tableau de bord"]}
+        title="Tableau de bord"
+        subtitle={config.subtitle}
+        icon={BarChart3}
+        action={
+          config.cta && CtaIcon ? (
             <Button
               render={<Link href={config.cta.href} />}
               nativeButton={false}
@@ -150,24 +127,9 @@ export function DashboardLayout({
               <CtaIcon data-icon="inline-start" />
               {config.cta.label}
             </Button>
-          )}
-        </div>
-        <div className="mt-6 flex items-center gap-4">
-          {/* #254: 40px tile on a phone, 48px from md: up. The tile shrinks as
-              the title shrinks, so the header never grows on a small screen. */}
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-[3px] bg-primary/10 md:size-12">
-            <BarChart3 className="size-6 text-primary" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-[24px] leading-tight font-bold tracking-[-0.01em] md:text-[40px]">
-              Tableau de bord
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {config.subtitle}
-            </p>
-          </div>
-        </div>
-      </div>
+          ) : undefined
+        }
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {config.statPills.map((pill, i) => {
