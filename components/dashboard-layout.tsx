@@ -281,7 +281,7 @@ export function DashboardLayout({
                         aria-label={`Ouvrir la demande ${d.numero}`}
                         className="flex items-center justify-end text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
-                        <ChevronRight className="size-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
+                        <ChevronRight className="size-3.5 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100" />
                       </Link>
                     </td>
                   </tr>

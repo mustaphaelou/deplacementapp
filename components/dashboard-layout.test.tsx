@@ -221,3 +221,66 @@ describe("DashboardLayout — the empty queue", () => {
     expect(html).not.toContain("py-10")
   })
 })
+
+// On a phone the chevron was the only way out of a row: #249 turned the numero
+// cell into a plain span, and `opacity-0 group-hover:opacity-100` needs a
+// hover-capable pointer to ever resolve. The list page already shipped the
+// fix — visible by default, hidden only from sm up, where hover exists.
+describe("DashboardLayout — the row chevron is reachable without a pointer", () => {
+  it("carries the list page's mobile-visible opacity triple", () => {
+    const html = renderToStaticMarkup(
+      <DashboardLayout
+        config={CONFIG}
+        navItems={NAV_ITEMS}
+        demandes={[demande({ etape: "FINAL", decision: "APPROVED" })]}
+      />
+    )
+
+    expect(html).toContain("sm:opacity-0 sm:group-hover:opacity-100")
+    // …and the mobile half of it, not just the hover half. Without opacity-100
+    // below sm the triple would resolve to nothing at all. Matched without the
+    // `class="` anchor: lucide prepends its own `lucide lucide-chevron-right`
+    // to the element's class attribute, so it does not begin at size-3.5.
+    expect(html).toContain(
+      "size-3.5 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
+    )
+    expect(html).not.toContain(
+      "size-3.5 opacity-0 transition-opacity group-hover:opacity-100"
+    )
+  })
+
+  it("keeps the chevron's link the row's named, reachable exit", () => {
+    const html = renderToStaticMarkup(
+      <DashboardLayout
+        config={CONFIG}
+        navItems={NAV_ITEMS}
+        demandes={[
+          demande({ id: "d-1", numero: "D-2026-001", etape: "FINAL", decision: "APPROVED" }),
+          demande({ id: "d-2", numero: "D-2026-002", etape: "MANAGER_REVIEW", decision: "REJECTED" }),
+        ]}
+      />
+    )
+
+    expect(html).toContain('aria-label="Ouvrir la demande D-2026-001"')
+    expect(html).toContain('aria-label="Ouvrir la demande D-2026-002"')
+    expect(html).toContain('href="/demandes/d-1"')
+    expect(html).toContain('href="/demandes/d-2"')
+    // Every row gets one, not just the first.
+    expect(html.match(/Ouvrir la demande/g)).toHaveLength(2)
+  })
+
+  it("leaves the numero cell a plain span — the whole row is not a link", () => {
+    const html = renderToStaticMarkup(
+      <DashboardLayout
+        config={CONFIG}
+        navItems={NAV_ITEMS}
+        demandes={[demande({ etape: "FINAL", decision: "APPROVED" })]}
+      />
+    )
+
+    // Out of scope for this ticket: the chevron is the affordance. If the
+    // numero ever becomes an anchor, this pin is the one that should break.
+    expect(html).toContain('<span class="font-medium">D-2026-001</span>')
+    expect(html).not.toContain('href="/demandes/d-1" class="font-medium"')
+  })
+})
