@@ -26,8 +26,14 @@ export function useAuthUser(): {
   return { user, isPending, refetch }
 }
 
-export async function signInWithCredentials(email: string, password: string) {
-  return authClient.signIn.email({ email, password })
+export async function signInWithCredentials(
+  email: string,
+  password: string,
+  rememberMe = false
+) {
+  // `rememberMe` is a documented field of the sign-in request body: it asks the
+  // engine for a long-lived session cookie instead of a session-scoped one.
+  return authClient.signIn.email({ email, password, rememberMe })
 }
 
 export async function signInWithGoogle() {

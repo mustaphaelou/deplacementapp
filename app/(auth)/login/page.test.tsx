@@ -77,38 +77,130 @@ async function renderLoginForm(props: {
   return renderToStaticMarkup(<LoginForm societe={SOCIETE} {...props} />)
 }
 
-describe("LoginForm (split-screen restyle, per prototype login-redesign)", () => {
-  it("renders the 50/50 split-screen anatomy with a dark brand panel", async () => {
+describe("LoginForm (Cloudflare single-column restyle, #245)", () => {
+  it("drops the split screen and centres one narrow column", async () => {
     const html = await renderLoginForm({ connexionGoogle: true })
 
-    expect(html).toContain("lg:grid-cols-2")
-    expect(html).toContain("hidden flex-col justify-between")
-    expect(html).toContain("bg-[#0B0F17]")
-    expect(html).toContain("Accédez avec confiance")
+    // The 50/50 split-screen and its dark brand panel are gone.
+    expect(html).not.toContain("lg:grid-cols-2")
+    expect(html).not.toContain("bg-[#0B0F17]")
+    expect(html).not.toContain("Accédez avec confiance")
+    // ...and the feature carousel with it.
+    expect(html).not.toContain("Circuit de validation clair")
+    expect(html).not.toContain('role="tablist"')
+    expect(html).not.toContain("Direction")
+
+    // One centred column, ~348px, on a full-height muted surface.
+    expect(html).toContain("min-h-dvh")
+    expect(html).toContain("max-w-[348px]")
+    expect(html).toContain("justify-center")
+  })
+
+  it("puts the brand mark above the heading, both centred", async () => {
+    const html = await renderLoginForm({ connexionGoogle: true })
+
     expect(html).toContain("HAY 2010 SARL")
+    expect(html).toContain("Connectez-vous à votre espace")
+    // The mark precedes the heading.
+    expect(html.indexOf("HAY 2010 SARL")).toBeLessThan(
+      html.indexOf("Connectez-vous à votre espace")
+    )
+    expect(html).toContain("text-center")
   })
 
-  it("shows the brand panel carousel with dots and the validation pipeline", async () => {
+  it("orders the rows: Google, divider, credentials, CTA, footer", async () => {
     const html = await renderLoginForm({ connexionGoogle: true })
 
-    expect(html).toContain("Circuit de validation clair")
-    expect(html).toContain("Saisie simple et rapide")
-    expect(html).toContain("Documents et PDF automatiques")
-    expect(html).toContain('role="tablist"')
-    expect(html).toContain("Manager")
-    expect(html).toContain("Finance")
-    expect(html).toContain("Direction")
+    const google = html.indexOf("Continuer avec Google")
+    const divider = html.indexOf(">ou<")
+    const email = html.indexOf('id="email"')
+    const cta = html.indexOf("Se connecter")
+    const footer = html.indexOf("Contactez votre administrateur")
+
+    expect(google).toBeGreaterThan(-1)
+    expect(divider).toBeGreaterThan(-1)
+    expect(email).toBeGreaterThan(-1)
+    expect(cta).toBeGreaterThan(-1)
+    expect(footer).toBeGreaterThan(-1)
+    expect(google).toBeLessThan(divider)
+    expect(divider).toBeLessThan(email)
+    expect(email).toBeLessThan(cta)
+    expect(cta).toBeLessThan(footer)
   })
 
-  it("renders the light form column with brand-ring inputs and the primary CTA", async () => {
+  it("uses the Cloudflare control geometry: 36px, hairline, 5px radius", async () => {
     const html = await renderLoginForm({ connexionGoogle: true })
 
-    expect(html).toContain("Bienvenue")
-    expect(html).toContain("Connectez-vous à votre espace de travail")
-    expect(html).toContain("h-11")
-    expect(html).toContain("focus-visible:ring-(--brand)/20")
+    expect(html).toContain("h-9") // 36px inputs and buttons
+    expect(html).toContain("rounded-[5px]")
+    expect(html).toContain("text-[13px]")
+    // Not the 44px controls of the previous restyle.
+    expect(html).not.toContain("h-11")
+  })
+
+  it("rings the focus in the Societe's primary colour, not a hardcoded one", async () => {
+    const html = await renderLoginForm({ connexionGoogle: true })
+
+    expect(html).toContain("(--brand)")
+    expect(html).not.toContain("#0F766E")
+  })
+
+  it("carries the remember-me checkbox and the forgot link on one row", async () => {
+    const html = await renderLoginForm({ connexionGoogle: true })
+
+    expect(html).toContain('type="checkbox"')
+    expect(html).toContain("Se souvenir de moi")
     expect(html).toContain("Mot de passe oublié")
+    // The toggle lives inside the field and names its action.  Only one of the
+    // two labels renders at a time — the initial state is "show".
+    expect(html).toMatch(/aria-label="(Afficher|Masquer) le mot de passe"/)
+  })
+
+  it("renders a full-width near-black primary CTA and the legal line", async () => {
+    const html = await renderLoginForm({ connexionGoogle: true })
+
     expect(html).toContain("Se connecter")
+    expect(html).toContain("w-full")
+    expect(html).toContain("bg-slate-900")
+    expect(html).toContain("Application de gestion des demandes de déplacement")
+  })
+
+  it("honours the dark theme instead of hardcoding a white surface", async () => {
+    const html = await renderLoginForm({ connexionGoogle: true })
+
+    expect(html).toContain("dark:")
+    expect(html).not.toContain('className="relative min-h-dvh bg-white')
+  })
+})
+
+describe("validateCredentials (pure, #245)", () => {
+  it("accepts a well-formed e-mail and a password", async () => {
+    const { validateCredentials } = await import("./page")
+
+    expect(validateCredentials("vous@exemple.ma", "secret")).toEqual({})
+  })
+
+  it("reports the empty e-mail, a malformed e-mail and the empty password", async () => {
+    const { validateCredentials } = await import("./page")
+
+    expect(validateCredentials("", "secret")).toEqual({
+      email: "Veuillez saisir votre email.",
+    })
+    expect(validateCredentials("pas-un-email", "secret")).toEqual({
+      email: "Adresse email invalide.",
+    })
+    expect(validateCredentials("vous@exemple.ma", "")).toEqual({
+      password: "Veuillez saisir votre mot de passe.",
+    })
+  })
+
+  it("reports both fields at once", async () => {
+    const { validateCredentials } = await import("./page")
+
+    expect(validateCredentials("", "")).toEqual({
+      email: "Veuillez saisir votre email.",
+      password: "Veuillez saisir votre mot de passe.",
+    })
   })
 })
 
@@ -116,7 +208,7 @@ describe("Google section visibility (connexionGoogle)", () => {
   it("renders the divider, Google row and footer when connexionGoogle is true", async () => {
     const html = await renderLoginForm({ connexionGoogle: true })
 
-    expect(html).toContain("Ou continuer avec")
+    expect(html).toContain(">ou<")
     expect(html).toContain("Continuer avec Google")
     expect(html).toContain("Application de gestion des demandes de déplacement")
     expect(html).not.toContain("S'inscrire")
@@ -126,7 +218,7 @@ describe("Google section visibility (connexionGoogle)", () => {
     const html = await renderLoginForm({ connexionGoogle: false })
 
     expect(html).not.toContain("Google")
-    expect(html).not.toContain("Ou continuer avec")
+    expect(html).not.toContain(">ou<")
     // ...and the rest of the form column is intact.
     expect(html).toContain("Se connecter")
     expect(html).toContain("Application de gestion des demandes de déplacement")
