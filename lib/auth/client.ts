@@ -26,8 +26,19 @@ export function useAuthUser(): {
   return { user, isPending, refetch }
 }
 
-export async function signInWithCredentials(email: string, password: string) {
-  return authClient.signIn.email({ email, password })
+export async function signInWithCredentials(
+  email: string,
+  password: string,
+  rememberMe = true
+) {
+  // `rememberMe` is a documented field of the sign-in request body.  It must
+  // default to `true`, not `false`: the engine's schema is
+  // `rememberMe: z.boolean().default(true)` and it decides the session with
+  // `createSession(userId, rememberMe === false)`.  Omitting the field — what
+  // every caller did before #245 — therefore yields a LONG-LIVED session, so a
+  // `false` default here would silently shorten every session to 24h, the
+  // setup wizard's post-Amorçage sign-in included.
+  return authClient.signIn.email({ email, password, rememberMe })
 }
 
 export async function signInWithGoogle() {
