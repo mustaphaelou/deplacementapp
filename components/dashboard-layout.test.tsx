@@ -221,3 +221,55 @@ describe("DashboardLayout — the empty queue", () => {
     expect(html).not.toContain("py-10")
   })
 })
+
+describe("DashboardLayout — the Accès rapide focus ring (#252)", () => {
+  const quickAccessClasses = (html: string): string[] =>
+    [...html.matchAll(/class="([^"]*)"/g)]
+      .map(([, cls]) => cls)
+      .filter((cls) => cls.includes("px-3 py-2.5"))
+
+  it("carries the app-wide focus pattern on every quick-access cell", () => {
+    const html = renderToStaticMarkup(
+      <DashboardLayout config={CONFIG} navItems={NAV_ITEMS} demandes={[]} />
+    )
+
+    const classes = quickAccessClasses(html)
+    expect(classes.length).toBeGreaterThan(0)
+    for (const cls of classes) {
+      expect(cls).toContain("outline-none")
+      expect(cls).toContain("focus-visible:ring-2")
+      expect(cls).toContain("focus-visible:ring-ring")
+    }
+  })
+
+  it("has no bare outline utility left painting a fake ring at rest", () => {
+    const html = renderToStaticMarkup(
+      <DashboardLayout config={CONFIG} navItems={NAV_ITEMS} demandes={[]} />
+    )
+
+    for (const cls of quickAccessClasses(html)) {
+      // `outline-none` contains the substring "outline", so compare tokens,
+      // not substrings: the bare `outline`/`outline-border` pair paints at
+      // rest under Tailwind v4 and must be gone.
+      expect(cls.split(/\s+/)).not.toContain("outline")
+      expect(cls.split(/\s+/)).not.toContain("outline-border")
+      expect(cls.split(/\s+/)).not.toContain("outline-offset-[-1px]")
+    }
+  })
+
+  it("keeps the hairline divider on the shadow slot so the ring is not erased", () => {
+    const html = renderToStaticMarkup(
+      <DashboardLayout config={CONFIG} navItems={NAV_ITEMS} demandes={[]} />
+    )
+
+    // Dividers moved off `outline` and onto --tw-shadow as an inset shadow:
+    // Tailwind composes one box-shadow from five slots, so a cell can carry
+    // both the resting hairline and the focus ring at once.
+    expect(html).toContain("shadow-[inset_0_0_0_1px_var(--color-border)]")
+    // The 1px gap and the panel container are the phantom-cell guards.
+    expect(html).toContain("gap-px")
+    expect(html).toContain(
+      "overflow-hidden rounded-[3px] border border-border"
+    )
+  })
+})

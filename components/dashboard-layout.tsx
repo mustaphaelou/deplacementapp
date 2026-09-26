@@ -187,7 +187,7 @@ export function DashboardLayout({
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "group flex min-w-0 items-center gap-2.5 bg-background px-3 py-2.5 outline outline-offset-[-1px] outline-border transition-colors",
+                  "group flex min-w-0 items-center gap-2.5 bg-background px-3 py-2.5 outline-none shadow-[inset_0_0_0_1px_var(--color-border)] transition-colors focus-visible:ring-2 focus-visible:ring-ring",
                   rowActionHover
                 )}
               >
