@@ -147,8 +147,8 @@ export function DashboardLayout({
 
       <section>
         <h2 className="text-base font-semibold tracking-tight">Accès rapide</h2>
-        {/* One hairline panel. Each cell draws its own rule with an inset
-            outline, so the dividers collapse to a single 1px line and a grid
+        {/* One hairline panel. Each cell draws its own rule as an inset
+            shadow, so the dividers collapse to a single 1px line and a grid
             that does not fill its last row leaves no phantom cell — a shared
             container background painting through a 1px gap would. */}
         <div className="mt-3 grid gap-px overflow-hidden rounded-[3px] border border-border sm:grid-cols-2 xl:grid-cols-3">
@@ -159,7 +159,14 @@ export function DashboardLayout({
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "group flex min-w-0 items-center gap-2.5 bg-background px-3 py-2.5 outline-none shadow-[inset_0_0_0_1px_var(--color-border)] transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                  // #252: the focus ring is drawn INSET, and it has to be.
+                  // The panel clips (`overflow-hidden`), the first cell sits
+                  // flush against that clip edge, and an outer ring paints
+                  // outside its own box — so a 2px ring had 1px of room and
+                  // rendered on none of the panel's outer edges. Inset keeps
+                  // it inside the clip and lets it compose with the resting
+                  // 1px hairline above (the two are separate shadow slots).
+                  "group flex min-w-0 items-center gap-2.5 bg-background px-3 py-2.5 outline-none shadow-[inset_0_0_0_1px_var(--color-border)] transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
                   rowActionHover
                 )}
               >

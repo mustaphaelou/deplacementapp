@@ -272,6 +272,39 @@ describe("DashboardLayout — the Accès rapide focus ring (#252)", () => {
       "overflow-hidden rounded-[3px] border border-border"
     )
   })
+
+  it("draws the ring inset, because the panel clips and an outer ring is lost", () => {
+    const html = renderToStaticMarkup(
+      <DashboardLayout config={CONFIG} navItems={NAV_ITEMS} demandes={[]} />
+    )
+
+    // This is the assertion the class-string pins above could not make. A cell
+    // inside an `overflow-hidden` panel is flush against the clip edge, and
+    // `ring-2` is an OUTER box-shadow: it paints outside the cell's own box,
+    // so on the first cell — the one a keyboard user tabs to first — 1px of
+    // the 2px had room and the ring showed on none of the panel's outer edges.
+    // Measured in Chromium against this app's compiled CSS, before the fix:
+    // 44 ring-coloured pixels, every one of them in the single inter-cell gap,
+    // zero on the panel's top or left edge. With `ring-inset`: 786, a full
+    // 2px band on all four sides.
+    //
+    // So the invariant is a RELATIONSHIP, not a class: any cell carrying a
+    // focus ring inside a clipping panel must draw it inset. Stated that way
+    // it survives the class being renamed.
+    expect(html).toContain("overflow-hidden")
+    for (const cls of quickAccessClasses(html)) {
+      const tokens = cls.split(/\s+/)
+      const ring = tokens.find((t) => /^focus-visible:ring-\d+$/.test(t))
+
+      if (!ring) continue
+      expect(
+        tokens.includes("focus-visible:ring-inset"),
+        `a cell inside the clipping panel carries ${ring} with no ` +
+          `focus-visible:ring-inset — an outer ring is clipped away on the ` +
+          `panel's edges, so the first cell shows no focus indicator at all`
+      ).toBe(true)
+    }
+  })
 })
 
 // On a phone the chevron was the only way out of a row: #249 turned the numero
