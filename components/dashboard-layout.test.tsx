@@ -221,3 +221,186 @@ describe("DashboardLayout — the empty queue", () => {
     expect(html).not.toContain("py-10")
   })
 })
+
+describe("DashboardLayout — the Accès rapide focus ring (#252)", () => {
+  const quickAccessClasses = (html: string): string[] =>
+    [...html.matchAll(/class="([^"]*)"/g)]
+      .map(([, cls]) => cls)
+      .filter((cls) => cls.includes("px-3 py-2.5"))
+
+  it("carries the app-wide focus pattern on every quick-access cell", () => {
+    const html = renderToStaticMarkup(
+      <DashboardLayout config={CONFIG} navItems={NAV_ITEMS} demandes={[]} />
+    )
+
+    const classes = quickAccessClasses(html)
+    expect(classes.length).toBeGreaterThan(0)
+    for (const cls of classes) {
+      expect(cls).toContain("outline-none")
+      expect(cls).toContain("focus-visible:ring-2")
+      expect(cls).toContain("focus-visible:ring-ring")
+    }
+  })
+
+  it("has no bare outline utility left painting a fake ring at rest", () => {
+    const html = renderToStaticMarkup(
+      <DashboardLayout config={CONFIG} navItems={NAV_ITEMS} demandes={[]} />
+    )
+
+    for (const cls of quickAccessClasses(html)) {
+      // `outline-none` contains the substring "outline", so compare tokens,
+      // not substrings: the bare `outline`/`outline-border` pair paints at
+      // rest under Tailwind v4 and must be gone.
+      expect(cls.split(/\s+/)).not.toContain("outline")
+      expect(cls.split(/\s+/)).not.toContain("outline-border")
+      expect(cls.split(/\s+/)).not.toContain("outline-offset-[-1px]")
+    }
+  })
+
+  it("keeps the hairline divider on the shadow slot so the ring is not erased", () => {
+    const html = renderToStaticMarkup(
+      <DashboardLayout config={CONFIG} navItems={NAV_ITEMS} demandes={[]} />
+    )
+
+    // Dividers moved off `outline` and onto --tw-shadow as an inset shadow:
+    // Tailwind composes one box-shadow from five slots, so a cell can carry
+    // both the resting hairline and the focus ring at once.
+    expect(html).toContain("shadow-[inset_0_0_0_1px_var(--color-border)]")
+    // The 1px gap and the panel container are the phantom-cell guards.
+    expect(html).toContain("gap-px")
+    expect(html).toContain(
+      "overflow-hidden rounded-[3px] border border-border"
+    )
+  })
+})
+
+// On a phone the chevron was the only way out of a row: #249 turned the numero
+// cell into a plain span, and `opacity-0 group-hover:opacity-100` needs a
+// hover-capable pointer to ever resolve. The list page already shipped the
+// fix — visible by default, hidden only from sm up, where hover exists.
+describe("DashboardLayout — the row chevron is reachable without a pointer", () => {
+  it("carries the list page's mobile-visible opacity triple", () => {
+    const html = renderToStaticMarkup(
+      <DashboardLayout
+        config={CONFIG}
+        navItems={NAV_ITEMS}
+        demandes={[demande({ etape: "FINAL", decision: "APPROVED" })]}
+      />
+    )
+
+    expect(html).toContain("sm:opacity-0 sm:group-hover:opacity-100")
+    // …and the mobile half of it, not just the hover half. Without opacity-100
+    // below sm the triple would resolve to nothing at all. Matched without the
+    // `class="` anchor: lucide prepends its own `lucide lucide-chevron-right`
+    // to the element's class attribute, so it does not begin at size-3.5.
+    expect(html).toContain(
+      "size-3.5 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
+    )
+    expect(html).not.toContain(
+      "size-3.5 opacity-0 transition-opacity group-hover:opacity-100"
+    )
+  })
+
+  it("keeps the chevron's link the row's named, reachable exit", () => {
+    const html = renderToStaticMarkup(
+      <DashboardLayout
+        config={CONFIG}
+        navItems={NAV_ITEMS}
+        demandes={[
+          demande({ id: "d-1", numero: "D-2026-001", etape: "FINAL", decision: "APPROVED" }),
+          demande({ id: "d-2", numero: "D-2026-002", etape: "MANAGER_REVIEW", decision: "REJECTED" }),
+        ]}
+      />
+    )
+
+    expect(html).toContain('aria-label="Ouvrir la demande D-2026-001"')
+    expect(html).toContain('aria-label="Ouvrir la demande D-2026-002"')
+    expect(html).toContain('href="/demandes/d-1"')
+    expect(html).toContain('href="/demandes/d-2"')
+    // Every row gets one, not just the first.
+    expect(html.match(/Ouvrir la demande/g)).toHaveLength(2)
+  })
+
+  it("leaves the numero cell a plain span — the whole row is not a link", () => {
+    const html = renderToStaticMarkup(
+      <DashboardLayout
+        config={CONFIG}
+        navItems={NAV_ITEMS}
+        demandes={[demande({ etape: "FINAL", decision: "APPROVED" })]}
+      />
+    )
+
+    // Out of scope for this ticket: the chevron is the affordance. If the
+    // numero ever becomes an anchor, this pin is the one that should break.
+    expect(html).toContain('<span class="font-medium">D-2026-001</span>')
+    expect(html).not.toContain('href="/demandes/d-1" class="font-medium"')
+  })
+})
+
+// #185 decided the responsive header but never landed it: every page rendered a
+// fixed 40px title and a fixed 48px tile, so the header grew on a phone. This
+// page is the reference implementation #258 copies to the other seven.
+// The pair is the point — the tile shrinks as the title shrinks, so the header
+// does not grow below md. A pin on either class alone would not catch a
+// half-applied rule, and a substring pin on "text-[40px]" would also pass on
+// "md:text-[40px]", so these assert the full class attribute both sides.
+describe("DashboardLayout — the #254 responsive page header", () => {
+  const header = () =>
+    renderToStaticMarkup(
+      <DashboardLayout config={CONFIG} navItems={NAV_ITEMS} demandes={[]} />
+    )
+
+  it("scales the title 24px below md: and 40px from md: up", () => {
+    expect(header()).toContain(
+      '<h1 class="text-[24px] leading-tight font-bold tracking-[-0.01em] md:text-[40px]">'
+    )
+  })
+
+  it("scales the icon tile 40px below md: and 48px from md: up", () => {
+    const html = header()
+
+    expect(html).toContain(
+      'class="flex size-10 shrink-0 items-center justify-center rounded-[3px] bg-primary/10 md:size-12"'
+    )
+    // The single-breakpoint rule: no other breakpoint variant may creep in.
+    expect(html).not.toContain("sm:text-[")
+    expect(html).not.toContain("lg:text-[")
+    expect(html).not.toMatch(/(?:sm|lg):size-\d/)
+  })
+
+  it("truncates the breadcrumb to one line instead of wrapping it", () => {
+    const html = header()
+
+    // flex-nowrap on the list — twMerge drops the primitive's flex-wrap for it,
+    // so `flex-nowrap` lands last and `flex-wrap` is gone from the output.
+    expect(html).toContain(
+      'class="flex items-center gap-1.5 text-sm wrap-break-word text-muted-foreground flex-nowrap"'
+    )
+    expect(html).not.toContain("flex-wrap")
+    // min-w-0 on the nav and the last item: a flex item's default min-width:auto
+    // refuses to shrink below its content, so without these the ellipsis can
+    // never engage.
+    expect(html).toContain('data-slot="breadcrumb" class="min-w-0"')
+    expect(html).toContain(
+      'data-slot="breadcrumb-item" class="inline-flex items-center gap-1 min-w-0"'
+    )
+    // truncate on the page itself, which is what renders the ellipsis.
+    expect(html).toContain(
+      'class="text-foreground min-w-0 truncate font-medium"'
+    )
+  })
+
+  it("keeps the desktop anatomy and the action exactly where they were", () => {
+    const html = header()
+
+    // The action stays top-right in the breadcrumb row, label intact, and the
+    // breadcrumb sits above the title rather than beside it.
+    expect(html).toContain("Nouvelle demande")
+    expect(html.indexOf("Nouvelle demande")).toBeLessThan(
+      html.indexOf("Tableau de bord</h1>")
+    )
+    // Untouched by #254: the 44px mobile touch targets and the mt-6 rhythm.
+    expect(html).toContain('class="mt-6 flex items-center gap-4"')
+    expect(html).toContain("size-6 text-primary")
+  })
+})
