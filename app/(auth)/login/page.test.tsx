@@ -165,11 +165,28 @@ describe("LoginForm (Cloudflare single-column restyle, #245)", () => {
     expect(html).toContain("Application de gestion des demandes de déplacement")
   })
 
-  it("honours the dark theme instead of hardcoding a white surface", async () => {
+  it("honours the dark theme with page-specific rules, not a white surface", async () => {
     const html = await renderLoginForm({ connexionGoogle: true })
 
-    expect(html).toContain("dark:")
-    expect(html).not.toContain('className="relative min-h-dvh bg-white')
+    // The page's OWN dark rules.  Asserting a bare "dark:" would pass on the
+    // Button's base `dark:aria-invalid:*` variants and prove nothing.
+    expect(html).toContain("dark:bg-slate-100")
+    expect(html).toContain("dark:bg-background")
+    // The surface is a theme token, not the hardcoded white the old form
+    // column carried.  (No `bg-white` negative here: the CTA legitimately
+    // carries `dark:hover:bg-white`.  A `className=` assertion would also be
+    // vacuous — renderToStaticMarkup emits `class=`.)
+    expect(html).toContain("bg-muted/40")
+  })
+
+  it("ticks remember-me by default, so the default sign-in stays long-lived", async () => {
+    const html = await renderLoginForm({ connexionGoogle: true })
+
+    // The engine's sign-in schema is `rememberMe: z.boolean().default(true)`
+    // and it calls `createSession(userId, rememberMe === false)`.  A box that
+    // rendered unticked would send `false` and silently drop every session —
+    // and the setup wizard's — from long-lived to 24h.
+    expect(html).toMatch(/type="checkbox"[^>]*checked/)
   })
 })
 

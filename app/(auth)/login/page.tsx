@@ -121,7 +121,11 @@ export function LoginForm({
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
-  const [rememberMe, setRememberMe] = useState(false)
+  // Checked by default, and that is a behaviour decision, not a default of
+  // convenience: the engine remembers a session unless it is told not to, so
+  // ticking this box reproduces what every sign-in did before #245.  Unticking
+  // it is the deliberate act that shortens the session to 24h.
+  const [rememberMe, setRememberMe] = useState(true)
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<CredentialErrors>({})
 
@@ -201,11 +205,7 @@ export function LoginForm({
                 Continuer avec Google
               </Button>
 
-              <div
-                className="my-5 flex items-center gap-3"
-                role="separator"
-                aria-hidden="true"
-              >
+              <div className="my-5 flex items-center gap-3" role="separator">
                 <span className="h-px flex-1 bg-border" />
                 <span className="text-[11px] tracking-[0.06em] text-muted-foreground uppercase">
                   ou
