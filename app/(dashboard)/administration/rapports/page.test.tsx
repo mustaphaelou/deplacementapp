@@ -170,6 +170,48 @@ describe("Rapports page", () => {
     expect(html).toContain("tabular-nums")
   })
 
+  // The shared stat component (#255). All three consumers — home, profile and
+  // reports — render this one component, so pinning it here pins it for all
+  // three. NOTE: `rounded-lg` already resolved to 3px in this app
+  // (`--radius: 0.1875rem`, and `.rounded-lg` emits `border-radius: var(--radius)`),
+  // so the radius swap is a no-op at render time. The class is now explicit and
+  // theme-proof rather than dependent on the radius scale staying at 3px.
+  // The value weight is the part that actually changes the type.
+  it("renders the shared stat row in the app's 3px palette, with a quietened value", async () => {
+    const { getAuthUser } = await import("@/lib/auth/server")
+    const {
+      countDemandes: mockCountDemandes,
+      aggregateBudget: mockAggregateBudget,
+    } = await import("@/lib/demande")
+
+    ;(getAuthUser as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser())
+    ;(mockCountDemandes as ReturnType<typeof vi.fn>).mockImplementation(
+      resolveCount
+    )
+    ;(mockAggregateBudget as ReturnType<typeof vi.fn>).mockResolvedValue(45000)
+
+    const { default: RapportsPage } = await import("./page")
+    const html = renderToStaticMarkup(await RapportsPage())
+
+    // The app's 3px radius, spelled the way every other surface spells it.
+    // Scoped to the stat tile's own class run: the CSV action button legitimately
+    // keeps its `rounded-lg` button variant, so a bare `rounded-lg` assertion
+    // over the whole page would fail on the wrong element.
+    expect(html).toContain(
+      'class="flex size-11 shrink-0 items-center justify-center rounded-[3px] bg-primary/10 text-primary'
+    )
+    expect(html).not.toContain(
+      "size-11 shrink-0 items-center justify-center rounded-lg"
+    )
+    // The value is quietened to the shell's secondary weight; the digits stay
+    // tabular so they still align.
+    expect(html).toContain("text-2xl font-medium tracking-tight tabular-nums")
+    expect(html).not.toContain("text-2xl font-semibold")
+    // Still borderless, per #175 — no card chrome crept back in.
+    expect(html).not.toContain('data-slot="card"')
+    expect(html).not.toContain("shadow-sm")
+  })
+
   it("redirects when role is not authorised", async () => {
     const { getAuthUser } = await import("@/lib/auth/server")
     const { redirect } = await import("next/navigation")

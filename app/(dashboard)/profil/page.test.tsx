@@ -92,7 +92,11 @@ describe("Profil page", () => {
     const html = await renderPage()
 
     expect(html).toContain("Demandes")
-    expect(html).toContain("text-2xl font-semibold")
+    // The stat value's weight moved from semibold to the shell's secondary
+    // medium in #255; the row stays borderless. This pin followed the spec
+    // change rather than asserting a weight the spec retired.
+    expect(html).toContain("text-2xl font-medium tracking-tight tabular-nums")
+    expect(html).toContain("rounded-[3px] bg-primary/10")
     expect(html).not.toContain('data-slot="card"')
   })
 
