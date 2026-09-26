@@ -180,6 +180,19 @@ describe("Demandes list page — the shared page header", () => {
     const { default: DemandesListPage } = await import("./page")
     const html = renderToStaticMarkup(<DemandesListPage />)
 
-    expect(html).toContain("Demandes</h1>")
+    // This asserts the page's OWN trail rendered through the module, not that
+    // an <h1> exists somewhere: a hand-inlined header satisfies a title
+    // assertion and is exactly the regression #261 removed. The breadcrumb
+    // truncation contract (nowrap list, shrinkable last item, truncate on the
+    // page element) is the module's marker — a copy would have to reproduce
+    // all three to pass.
+    // The three-item trail is this page's own, and #262's acceptance criterion
+    // for it: one separator per crumb, last item in page treatment.
+    expect(html).toContain(">Espace</span>")
+    expect(html).toContain(">Demandes de déplacement</span>")
+    expect(html.match(/data-slot="breadcrumb-separator"/g)).toHaveLength(2)
+    expect(html).toContain(
+      'class="text-foreground min-w-0 truncate font-medium">'
+    )
   })
 })

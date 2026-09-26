@@ -350,6 +350,21 @@ describe("DashboardLayout — the shared page header", () => {
       <DashboardLayout config={CONFIG} navItems={NAV_ITEMS} demandes={[]} />
     )
 
-    expect(html).toContain("Tableau de bord</h1>")
+    // This asserts the page's OWN trail rendered through the module, not that
+    // an <h1> exists somewhere: a hand-inlined header satisfies a title
+    // assertion and is exactly the regression #261 removed. The breadcrumb
+    // truncation contract (nowrap list, shrinkable last item, truncate on the
+    // page element) is the module's marker — a copy would have to reproduce
+    // all three to pass.
+    // The layout's own trail, plus the CTA it configures — the one call site
+    // that already carried gap-4, so the row keeps the module's form.
+    expect(html).toContain(">Espace</span>")
+    expect(html).toContain(
+      'class="text-foreground min-w-0 truncate font-medium">Tableau de bord</span>'
+    )
+    expect(html).toContain(
+      '<div class="flex items-center justify-between gap-4">'
+    )
+    expect(html).toContain("Nouvelle demande")
   })
 })

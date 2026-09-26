@@ -59,9 +59,11 @@ export function PageHeader({
   return (
     <div>
       {/* gap-4 is a minimum separation between the trail and the action, so it
-          only binds when the row is full. Two of the ten call sites carried it
-          and eight did not; keeping it here is the form that holds in the
-          tight case those two were defending. */}
+          only binds once the row is full — and a full row is exactly the case
+          the breadcrumb's truncate rules exist for. Of the nine call sites this
+          module replaced, one (the dashboard layout) already carried it and
+          eight did not, so keeping it here is inert for the other eight until
+          their row goes tight, and is the form that held where it already was. */}
       <div className="flex items-center justify-between gap-4">
         <Breadcrumb className="min-w-0">
           <BreadcrumbList className="flex-nowrap">
