@@ -10,14 +10,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { DateRangePicker } from "@/components/ui/date-range-picker"
 import { CityCombobox } from "@/components/ui/city-combobox"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
-import Link from "next/link"
+import { PageHeader } from "@/components/page-header"
 import { cn } from "@/lib/utils"
 import {
   Loader2,
@@ -124,50 +117,16 @@ export function DemandeForm() {
 
   return (
     <div className="mx-auto w-full max-w-[720px] pb-8">
-      {/* Page header */}
-      <div>
-        <div className="flex items-center justify-between">
-          {/* #258: the reference #254 breadcrumb block, verbatim — min-w-0 on
-              the nav and the last item (a flex item's default min-width:auto
-              refuses to shrink below its content), flex-nowrap so the list
-              cannot break across lines, truncate on the page to ellipsise.
-              twMerge drops the primitive's flex-wrap for flex-nowrap. */}
-          <Breadcrumb className="min-w-0">
-            <BreadcrumbList className="flex-nowrap">
-              <BreadcrumbItem>
-                <span>Espace</span>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <Link href="/demandes" className="transition-colors hover:text-foreground">
-                  Demandes de déplacement
-                </Link>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem className="min-w-0">
-                <BreadcrumbPage className="min-w-0 truncate font-medium">
-                  Nouvelle Demande
-                </BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
-        </div>
-        <div className="mt-6 flex items-center gap-4">
-          {/* #258: 40px tile on a phone, 48px from md: up. */}
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-[3px] bg-primary/10 md:size-12">
-            <MapPin className="size-6 text-primary" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-[24px] leading-tight font-bold tracking-[-0.01em] md:text-[40px]">
-              Nouvelle Demande
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Renseignez les informations du déplacement. Certains champs
-              peuvent être pré-remplis automatiquement.
-            </p>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        crumbs={[
+          "Espace",
+          { label: "Demandes de déplacement", href: "/demandes" },
+          "Nouvelle Demande",
+        ]}
+        title="Nouvelle Demande"
+        subtitle="Renseignez les informations du déplacement. Certains champs peuvent être pré-remplis automatiquement."
+        icon={MapPin}
+      />
 
       <form className="mt-10 space-y-10">
         {/* Motif & contexte */}

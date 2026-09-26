@@ -6,13 +6,7 @@ import { formatCurrency } from "@/lib/constants"
 import { ETAPE_LABELS } from "@/lib/demande-presentation"
 import { DashboardCard } from "@/components/ui/dashboard-card"
 import { Button } from "@/components/ui/button"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
+import { PageHeader } from "@/components/page-header"
 import {
   Tooltip,
   TooltipContent,
@@ -53,25 +47,14 @@ export default async function RapportsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <div className="flex items-center justify-between">
-          {/* #258: the #254 reference block, verbatim — min-w-0 on the nav and
-              the last item, flex-nowrap so the list cannot break across lines,
-              truncate on the page to ellipsise. twMerge drops the primitive's
-              flex-wrap for flex-nowrap. */}
-          <Breadcrumb className="min-w-0">
-            <BreadcrumbList className="flex-nowrap">
-              <BreadcrumbItem>
-                <span>Administration</span>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem className="min-w-0">
-                <BreadcrumbPage className="min-w-0 truncate font-medium">
-                  Rapports
-                </BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
+      {/* #261: the header geometry and the breadcrumb markup live in the
+          shared module; the page passes only what varies. */}
+      <PageHeader
+        crumbs={["Administration", "Rapports"]}
+        title="Rapports"
+        subtitle="Vue d'ensemble des demandes de déplacement"
+        icon={BarChart}
+        action={
           <Tooltip>
             <TooltipTrigger
               render={
@@ -87,22 +70,8 @@ export default async function RapportsPage() {
             />
             <TooltipContent>Exporter en CSV</TooltipContent>
           </Tooltip>
-        </div>
-        <div className="mt-6 flex items-center gap-4">
-          {/* #258: 40px tile on a phone, 48px from md: up. */}
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-[3px] bg-primary/10 md:size-12">
-            <BarChart className="size-6 text-primary" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-[24px] leading-tight font-bold tracking-[-0.01em] md:text-[40px]">
-              Rapports
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Vue d&apos;ensemble des demandes de déplacement
-            </p>
-          </div>
-        </div>
-      </div>
+        }
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <DashboardCard
