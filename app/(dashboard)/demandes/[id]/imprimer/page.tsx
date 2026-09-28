@@ -11,9 +11,10 @@ import {
 } from "@/lib/constants"
 import {
   toDemandePresentation,
+  toDemandeDocumentView,
   TRANSPORT_LABELS,
 } from "@/lib/demande-presentation"
-import { parseMotif, type DemandeWithRelations } from "@/lib/demande-types"
+import type { DemandeWithRelations } from "@/lib/demande-types"
 
 export default async function ImprimerPage({
   params,
@@ -35,7 +36,10 @@ export default async function ImprimerPage({
     throw e
   }
 
-  const motifs = parseMotif(demande.motif)
+  // The document projection is the one home of the labelled Motif list: the
+  // stored values are slugs, and the projection maps each through the label
+  // vocabulary (an « Autre » free-text entry comes out verbatim).
+  const { motifs } = toDemandeDocumentView(demande)
   const presentation = toDemandePresentation(demande)
   const societe = await getSocieteBranding()
   const societeNom = societe?.nom ?? DEFAULT_SOCIETE_NOM
