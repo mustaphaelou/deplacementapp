@@ -249,7 +249,7 @@ export function TravelRequestPdf({ data }: { data: PdfRenderData }) {
 
           <View style={styles.fieldFull}>
             <Text style={styles.fieldLabel}>Motif du deplacement</Text>
-            <Text style={styles.fieldValue}>{data.motif.join(", ")}</Text>
+            <Text style={styles.fieldValue}>{data.motifsLabels.join(", ")}</Text>
           </View>
 
           <View style={styles.field}>

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { NextRequest } from "next/server"
 import type { DemandeWithRelations } from "@/lib/demande-types"
 import { DemandeNotFoundError, PdfRenderError } from "@/lib/errors"
+import { STORED_MOTIF_JSON } from "@/lib/test/demande-motif-fixtures"
 
 vi.mock("@/lib/auth/server", () => ({
   requireAuth: vi.fn(),
@@ -44,7 +45,7 @@ const mockDemande: DemandeWithRelations = {
   employePrenom: "Jean",
   employePoste: "Développeur",
   employeDepartement: "IT",
-  motif: '["Réunion client"]',
+  motif: STORED_MOTIF_JSON,
   dateDepart: new Date("2025-06-01"),
   dateRetour: new Date("2025-06-05"),
   destination: "Casablanca",

@@ -1,6 +1,14 @@
 import { describe, it, expect } from "vitest"
 import { TravelRequestPdfAdapter } from "./travel-request-pdf-adapter"
 import type { PdfRenderData } from "@/lib/pdf-types"
+import { toDemandeDocumentView } from "@/lib/demande-presentation"
+import {
+  MOTIF_CANONICAL_LABEL,
+  MOTIF_CANONICAL_SLUG,
+  MOTIF_FREE_TEXT,
+  MOTIF_LABELS_EXPECTED,
+  STORED_MOTIF_JSON,
+} from "@/lib/test/demande-motif-fixtures"
 
 function makePdfRenderData(overrides?: Partial<PdfRenderData>): PdfRenderData {
   return {
@@ -11,7 +19,7 @@ function makePdfRenderData(overrides?: Partial<PdfRenderData>): PdfRenderData {
     employePrenom: "Jean",
     employePoste: "Développeur",
     employeDepartement: "IT",
-    motif: ["Réunion client"],
+    motifsLabels: [...MOTIF_LABELS_EXPECTED],
     dateDepart: new Date("2025-06-01"),
     dateRetour: new Date("2025-06-05"),
     destination: "Casablanca",
@@ -64,5 +72,29 @@ describe("TravelRequestPdfAdapter", () => {
 
     expect(Buffer.isBuffer(buffer)).toBe(true)
     expect(buffer.length).toBeGreaterThan(0)
+  })
+
+  // The renderer's own job is to print what it is handed. The fixture is
+  // therefore seeded from the shared Motif fixtures at the shape the document
+  // projection produces — French labels, no stored slug — so the adapter
+  // cannot be handed a shape the mapper never emits, and so a slug here would
+  // be a visible failure rather than a silent pass.
+  it("is seeded with the labels the document projection produces", () => {
+    const view = toDemandeDocumentView({
+      motif: STORED_MOTIF_JSON,
+      typeTransport: "AVION",
+      etape: "MANAGER_REVIEW",
+      decision: "APPROVED",
+    })
+
+    expect(makePdfRenderData().motifsLabels).toEqual(view.motifs)
+    expect(makePdfRenderData().motifsLabels).toEqual([
+      MOTIF_CANONICAL_LABEL,
+      MOTIF_FREE_TEXT,
+    ])
+  })
+
+  it("is never handed a stored Motif slug", () => {
+    expect(makePdfRenderData().motifsLabels).not.toContain(MOTIF_CANONICAL_SLUG)
   })
 })

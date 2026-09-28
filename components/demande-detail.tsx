@@ -13,9 +13,9 @@ import {
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/constants"
 import {
   toDemandePresentation,
+  toDemandeDocumentView,
   TRANSPORT_LABELS,
 } from "@/lib/demande-presentation"
-import { parseMotif } from "@/lib/demande-types"
 import type { DemandeDetail } from "@/lib/demande-types"
 import {
   CheckCircle,
@@ -81,7 +81,11 @@ export function DemandeDetail({
     handleDownloadPdf,
   } = useDemandeActions(demande.id, demande.numero)
 
-  const motifs = parseMotif(demande.motif)
+  // The Motifs are read from the document projection, not from the storage
+  // decoder: the stored values are slugs, and only the projection knows the
+  // French label each one carries. A « Autre » entry, absent from the label
+  // map, still comes out verbatim through the projection's fallback.
+  const { motifs } = toDemandeDocumentView(demande)
 
   const presentation = toDemandePresentation(demande)
   const isRejected = presentation.decision.outcome === "rejected"
