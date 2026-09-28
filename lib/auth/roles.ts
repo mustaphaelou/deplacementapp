@@ -20,15 +20,41 @@ export interface NavItem {
   description: string
 }
 
-export const NAV_ITEMS: Record<string, NavItem[]> = {
-  common: [
-    {
-      label: "Tableau de bord",
-      href: "/",
-      icon: "bar-chart-3",
-      description: "Vue d'ensemble et statistiques",
-    },
-  ],
+// The administration block: the four /administration surfaces, declared ONCE.
+// Which Roles see it is not written here — it is ROLES_MANAGEMENT's to say, so
+// a Utilisateur is offered exactly what the guards admit (#285).
+export const NAV_ADMINISTRATION: readonly NavItem[] = [
+  {
+    label: "Société",
+    href: "/administration/societe",
+    icon: "building",
+    description: "Paramètres de la société",
+  },
+  {
+    label: "Utilisateurs",
+    href: "/administration/utilisateurs",
+    icon: "users",
+    description: "Gestion des comptes et rôles",
+  },
+  {
+    label: "Véhicules",
+    href: "/administration/vehicules",
+    icon: "car",
+    description: "Gestion du parc automobile",
+  },
+  {
+    label: "Rapports",
+    href: "/administration/rapports",
+    icon: "bar-chart-3",
+    description: "Statistiques et exports",
+  },
+]
+
+// The pipeline lanes « Mes Demandes », « Nouvelle Demande », « Demandes Équipe »,
+// « En Attente », « Approbations Budget » and « Approbations Finales » with their
+// ?etape=…&decision=PENDING queue links. These belong to the workflow module, not
+// to the management set, so they stay hand-written per Role and unchanged.
+export const NAV_LANES: Record<Role, NavItem[]> = {
   EMPLOYEE: [
     {
       label: "Mes Demandes",
@@ -64,30 +90,6 @@ export const NAV_ITEMS: Record<string, NavItem[]> = {
       icon: "dollar-sign",
       description: "Validation budgétaire des demandes",
     },
-    {
-      label: "Société",
-      href: "/administration/societe",
-      icon: "building",
-      description: "Paramètres de la société",
-    },
-    {
-      label: "Utilisateurs",
-      href: "/administration/utilisateurs",
-      icon: "users",
-      description: "Gestion des comptes et rôles",
-    },
-    {
-      label: "Véhicules",
-      href: "/administration/vehicules",
-      icon: "car",
-      description: "Gestion du parc automobile",
-    },
-    {
-      label: "Rapports",
-      href: "/administration/rapports",
-      icon: "bar-chart-3",
-      description: "Statistiques et exports",
-    },
   ],
   GENERAL_DIRECTION: [
     {
@@ -96,11 +98,27 @@ export const NAV_ITEMS: Record<string, NavItem[]> = {
       icon: "check-circle",
       description: "Validation finale des demandes",
     },
+  ],
+}
+
+/** The lanes a Role owns, then the administration block the declared set admits. */
+function navItemsForRole(role: Role): NavItem[] {
+  return [
+    ...NAV_LANES[role],
+    ...(ROLES_MANAGEMENT.includes(role) ? NAV_ADMINISTRATION : []),
+  ]
+}
+
+export const NAV_ITEMS: Record<string, NavItem[]> = {
+  common: [
     {
-      label: "Rapports",
-      href: "/administration/rapports",
+      label: "Tableau de bord",
+      href: "/",
       icon: "bar-chart-3",
-      description: "Statistiques et exports",
+      description: "Vue d'ensemble et statistiques",
     },
   ],
+  ...Object.fromEntries(
+    Object.keys(NAV_LANES).map((role) => [role, navItemsForRole(role as Role)])
+  ),
 }
