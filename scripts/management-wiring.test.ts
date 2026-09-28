@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest"
 import { readFileSync, readdirSync, statSync } from "node:fs"
 import { dirname, join, relative } from "node:path"
 import { fileURLToPath } from "node:url"
+import { ROLES_MANAGEMENT } from "../lib/auth/roles"
 
 /**
  * The wiring check for spec #281 / ticket #286.
@@ -35,6 +36,15 @@ import { fileURLToPath } from "node:url"
  * allowlist nobody can extend silently is the only kind that still means
  * something — and each entry cites the spec clause that puts the site out of
  * scope.
+ *
+ * SCOPE, stated honestly: the backward walk covers `app/` only. A
+ * administration surface that lands in `lib/` (a server action, a shared
+ * route helper) would be invisible to it. Nothing escapes today — the repo
+ * has no `"use server"` file and no middleware Role gate — and the surfaces
+ * the set governs are all routes and pages. If a server action is ever
+ * introduced, widen `appFiles` to cover `lib/` (or add those files to
+ * ADMINISTRATION_SURFACES explicitly) in the same change. The claim this file
+ * makes is « an omission under app/ is loud », and that is the claim it keeps.
  */
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
@@ -115,11 +125,66 @@ function* appFiles(dir: string): Generator<string> {
   }
 }
 
-/** Strip comments, so a comment explaining the rule may quote a Role name. */
-const code = (source: string): string =>
-  source
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/\/\/[^\n]*/g, "")
+/**
+ * Strip comments, so a comment explaining the rule may quote a Role name.
+ *
+ * A single pass that tracks string state, NOT a regex. A regex stripper
+ * cannot tell a comment from a `//` that lives inside a string literal, so
+ * `requireRole(auth, "https://x/FINANCE_ADMIN")` had the rest of its line —
+ * Role included — deleted as if it were a comment, and the surface passed.
+ * (Found by live injection.) Here a `//` inside quotes is just a character.
+ */
+function code(source: string): string {
+  let out = ""
+  let i = 0
+  // Which string delimiter we are inside, or null. `undefined` would be
+  // ambiguous with "not in a string" being falsy-checked below.
+  let quote: '"' | "'" | "`" | null = null
+
+  while (i < source.length) {
+    const char = source[i]!
+
+    if (quote) {
+      // A backslash escapes the next character inside a string, so an
+      // escaped quote does not close it.
+      if (char === "\\") {
+        out += source.slice(i, i + 2)
+        i += 2
+        continue
+      }
+      if (char === quote) quote = null
+      out += char
+      i += 1
+      continue
+    }
+
+    if (char === '"' || char === "'" || char === "`") {
+      quote = char
+      out += char
+      i += 1
+      continue
+    }
+
+    // Line comment.
+    if (char === "/" && source[i + 1] === "/") {
+      while (i < source.length && source[i] !== "\n") i += 1
+      continue
+    }
+
+    // Block comment.
+    if (char === "/" && source[i + 1] === "*") {
+      const end = source.indexOf("*/", i + 2)
+      i = end === -1 ? source.length : end + 2
+      // Keep the newlines so line-based reporting stays aligned.
+      continue
+    }
+
+    out += char
+    i += 1
+  }
+
+  return out
+}
 
 // Two forms on purpose. The global one is for `match()` (which needs /g to
 // collect every occurrence); the plain one is for `test()`, which on a /g
@@ -355,6 +420,42 @@ describe("the wiring check fails when it should", () => {
     )
   })
 
+  it("catches a Role hidden behind a // inside a string literal", () => {
+    // The second live-injection false negative: the regex stripper deleted
+    // everything after `//` to end-of-line, so a Role inside a URL string was
+    // removed along with the "comment" and the surface passed. A `//` inside
+    // quotes is a character, not a comment.
+    const defect = `
+      export const PATCH = async () => {
+        return requireRole(auth, "https://example.test/FINANCE_ADMIN")
+      }
+    `
+    // The Role SURVIVES comment-stripping — that is the whole point. (It does
+    // not match ROLE_LITERAL, which wants a standalone quoted token; this rule
+    // is about the stripper deleting it, not about a second matcher finding
+    // it.)
+    expect(code(defect)).toContain("FINANCE_ADMIN")
+
+    // A standalone Role literal after a // in a string is the stronger form,
+    // and this is the one the surface rule can act on:
+    const standalone = `
+      export const PATCH = async () => {
+        return requireRole(auth, "https://example.test/" + "FINANCE_ADMIN")
+      }
+    `
+    expect(code(standalone).match(ROLE_LITERAL_G)).toEqual(['"FINANCE_ADMIN"'])
+  })
+
+  it("still strips a real comment that mentions a Role", () => {
+    const withComment = `
+      // Historically this was reserved to FINANCE_ADMIN (see ADR-0012).
+      export const PATCH = async () => requireAnyRole(auth, ROLES_MANAGEMENT)
+    `
+    // match() yields null, not [], when nothing matches.
+    expect(code(withComment).match(ROLE_LITERAL_G) ?? []).toEqual([])
+    expect(asksTheSet(withComment)).toBe(true)
+  })
+
   it("catches a surface that names the set ONLY in a comment", () => {
     // The live-injection false negative: a local `peutGerer()` wrapper
     // re-derives the answer in code, while a comment above it explains the
@@ -386,13 +487,7 @@ describe("the wiring check fails when it should", () => {
   })
 })
 
-/** The set itself, so the hybrid rule above is checked against the real one. */
-function ROLES_MANAGEMENT_FOR_TEST(): readonly string[] {
-  const roles = readFileSync(join(REPO_ROOT, "lib/auth/roles.ts"), "utf8")
-  const block = roles.match(
-    /ROLES_MANAGEMENT:\s*readonly Role\[\]\s*=\s*\[([^\]]*)\]/,
-  )
-  if (!block) throw new Error("ROLES_MANAGEMENT not declared in lib/auth/roles.ts")
-  return [...block[1].matchAll(/["'`]([A-Z_]+)["'`]/g)].map((m) => m[1])
-}
-const ROLES_MANAGEMENT = ROLES_MANAGEMENT_FOR_TEST()
+// Imported, not re-read. An earlier version regex-parsed the declaration out
+// of lib/auth/roles.ts as text — a SECOND, textual reading of the set, which
+// is the same defect class this spec exists to remove, one level up. The
+// literal pin on the set itself lives in lib/auth/roles.test.ts.

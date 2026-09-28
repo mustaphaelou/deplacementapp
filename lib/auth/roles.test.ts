@@ -82,6 +82,22 @@ describe("NAV_ITEMS — the administration block comes from the declared set", (
     }
   })
 
+  // #285 asks the block to be derived from the set, and it is — but deriving
+  // BOTH sides of the assertion above from NAV_ADMINISTRATION means the block's
+  // own membership was unpinned: deleting the « Société » entry left every
+  // suite green (verified by injection), which is the omission this spec
+  // exists to make loud, on the one surface #284 widened. So the membership is
+  // pinned here, literally — this list is the four /administration surfaces
+  // the guards govern, and a fifth or a missing one is a deliberate edit.
+  it("holds exactly the four administration surfaces the guards govern", () => {
+    expect(NAV_ADMINISTRATION.map((item) => item.href)).toEqual([
+      "/administration/societe",
+      "/administration/utilisateurs",
+      "/administration/vehicules",
+      "/administration/rapports",
+    ])
+  })
+
   // Non-vacuity: a set that admitted nothing, or a block that had been emptied,
   // would satisfy the assertion above while offering nobody anything.
   it("has an administration block to admit, and admits it to more than nobody", () => {
