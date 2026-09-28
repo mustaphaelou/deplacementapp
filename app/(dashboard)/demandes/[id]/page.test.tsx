@@ -2,11 +2,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { renderToStaticMarkup } from "react-dom/server"
 import type { DemandeDetail } from "@/lib/demande-types"
 import {
-  MOTIF_STOCKE,
-  LIBELLE_MOTIF_SLUG,
-  MOTIF_SLUG,
-  MOTIF_LIBRE,
-  MOTIFS_AFFICHES_TEXTE,
+  STORED_MOTIF_JSON,
+  MOTIF_CANONICAL_LABEL,
+  MOTIF_CANONICAL_SLUG,
+  MOTIF_FREE_TEXT,
+  MOTIF_LABELS_EXPECTED_TEXT,
 } from "@/lib/test/demande-motif-fixtures"
 
 vi.mock("@/lib/auth/server", () => ({
@@ -44,7 +44,7 @@ const mockDemande: DemandeDetail = {
   // Production-shaped: a canonical slug plus an « Autre » free-text entry,
   // exactly as lib/demande/mutations.ts writes them. Seeding a stored literal
   // instead would read identically labelled or unlabelled, and hide the defect.
-  motif: MOTIF_STOCKE,
+  motif: STORED_MOTIF_JSON,
   dateDepart: "2025-06-01",
   dateRetour: "2025-06-05",
   destination: "Casablanca",
@@ -299,8 +299,8 @@ describe("Demande detail page — the Motif list comes from the projection", () 
   it("renders the French label of a stored slug, not the slug", async () => {
     const html = await renderPage()
 
-    expect(motifCell(html)).toContain(LIBELLE_MOTIF_SLUG)
-    expect(motifCell(html)).not.toContain(MOTIF_SLUG)
+    expect(motifCell(html)).toContain(MOTIF_CANONICAL_LABEL)
+    expect(motifCell(html)).not.toContain(MOTIF_CANONICAL_SLUG)
   })
 
   it("renders an « Autre » free-text entry verbatim", async () => {
@@ -309,13 +309,13 @@ describe("Demande detail page — the Motif list comes from the projection", () 
     // It is absent from MOTIF_LABELS: the projection's fallback carries it
     // through untouched, and the page must do the same — never blank, never
     // prettified.
-    expect(motifCell(html)).toContain(MOTIF_LIBRE)
+    expect(motifCell(html)).toContain(MOTIF_FREE_TEXT)
   })
 
   it("lists every motif in the stored order, joined", async () => {
     const html = await renderPage()
 
-    expect(motifCell(html)).toBe(MOTIFS_AFFICHES_TEXTE)
+    expect(motifCell(html)).toBe(MOTIF_LABELS_EXPECTED_TEXT)
   })
 
   it("shows the raw stored JSON nowhere on the page", async () => {
@@ -324,8 +324,8 @@ describe("Demande detail page — the Motif list comes from the projection", () 
     // A surface that forgot to decode at all would leak the column value; the
     // projection renders labels, so neither the encoded list nor the slug is
     // on screen.
-    expect(html).not.toContain(MOTIF_STOCKE)
-    expect(html).not.toContain(MOTIF_SLUG)
+    expect(html).not.toContain(STORED_MOTIF_JSON)
+    expect(html).not.toContain(MOTIF_CANONICAL_SLUG)
   })
 })
 

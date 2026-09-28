@@ -1,5 +1,6 @@
 import type { PdfRenderData } from "./pdf-types"
-import { parseMotif, type DemandeWithRelations } from "./demande-types"
+import { type DemandeWithRelations } from "./demande-types"
+import { toDemandeDocumentView } from "./demande-presentation"
 import type { SocieteBranding } from "./societe"
 
 function toNumber(value: unknown): number {
@@ -17,6 +18,8 @@ export function toPdfRenderData(
   demande: DemandeWithRelations,
   branding: SocieteBranding | null = null
 ): PdfRenderData {
+  const view = toDemandeDocumentView(demande)
+
   return {
     numero: demande.numero,
     etape: demande.etape,
@@ -25,7 +28,7 @@ export function toPdfRenderData(
     employePrenom: demande.employePrenom,
     employePoste: demande.employePoste,
     employeDepartement: demande.employeDepartement,
-    motif: parseMotif(demande.motif),
+    motifsLabels: view.motifs,
     dateDepart: demande.dateDepart,
     dateRetour: demande.dateRetour,
     destination: demande.destination,
