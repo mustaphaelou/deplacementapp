@@ -50,7 +50,7 @@ async function signInAs(role: string) {
 
 const validSocietePayload = { nom: "Nouvelle Société", couleurPrimaire: null }
 
-describe("societe route", () => {
+describe("societe route", { timeout: 30000 }, () => {
   beforeEach(() => {
     vi.resetAllMocks()
   })

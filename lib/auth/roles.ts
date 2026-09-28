@@ -115,7 +115,11 @@ export const NAV_LANES: Record<Role, NavItem[]> = {
 function navItemsForRole(role: Role): NavItem[] {
   return [
     ...NAV_LANES[role],
-    ...(ROLES_MANAGEMENT.includes(role) ? NAV_ADMINISTRATION : []),
+    // The predicate, not `ROLES_MANAGEMENT.includes(role)` inlined: the
+    // Demandes page was moved off that hand-rolled shape in #286, and the
+    // navigation asking the same question by hand would be the second
+    // spelling #281 removed.
+    ...(hasAnyRole(role, ROLES_MANAGEMENT) ? NAV_ADMINISTRATION : []),
   ]
 }
 
