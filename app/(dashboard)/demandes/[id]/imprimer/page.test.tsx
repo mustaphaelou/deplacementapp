@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
+import { renderToStaticMarkup } from "react-dom/server"
 import { DemandeNotFoundError } from "@/lib/errors"
 import type { DemandeWithRelations } from "@/lib/demande-types"
+import {
+  MOTIF_STOCKE,
+  LIBELLE_MOTIF_SLUG,
+  MOTIF_SLUG,
+  MOTIF_LIBRE,
+  MOTIFS_AFFICHES_TEXTE,
+} from "@/lib/test/demande-motif-fixtures"
 
 vi.mock("@/lib/auth/server", () => ({
   getAuthUser: vi.fn(),
@@ -35,7 +43,10 @@ const mockDemande: DemandeWithRelations = {
   employePrenom: "Jean",
   employePoste: "Développeur",
   employeDepartement: "IT",
-  motif: '["Réunion client"]',
+  // Production-shaped: a canonical slug plus an « Autre » free-text entry,
+  // exactly as lib/demande/mutations.ts writes them. Seeding a stored literal
+  // instead would read identically labelled or unlabelled, and hide the defect.
+  motif: MOTIF_STOCKE,
   dateDepart: new Date("2025-06-01"),
   dateRetour: new Date("2025-06-05"),
   destination: "Casablanca",
@@ -127,6 +138,35 @@ function collectText(node: unknown): string {
     return collectText((node as { props: { children: unknown } }).props.children)
   }
   return ""
+}
+
+/**
+ * Render the page against the mocks and return its static markup. The Motif
+ * assertions below read the rendered output rather than the element tree, so
+ * they fail the way a reader of the printed form would see them.
+ */
+async function renderPage(demande: DemandeWithRelations = mockDemande) {
+  const { getAuthUser } = await import("@/lib/auth/server")
+  const { findById: mockFindById } = await import("@/lib/demande")
+  const { getSocieteBranding } = await import("@/lib/societe")
+
+  ;(getAuthUser as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser())
+  ;(mockFindById as ReturnType<typeof vi.fn>).mockResolvedValue(demande)
+  ;(getSocieteBranding as ReturnType<typeof vi.fn>).mockResolvedValue(
+    mockBranding()
+  )
+
+  const { default: ImprimerPage } = await import("./page")
+  const element = await ImprimerPage({ params: Promise.resolve({ id: "d-1" }) })
+  return renderToStaticMarkup(element)
+}
+
+/** The value the « Motif(s) » table cell renders, not the whole page. */
+function motifCell(html: string): string {
+  const labelIndex = html.indexOf(">Motif(s)</td>")
+  const start = html.indexOf(">", labelIndex + ">Motif(s)</td>".length) + 1
+  const end = html.indexOf("</td>", start)
+  return html.slice(start, end)
 }
 
 describe("Imprimer page", () => {
@@ -271,5 +311,45 @@ describe("Imprimer page", () => {
     ).rejects.toThrow("NEXT_REDIRECT: /login")
 
     expect(redirect).toHaveBeenCalledWith("/login")
+  })
+})
+
+// #274: the printable form displayed the Motif list straight out of the storage
+// decoder (parseMotif), so the paper form printed raw slugs. The projection
+// (toDemandeDocumentView) is the one home of the labelled list. The suite
+// previously seeded `["Réunion client"]` — a stored literal that reads the same
+// either way — so it could not see the defect; the seed is now production-shaped
+// (a canonical slug + an « Autre » free-text entry), which makes it observable.
+describe("Imprimer page — the Motif list comes from the projection", () => {
+  it("prints the French label of a stored slug, not the slug", async () => {
+    const html = await renderPage()
+
+    expect(motifCell(html)).toContain(LIBELLE_MOTIF_SLUG)
+    expect(motifCell(html)).not.toContain(MOTIF_SLUG)
+  })
+
+  it("prints an « Autre » free-text entry verbatim", async () => {
+    const html = await renderPage()
+
+    // It is absent from MOTIF_LABELS: the projection's fallback carries it
+    // through untouched, and the form must do the same — never blank, never
+    // prettified.
+    expect(motifCell(html)).toContain(MOTIF_LIBRE)
+  })
+
+  it("prints every motif in the stored order, joined", async () => {
+    const html = await renderPage()
+
+    expect(motifCell(html)).toBe(MOTIFS_AFFICHES_TEXTE)
+  })
+
+  it("prints the raw stored JSON nowhere on the form", async () => {
+    const html = await renderPage()
+
+    // A surface that forgot to decode at all would leak the column value; the
+    // projection renders labels, so neither the encoded list nor the slug is
+    // on paper.
+    expect(html).not.toContain(MOTIF_STOCKE)
+    expect(html).not.toContain(MOTIF_SLUG)
   })
 })
