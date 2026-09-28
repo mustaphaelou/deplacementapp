@@ -1,0 +1,85 @@
+name: Frontend Drift Sweep
+
+# The scheduled half of the UI/UX sweep automation. `docker-publish.yml` gates
+# every PR on the same checker; this runs it on a cadence so drift that arrived
+# WITHOUT a PR touching the header still surfaces.
+#
+# It is deliberately its own workflow rather than a scheduled job inside
+# `docker-publish.yml`. A `schedule:` trigger there fires EVERY job in the file,
+# and `publish-check` / `build-and-push` only exclude `pull_request` — so a
+# weekly cron would have pushed images to GHCR (and re-tagged `latest`) every
+# Monday, outside the release ritual ADR-0015 defines. Isolating the sweep keeps
+# the release path exactly as it was.
+#
+# This workflow has no `deploy` job and no registry credentials. It can only
+# read the repo and write a report.
+
+on:
+  schedule:
+    # Mondays 06:37 UTC. Off the hour on purpose: the top-of-hour is the most
+    # contended slot in the shared GitHub Actions scheduler queue.
+    - cron: "37 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Sweep the frontend against the locked UI/UX spec
+        id: drift
+        # Non-fatal by design: this is a REPORT. A scheduled run must not page
+        # anyone or block on a pre-existing finding. The PR gate in
+        # `docker-publish.yml` is what actually blocks a regression.
+        continue-on-error: true
+        run: node scripts/frontend-drift.mjs --census
+
+      - name: Publish the sweep to the run summary
+        if: always()
+        run: |
+          {
+            echo "### Frontend drift sweep"
+            echo ""
+            echo '```'
+            node scripts/frontend-drift.mjs --census || true
+            echo '```'
+            echo ""
+            echo "Rules encode the decisions locked in the #171 Notion direction and closed"
+            echo "in #251. A rule that cannot cite its authority does not belong in the set —"
+            echo "if a finding looks wrong, it probably is: check OUT_OF_SCOPE in"
+            echo "\`scripts/frontend-drift.mjs\` before filing it."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Open a draft issue when the sweep finds drift
+        if: steps.drift.outcome == 'failure'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # De-dupe: a weekly cron that files the same finding every Monday
+          # buries the tracker. Only file when nothing open already mentions it.
+          existing=$(gh issue list --state open --limit 100 \
+            --json title,body --jq '.[] | select((.title + " " + .body) | test("frontend-drift"; "i")) | .title')
+          if [ -n "$existing" ]; then
+            echo "An open issue already tracks a frontend-drift finding; not filing a duplicate:"
+            echo "$existing"
+            exit 0
+          fi
+          gh issue create \
+            --title "Frontend drift sweep found spec regressions" \
+            --label "ready-for-agent" \
+            --body "$(printf 'Automated sweep of \`scripts/frontend-drift.mjs\` reported findings.\n\n```\n%s\n```\n\nRun `npm run frontend:drift` locally for the same output.\n\nBefore acting: each rule is anchored to a decision locked in the #171 Notion\ndirection or closed in #251. If a finding looks wrong, it probably is — check\nOUT_OF_SCOPE / ALLOWLIST in the script before changing code. The radius findings\nin particular are usually the remapped scale in `app/globals.css` being read\nwith shadcn defaults, not real drift.\n\n_Opened by the weekly Frontend Drift Sweep workflow._' "$(node scripts/frontend-drift.mjs --census 2>&1 || true)")"

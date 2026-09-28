@@ -41,6 +41,9 @@ jobs:
       - name: Unit tests
         run: npm run test
 
+      - name: Frontend drift (UI/UX spec invariants)
+        run: npm run frontend:drift
+
       - name: Verify production dependency tree
         run: npm ls --omit=dev --depth=0
 
