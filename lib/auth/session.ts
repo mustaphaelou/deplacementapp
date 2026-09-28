@@ -6,6 +6,7 @@ import { utilisateurs } from "../../db/schema/utilisateurs"
 import { toAuthUser } from "./user-mapper"
 import { auth } from "./better-auth"
 import type { Role } from "./roles"
+import { hasAnyRole } from "./roles"
 import type { AuthUser } from "./user-mapper"
 
 export type { AuthUser } from "./user-mapper"
@@ -52,9 +53,10 @@ export async function requireAuth(): Promise<AuthResult> {
   return { ok: true, user }
 }
 
-export function hasAnyRole(role: string, allowed: readonly Role[]): boolean {
-  return allowed.includes(role as Role)
-}
+// Re-exported rather than redefined: the predicate now lives in `roles.ts`,
+// beside the Role union and ROLES_MANAGEMENT, so client components can ask the
+// same question (#286). Server callers import it from here unchanged.
+export { hasAnyRole } from "./roles"
 
 export function requireRole(
   user: AuthUser,

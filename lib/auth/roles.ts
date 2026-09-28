@@ -13,6 +13,16 @@ export const ROLE_LABELS: Record<string, string> = {
 // #281). One declared set: a surface asks it instead of naming Roles.
 export const ROLES_MANAGEMENT: readonly Role[] = ["FINANCE_ADMIN", "GENERAL_DIRECTION"]
 
+// The guard's pure half: does this Role satisfy this set? It lives beside the
+// Role union and ROLES_MANAGEMENT rather than in `session.ts` so a CLIENT
+// component can ask the same question the server guards ask — the Demandes
+// list page's export button (#286) needs it, and `session.ts` imports
+// `next/headers` and the database, which a client bundle must not pull in.
+// `session.ts` re-exports it, so server callers are unchanged.
+export function hasAnyRole(role: string, allowed: readonly Role[]): boolean {
+  return allowed.includes(role as Role)
+}
+
 export interface NavItem {
   label: string
   href: string
