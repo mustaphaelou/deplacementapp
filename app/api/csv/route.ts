@@ -1,15 +1,14 @@
 import { NextResponse } from "next/server"
-import { requireAuth, requireAnyRole, type Role } from "@/lib/auth/server"
+import { requireAuth, requireAnyRole } from "@/lib/auth/server"
+import { ROLES_MANAGEMENT } from "@/lib/auth/roles"
 import { findAllForExport } from "@/lib/demande"
 import { toDemandeDocumentView } from "@/lib/demande-presentation"
 import { handleServiceError } from "@/lib/errors"
 
-const EXPORT_ROLES: Role[] = ["FINANCE_ADMIN", "GENERAL_DIRECTION"]
-
 export async function GET() {
   const auth = await requireAuth()
   if (!auth.ok) return auth.response
-  const authorized = requireAnyRole(auth.user, EXPORT_ROLES)
+  const authorized = requireAnyRole(auth.user, ROLES_MANAGEMENT)
   if (!authorized.ok) return authorized.response
 
   let demandes

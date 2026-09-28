@@ -1,22 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import type { DemandeExportRow } from "@/lib/demande"
 
-const { mockRequireAnyRole } = vi.hoisted(() => ({
-  mockRequireAnyRole: (user: { role: string }, roles: readonly string[]) => {
-    if (roles.includes(user.role)) return { ok: true }
-    return {
-      ok: false,
-      response: new Response(JSON.stringify({ error: "Accès refusé" }), {
-        status: 403,
-      }),
-    }
-  },
-}))
-
-vi.mock("@/lib/auth/server", () => ({
-  requireAuth: vi.fn(),
-  requireAnyRole: mockRequireAnyRole,
-}))
+// #283: only the SESSION is faked here. `requireAnyRole` stays REAL, so the
+// admission cases below assert what the declared set in `lib/auth/roles.ts`
+// admits rather than what a hand-rolled copy of the rule admits.
+vi.mock("@/lib/auth/server", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/lib/auth/server")>()
+  return { ...actual, requireAuth: vi.fn(), getAuthUser: vi.fn() }
+})
 
 vi.mock("@/lib/demande", () => ({
   findAllForExport: vi.fn(),
@@ -95,16 +87,22 @@ function mockAuth(role = "FINANCE_ADMIN") {
   }
 }
 
+async function signInAs(role: string) {
+  const { requireAuth } = await import("@/lib/auth/server")
+  ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth(role))
+  return requireAuth as ReturnType<typeof vi.fn>
+}
+
 describe("CSV export route", () => {
   beforeEach(() => {
     vi.resetAllMocks()
   })
 
   it("GET exports demandes through the queries port and returns CSV", async () => {
-    const { requireAuth } = await import("@/lib/auth/server")
+    const requireAuth = await signInAs("FINANCE_ADMIN")
     const { findAllForExport } = await import("@/lib/demande")
 
-    ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
+    expect(requireAuth).toBeDefined()
     ;(findAllForExport as ReturnType<typeof vi.fn>).mockResolvedValue(
       mockExportRows
     )
@@ -155,22 +153,23 @@ describe("CSV export route", () => {
   })
 
   it("GET returns 403 when role is not authorised", async () => {
-    const { requireAuth } = await import("@/lib/auth/server")
-    ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(
-      mockAuth("EMPLOYEE")
-    )
+    await signInAs("EMPLOYEE")
+    const { findAllForExport } = await import("@/lib/demande")
 
     const { GET } = await import("./route")
     const response = await GET()
 
     expect(response.status).toBe(403)
+    const body = await response.json()
+    expect(body.error).toBe("Accès refusé")
+    // The refusal short-circuits before any row is read.
+    expect(findAllForExport).not.toHaveBeenCalled()
   })
 
   it("GET returns 500 when the queries port throws", async () => {
-    const { requireAuth } = await import("@/lib/auth/server")
+    await signInAs("FINANCE_ADMIN")
     const { findAllForExport } = await import("@/lib/demande")
 
-    ;(requireAuth as ReturnType<typeof vi.fn>).mockResolvedValue(mockAuth())
     ;(findAllForExport as ReturnType<typeof vi.fn>).mockRejectedValue(
       new Error("DB down")
     )
@@ -179,5 +178,44 @@ describe("CSV export route", () => {
     const response = await GET()
 
     expect(response.status).toBe(500)
+  })
+})
+
+// #283: the export asks the declared set (`ROLES_MANAGEMENT`) and the REAL
+// guard decides. Admission is proven for a Role inside the set, refusal for one
+// outside it, so a wrong set is a red test rather than a silent leak of the
+// whole DemandeDeplacement history.
+describe("CSV export route — ROLES_MANAGEMENT guards the export", () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  it("GET admits a Role inside the set and produces the file", async () => {
+    await signInAs("GENERAL_DIRECTION")
+    const { findAllForExport } = await import("@/lib/demande")
+    ;(findAllForExport as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockExportRows
+    )
+
+    const { GET } = await import("./route")
+    const response = await GET()
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get("Content-Type")).toBe("text/csv; charset=utf-8")
+    expect(await response.text()).toContain("DD-2025-0001")
+    expect(findAllForExport).toHaveBeenCalledOnce()
+  })
+
+  it("GET refuses a Role outside the set with 403 « Accès refusé »", async () => {
+    await signInAs("MANAGER")
+    const { findAllForExport } = await import("@/lib/demande")
+
+    const { GET } = await import("./route")
+    const response = await GET()
+
+    expect(response.status).toBe(403)
+    const body = await response.json()
+    expect(body.error).toBe("Accès refusé")
+    expect(findAllForExport).not.toHaveBeenCalled()
   })
 })
