@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { renderToStaticMarkup } from "react-dom/server"
+import { readFileSync } from "node:fs"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
 
 const { mockSearchParams, mockUseAuthUser } = vi.hoisted(() => ({
   mockSearchParams: { etape: "", decision: "" },
@@ -108,6 +111,49 @@ describe("Demandes list page", () => {
 
     expect(html).toContain("CSV")
     expect(html).toContain('data-slot="tooltip-trigger"')
+  })
+
+  // #286: the page used to decide this with its own inline comparison. It now
+  // asks the guard over the declared set, so the export is offered to exactly
+  // the Roles the set admits — the same answer /api/csv gives, which is the
+  // whole point: a button that is offered and then refused is the defect this
+  // ticket closed. Driven by the signed-in Role, so it fails if either the page
+  // or the set is wrong.
+  it("offers the CSV export to every Role the declared set admits", async () => {
+    for (const role of ["FINANCE_ADMIN", "GENERAL_DIRECTION"]) {
+      mockUseAuthUser.mockReturnValue({ user: mockUser(role) })
+
+      const { default: DemandesListPage } = await import("./page")
+      const html = renderToStaticMarkup(<DemandesListPage />)
+
+      expect(html, role).toContain("CSV")
+    }
+  })
+
+  it("withholds the CSV export from a Role outside the declared set", async () => {
+    for (const role of ["MANAGER", "EMPLOYEE"]) {
+      mockUseAuthUser.mockReturnValue({ user: mockUser(role) })
+
+      const { default: DemandesListPage } = await import("./page")
+      const html = renderToStaticMarkup(<DemandesListPage />)
+
+      expect(html, role).not.toContain("CSV")
+    }
+  })
+
+  // The comparison is deleted, not wrapped in a local helper: this is the shape
+  // a re-derivation would take, and it must not come back.
+  it("reaches the export answer through the guard, not a local Role comparison", async () => {
+    const source = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "page.tsx"),
+      "utf8"
+    )
+
+    expect(source).toMatch(
+      /canExportCsv\s*=\s*role\s*\?\s*hasAnyRole\(\s*role\s*,\s*ROLES_MANAGEMENT\s*\)\s*:\s*false/
+    )
+    expect(source).not.toMatch(/role\s*===\s*"FINANCE_ADMIN"/)
+    expect(source).not.toMatch(/role\s*===\s*"GENERAL_DIRECTION"/)
   })
 
   it("keeps the active tab pill highlighted from the etape param", async () => {

@@ -1,4 +1,5 @@
 ﻿import { getAuthUser, hasAnyRole } from "@/lib/auth/server"
+import { ROLES_MANAGEMENT } from "@/lib/auth/roles"
 import { redirect } from "next/navigation"
 import { countDemandes, aggregateBudget } from "@/lib/demande"
 import { PIPELINE } from "@/lib/workflow"
@@ -24,7 +25,7 @@ import {
 
 export default async function RapportsPage() {
   const user = await getAuthUser()
-  if (!user || !hasAnyRole(user.role, ["FINANCE_ADMIN", "GENERAL_DIRECTION"])) {
+  if (!user || !hasAnyRole(user.role, ROLES_MANAGEMENT)) {
     redirect("/")
   }
 

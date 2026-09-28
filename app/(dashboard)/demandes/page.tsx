@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useAuthUser } from "@/lib/auth/client"
+import { hasAnyRole, ROLES_MANAGEMENT } from "@/lib/auth"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
@@ -213,8 +214,13 @@ export default function DemandesListPage() {
     }
   }
 
-  const canExportCsv =
-    role === "FINANCE_ADMIN" || role === "GENERAL_DIRECTION"
+  // #286: this page used to decide the export question with its own inline
+  // Role comparison — the one site of the eight that reached around the guard
+  // interface, and therefore the one that could drift from /api/csv's own guard
+  // with nothing to catch it. It now asks the same question through the same
+  // interface, with the same declared set. The comparison is deleted, not
+  // wrapped: a local helper would be the re-derivation this ticket removes.
+  const canExportCsv = role ? hasAnyRole(role, ROLES_MANAGEMENT) : false
 
   return (
     <div className="space-y-6">

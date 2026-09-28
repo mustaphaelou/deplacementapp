@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { requireRole } from "@/lib/auth/server"
+import { requireAnyRole } from "@/lib/auth/server"
+import { ROLES_MANAGEMENT } from "@/lib/auth/roles"
 import { AUCUNE_SOCIETE_CONFIGUREE, handleServiceError } from "@/lib/errors"
 import { getSocieteBranding, updateSociete } from "@/lib/societe"
 import { societeUpdateSchema } from "@/lib/schemas"
@@ -23,13 +24,15 @@ export async function GET() {
   }
 }
 
-// Societe management (ADR-0012): reserved to FINANCE_ADMIN, body validated by
-// societeUpdateSchema, row + JournalAudit written in one transaction inside
-// updateSociete.
+// Societe management: the write is open to the declared set of Roles that may
+// manage the application (ROLES_MANAGEMENT, spec #281) — it names no Role of its
+// own. ADR-0012 is cited here for what it actually decided: the body is
+// validated by societeUpdateSchema, and the row + JournalAudit are written in
+// one transaction inside updateSociete. It decides nothing about Roles.
 export const PATCH = withValidation(
   societeUpdateSchema,
   async (_req, auth, data) => {
-    const authorized = requireRole(auth, "FINANCE_ADMIN")
+    const authorized = requireAnyRole(auth, ROLES_MANAGEMENT)
     if (!authorized.ok) return authorized.response
 
     try {

@@ -4,15 +4,14 @@ import { formatCurrency } from "@/lib/constants"
 import { PIPELINE } from "@/lib/workflow"
 import { ETAPE_LABELS } from "@/lib/demande-presentation"
 
-const { mockHasAnyRole } = vi.hoisted(() => ({
-  mockHasAnyRole: (role: string, allowed: readonly string[]) =>
-    allowed.includes(role),
-}))
-
-vi.mock("@/lib/auth/server", () => ({
-  getAuthUser: vi.fn(),
-  hasAnyRole: mockHasAnyRole,
-}))
+// #283: only the SESSION is faked here. `hasAnyRole` stays REAL, so the guard
+// cases below assert what the declared set in `lib/auth/roles.ts` admits rather
+// than what a hand-rolled copy of the rule admits.
+vi.mock("@/lib/auth/server", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/lib/auth/server")>()
+  return { ...actual, getAuthUser: vi.fn(), requireAuth: vi.fn() }
+})
 
 vi.mock("@/lib/demande", () => ({
   countDemandes: vi.fn(),
@@ -231,6 +230,56 @@ describe("Rapports page", () => {
     const { redirect } = await import("next/navigation")
 
     ;(getAuthUser as ReturnType<typeof vi.fn>).mockResolvedValue(null)
+
+    const { default: RapportsPage } = await import("./page")
+    await expect(RapportsPage()).rejects.toThrow("NEXT_REDIRECT: /")
+
+    expect(redirect).toHaveBeenCalledWith("/")
+  })
+})
+
+// #283: the page asks the declared set (`ROLES_MANAGEMENT`) instead of
+// inlining Roles, and the REAL `hasAnyRole` decides. A Role inside the set
+// renders; a Role outside it is redirected to "/". If someone later edits the
+// declaration, these cases move with it and the literal pin in
+// `lib/auth/roles.test.ts` is what fails loudly.
+describe("Rapports page — ROLES_MANAGEMENT guards the page", () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  async function primeDemandePort() {
+    const {
+      countDemandes: mockCountDemandes,
+      aggregateBudget: mockAggregateBudget,
+    } = await import("@/lib/demande")
+    ;(mockCountDemandes as ReturnType<typeof vi.fn>).mockImplementation(
+      resolveCount
+    )
+    ;(mockAggregateBudget as ReturnType<typeof vi.fn>).mockResolvedValue(45000)
+  }
+
+  it("renders for a Role inside the set", async () => {
+    const { getAuthUser } = await import("@/lib/auth/server")
+    ;(getAuthUser as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockUser("GENERAL_DIRECTION")
+    )
+    await primeDemandePort()
+
+    const { default: RapportsPage } = await import("./page")
+    const html = renderToStaticMarkup(await RapportsPage())
+
+    expect(html).toContain("Rapports")
+    expect(html).toContain("Répartition par étape")
+  })
+
+  it("redirects to \"/\" for a Role outside the set", async () => {
+    const { getAuthUser } = await import("@/lib/auth/server")
+    const { redirect } = await import("next/navigation")
+
+    ;(getAuthUser as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockUser("MANAGER")
+    )
 
     const { default: RapportsPage } = await import("./page")
     await expect(RapportsPage()).rejects.toThrow("NEXT_REDIRECT: /")
