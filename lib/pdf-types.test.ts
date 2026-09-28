@@ -1,5 +1,6 @@
 import { expect, describe, it } from "vitest"
 import type { CoutEstime, PdfRenderData } from "./pdf-types"
+import { MOTIF_LABELS_EXPECTED } from "./test/demande-motif-fixtures"
 
 describe("PdfRenderData contract", () => {
   it("has all required fields with French names", () => {
@@ -19,7 +20,7 @@ describe("PdfRenderData contract", () => {
       employePrenom: "Jean",
       employePoste: "Développeur",
       employeDepartement: "IT",
-      motif: ["Réunion client"],
+      motifsLabels: [...MOTIF_LABELS_EXPECTED],
       dateDepart: new Date("2025-06-01"),
       dateRetour: new Date("2025-06-05"),
       destination: "Casablanca",
@@ -41,7 +42,7 @@ describe("PdfRenderData contract", () => {
     expect(data.employePrenom).toBe("Jean")
     expect(data.employePoste).toBe("Développeur")
     expect(data.employeDepartement).toBe("IT")
-    expect(data.motif).toEqual(["Réunion client"])
+    expect(data.motifsLabels).toEqual(MOTIF_LABELS_EXPECTED)
     expect(data.dateDepart).toEqual(new Date("2025-06-01"))
     expect(data.dateRetour).toEqual(new Date("2025-06-05"))
     expect(data.destination).toBe("Casablanca")
@@ -77,7 +78,7 @@ describe("PdfRenderData contract", () => {
       employePrenom: "Marie",
       employePoste: "Commercial",
       employeDepartement: "Ventes",
-      motif: ["Déplacement client"],
+      motifsLabels: [...MOTIF_LABELS_EXPECTED],
       dateDepart: new Date("2025-08-01"),
       dateRetour: new Date("2025-08-10"),
       destination: "Fès",
@@ -126,7 +127,7 @@ describe("PdfRenderData contract", () => {
       employePrenom: "Alice",
       employePoste: "Manager",
       employeDepartement: "RH",
-      motif: ["Formation"],
+      motifsLabels: ["Formation"],
       dateDepart: new Date("2025-07-01"),
       dateRetour: new Date("2025-07-03"),
       destination: "Marrakech",
@@ -168,7 +169,7 @@ describe("PdfRenderData contract", () => {
       employePrenom: "Marie",
       employePoste: "Commercial",
       employeDepartement: "Ventes",
-      motif: ["Déplacement client"],
+      motifsLabels: [...MOTIF_LABELS_EXPECTED],
       dateDepart: new Date("2025-08-01"),
       dateRetour: new Date("2025-08-10"),
       destination: "Fès",

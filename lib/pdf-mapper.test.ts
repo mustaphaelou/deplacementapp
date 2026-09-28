@@ -1,6 +1,14 @@
 import { expect, describe, it } from "vitest"
 import { type DemandeWithRelations } from "./demande-types"
+import { MOTIF_LABELS } from "./demande-presentation"
 import { toPdfRenderData } from "./pdf-mapper"
+import {
+  MOTIF_CANONICAL_LABEL,
+  MOTIF_CANONICAL_SLUG,
+  MOTIF_FREE_TEXT,
+  MOTIF_LABELS_EXPECTED,
+  STORED_MOTIF_JSON,
+} from "./test/demande-motif-fixtures"
 
 function makeDemande(
   overrides?: Record<string, unknown>
@@ -17,7 +25,7 @@ function makeDemande(
     employePrenom: "Jean",
     employePoste: "Développeur",
     employeDepartement: "IT",
-    motif: '["Réunion client","Formation"]',
+    motif: STORED_MOTIF_JSON,
     dateDepart: new Date("2025-06-01"),
     dateRetour: new Date("2025-06-05"),
     destination: "Casablanca",
@@ -90,7 +98,7 @@ describe("toPdfRenderData", () => {
   it("maps a full demande with all fields to PdfRenderData", () => {
     const demande = makeDemandeWithRelations({
       demande: {
-        motif: '["Réunion client","Formation"]',
+        motif: STORED_MOTIF_JSON,
         autreTransport: "Taxi",
         avanceRequise: true,
         montantAvance: 500,
@@ -108,7 +116,7 @@ describe("toPdfRenderData", () => {
     expect(result.employePrenom).toBe("Jean")
     expect(result.employePoste).toBe("Développeur")
     expect(result.employeDepartement).toBe("IT")
-    expect(result.motif).toEqual(["Réunion client", "Formation"])
+    expect(result.motifsLabels).toEqual(MOTIF_LABELS_EXPECTED)
     expect(result.dateDepart).toEqual(new Date("2025-06-01"))
     expect(result.dateRetour).toEqual(new Date("2025-06-05"))
     expect(result.destination).toBe("Casablanca")
@@ -180,11 +188,11 @@ describe("toPdfRenderData", () => {
     expect(result.branding).toEqual({ nom: "Acme SARL", couleurPrimaire: null })
   })
 
-  it("falls back to raw motif string when JSON.parse fails", () => {
+  it("carries an unparseable stored Motif through verbatim", () => {
     const demande = makeDemandeWithRelations({ demande: { motif: "not-json" } })
     const result = toPdfRenderData(demande)
 
-    expect(result.motif).toEqual(["not-json"])
+    expect(result.motifsLabels).toEqual(["not-json"])
   })
 
   it("converts string number fields to numbers", () => {
@@ -223,5 +231,54 @@ describe("toPdfRenderData", () => {
     expect(result.couts.transport).toBe(42)
     expect(result.couts.hebergement).toBe(0)
     expect(result.couts.total).toBe(50)
+  })
+})
+
+// The PDF renders the Motif the render data is handed — it holds no vocabulary
+// of its own. So what the mapper must guarantee is that the render data is
+// already labelled: the renderer is given "Mission client", never the slug
+// "mission_client", and is given no slug it could fall back to. These
+// assertions are what make a drift back to the stored entries impossible
+// rather than merely unlikely.
+describe("toPdfRenderData — the Motif it hands the renderer", () => {
+  it("holds the French label, not the stored slug", () => {
+    const result = toPdfRenderData(
+      makeDemandeWithRelations({ demande: { motif: STORED_MOTIF_JSON } })
+    )
+
+    expect(result.motifsLabels).toContain(MOTIF_CANONICAL_LABEL)
+    expect(result.motifsLabels).not.toContain(MOTIF_CANONICAL_SLUG)
+  })
+
+  it("preserves a stored free-text Motif verbatim", () => {
+    const result = toPdfRenderData(
+      makeDemandeWithRelations({ demande: { motif: STORED_MOTIF_JSON } })
+    )
+
+    expect(result.motifsLabels).toContain(MOTIF_FREE_TEXT)
+  })
+
+  it("labels every canonical Motif it is seeded with", () => {
+    for (const [slug, label] of Object.entries(MOTIF_LABELS)) {
+      const result = toPdfRenderData(
+        makeDemandeWithRelations({
+          demande: { motif: JSON.stringify([slug]) },
+        })
+      )
+
+      expect(result.motifsLabels).toEqual([label])
+      expect(result.motifsLabels).not.toContain(slug)
+    }
+  })
+
+  it("never hands the renderer a stored value it would have to translate", () => {
+    const result = toPdfRenderData(
+      makeDemandeWithRelations({ demande: { motif: STORED_MOTIF_JSON } })
+    )
+
+    for (const label of result.motifsLabels) {
+      expect(label).not.toBe("")
+      expect(Object.keys(MOTIF_LABELS)).not.toContain(label)
+    }
   })
 })

@@ -23,7 +23,13 @@ export interface PdfRenderData {
   employePrenom: string
   employePoste: string
   employeDepartement: string
-  motif: string[]
+  /**
+   * The Motif labels to print — every stored entry already mapped through
+   * `MOTIF_LABELS` by the document projection, an unmapped entry verbatim.
+   * Never a stored slug: the renderer is handed display values only, so it
+   * cannot drift back to the storage vocabulary.
+   */
+  motifsLabels: string[]
   dateDepart: Date
   dateRetour: Date
   destination: string
