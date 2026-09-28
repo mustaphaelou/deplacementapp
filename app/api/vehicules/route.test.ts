@@ -61,7 +61,7 @@ const validVehiculePayload = {
   immatriculation: "AB-123-CD",
 }
 
-describe("vehicules route", () => {
+describe("vehicules route", { timeout: 30000 }, () => {
   beforeEach(() => {
     vi.resetAllMocks()
   })
@@ -155,7 +155,7 @@ describe("vehicules route", () => {
 // shipped permission change. Every write is checked both ways: a Role inside
 // the set reaches the service, a Role outside it is refused with the
 // « Accès refusé » 403 the guard already produced.
-describe("vehicules route — ROLES_MANAGEMENT guards every write", () => {
+describe("vehicules route — ROLES_MANAGEMENT guards every write", { timeout: 30000 }, () => {
   beforeEach(() => {
     vi.resetAllMocks()
   })
@@ -261,7 +261,10 @@ describe("vehicules route — ROLES_MANAGEMENT guards every write", () => {
 // creation. This pins that open: a Role that every write above refuses still
 // reads the fleet. If someone tightens the GET to the declared set, or past it,
 // this turns red.
-describe("vehicules route — the fleet read stays open to every signed-in Utilisateur", () => {
+describe(
+  "vehicules route — the fleet read stays open to every signed-in Utilisateur",
+  { timeout: 30000 },
+  () => {
   beforeEach(() => {
     vi.resetAllMocks()
   })

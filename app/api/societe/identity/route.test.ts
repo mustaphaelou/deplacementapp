@@ -47,7 +47,14 @@ const rawSocieteRow = {
   domaineEmail: "example.ma",
 }
 
-describe("societe identity route", () => {
+// These suites load the REAL session module (importOriginal above) so the
+// declared set decides, which is slower than the wholesale mock they
+// replaced. Under a loaded machine the default 5s budget can expire, and a
+// timed-out test leaves the module registry half-initialised — the NEXT
+// test's dynamic import then gets a real requireAuth instead of the mock
+// and fails with a misleading `mockResolvedValue is not a function`.
+// Same remedy as app/(dashboard)/demandes/nouvelle/page.test.tsx.
+describe("societe identity route", { timeout: 30000 }, () => {
   beforeEach(() => {
     vi.resetAllMocks()
   })
