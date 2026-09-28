@@ -140,8 +140,14 @@ function decidesAccess(source: string): boolean {
 const readSurface = (relPath: string): string =>
   readFileSync(join(REPO_ROOT, relPath), "utf8")
 
+// Tests `code(source)`, NOT the raw source. A comment that explains the rule
+// may name ROLES_MANAGEMENT — and if this read the raw file, a surface could
+// satisfy this rule in prose while re-deriving the answer in code, which is
+// the exact defect #281 exists to remove. (Found by live injection: replacing
+// the Societe guard with a local `peutGerer()` wrapper and leaving the set
+// mentioned only in a comment passed every rule in this file.)
 const asksTheSet = (source: string): boolean =>
-  /\bROLES_MANAGEMENT\b/.test(source)
+  /\bROLES_MANAGEMENT\b/.test(code(source))
 
 /** Is this file accounted for — an administration surface, or explained? */
 const isAccountedFor = (relPath: string, source: string): boolean =>
@@ -346,6 +352,24 @@ describe("the wiring check fails when it should", () => {
   it("passes a file that makes no access decision", () => {
     expect(isAccountedFor("components/page-header.tsx", "export const X = 1")).toBe(
       true,
+    )
+  })
+
+  it("catches a surface that names the set ONLY in a comment", () => {
+    // The live-injection false negative: a local `peutGerer()` wrapper
+    // re-derives the answer in code, while a comment above it explains the
+    // rule and names the set. Reading the raw file, this passed every rule in
+    // this file. It must not.
+    const defect = `
+      // Access is governed by ROLES_MANAGEMENT (spec #281).
+      const peutGerer = (role: string) => role === "FINANCE_ADMIN"
+      export const PATCH = async () => {
+        if (!peutGerer(user.role)) return null
+      }
+    `
+    expect(decidesAccess(defect)).toBe(true)
+    expect(asksTheSet(defect), "a comment must not satisfy the forward rule").toBe(
+      false,
     )
   })
 
