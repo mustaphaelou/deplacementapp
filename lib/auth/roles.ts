@@ -8,6 +8,11 @@ export const ROLE_LABELS: Record<string, string> = {
   GENERAL_DIRECTION: "Direction Générale",
 }
 
+// The Roles that may manage the application — Utilisateurs, the Societe write,
+// the Societe identity read, the fleet writes, the export and Rapports (spec
+// #281). One declared set: a surface asks it instead of naming Roles.
+export const ROLES_MANAGEMENT: readonly Role[] = ["FINANCE_ADMIN", "GENERAL_DIRECTION"]
+
 export interface NavItem {
   label: string
   href: string
