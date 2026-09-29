@@ -1,0 +1,20 @@
+# Staged-file gate. CI (docker-publish.yml `verify`) stays the authority; this
+# exists so a broken commit fails where it is written rather than at PR time.
+#
+# Scope, and why: eslint runs on STAGED FILES only (lint-staged), and typecheck
+# runs on the project (tsc has no per-file mode). The full test suite is
+# deliberately NOT here — it stands up one PGlite per test file and takes ~90s,
+# which nobody waits for on every commit. Run `npm test` before pushing; CI
+# holds the line regardless of what this hook lets through.
+#
+# NO `prettier --write` HERE, deliberately. .prettierrc loads
+# prettier-plugin-tailwindcss with tailwindFunctions ["cn","cva"], so formatting
+# REORDERS Tailwind class lists — and 12 tests assert literal class strings
+# ("uppercase tracking-[0.06em]", "rounded-[3px] bg-primary/10"). An automatic
+# format-on-commit rewrites the exact strings those tests match on, turning a
+# green suite red with no visible cause. Format on purpose, with the tests in
+# view: npm run format.
+#
+# Bypass for a deliberate WIP commit only: git commit --no-verify
+npx lint-staged
+npm run typecheck

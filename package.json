@@ -22,7 +22,8 @@
     "docker:prod": "docker compose up --build",
     "docker:down": "docker compose down -v",
     "postinstall": "drizzle-kit generate",
-    "sandcastle": "npx tsx .sandcastle/main.ts"
+    "sandcastle": "npx tsx .sandcastle/main.ts",
+    "prepare": "husky"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
@@ -64,7 +65,9 @@
     "drizzle-kit": "^0.31.4",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.2.12",
+    "husky": "^9.1.7",
     "js-yaml": "^4.3.2",
+    "lint-staged": "^15.5.2",
     "postcss": "^8.5.25",
     "prettier": "^3.9.6",
     "prettier-plugin-tailwindcss": "^0.8.1",
@@ -78,5 +81,10 @@
     "@esbuild-kit/core-utils": {
       "esbuild": "^0.25.0"
     }
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix"
+    ]
   }
 }
