@@ -103,7 +103,7 @@ const INK_TINT_BASELINE = {
 /** Radius utilities that resolve to the 3px spec radius in this app. */
 const RADIUS_ALLOWED = new Set(["rounded-[3px]", "rounded-lg", "rounded-sm", "rounded-md", "rounded-none", "rounded-full"])
 /** Radius utilities that exceed 3px given globals.css's remapped scale. */
-const RADIUS_OVER = /rounded-(xl|2xl|3xl|4xl)\b/
+const RADIUS_OVER = /^rounded-(xl|2xl|3xl|4xl)$/
 
 function walk(dir, out = []) {
   for (const entry of readdirSync(dir)) {
@@ -123,11 +123,21 @@ function isOutOfScope(relPath) {
   return Object.entries(OUT_OF_SCOPE).find(([prefix]) => relPath === prefix || relPath.startsWith(`${prefix}/`))
 }
 
-function isAllowlisted(rule, relPath, line) {
+/**
+ * Is this file allowlisted for this rule?
+ *
+ * BY FILE, ONLY. The keys are repo-relative paths and the match is exact.
+ * There is deliberately no glob and no source-line fallback: an earlier version
+ * fell back to `Object.entries(entries).some(([pat]) => line.includes(pat))`,
+ * which tested whether an ALLOWLIST KEY appeared as a substring of a line of
+ * source. A key like `app/(auth)/login/setup-wizard.tsx` never appears inside a
+ * .tsx line, so that branch was unreachable — it read as "add a glob here" to a
+ * maintainer and could never do what it advertised. Add the file path.
+ */
+function isAllowlisted(rule, relPath) {
   const entries = ALLOWLIST[rule]
   if (!entries) return false
-  if (entries[relPath]) return true
-  return Object.entries(entries).some(([pat, _]) => line.includes(pat))
+  return Boolean(entries[relPath])
 }
 
 function lineOf(src, index) {
@@ -181,6 +191,28 @@ function openingTagAt(src, start) {
   return null
 }
 
+/**
+ * The enclosing JSX opening tag for the character at `index`, or null.
+ *
+ * A line-scoped `line.includes("md:text-[40px]")` is wrong for a class list
+ * spread over several lines: `<h1 className={cn("text-[40px]",\n "md:text-[40px]")}>`
+ * carries a correct md: twin, but the bare token's own line does not contain
+ * it, so the rule fired a false positive on exactly the shape it should bless.
+ * Find the tag that owns the token and read the twin out of the whole tag.
+ */
+function enclosingTagAt(src, index) {
+  // Walk back to the nearest `<` that opens a tag before the token.
+  for (let i = index; i >= 0; i--) {
+    if (src[i] !== "<") continue
+    // A JSX tag opener is `<` followed by a name/fragment character. Anything
+    // else (`<=`, `< 5`, a closing tag already passed) is not our anchor.
+    if (!/[A-Za-z>]/.test(src[i + 1] ?? "")) continue
+    const tag = openingTagAt(src, i)
+    if (tag && tag.includes(">")) return tag
+  }
+  return null
+}
+
 export function runChecks() {
   const files = walk(join(ROOT, "app")).concat(walk(join(ROOT, "components")))
   const findings = []
@@ -190,9 +222,16 @@ export function runChecks() {
     const r = rel(file)
 
     // RULE_TITLE_RESPONSIVE — 40px must only apply from md: up.
+    //
+    // The md: twin is read out of the ENCLOSING TAG, not the token's own line,
+    // so a `cn()` spread over several lines with a correct twin is silent.
     for (const m of src.matchAll(/text-\[40px\]/g)) {
-      const line = src.split("\n")[lineOf(src, m.index) - 1] ?? ""
-      if (!line.includes("md:text-[40px]") && !isAllowlisted("RULE_TITLE_RESPONSIVE", r, line)) {
+      const tag = enclosingTagAt(src, m.index)
+      // No enclosing tag means the token is not in JSX class position (a
+      // constant, a comment). Fall back to the line so the token is still
+      // judged rather than silently skipped.
+      const scope = tag ?? (src.split("\n")[lineOf(src, m.index) - 1] ?? "")
+      if (!scope.includes("md:text-[40px]") && !isAllowlisted("RULE_TITLE_RESPONSIVE", r)) {
         findings.push({
           rule: "RULE_TITLE_RESPONSIVE",
           file: r,
@@ -203,15 +242,28 @@ export function runChecks() {
     }
 
     // RULE_RADIUS_SCALE — radius above the 3px spec, in page-level code only.
+    //
+    // Two shapes are defects and they are DIFFERENT defects, so they get
+    // different messages:
+    //   1. a named step that exceeds the spec (`rounded-xl` and up) — this is
+    //      the ordinary way the scale drifts, and it is what the rule is FOR;
+    //   2. an arbitrary value (`rounded-[8px]`) that resolves to nothing the
+    //      scale defines.
+    // An earlier version tested `RADIUS_OVER.test(token) || RADIUS_ALLOWED...`
+    // inside a single `continue`, which exempted shape 1 — the named scale,
+    // the common case — and caught only shape 2. The rule reported clean on a
+    // tree full of `rounded-xl`. The two shapes are now separate findings.
     if (!isOutOfScope(r)) {
       for (const m of src.matchAll(/rounded-[a-z0-9\[\]-]+/g)) {
         const token = m[0]
-        if (RADIUS_OVER.test(token) || RADIUS_ALLOWED.has(token)) continue
+        if (RADIUS_ALLOWED.has(token)) continue
         findings.push({
           rule: "RULE_RADIUS_SCALE",
           file: r,
           line: lineOf(src, m.index),
-          message: `unrecognised radius utility ${token}; the scale is remapped in globals.css (3px)`,
+          message: RADIUS_OVER.test(token)
+            ? `${token} is above the 3px spec; globals.css remaps the scale, so use rounded-[3px]`
+            : `unrecognised radius utility ${token}; the scale is remapped in globals.css (3px)`,
         })
       }
     }
@@ -262,7 +314,7 @@ export function runChecks() {
   for (const { route, component, uses } of dashboardRoutes(files)) {
     if (isOutOfScope(route)) continue
     const target = component ?? route
-    if (isAllowlisted("RULE_HEADER_ADOPTION", target, "")) continue
+    if (isAllowlisted("RULE_HEADER_ADOPTION", target)) continue
     const rendersHeader = /<PageHeader[\s>]/.test(uses) || /<h1[\s>]/.test(uses)
     if (!rendersHeader) {
       findings.push({

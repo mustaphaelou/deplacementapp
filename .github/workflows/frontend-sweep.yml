@@ -27,6 +27,14 @@ permissions:
 jobs:
   sweep:
     runs-on: ubuntu-latest
+    # `gh issue create` needs issues: write. The workflow-level default above is
+    # contents: read, and a job inherits it — so without this override the
+    # filing step failed with a 403 every Monday and, carrying
+    # continue-on-error, failed silently. Report-only was the intent; unable to
+    # file was not.
+    permissions:
+      contents: read
+      issues: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -64,7 +72,7 @@ jobs:
             echo "\`scripts/frontend-drift.mjs\` before filing it."
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Open a draft issue when the sweep finds drift
+      - name: File an issue when the sweep finds drift
         if: steps.drift.outcome == 'failure'
         continue-on-error: true
         env:

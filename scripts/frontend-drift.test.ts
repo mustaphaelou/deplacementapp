@@ -208,6 +208,121 @@ export const D = () => <div className="rounded-full" />
     expect(runOnTree(dir).status).toBe(0)
   })
 
+  it("RULE_RADIUS_SCALE fires on the NAMED scale, not just arbitrary values", () => {
+    // Regression: the rule read
+    //   if (RADIUS_OVER.test(token) || RADIUS_ALLOWED.has(token)) continue
+    // which exempted exactly the utilities RADIUS_OVER names. `rounded-xl` is
+    // the ORDINARY way the radius drifts, and it was silent; only an arbitrary
+    // `rounded-[8px]` fired. Each named step is now its own finding.
+    for (const token of ["rounded-xl", "rounded-2xl", "rounded-3xl", "rounded-4xl"]) {
+      write("components/drift-radius-named.tsx", `export const N = () => <div className="${token}" />\n`)
+      const { stdout, status } = runOnTree(dir)
+      expect(status, `${token} must fire`).toBe(1)
+      expect(stdout).toContain("RULE_RADIUS_SCALE")
+      expect(stdout).toContain("above the 3px spec")
+      rmSync(join(dir, "components/drift-radius-named.tsx"), { force: true })
+    }
+  })
+
+  it("RULE_RADIUS_SCALE still fires on an arbitrary radius value", () => {
+    // The other half of the rule, and the half that did work: a value the
+    // scale never defines.
+    write("components/drift-radius-arbitrary.tsx", `export const X = () => <div className="rounded-[8px]" />\n`)
+    const { stdout, status } = runOnTree(dir)
+    expect(status).toBe(1)
+    expect(stdout).toContain("RULE_RADIUS_SCALE")
+    expect(stdout).toContain("unrecognised radius utility")
+  })
+
+  it("RULE_TITLE_RESPONSIVE sees an md: twin on a LATER line of a cn() call", () => {
+    // Regression: the rule tested `line.includes("md:text-[40px]")` against the
+    // token's own line, so a correct multi-line cn() — the same shape that broke
+    // RULE_FOCUS_RING and was fixed with openingTagAt — fired a false positive
+    // here. The sibling rule was fixed; this one was left behind.
+    write(
+      "components/drift-probe.tsx",
+      `import { cn } from "@/lib/utils"
+export const Title = () => (
+  <h1
+    className={cn(
+      "text-[40px] font-bold",
+      "md:text-[40px]"
+    )}
+  >
+    x
+  </h1>
+)
+`
+    )
+    expect(runOnTree(dir).status).toBe(0)
+  })
+
+  it("RULE_TITLE_RESPONSIVE still fires when the multi-line cn() has NO twin", () => {
+    // The false-positive fix must not become a blind spot: the same multi-line
+    // shape with the twin removed is the real defect and must still be caught.
+    write(
+      "components/drift-probe.tsx",
+      `import { cn } from "@/lib/utils"
+export const Title = () => (
+  <h1
+    className={cn(
+      "text-[40px] font-bold",
+      "tracking-tight"
+    )}
+  >
+    x
+  </h1>
+)
+`
+    )
+    const { stdout, status } = runOnTree(dir)
+    expect(status).toBe(1)
+    expect(stdout).toContain("RULE_TITLE_RESPONSIVE")
+  })
+
+  it("allowlisting is BY FILE — exact path, no glob, no source-text fallback", () => {
+    // Regression (#322): isAllowlisted had a fallback branch testing whether an
+    // ALLOWLIST KEY appeared as a substring of a LINE OF SOURCE. A key like
+    // `app/(auth)/login/setup-wizard.tsx` never appears inside a .tsx line, so
+    // that branch was unreachable — and it read to a maintainer as "add a glob
+    // here". Structural assertion: the branch is gone, and the signature no
+    // longer takes a source line at all.
+    const src = readFileSync(SCRIPT, "utf8")
+    // Assert against CODE, not prose: the fix's own doc comment quotes the
+    // removed expression, so matching the raw file tests the comment.
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
+    expect(code).not.toMatch(/function isAllowlisted\(rule, relPath, line\)/)
+    expect(code).not.toMatch(/\.some\(\(\[pat/)
+    expect(code).toMatch(/function isAllowlisted\(rule, relPath\)/)
+
+    // Behavioural half: the key is an EXACT path. `components/profile-edit.tsx`
+    // is the allowlisted file for RULE_HEADER_ADOPTION, and the real /profil
+    // route delegates to it — so that delegation is silent by decision. A
+    // sibling component is NOT allowlisted and is still judged. This is what a
+    // reintroduced prefix or glob match would break.
+    appendTo(
+      "components/profile-edit.tsx",
+      `export const Extra = () => <h1 className="text-[24px]">x</h1>\n`
+    )
+    expect(runOnTree(dir).status, "the allowlisted component stays silent").toBe(0)
+
+    write(
+      "components/drift-header-sibling.tsx",
+      `export const Sibling = () => <h1 className="text-[24px]">x</h1>\n`
+    )
+    write(
+      "app/(dashboard)/drift-sibling/page.tsx",
+      `import { Sibling } from "@/components/drift-header-sibling"
+export default function Page() {
+  return <Sibling />
+}
+`
+    )
+    const { stdout, status } = runOnTree(dir)
+    expect(status, "a sibling sharing the prefix is NOT allowlisted").toBe(1)
+    expect(stdout).toContain("RULE_HEADER_ADOPTION")
+  })
+
   it("honours the out-of-scope allowlist instead of filing on excluded surfaces", () => {
     // 403 is out of scope for #251 and owns a bare 40px title by decision.
     write("app/(protected)/403/page.tsx", `export default function P() {
