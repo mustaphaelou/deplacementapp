@@ -28,9 +28,30 @@ import yaml from "js-yaml"
 // for auto-deploy. Both were phrase assertions; neither was a property of the
 // release job. The durable form of what they half-measured — that the
 // documentation is required to describe the deploy at all — belongs to whoever
-// owns the documentation, not to the release gate. The other four dropped
-// tests pinned the publish gate's term, the matrix as image map, the closed
-// twin-block candidate, and the who-pulls decision; same reasoning.
+// owns the documentation, not to the release gate.
+//
+// The other four DROPPED tests, named so the record is the real set:
+//   - `defines the publish gate term in the deployment documentation`
+//     (CONTEXT.md must name the publish gate and its three jobs)
+//   - `records the twin-block deepening candidate as closed in ADR-0004`
+//   - `records the who-pulls decision in ADR-0015 and cites ADR-0004`
+//   - `documents the deploy exactly as the workflow ships it`
+// The last is the one worth a second reading, because it also held two claims
+// about the workflow rather than about prose. Those were not lost: they are
+// subsumed by the exact `toBe` on `job("deploy").if` in `deploys only on the
+// exact single-owner gate`, and #324 argues that below at the deploy-script
+// assertions. Same reasoning as the three above it.
+//
+// Narrowing a test drops assertions too, and those are the larger half of what
+// went: six surviving tests each kept only their `not.toContain` guards, and
+// with them went the phrase assertions those tests used to carry — CONTEXT.md
+// naming `publish-check` and `build-and-push`, ADR-0003's "no consumer pulls an
+// arm64 migrator" and the arm64-drop consequence, ADR-0004's "non-semver tags
+// fail", release.md naming `release-gate`, "Coolify deploy webhook" and
+// "escape hatch", CONTEXT.md's Release entry naming the webhook and ADR-0015,
+// and the naming half of "secrets by name only". None of those has a new home
+// and none should: each says a sentence must be worded a particular way. They
+// are listed here so a reader reconstructing the trade is not left to infer it.
 //
 // #324 then measured what the surviving release-job pins actually hold, by
 // breaking the workflow on purpose and reverting it. Two results belong to the
@@ -532,9 +553,10 @@ describe(".github/workflows/docker-publish.yml", () => {
       // the old name in a comment keeps `raw.includes(...)` true and turns the
       // three deploy tests that call `deployScriptStep()` red. The weaker
       // substring form is already carried once, by `adds a workflow_dispatch
-      // dry-run input…`; a third copy, against the bytes instead of the value,
-      // is the same redundancy #323 struck from `documents the deploy exactly
-      // as the workflow ships it`.
+      // dry-run input…`, which also reads the parsed step rather than the
+      // bytes; a third copy, against the bytes instead of the value, would be
+      // the same redundancy #323 struck from `documents the deploy exactly as
+      // the workflow ships it`.
       expect(run).toContain(
         'scripts/deploy-coolify.sh --dry-run --ref "$GITHUB_REF_NAME"'
       )
