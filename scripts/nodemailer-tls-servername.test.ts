@@ -116,9 +116,13 @@ describe("nodemailer DNS cache does not leak one transport's TLS servername to a
     await resolveWith({ host: WRITE_HOST, servername: "victim.test" })
 
     // The fix purges `servername` from what is stored, so the next transport to
-    // reach this host is handed its own name rather than this one's.
+    // reach this host is handed its own name rather than this one's. That the
+    // entry still carries addresses is asserted loosely on purpose: the exact
+    // list depends on the runner's resolver (IPv4-only locally, IPv4 + IPv6 on
+    // CI), and the address set is not the property under test — the absence of
+    // a connection-specific name beside it is.
     const stored = dnsCache.get(WRITE_HOST) as unknown as VulnerableCacheEntry | undefined
-    expect(stored?.value?.addresses).toEqual(["127.0.0.1"])
+    expect(stored?.value?.addresses.length).toBeGreaterThan(0)
     expect(stored?.value?.servername).toBeUndefined()
   })
 
