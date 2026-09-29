@@ -592,10 +592,19 @@ describe(".github/workflows/docker-publish.yml", () => {
       // a deploy that never comes. This is the one prose guard the spec keeps
       // by name, and it survives any rewrite — it fails only if the misleading
       // claim is made, never because the sentence around it changed.
-      expect(releaseDocs).not.toContain(
-        "no Coolify changes are needed for a Release"
+      //
+      // Compared lowercased, and that is load-bearing rather than fussy. The
+      // claim reads as a sentence, so it appears capitalised in at least half
+      // its natural forms — at the start of a sentence, a bullet, or a heading.
+      // A case-sensitive `not.toContain` here was measured going GREEN against
+      // "No Coolify changes are needed for a Release.", i.e. the guard the spec
+      // names as the one survivor was defeatable by typing the claim the
+      // ordinary way. Lowercasing both sides keeps the claim a guard and stops
+      // capitalisation from being a bypass.
+      expect(releaseDocs.toLowerCase()).not.toContain(
+        "no coolify changes are needed for a release"
       )
-      expect(releaseDocs).not.toContain("no Coolify changes")
+      expect(releaseDocs.toLowerCase()).not.toContain("no coolify changes")
     })
 
     it("does not let CONTEXT.md promote the deploy hop to a term of its own", () => {
