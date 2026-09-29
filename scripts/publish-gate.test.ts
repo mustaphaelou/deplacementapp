@@ -31,6 +31,25 @@ import yaml from "js-yaml"
 // owns the documentation, not to the release gate. The other four dropped
 // tests pinned the publish gate's term, the matrix as image map, the closed
 // twin-block candidate, and the who-pulls decision; same reasoning.
+//
+// #324 then measured what the surviving release-job pins actually hold, by
+// breaking the workflow on purpose and reverting it. Two results belong to the
+// next reader, because both are edits a careful person could make that leave
+// every test here green:
+//
+//   - The chain is pinned as a GRAPH, not as a file layout. Moving
+//     `build-and-push` above `publish-check` with every `needs:` left intact
+//     keeps the file green. Exactly one test reads key order — `keeps deploy
+//     as the final job of the workflow` — so moving `deploy` up fails that one
+//     and nothing else changes. Both facts are correct: `needs:` is what
+//     GitHub Actions executes, and deploy-last is the one ordering that carries
+//     a meaning ("the last act"), which is why it is the one pinned as text.
+//   - The push trigger is pinned by `toContain("v*")` in two places, which
+//     says `v*` must be AMONG the patterns, not that it is the only one.
+//     `tags: ["v*", "*"]` is green; `tags: ["*"]` is red on both tests. What
+//     the gate does not see is covered at runtime instead: the release-gate
+//     step exits 1 on a non-semver tag, so an over-broad trigger turns a
+//     stray tag into a failed run rather than into a deploy.
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 const WORKFLOW_PATH = join(ROOT, ".github/workflows/docker-publish.yml")
@@ -500,6 +519,22 @@ describe(".github/workflows/docker-publish.yml", () => {
     it("switches between dry-run and the real webhook from the dispatch input, passing the ref on both paths", () => {
       const step = deployScriptStep()
       const run = step.run ?? ""
+      // #324 asked whether the release file should ALSO be pinned against the
+      // raw workflow text, and left the answer here rather than adding the
+      // assertion. These two lines are the stronger pin: they read the PARSED
+      // `run` of the step `deployScriptStep()` located by name, and they pin
+      // the whole invocation — script, flags and ref — on BOTH the dry-run and
+      // the webhook path. A raw `toContain("scripts/deploy-coolify.sh")` is
+      // implied by them, so it cannot fail when they pass, and it is weaker in
+      // the one direction that matters: a YAML comment naming the file
+      // satisfies it while the job runs something else. #324 ran exactly that
+      // — renaming the invocation to `scripts/coolify-deploy.sh` and leaving
+      // the old name in a comment keeps `raw.includes(...)` true and turns the
+      // three deploy tests that call `deployScriptStep()` red. The weaker
+      // substring form is already carried once, by `adds a workflow_dispatch
+      // dry-run input…`; a third copy, against the bytes instead of the value,
+      // is the same redundancy #323 struck from `documents the deploy exactly
+      // as the workflow ships it`.
       expect(run).toContain(
         'scripts/deploy-coolify.sh --dry-run --ref "$GITHUB_REF_NAME"'
       )
