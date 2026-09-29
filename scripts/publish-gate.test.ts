@@ -4,11 +4,21 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import yaml from "js-yaml"
 
+// GATE-NOTES — what this gate holds, and what it deliberately does not.
+// Three notes, kept together because each records a decision a future editor
+// would otherwise have to reverse-engineer: (1) the scope, (2) the coverage
+// this gate gave up in #323 and why, (3) what the surviving pins were measured
+// to hold in #324. Grep for "GATE-NOTES" to find them again.
+
+// NOTE 1 — SCOPE.
+//
 // This gate asserts claims about the release job: the publish chain, the two
 // jobs and their order, the exact deploy condition, malformed tags failing the
 // run and pushing nothing, the deploy as the last act. It does not assert how a
 // document is worded. Rephrasing a sentence in any document the gate reads must
 // leave it green.
+
+// NOTE 2 — THE COVERAGE THIS GATE GAVE UP (#323).
 //
 // Twelve tests here once opened a prose document — the ticket that prompted
 // this change counted seven, which was low. They split cleanly in two:
@@ -39,8 +49,7 @@ import yaml from "js-yaml"
 // The last is the one worth a second reading, because it also held two claims
 // about the workflow rather than about prose. Those were not lost: they are
 // subsumed by the exact `toBe` on `job("deploy").if` in `deploys only on the
-// exact single-owner gate`, and #324 argues that below at the deploy-script
-// assertions. Same reasoning as the three above it.
+// exact single-owner gate` (see NOTE 3). Same reasoning as the three above it.
 //
 // Narrowing a test drops assertions too, and those are the larger half of what
 // went: six surviving tests each kept only their `not.toContain` guards, and
@@ -52,11 +61,12 @@ import yaml from "js-yaml"
 // and the naming half of "secrets by name only". None of those has a new home
 // and none should: each says a sentence must be worded a particular way. They
 // are listed here so a reader reconstructing the trade is not left to infer it.
+
+// NOTE 3 — WHAT THE SURVIVING PINS WERE MEASURED TO HOLD (#324).
 //
-// #324 then measured what the surviving release-job pins actually hold, by
-// breaking the workflow on purpose and reverting it. Two results belong to the
-// next reader, because both are edits a careful person could make that leave
-// every test here green:
+// #324 broke the workflow on purpose and reverted it. Three results belong to
+// the next reader, because each is an edit a careful person could make that
+// leaves every test here green:
 //
 //   - The chain is pinned as a GRAPH, not as a file layout. Moving
 //     `build-and-push` above `publish-check` with every `needs:` left intact
@@ -71,6 +81,18 @@ import yaml from "js-yaml"
 //     the gate does not see is covered at runtime instead: the release-gate
 //     step exits 1 on a non-semver tag, so an over-broad trigger turns a
 //     stray tag into a failed run rather than into a deploy.
+//   - The release file is pinned against the PARSED step, not the bytes, and
+//     that is deliberate. #324 weighed adding a raw-text
+//     `toContain("scripts/deploy-coolify.sh")` on the workflow text and
+//     rejected it on the evidence of a probe: renaming both invocations to
+//     `scripts/coolify-deploy.sh` while leaving a YAML comment naming the old
+//     file keeps `raw.includes("scripts/deploy-coolify.sh")` TRUE — a comment
+//     supplies the string — while the existing parsed pin goes RED on all three
+//     tests that call `deployScriptStep()`. The proposed assertion would have
+//     passed the defect it was written to catch; the existing one catches it.
+//     The pin in question lives in `switches between dry-run and the real
+//     webhook from the dispatch input`, which reads the parsed `run` and
+//     asserts the whole invocation — script, flags and ref — on both branches.
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 const WORKFLOW_PATH = join(ROOT, ".github/workflows/docker-publish.yml")
@@ -540,23 +562,11 @@ describe(".github/workflows/docker-publish.yml", () => {
     it("switches between dry-run and the real webhook from the dispatch input, passing the ref on both paths", () => {
       const step = deployScriptStep()
       const run = step.run ?? ""
-      // #324 asked whether the release file should ALSO be pinned against the
-      // raw workflow text, and left the answer here rather than adding the
-      // assertion. These two lines are the stronger pin: they read the PARSED
-      // `run` of the step `deployScriptStep()` located by name, and they pin
-      // the whole invocation — script, flags and ref — on BOTH the dry-run and
-      // the webhook path. A raw `toContain("scripts/deploy-coolify.sh")` is
-      // implied by them, so it cannot fail when they pass, and it is weaker in
-      // the one direction that matters: a YAML comment naming the file
-      // satisfies it while the job runs something else. #324 ran exactly that
-      // — renaming the invocation to `scripts/coolify-deploy.sh` and leaving
-      // the old name in a comment keeps `raw.includes(...)` true and turns the
-      // three deploy tests that call `deployScriptStep()` red. The weaker
-      // substring form is already carried once, by `adds a workflow_dispatch
-      // dry-run input…`, which also reads the parsed step rather than the
-      // bytes; a third copy, against the bytes instead of the value, would be
-      // the same redundancy #323 struck from `documents the deploy exactly as
-      // the workflow ships it`.
+      // These two lines are the pin on the release file. #324 asked whether
+      // the file should ALSO be pinned against the raw workflow text and
+      // concluded no — see GATE-NOTES: "the release file is pinned against
+      // the parsed step, not the bytes" for that argument and the probe that
+      // decided it.
       expect(run).toContain(
         'scripts/deploy-coolify.sh --dry-run --ref "$GITHUB_REF_NAME"'
       )
