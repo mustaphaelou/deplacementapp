@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { readFileSync } from "node:fs"
+import { readFileSync, readdirSync, statSync } from "node:fs"
 import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 import { renderToStaticMarkup } from "react-dom/server"
@@ -48,6 +48,22 @@ import {
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 const source = (rel: string) => readFileSync(join(ROOT, rel), "utf8")
+
+/**
+ * Every `.tsx` under `dir`, recursively, sorted so a failure names one path.
+ *
+ * `.tsx` only — a `.ts` file cannot hold a JSX attribute, and counting test
+ * files would make the "one definition" pin fail on its own assertion.
+ */
+function walkTsx(dir: string): string[] {
+  const out: string[] = []
+  for (const entry of readdirSync(dir).sort()) {
+    const full = join(dir, entry)
+    if (statSync(full).isDirectory()) out.push(...walkTsx(full))
+    else if (full.endsWith(".tsx") && !full.endsWith(".test.tsx")) out.push(full)
+  }
+  return out
+}
 
 // Slice a region for a NEGATIVE assertion, and fail loudly if the anchor has
 // drifted. `String.indexOf` returns -1 on a miss and `slice(-1, -1)` is "",
@@ -125,88 +141,245 @@ describe("the display class constants — each is the exact string, spelled out"
 })
 
 /**
- * The module's value against the page's value, in the page's own source.
+ * The migrated call sites reach this module; the out-of-scope ones still
+ * carry their own copy.
  *
- * No call site is migrated by this ticket, so the pages still carry their own
- * copies — and that is exactly what makes this test meaningful: it is what
- * proves the new constant is byte-identical to the copy it will replace at
- * #307. A constant typed from memory rather than copied from a page fails
- * here on the first character that differs.
+ * #306 created the module and moved nothing, so this block asserted the module's
+ * value against the LITERAL each page rendered — proving byte-identity before
+ * the migration could lose a character. #307 migrates the pages, and that
+ * assertion inverts: a migrated page no longer contains the literal at all, so
+ * asserting it does would guard the opposite of what the ticket claims.
  *
- * #307 deletes this describe block: once the pages import the module, the
- * source no longer carries the literal, and asserting that it does would
- * guard the opposite of what this ticket claims.
+ * What replaces it is the pin that matters once the pages import the module: a
+ * migrated site must reach for the shared value rather than hold its own. This
+ * is deliberately NOT a source-only grep for the import — a page that imports
+ * the module and then keeps a private `const rowHover` beside it would pass
+ * that, and it is exactly the drift the ticket removes. So each migrated site
+ * is asserted twice: it imports the module, AND it no longer spells the value.
+ *
+ * The sites #307 does not reach (`app/(auth)/**`, `app/prototype/**`, and the
+ * three component modules) keep the original byte-identity pin, unchanged and
+ * still true — it is the guard on the NEXT migration.
  */
-describe("the constants are byte-identical to what the pages render today", () => {
+describe("the sites this ticket migrated reach the module; the rest still carry their own", () => {
+  /** Every page #307 moved onto this module, and what it should now hold. */
+  const MIGRATED = [
+    {
+      file: "app/(dashboard)/administration/utilisateurs/page.tsx",
+      symbols: [
+        "Field",
+        "hideClassFor",
+        "LoadingBlock",
+        "rowHoverInkTint",
+        "searchFieldIconClass",
+        "searchFieldInputClass",
+        "tableShellClass",
+        "textInputClass",
+      ],
+      gone: [
+        textInputClass,
+        rowHoverInkTint,
+        tableShellClass,
+        searchFieldIconClass,
+        searchFieldInputClass,
+        // `loadingTextClass` is deliberately NOT listed here: its two tokens
+        // also spell the pages' EMPTY-STATE paragraph, a different element that
+        // #307 does not migrate. See the note on the assertion below.
+        loadingBlockClass,
+        fieldLabelClass,
+      ],
+    },
+    {
+      file: "app/(dashboard)/administration/vehicules/page.tsx",
+      symbols: [
+        "Field",
+        "hideClassFor",
+        "LoadingBlock",
+        "rowHoverInkTint",
+        "searchFieldIconClass",
+        "searchFieldInputClass",
+        "tableShellClass",
+        "textInputClass",
+      ],
+      gone: [
+        textInputClass,
+        rowHoverInkTint,
+        tableShellClass,
+        searchFieldIconClass,
+        tableShellClass,
+        loadingBlockClass,
+      ],
+    },
+    {
+      file: "app/(dashboard)/demandes/page.tsx",
+      symbols: [
+        "hideClassFor",
+        "LoadingBlock",
+        "rowHoverInkTint",
+        "searchFieldIconClass",
+        "tableShellClass",
+      ],
+      gone: [
+        rowHoverInkTint,
+        tableShellClass,
+        searchFieldIconClass,
+        loadingBlockClass,
+      ],
+    },
+    {
+      file: "app/(dashboard)/notifications/page.tsx",
+      symbols: ["LoadingBlock"],
+      gone: [loadingBlockClass],
+    },
+    {
+      file: "app/(dashboard)/administration/societe/page.tsx",
+      symbols: ["Field", "SectionHeading", "textInputClass"],
+      gone: [
+        textInputClass,
+        fieldLabelClass,
+        fieldHintClass,
+        sectionHeadingRuleClass,
+        sectionHeadingRowClass,
+        // The five heading tokens, as the module orders them. The page used to
+        // carry them with `uppercase` last; it no longer carries them at all.
+        sectionHeadingClass,
+      ],
+    },
+  ]
+
+  it.each(MIGRATED)("$file imports what it renders", ({ file, symbols }) => {
+    const src = source(file)
+    const importBlock = /import\s*\{([^}]*)\}\s*from\s*"@\/components\/display"/.exec(
+      src,
+    )
+    expect(
+      importBlock,
+      `${file} renders through this module but does not import from it — ` +
+        `the values below are what it is expected to reach for`,
+    ).not.toBeNull()
+    const imported = (importBlock![1] ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+    for (const symbol of symbols as string[]) {
+      expect(
+        imported,
+        `${file} renders ${symbol} but does not import it from this module`,
+      ).toContain(symbol)
+    }
+  })
+
+  it.each(MIGRATED)(
+    "$file no longer spells the values it now imports",
+    ({ file, gone }) => {
+      const src = source(file)
+      for (const value of gone as string[]) {
+        expect(
+          src.includes(value),
+          `${file} still spells ${JSON.stringify(value)} inline. It is now ` +
+            `imported from this module; a private copy beside the import is the ` +
+            `exact drift #307 removes, and a grep for the import alone would ` +
+            `not catch it.`,
+        ).toBe(false)
+      }
+    },
+  )
+
+  it("the loading text is gone from the loading block, even though its tokens survive elsewhere", () => {
+    // `loadingTextClass` is the one migrated value that CANNOT be pinned by
+    // absence: `text-sm text-muted-foreground` is also how each page styles its
+    // EMPTY-STATE paragraph, a different element this ticket does not migrate.
+    // A blanket `not.toContain(loadingTextClass)` would therefore be a false
+    // claim — it asserts an absence that is not there and is not wanted.
+    //
+    // What is true is narrower, and it is the claim worth making: no page
+    // spells the loading BLOCK's geometry inline any more, so the word
+    // "Chargement..." now only reaches the DOM through `<LoadingBlock />`.
+    // Asserted on the rendering, which is where the distinction is real.
+    for (const file of [
+      "app/(dashboard)/administration/utilisateurs/page.tsx",
+      "app/(dashboard)/administration/vehicules/page.tsx",
+      "app/(dashboard)/demandes/page.tsx",
+      "app/(dashboard)/notifications/page.tsx",
+    ]) {
+      expect(
+        source(file).includes(loadingBlockClass),
+        `${file} still spells the loading block's geometry inline`,
+      ).toBe(false)
+      expect(
+        source(file),
+        `${file} spells "Chargement..." itself — it should render <LoadingBlock />`,
+      ).not.toContain("Chargement...")
+    }
+  })
+
+  it("declares no private copy of a name this module owns", () => {
+    // The import test above would pass on a page that imports the module AND
+    // redeclares `rowHover` locally. These are the local declarations that
+    // duplication takes, named here so none of them comes back.
+    for (const { file } of MIGRATED) {
+      const src = source(file)
+      for (const decl of [
+        /function\s+hideClassFor\b/,
+        /function\s+SectionHeading\b/,
+        /function\s+Field\b/,
+        /function\s+LoadingBlock\b/,
+        /const\s+FIELD_INPUT\b/,
+        /const\s+rowHover\b/,
+      ]) {
+        expect(
+          decl.test(src),
+          `${file} declares a private ${decl.source} — this module owns that name`,
+        ).toBe(false)
+      }
+    }
+  })
+
+  it("the dashboard layout imports hideClassFor instead of defining it", () => {
+    const src = source("components/dashboard-layout.tsx")
+    // The duplicate this ticket had to delete: a second definition of a rule
+    // this module already owns, serving a DIFFERENT table (the config-driven
+    // home widget) but identical in behaviour.
+    expect(
+      /function\s+hideClassFor\b/.test(src),
+      "components/dashboard-layout.tsx declares its own hideClassFor — the " +
+        "duplicate #307 deleted. One definition of the rule, in the module.",
+    ).toBe(false)
+    expect(
+      /import\s*\{[^}]*\bhideClassFor\b[^}]*\}\s*from\s*"@\/components\/display"/.test(
+        src,
+      ),
+      "components/dashboard-layout.tsx calls hideClassFor without importing it " +
+        "from this module",
+    ).toBe(true)
+  })
+
+  it("keeps exactly one hideClassFor definition in the whole tree", () => {
+    // The structural form of the same claim, and the one that fails if a
+    // fifth file grows its own copy: read the tree rather than trust one file.
+    const files = [
+      ...walkTsx(join(ROOT, "app")),
+      ...walkTsx(join(ROOT, "components")),
+    ]
+    const definitions = files.filter((f) =>
+      /function\s+hideClassFor\b/.test(readFileSync(f, "utf8")),
+    )
+    expect(
+      definitions.map((f) => f.replace(`${ROOT}/`, "")),
+      "more than one hideClassFor definition exists — the rule is owned once",
+    ).toEqual(["components/display.tsx"])
+  })
+
   it.each([
-    [
-      "textInputClass",
-      textInputClass,
-      [
-        "components/demande-form.tsx",
-        "components/profile-edit.tsx",
-        "app/(dashboard)/administration/societe/page.tsx",
-        "app/(dashboard)/administration/vehicules/page.tsx",
-        "app/(dashboard)/administration/utilisateurs/page.tsx",
-      ],
-    ],
-    [
-      "rowHoverInkTint",
-      rowHoverInkTint,
-      [
-        "components/dashboard-layout.tsx",
-        "app/(dashboard)/demandes/page.tsx",
-        "app/(dashboard)/administration/utilisateurs/page.tsx",
-        "app/(dashboard)/administration/vehicules/page.tsx",
-      ],
-    ],
-    [
-      "tableShellClass",
-      tableShellClass,
-      [
-        "components/dashboard-layout.tsx",
-        "app/(dashboard)/demandes/page.tsx",
-        "app/(dashboard)/administration/utilisateurs/page.tsx",
-        "app/(dashboard)/administration/vehicules/page.tsx",
-      ],
-    ],
-    [
-      "searchFieldIconClass",
-      searchFieldIconClass,
-      [
-        "app/(dashboard)/demandes/page.tsx",
-        "app/(dashboard)/administration/utilisateurs/page.tsx",
-        "app/(dashboard)/administration/vehicules/page.tsx",
-      ],
-    ],
-    [
-      "searchFieldInputClass",
-      searchFieldInputClass,
-      [
-        "app/(dashboard)/administration/utilisateurs/page.tsx",
-        "app/(dashboard)/administration/vehicules/page.tsx",
-      ],
-    ],
-    ["loadingBlockClass", loadingBlockClass, [
-      "app/(dashboard)/demandes/page.tsx",
-      "app/(dashboard)/notifications/page.tsx",
-      "app/(dashboard)/administration/utilisateurs/page.tsx",
-      "app/(dashboard)/administration/vehicules/page.tsx",
-    ]],
-    ["loadingTextClass", loadingTextClass, [
-      "app/(dashboard)/demandes/page.tsx",
-      "app/(dashboard)/notifications/page.tsx",
-      "app/(dashboard)/administration/utilisateurs/page.tsx",
-      "app/(dashboard)/administration/vehicules/page.tsx",
+    ["textInputClass", textInputClass, [
+      "components/demande-form.tsx",
+      "components/profile-edit.tsx",
+      "app/(auth)/login/setup-wizard.tsx",
     ]],
     ["fieldLabelClass", fieldLabelClass, [
       "components/demande-form.tsx",
-      "app/(dashboard)/administration/societe/page.tsx",
-      "app/(dashboard)/administration/vehicules/page.tsx",
-      "app/(dashboard)/administration/utilisateurs/page.tsx",
-    ]],
-    ["fieldHintClass", fieldHintClass, [
-      "app/(dashboard)/administration/societe/page.tsx",
+      "components/profile-edit.tsx",
+      "app/prototype/notion-redesign/variant-a.tsx",
     ]],
     ["sectionHeadingClass", sectionHeadingClass, [
       "components/demande-form.tsx",
@@ -217,6 +390,7 @@ describe("the constants are byte-identical to what the pages render today", () =
       "components/demande-form.tsx",
       "components/profile-edit.tsx",
       "components/demande-detail.tsx",
+      "app/(auth)/login/page.tsx",
     ]],
     ["sectionHeadingRowClass", sectionHeadingRowClass, [
       "components/demande-form.tsx",
@@ -231,32 +405,37 @@ describe("the constants are byte-identical to what the pages render today", () =
       "components/demande-detail.tsx",
       "components/profile-edit.tsx",
     ]],
-  ])("%s is present, unchanged, in every site that renders it", (_name, value, files) => {
-    for (const file of files as string[]) {
-      expect(
-        source(file),
-        `${_name} is not present in ${file} — the constant and the page it replaces have drifted`,
-      ).toContain(value as string)
-    }
-  })
+  ])(
+    "%s is still byte-identical in the out-of-scope site %s",
+    (_name, value, files) => {
+      for (const file of files as string[]) {
+        expect(
+          source(file),
+          `${_name} is not present in ${file} — the module and the site that ` +
+            `has not migrated yet have drifted`,
+        ).toContain(value as string)
+      }
+    },
+  )
 
   it("sectionHeadingClass normalises the Societe page's token order and nothing else", () => {
-    // The one authorised difference. The Societe page carries the SAME tokens
-    // with `uppercase` last; class order is not behaviour. This asserts the
-    // token SET matches and that `uppercase` is the only thing that moved, so
-    // a fifth site with genuinely different tokens fails here instead of being
-    // normalised away.
+    // The one authorised difference. The Societe page carried the SAME tokens
+    // with `uppercase` last; class order is not behaviour, and it now renders
+    // the module's ordering. This asserts the token SET matches the five the
+    // page used, so a site with genuinely different tokens fails here instead
+    // of being normalised away.
     const tokens = (s: string) => s.split(" ").sort().join(" ")
     expect(tokens(sectionHeadingClass)).toBe(
       tokens("text-xs font-medium uppercase tracking-[0.06em] text-muted-foreground"),
     )
-    // Every individual token, checked in the page's own source. A token-set
-    // comparison alone would be satisfied by a reordering of DIFFERENT
-    // utilities; pinning each token proves the page carries the same five.
+    // Every token individually, against the module's own rendered markup. The
+    // page's source no longer carries them — that is the migration — so the
+    // token-set claim is checked where the tokens now live.
+    const html = renderToStaticMarkup(<SectionHeading>Identité visuelle</SectionHeading>)
     for (const token of sectionHeadingClass.split(" ")) {
       expect(
-        source("app/(dashboard)/administration/societe/page.tsx"),
-        `the Societe page's section heading is missing ${token}`,
+        html,
+        `the module's section heading is missing ${token}`,
       ).toContain(token)
     }
   })

@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Select, SelectItem } from "@/components/ui/select"
 import {
   Dialog,
@@ -13,6 +12,16 @@ import {
 } from "@/components/ui/dialog"
 import { PageHeader } from "@/components/page-header"
 import { StatusPill } from "@/components/status-pill"
+import {
+  Field,
+  hideClassFor,
+  LoadingBlock,
+  rowHoverInkTint,
+  searchFieldIconClass,
+  searchFieldInputClass,
+  tableShellClass,
+  textInputClass,
+} from "@/components/display"
 import { toast } from "sonner"
 import { Plus, Loader2, Pencil, Search, Users } from "lucide-react"
 import { ROLE_LABELS } from "@/lib/auth"
@@ -37,30 +46,6 @@ interface Departement {
   nom: string
 }
 
-const FIELD_INPUT =
-  "h-9 rounded-[3px] focus-visible:ring-1 focus-visible:ring-(--brand)"
-const rowHover =
-  "hover:bg-[rgba(55,53,47,0.024)] dark:hover:bg-sidebar-accent/40"
-
-function Field({
-  label,
-  htmlFor,
-  children,
-}: {
-  label: string
-  htmlFor?: string
-  children: React.ReactNode
-}) {
-  return (
-    <div>
-      <Label htmlFor={htmlFor} className="mb-1.5 block text-sm font-medium">
-        {label}
-      </Label>
-      {children}
-    </div>
-  )
-}
-
 export function UtilisateursTable({
   users,
   onEdit,
@@ -69,20 +54,39 @@ export function UtilisateursTable({
   onEdit: (user: Utilisateur) => void
 }) {
   return (
-    <div className="overflow-x-auto border-y border-border text-sm">
+    <div className={tableShellClass}>
       <table className="w-full min-w-[500px]">
         <thead>
           <tr className="border-b border-border text-left">
             <th className="px-2 py-2 font-normal text-muted-foreground">
               Nom complet
             </th>
-            <th className="hidden px-2 py-2 font-normal text-muted-foreground md:table-cell">
+            {/* #307: the eight cells this table hides below a breakpoint ask
+                the shared rule for their half of the pair instead of writing
+                `hidden … :table-cell` into the header. The page keeps the
+                base cell geometry, which is its own decision. */}
+            <th
+              className={cn(
+                "px-2 py-2 font-normal text-muted-foreground",
+                hideClassFor({ hideAt: "md" })
+              )}
+            >
               Email
             </th>
-            <th className="hidden px-2 py-2 font-normal text-muted-foreground md:table-cell">
+            <th
+              className={cn(
+                "px-2 py-2 font-normal text-muted-foreground",
+                hideClassFor({ hideAt: "md" })
+              )}
+            >
               Poste
             </th>
-            <th className="hidden px-2 py-2 font-normal text-muted-foreground lg:table-cell">
+            <th
+              className={cn(
+                "px-2 py-2 font-normal text-muted-foreground",
+                hideClassFor({ hideAt: "lg" })
+              )}
+            >
               Département
             </th>
             <th className="px-2 py-2 font-normal text-muted-foreground">
@@ -91,7 +95,12 @@ export function UtilisateursTable({
             <th className="px-2 py-2 font-normal text-muted-foreground">
               Statut
             </th>
-            <th className="hidden px-2 py-2 font-normal text-muted-foreground lg:table-cell">
+            <th
+              className={cn(
+                "px-2 py-2 font-normal text-muted-foreground",
+                hideClassFor({ hideAt: "lg" })
+              )}
+            >
               Auth
             </th>
             <th className="w-8 px-2 py-2 text-right font-normal text-muted-foreground">
@@ -105,7 +114,7 @@ export function UtilisateursTable({
               key={u.id}
               className={cn(
                 "group border-b border-border transition-colors last:border-0",
-                rowHover
+                rowHoverInkTint
               )}
             >
               <td className="px-2 py-2.5">
@@ -119,11 +128,22 @@ export function UtilisateursTable({
                   </span>
                 </div>
               </td>
-              <td className="hidden px-2 py-2.5 text-xs md:table-cell">
+              <td
+                className={cn(
+                  "px-2 py-2.5 text-xs",
+                  hideClassFor({ hideAt: "md" })
+                )}
+              >
                 {u.email}
               </td>
-              <td className="hidden px-2 py-2.5 md:table-cell">{u.poste}</td>
-              <td className="hidden px-2 py-2.5 lg:table-cell">
+              <td
+                className={cn("px-2 py-2.5", hideClassFor({ hideAt: "md" }))}
+              >
+                {u.poste}
+              </td>
+              <td
+                className={cn("px-2 py-2.5", hideClassFor({ hideAt: "lg" }))}
+              >
                 {u.departement.nom}
               </td>
               <td className="px-2 py-2.5">
@@ -138,7 +158,9 @@ export function UtilisateursTable({
                   tone={u.actif ? "success" : "danger"}
                 />
               </td>
-              <td className="hidden px-2 py-2.5 lg:table-cell">
+              <td
+                className={cn("px-2 py-2.5", hideClassFor({ hideAt: "lg" }))}
+              >
                 {u.googleAuthEnabled && (
                   <StatusPill label="Google" tone="neutral" />
                 )}
@@ -292,20 +314,18 @@ export default function UtilisateursPage() {
 
       <div className="flex justify-end">
         <div className="relative">
-          <Search className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Search className={searchFieldIconClass} />
           <Input
             placeholder="Rechercher"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="h-8 w-60 pl-8"
+            className={searchFieldInputClass}
           />
         </div>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center p-8">
-          <p className="text-sm text-muted-foreground">Chargement...</p>
-        </div>
+        <LoadingBlock />
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-2 p-8">
           <Users className="size-8 text-muted-foreground/50" />
@@ -331,7 +351,7 @@ export default function UtilisateursPage() {
                   value={form.prenom}
                   onChange={(e) => setForm({ ...form, prenom: e.target.value })}
                   required
-                  className={FIELD_INPUT}
+                  className={textInputClass}
                 />
               </Field>
               <Field label="Nom">
@@ -339,7 +359,7 @@ export default function UtilisateursPage() {
                   value={form.nom}
                   onChange={(e) => setForm({ ...form, nom: e.target.value })}
                   required
-                  className={FIELD_INPUT}
+                  className={textInputClass}
                 />
               </Field>
             </div>
@@ -349,7 +369,7 @@ export default function UtilisateursPage() {
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 required
-                className={FIELD_INPUT}
+                className={textInputClass}
               />
             </Field>
             <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
@@ -358,7 +378,7 @@ export default function UtilisateursPage() {
                   value={form.poste}
                   onChange={(e) => setForm({ ...form, poste: e.target.value })}
                   required
-                  className={FIELD_INPUT}
+                  className={textInputClass}
                 />
               </Field>
               <Select
@@ -392,7 +412,7 @@ export default function UtilisateursPage() {
                 onChange={(e) =>
                   setForm({ ...form, telephone: e.target.value })
                 }
-                className={FIELD_INPUT}
+                className={textInputClass}
               />
             </Field>
             <Field
@@ -410,7 +430,7 @@ export default function UtilisateursPage() {
                 }
                 required={!editingUser && !form.googleAuthEnabled}
                 minLength={6}
-                className={FIELD_INPUT}
+                className={textInputClass}
               />
             </Field>
             <label className="flex items-center gap-2 text-sm">

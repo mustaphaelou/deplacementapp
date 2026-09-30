@@ -1,5 +1,9 @@
 import { describe, it, expect, vi } from "vitest"
 import { renderToStaticMarkup } from "react-dom/server"
+import { readFileSync } from "node:fs"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
+import { SectionHeading } from "@/components/display"
 
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
@@ -47,9 +51,12 @@ describe("Société administration page", () => {
 
     expect(html).not.toContain('data-slot="card"')
     expect(html).toContain("Identité visuelle")
-    expect(html).toContain("uppercase")
-    expect(html).toContain("tracking-[0.06em]")
-    expect(html).toContain("h-px flex-1 bg-border")
+    // #307: the heading's classes belong to the shared module, so they are
+    // asserted as the module's own RENDERED markup next to this page's — not
+    // re-pinned here as three separate literal substrings. A page test that
+    // spells them is a second copy of the pin the module already owns, and it
+    // would have caught this page reverting to a private heading.
+    expect(html).toContain(renderToStaticMarkup(<SectionHeading>Identité visuelle</SectionHeading>))
     expect(html).toContain("Nom de la société")
     expect(html).toContain("Nom d&#x27;expéditeur email")
     expect(html).toContain("Domaine email")
@@ -75,6 +82,50 @@ describe("Société administration page", () => {
     expect(html).toContain("Logo actuel")
     expect(html).toContain('alt="Logo"')
     expect(html).toContain("uploads/logo.png")
+  })
+})
+
+// #307: the page used to carry its own SectionHeading and Field, both real
+// duplicates of the shared module's. This asserts it renders THROUGH the module
+// rather than spelling its own — and it fails if the private copy comes back,
+// which a rendered-markup comparison could not: the two produce the same bytes.
+describe("Société administration page — the shared display module", () => {
+  it("renders both section headings through the shared SectionHeading", async () => {
+    const { SocieteSettings } = await import("./page")
+    const html = renderToStaticMarkup(<SocieteSettings {...EMPTY_PROPS} />)
+
+    // The page's OWN two titles, each rendered by the module's component.
+    for (const title of ["Identité visuelle", "Email"]) {
+      expect(
+        html,
+        `the ${title} section is not the shared SectionHeading's markup`,
+      ).toContain(renderToStaticMarkup(<SectionHeading>{title}</SectionHeading>))
+    }
+  })
+
+  it("declares no private SectionHeading, Field or heading class of its own", () => {
+    const src = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "page.tsx"),
+      "utf8"
+    )
+    // Rendered markup alone cannot catch this: a private copy that renders the
+    // same bytes is invisible to a markup comparison. The source is the only
+    // place the duplication is observable.
+    expect(
+      /function\s+SectionHeading\b/.test(src),
+      "the page declares its own SectionHeading — the shared module owns that name",
+    ).toBe(false)
+    expect(
+      /function\s+Field\b/.test(src),
+      "the page declares its own Field — the shared module owns that name",
+    ).toBe(false)
+    for (const token of ["uppercase", "h-px flex-1 bg-border", "tracking-[0.06em]"]) {
+      expect(
+        src.includes(token),
+        `the page still spells ${JSON.stringify(token)} inline; it now reaches ` +
+          `the DOM through <SectionHeading />`,
+      ).toBe(false)
+    }
   })
 })
 

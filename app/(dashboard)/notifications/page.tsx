@@ -10,6 +10,7 @@ import { formatDateTime } from "@/lib/constants"
 import { Button } from "@/components/ui/button"
 import { useNotificationContext } from "@/components/notification-context"
 import { PageHeader } from "@/components/page-header"
+import { LoadingBlock } from "@/components/display"
 
 type Notification = {
   id: string
@@ -173,9 +174,7 @@ export default function NotificationsPage() {
       />
 
       {loading ? (
-        <div className="flex items-center justify-center p-8">
-          <p className="text-sm text-muted-foreground">Chargement...</p>
-        </div>
+        <LoadingBlock />
       ) : notifications.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-2 p-8">
           <Bell className="size-8 text-muted-foreground/50" />

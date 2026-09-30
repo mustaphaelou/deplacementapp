@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button"
 import { DashboardCard } from "@/components/ui/dashboard-card"
 import { PageHeader } from "@/components/page-header"
 import { StatusPill } from "@/components/status-pill"
+import { hideClassFor, tableShellClass } from "@/components/display"
 import { toDemandePresentation } from "@/lib/demande-presentation"
 import { formatCurrency, formatDate } from "@/lib/constants"
 import { cn } from "@/lib/utils"
@@ -54,17 +55,6 @@ interface DashboardLayoutProps {
   config: DashboardConfig
   navItems: NavItem[]
   demandes: DashboardDemandeSummary[]
-}
-
-function hideClassFor(col: { hideAt?: "sm" | "md" | "lg" }) {
-  if (!col.hideAt) return undefined
-  const showAt =
-    col.hideAt === "sm"
-      ? "sm:table-cell"
-      : col.hideAt === "md"
-        ? "md:table-cell"
-        : "lg:table-cell"
-  return `hidden ${showAt}`
 }
 
 const cellRenderers: Record<
@@ -219,7 +209,7 @@ export function DashboardLayout({
         ) : (
           /* The database table the list page uses — hairline rules top and
              bottom, no left/right borders, ink-tint row hover. */
-          <div className="overflow-x-auto border-y border-border text-sm">
+          <div className={tableShellClass}>
             <table className="w-full min-w-[640px]">
               <thead>
                 <tr className="border-b border-border text-left">
