@@ -373,9 +373,10 @@ export const conditionActif = eq(utilisateurs.actif, true)
  *
  * An identifier matching no Utilisateur reads `false` rather than throwing:
  * the question asked is « may this one act », and a Utilisateur that does not
- * exist may not. This preserves the behaviour of the private copy in
- * `lib/auth/session.ts` (`row?.actif ?? false`), which #316 will retire in
- * favour of a call to here.
+ * exist may not. This preserves the behaviour of the private copy that
+ * `lib/auth/session.ts` used to keep (`row?.actif ?? false`); #316 retired that
+ * copy in favour of a call to here, so the three former copies of this rule
+ * are now one.
  */
 export async function peutAgir(
   utilisateurId: string,
