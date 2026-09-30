@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest"
+import { readFile } from "node:fs/promises"
 import { sql, eq } from "drizzle-orm"
 import * as schema from "../db/schema"
 import { createPgliteDb } from "./test/create-pglite-db"
@@ -13,6 +14,7 @@ import {
   UtilisateurService,
   UtilisateurNotFoundError,
 } from "./utilisateur-service"
+import type { ProfileResult } from "./utilisateur-service"
 
 vi.mock("bcryptjs", () => ({
   hash: vi.fn().mockResolvedValue("$hashed$"),
@@ -22,6 +24,24 @@ vi.mock("bcryptjs", () => ({
 import { hash, compare } from "bcryptjs"
 
 const TIMEOUT = 30_000
+
+// #288 — compile-time half of the "no fabricated count" pin.
+//
+// A type is erased at runtime, so no assertion inside `it()` can observe the
+// DECLARED shape; only the value the read returns is visible to the suite.
+// This alias is therefore the pin for the declaration, and `npm run typecheck`
+// (part of the `verify` gate) is what enforces it: re-adding any of these keys
+// to `ProfileResult` makes `ProfileResultCountKeys` stop being `never`, which
+// violates `AssertNever`'s constraint and fails the build.
+//
+// Exported so `@typescript-eslint/no-unused-vars` does not flag it.
+type AssertNever<T extends never> = T
+type ProfileResultCountKeys = Extract<
+  keyof ProfileResult,
+  "_count" | "count" | "demandesCount" | "nbDemandes" | "demandes"
+>
+export type _PinProfileResultDeclaresNoCount =
+  AssertNever<ProfileResultCountKeys>
 
 function mockAvatarStorage(): AvatarStorage & {
   save: ReturnType<typeof vi.fn>
@@ -142,6 +162,40 @@ describe("UtilisateurService", { timeout: TIMEOUT }, () => {
       expect(result.id).toBe(actor.id)
       expect(result.nom).toBe("Admin")
       expect(result.departement).toEqual({ nom: "Test Departement" })
+    })
+
+    // #288. The read used to declare `_count: { demandes }` and return a
+    // fabricated `0` for every Utilisateur, admitted by a blanket
+    // `as unknown as ProfileResult`. Two pins, one per half of that:
+    // this one for the value the read returns, the type pin below for the
+    // shape it declares.
+    it("returns no fabricated count key on the row", async () => {
+      const result = await svc.findProfile(actor.id)
+
+      // `_count` is the exact key the fabrication used; the pattern also
+      // catches the obvious renames (demandesCount, nbDemandes).
+      expect(Object.keys(result)).not.toContain("_count")
+      expect(
+        Object.keys(result).filter((k) => /count|demandes/i.test(k))
+      ).toEqual([])
+    })
+
+    it("carries no blanket assertion: the selection satisfies the declaration", async () => {
+      // If the read ever needs to reconcile its selection with ProfileResult
+      // again, it must do so explicitly and locally. A blanket assertion is
+      // exactly what let the fabricated `_count` through, so the source of
+      // findProfile is pinned to contain no `as unknown as`.
+      const source = await readFile(
+        new URL("./utilisateur-service.ts", import.meta.url),
+        "utf8"
+      )
+      const findProfileBody = source.slice(
+        source.indexOf("async findProfile"),
+        source.indexOf("async create")
+      )
+
+      expect(findProfileBody).not.toContain("as unknown as")
+      expect(findProfileBody).not.toContain("_count")
     })
 
     it("throws UtilisateurNotFoundError when user is not found", async () => {

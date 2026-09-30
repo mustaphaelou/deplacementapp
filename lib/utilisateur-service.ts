@@ -18,6 +18,23 @@ import {
   AvatarError,
 } from "./errors"
 
+// What the profile read actually selects: the Utilisateur and their
+// Departement. It deliberately carries no demand count — the « Demandes »
+// stat is a DemandeDeplacement fact, so it is counted by the demande read
+// model (`countDemandes`) and asked for at the page, not here. #288 removed
+// the `_count: { demandes }` this interface used to promise.
+//
+// The selection and this shape agree exactly, so no assertion is needed to
+// reconcile them. The blanket `as unknown as ProfileResult` that used to sit
+// on this return existed for the fabricated `_count` alone: it was the only
+// mismatch, and `departement`'s nullability forced nothing (departementId is
+// NOT NULL, so the relation is non-nullable here). With the fabrication gone
+// the assertion had no reason to exist and was deleted rather than narrowed.
+//
+// Known, deliberately not fixed here: this still mirrors a persistence row
+// closely — it is a subset of the utilisateurs table that still carries
+// departementId/societeId/actif/modifieLe and friends the profile page never
+// presents. Tightening it to exactly what a profile shows is future work.
 export interface ProfileResult {
   id: string
   email: string
@@ -30,7 +47,6 @@ export interface ProfileResult {
   departement: { nom: string }
   dateEmbauche: Date | null
   creeLe: Date
-  _count: { demandes: number }
 }
 
 export {
@@ -64,10 +80,7 @@ export class UtilisateurService {
       },
     })
     if (!user) throw new UtilisateurNotFoundError()
-    return {
-      ...user,
-      _count: { demandes: 0 },
-    } as unknown as ProfileResult
+    return { ...user }
   }
 
   async create(
@@ -110,10 +123,7 @@ export class UtilisateurService {
           prenom: data.prenom,
           poste: data.poste,
           role: data.role as
-            | "EMPLOYEE"
-            | "MANAGER"
-            | "FINANCE_ADMIN"
-            | "GENERAL_DIRECTION",
+            "EMPLOYEE" | "MANAGER" | "FINANCE_ADMIN" | "GENERAL_DIRECTION",
           societeId: societe.id,
           departementId: data.departementId,
           telephone: data.telephone || null,
@@ -248,7 +258,11 @@ export class UtilisateurService {
       if (!data.currentPassword) {
         throw new EmailChangeRequiresPasswordError()
       }
-      const isValid = await verifyCredential(this._db, userId, data.currentPassword)
+      const isValid = await verifyCredential(
+        this._db,
+        userId,
+        data.currentPassword
+      )
       if (!isValid) throw new MotDePasseIncorrectError()
       updateData.email = data.email
     }
