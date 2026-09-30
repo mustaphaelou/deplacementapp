@@ -1,4 +1,4 @@
-import { eq, asc } from "drizzle-orm"
+import { eq, and, asc } from "drizzle-orm"
 import type { DrizzleDb } from "../db"
 import { db } from "../db"
 import { utilisateurs } from "../db/schema/utilisateurs"
@@ -333,13 +333,43 @@ export class UtilisateurService {
 }
 
 /**
- * One reader owns the rule that a Utilisateur may act: the `actif` column, and
- * nothing else. It is deliberately NOT a method on {@link UtilisateurService} —
- * that class binds its handle at construction and the module's exported
- * instance is built at module load, so a method there would have captured the
- * handle before any test could substitute it. A module-level function whose
- * handle argument defaults to this module's own `db` is redirected by exactly
- * that substitution; #314's test does it against a real in-process Postgres.
+ * The rule that a Utilisateur may act, in the one shape a SQL fragment can
+ * have: « the `actif` column reads true », and nothing else.
+ *
+ * This is the reader's SECOND shape, added in #315. A caller that filters a
+ * SET of Utilisateurs — the Notification recipient resolver — cannot ask
+ * {@link peutAgir} once per candidate without turning one query into many, so
+ * it needs the rule as something it can compose into its own `WHERE`. This
+ * export is that something: the resolver imports it instead of writing
+ * `eq(utilisateurs.actif, true)` a second time.
+ *
+ * It is a Drizzle `SQL` fragment built from the schema table, so this module
+ * stays what it already was — a server module that imports `db` and the
+ * schema at runtime. Nothing new reaches a client bundle through it, and
+ * `google-refusals.ts` (the login page's own vocabulary) deliberately does NOT
+ * import this module.
+ */
+export const conditionActif = eq(utilisateurs.actif, true)
+
+/**
+ * The same rule asked about ONE Utilisateur, derived from
+ * {@link conditionActif} rather than restated: the query below is « is there a
+ * Utilisateur with this identifier that the activity condition admits? ».
+ *
+ * That derivation is the point. If `peutAgir` and the condition could be
+ * written independently, a future change to one would leave the other
+ * answering a different question — two spellings of one rule, which is the
+ * defect #313 exists to remove. Because the per-Utilisateur answer is the set
+ * condition applied to a single id, they cannot disagree: a Utilisateur the
+ * condition admits is exactly one `peutAgir` answers true for. The suite pins
+ * that equivalence against a real in-process Postgres.
+ *
+ * Deliberately NOT a method on {@link UtilisateurService}: that class binds
+ * its handle at construction and the module's exported instance is built at
+ * module load, so a method there would have captured the handle before any
+ * test could substitute it. A module-level function whose handle argument
+ * defaults to this module's own `db` is redirected by exactly that
+ * substitution; #314's test does it against a real in-process Postgres.
  *
  * An identifier matching no Utilisateur reads `false` rather than throwing:
  * the question asked is « may this one act », and a Utilisateur that does not
@@ -352,11 +382,11 @@ export async function peutAgir(
   handle: DrizzleDb = db
 ): Promise<boolean> {
   const [row] = await handle
-    .select({ actif: utilisateurs.actif })
+    .select({ id: utilisateurs.id })
     .from(utilisateurs)
-    .where(eq(utilisateurs.id, utilisateurId))
+    .where(and(eq(utilisateurs.id, utilisateurId), conditionActif))
     .limit(1)
-  return row?.actif ?? false
+  return row !== undefined
 }
 
 export const utilisateurService = new UtilisateurService(db)

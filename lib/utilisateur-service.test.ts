@@ -703,4 +703,104 @@ describe("UtilisateurService", { timeout: TIMEOUT }, () => {
       expect(await peutAgir(actifId, pgliteDb as any)).toBe(true)
     })
   })
+
+  // #315 — the reader's second shape, `conditionActif`, and the one
+  // implementation the two shapes share.
+  //
+  // The interface is the test surface (#313), and the claim under test here is
+  // the one that makes the interface trustworthy: a per-Utilisateur answer and
+  // a reusable condition that CANNOT disagree. It is asserted as a SET
+  // EQUALITY against a real in-process Postgres, not as two separate answers —
+  // two separate answers would only prove each shape is individually right,
+  // which is exactly the state in which they could drift.
+  //
+  // If `peutAgir` were re-spelled independently of the condition, or the
+  // condition were changed to admit an inactive Utilisateur, one side of this
+  // equality moves and the other does not. Both failures are RED here.
+  describe("conditionActif — the reader's set filter, one implementation with peutAgir", () => {
+    let dbModule: typeof import("../db")
+    let peutAgir: typeof import("./utilisateur-service").peutAgir
+    let conditionActif: typeof import("./utilisateur-service").conditionActif
+    // Two of each, so a rule that admitted "some" inactive Utilisateurs — a
+    // single-row sample cannot tell that apart from admitting none.
+    let seededIds: Array<{ id: string; actif: boolean }>
+
+    beforeEach(async () => {
+      dbModule = await import("../db")
+      const reader = await import("./utilisateur-service")
+      ;({ peutAgir, conditionActif } = reader)
+      // Same redirection as the block above: the DEFAULT handle must resolve
+      // through the module binding at call time, so every `peutAgir` call in
+      // this block omits the argument.
+      vi.spyOn(dbModule, "db", "get").mockReturnValue(pgliteDb as any)
+
+      seededIds = [true, false, true, false].map((actif) => {
+        const id = crypto.randomUUID()
+        return { id, actif }
+      })
+      await pgliteDb.insert(schema.utilisateurs).values(
+        seededIds.map(({ id, actif }) => ({
+          ...makeUser({ id, email: `${id}@test.com`, actif }),
+          societeId,
+          departementId,
+        }))
+      )
+    })
+
+    /**
+     * Every Utilisateur the condition admits, read through a real query —
+     * the same composition the Notification resolver performs.
+     */
+    async function admittedByCondition(): Promise<string[]> {
+      const rows = await pgliteDb
+        .select({ id: utilisateurs.id })
+        .from(utilisateurs)
+        .where(conditionActif)
+      return rows.map((row) => row.id).sort()
+    }
+
+    it("admits every active Utilisateur and no inactive one", async () => {
+      const admitted = await admittedByCondition()
+      for (const { id, actif } of seededIds) {
+        if (actif) expect(admitted).toContain(id)
+        else expect(admitted).not.toContain(id)
+      }
+    })
+
+    // THE pin for « one implementation ». The per-Utilisateur answer and the
+    // set filter are compared as an EQUALITY OF ID SETS over every row in the
+    // table, not as two separate assertions: two separate ones would only show
+    // each shape is individually right, which is precisely the state in which
+    // they are free to drift. Here a change to one side that the other does not
+    // follow fails.
+    it("agrees with peutAgir on every Utilisateur, in both directions", async () => {
+      const everyId = (
+        await pgliteDb.select({ id: utilisateurs.id }).from(utilisateurs)
+      ).map((row) => row.id)
+
+      // The rows the reader is asked about are exactly the rows the condition
+      // is applied to — the two shapes are compared over the same population.
+      const answeredTrue: string[] = []
+      for (const id of everyId) {
+        if (await peutAgir(id)) answeredTrue.push(id)
+      }
+
+      expect(answeredTrue.sort()).toEqual(await admittedByCondition())
+    })
+
+    it("answers false for an identifier the condition admits nothing for", async () => {
+      const strangerId = crypto.randomUUID()
+      expect(await peutAgir(strangerId)).toBe(false)
+      expect(await admittedByCondition()).not.toContain(strangerId)
+    })
+
+    // The resolver composes this fragment into its OWN `where`, so it has to
+    // be a value and not a query or a function. Pinned as a positive type
+    // check rather than by inspecting internals: a re-export as a function
+    // would break every caller's query silently at the SQL level, and only
+    // `tsc` would notice.
+    it("is a SQL value a caller can compose into its own where", () => {
+      expect(conditionActif).toBeTypeOf("object")
+    })
+  })
 })
