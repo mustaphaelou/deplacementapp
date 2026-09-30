@@ -104,6 +104,21 @@ export class PdfRenderError extends Error {
   }
 }
 
+/**
+ * The DemandeDeplacement numéro collision: the numéro is allocated by
+ * counting the rows and then writing, against a unique index on the numéro,
+ * so two creations that interleave read the same count and the database
+ * refuses the second. Named so the refusal says what happened instead of
+ * answering « Erreur interne » (ADR-0002).
+ */
+export class NumeroCollisionError extends Error {
+  status = 409
+  constructor() {
+    super("Le numéro de la demande est déjà utilisé")
+    this.name = "NumeroCollisionError"
+  }
+}
+
 export function handleServiceError(e: unknown): NextResponse {
   if (e && typeof (e as Record<string, unknown>).status === "number") {
     const err = e as Error & { status: number }
