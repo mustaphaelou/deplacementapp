@@ -14,6 +14,7 @@ import {
   DemandeNotFoundError,
   UnauthorizedActionError,
   InvalidTransitionError,
+  NumeroCollisionError,
 } from "../errors"
 
 export type DemandeDeplacementRow = typeof demandesDeplacement.$inferSelect
@@ -46,6 +47,22 @@ function computeTotalEstime(data: CreateDemandeData): number {
     parseDecimal(data.fraisRepas) +
     parseDecimal(data.fraisDivers)
   )
+}
+
+/**
+ * Postgres SQLSTATE for a unique violation, on the unique index
+ * `demandes_deplacement_numero_index` that guards the numéro. Drizzle wraps
+ * the driver error in a `DrizzleQueryError` and keeps the driver error — the
+ * one carrying `code`/`constraint` — as its `cause`, so the chain is walked.
+ * Matching the code alone is deliberate: only the numéro insert can raise it
+ * inside this transaction, and a broader match would swallow an unrelated
+ * database failure into a refusal that does not describe it.
+ */
+function isNumeroUniqueViolation(e: unknown): boolean {
+  for (let cause: unknown = e; cause; cause = (cause as Error).cause) {
+    if ((cause as { code?: unknown }).code === "23505") return true
+  }
+  return false
 }
 
 async function generateNumero(): Promise<string> {
@@ -120,37 +137,43 @@ async function createDemande(
     notificationEvent = transition.notificationEvent
   }
 
-  const [demande] = await db.transaction(async (tx) => {
-    const [demande] = await tx
-      .insert(demandesDeplacement)
-      .values(createValues as never)
-      .returning()
+  let demande: DemandeDeplacementRow
+  try {
+    ;[demande] = await db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(demandesDeplacement)
+        .values(createValues as never)
+        .returning()
 
-    await appliquerEffets(tx, {
-      audit: {
-        utilisateurId: userRow.id,
-        action: auditAction,
-        entiteId: demande.id,
-        numero,
-      },
-      notification: notificationEvent
-        ? {
-            event: notificationEvent,
-            demandeId: demande.id,
-            numero,
-            employe: {
-              id: userRow.id,
-              prenom: userRow.prenom,
-              nom: userRow.nom,
-              departementId: userRow.departementId ?? "",
-            },
-            assigneAId: null,
-          }
-        : null,
+      await appliquerEffets(tx, {
+        audit: {
+          utilisateurId: userRow.id,
+          action: auditAction,
+          entiteId: created.id,
+          numero,
+        },
+        notification: notificationEvent
+          ? {
+              event: notificationEvent,
+              demandeId: created.id,
+              numero,
+              employe: {
+                id: userRow.id,
+                prenom: userRow.prenom,
+                nom: userRow.nom,
+                departementId: userRow.departementId ?? "",
+              },
+              assigneAId: null,
+            }
+          : null,
+      })
+
+      return [created]
     })
-
-    return [demande]
-  })
+  } catch (e) {
+    if (isNumeroUniqueViolation(e)) throw new NumeroCollisionError()
+    throw e
+  }
 
   return demande
 }
