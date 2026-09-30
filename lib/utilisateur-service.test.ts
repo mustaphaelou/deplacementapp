@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest"
+import { readFile } from "node:fs/promises"
 import { sql, eq } from "drizzle-orm"
 import * as schema from "../db/schema"
 import { createPgliteDb } from "./test/create-pglite-db"
@@ -13,6 +14,7 @@ import {
   UtilisateurService,
   UtilisateurNotFoundError,
 } from "./utilisateur-service"
+import type { ProfileResult } from "./utilisateur-service"
 
 vi.mock("bcryptjs", () => ({
   hash: vi.fn().mockResolvedValue("$hashed$"),
@@ -22,6 +24,43 @@ vi.mock("bcryptjs", () => ({
 import { hash, compare } from "bcryptjs"
 
 const TIMEOUT = 30_000
+
+// #288 — compile-time half of the "no fabricated count" pin.
+//
+// A type is erased at runtime, so no assertion inside `it()` can observe the
+// DECLARED shape; only the value the read returns is visible to the suite.
+// This alias is therefore the pin for the declaration, and `npm run typecheck`
+// (part of the `verify` gate) is what enforces it.
+//
+// The assertion is POSITIVE — the exact key set — rather than a denylist of
+// count-shaped names. A denylist can only catch the spellings it was written
+// with, so `nombreDemandes` or `demandesTotal` would slip past both this and
+// the runtime key check. Pinning the whole set means ANY field added to
+// `ProfileResult` fails the build, which is what "cannot be re-added
+// silently" actually asks for.
+//
+// Exported so `@typescript-eslint/no-unused-vars` does not flag it.
+type Equals<A, B> =
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2
+    ? true
+    : false
+type Assert<T extends true> = T
+export type _PinProfileResultDeclaresNoCount = Assert<
+  Equals<
+    keyof ProfileResult,
+    | "id"
+    | "email"
+    | "nom"
+    | "prenom"
+    | "poste"
+    | "telephone"
+    | "avatarUrl"
+    | "role"
+    | "departement"
+    | "dateEmbauche"
+    | "creeLe"
+  >
+>
 
 function mockAvatarStorage(): AvatarStorage & {
   save: ReturnType<typeof vi.fn>
@@ -142,6 +181,47 @@ describe("UtilisateurService", { timeout: TIMEOUT }, () => {
       expect(result.id).toBe(actor.id)
       expect(result.nom).toBe("Admin")
       expect(result.departement).toEqual({ nom: "Test Departement" })
+    })
+
+    // #288. The read used to declare `_count: { demandes }` and return a
+    // fabricated `0` for every Utilisateur, admitted by a blanket
+    // `as unknown as ProfileResult`. Two pins, one per half of that:
+    // this one for the value the read returns, the type pin below for the
+    // shape it declares.
+    it("returns no fabricated count key on the row", async () => {
+      const result = await svc.findProfile(actor.id)
+
+      // `_count` is the exact key the fabrication used; the pattern also
+      // catches the obvious renames (demandesCount, nbDemandes).
+      expect(Object.keys(result)).not.toContain("_count")
+      expect(
+        Object.keys(result).filter((k) => /count|demandes/i.test(k))
+      ).toEqual([])
+    })
+
+    it("carries no blanket assertion: the selection satisfies the declaration", async () => {
+      // If the read ever needs to reconcile its selection with ProfileResult
+      // again, it must do so explicitly and locally. A blanket assertion is
+      // exactly what let the fabricated `_count` through, so the source of
+      // findProfile is pinned to contain no `as unknown as`.
+      const source = await readFile(
+        new URL("./utilisateur-service.ts", import.meta.url),
+        "utf8"
+      )
+      const start = source.indexOf("async findProfile")
+      const end = source.indexOf("async create")
+      // The anchors are asserted BEFORE slicing. `indexOf` answers -1 when a
+      // needle is absent, and `slice` then yields "" — against which both
+      // `not.toContain` assertions pass trivially. Without these two, a rename
+      // of `findProfile` or a reorder that put `create` above it would silently
+      // disarm this pin rather than fail it.
+      expect(start).toBeGreaterThan(-1)
+      expect(end).toBeGreaterThan(start)
+      const findProfileBody = source.slice(start, end)
+      expect(findProfileBody.length).toBeGreaterThan(0)
+
+      expect(findProfileBody).not.toContain("as unknown as")
+      expect(findProfileBody).not.toContain("_count")
     })
 
     it("throws UtilisateurNotFoundError when user is not found", async () => {

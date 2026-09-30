@@ -25,6 +25,11 @@ import { formatDate } from "@/lib/constants"
 import { useProfileForm } from "@/hooks/use-profile-form"
 import { usePasswordChange } from "@/hooks/use-password-change"
 
+// The profile's own facts. `demandesCount` is passed as a plain number rather
+// than nested under a persistence-shaped key: it is a DemandeDeplacement fact,
+// counted by the demande read model at the page (ADR-0020), and the component
+// only renders the number it is handed. Before #289 this arrived as
+// `user._count.demandes`, a count the profile read declared and fabricated.
 interface UserData {
   id: string
   email: string
@@ -37,7 +42,6 @@ interface UserData {
   departement: { nom: string }
   dateEmbauche: Date | null
   creeLe: Date
-  _count: { demandes: number }
 }
 
 const FIELD_INPUT =
@@ -73,7 +77,13 @@ function Property({
   )
 }
 
-export default function ProfileEdit({ user }: { user: UserData }) {
+export default function ProfileEdit({
+  user,
+  demandesCount,
+}: {
+  user: UserData
+  demandesCount: number
+}) {
   const fileRef = useRef<HTMLInputElement>(null)
   const profile = useProfileForm({
     email: user.email,
@@ -193,11 +203,7 @@ export default function ProfileEdit({ user }: { user: UserData }) {
 
       {/* Stats — borderless row */}
       <div className="mt-8 grid gap-6 sm:grid-cols-3">
-        <DashboardCard
-          icon={Briefcase}
-          label="Demandes"
-          value={user._count.demandes}
-        />
+        <DashboardCard icon={Briefcase} label="Demandes" value={demandesCount} />
         <DashboardCard
           icon={Calendar}
           label="Date d'embauche"

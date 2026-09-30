@@ -18,6 +18,24 @@ import {
   AvatarError,
 } from "./errors"
 
+// What the profile read actually selects: the Utilisateur and their
+// Departement. It deliberately carries no demand count — the « Demandes »
+// stat is a DemandeDeplacement fact, so it is counted by the demande read
+// model (`countDemandes`) and asked for at the page, not here. #288 removed
+// the `_count: { demandes }` this interface used to promise.
+//
+// The blanket `as unknown as ProfileResult` that used to sit on this return
+// existed for the fabricated `_count` alone. That is measured, not assumed:
+// with `_count` still on the return value, deleting the assertion typechecks
+// clean; with `_count` gone from both the type and the value, nothing is left
+// to reconcile. So no narrowing was needed, the assertion was deleted rather
+// than replaced, and no explicit-and-local narrowing comment is owed here.
+//
+// Known, deliberately not fixed here, and recorded by the spec rather than
+// promised by this comment: the shape still mirrors a persistence row — a
+// subset of the utilisateurs table carrying departementId/societeId/actif/
+// modifieLe and friends the profile page never presents. Tightening it to
+// exactly what a profile shows is future work (#287, Further Notes).
 export interface ProfileResult {
   id: string
   email: string
@@ -30,7 +48,6 @@ export interface ProfileResult {
   departement: { nom: string }
   dateEmbauche: Date | null
   creeLe: Date
-  _count: { demandes: number }
 }
 
 export {
@@ -64,10 +81,9 @@ export class UtilisateurService {
       },
     })
     if (!user) throw new UtilisateurNotFoundError()
-    return {
-      ...user,
-      _count: { demandes: 0 },
-    } as unknown as ProfileResult
+    // The selection IS the declared shape — no reshaping, so no spread that
+    // only reads as if it narrowed one, and no assertion to reconcile it.
+    return user
   }
 
   async create(
