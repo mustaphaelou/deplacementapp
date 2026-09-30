@@ -63,6 +63,17 @@ function isNumeroUniqueViolation(e: unknown): boolean {
   return false
 }
 
+/**
+ * The counter feeds a global count and a year prefix read from the clock, so
+ * two creations that interleave can read the same count and write the same
+ * numéro. The database then refuses the second one — a lost race, not a bad
+ * form — so the creation is tried again, this many times at most. Past the
+ * bound the Utilisateur is refused with the collision's own sentence and
+ * status (`NumeroCollisionError`), which is the refusal #291 made legible
+ * (#292).
+ */
+const NUMERO_COLLISION_ATTEMPTS = 3
+
 async function generateNumero(): Promise<string> {
   const [result] = await db.select({ value: count() }).from(demandesDeplacement)
   const nextNum = (result?.value ?? 0) + 1
@@ -89,7 +100,6 @@ async function createDemande(
     .limit(1)
   if (!userRow) throw new UnauthorizedActionError("Utilisateur introuvable")
 
-  const numero = await generateNumero()
   const motifArray = processMotif(data.motif, data.motifAutre)
   const totalEstime = computeTotalEstime(data)
 
@@ -102,78 +112,96 @@ async function createDemande(
   const auditAction: string = etat.auditAction
   const notificationEvent: NotificationEventType | null = etat.notification
 
-  const createValues: Record<string, unknown> = {
-    id: crypto.randomUUID(),
-    numero,
-    employeId: userRow.id,
-    ...etat.champs,
-    employeNom: userRow.nom,
-    employePrenom: userRow.prenom,
-    employePoste: userRow.poste,
-    employeDepartement: userRow.departementNom ?? userRow.departementId,
-    motif: JSON.stringify(motifArray),
-    dateDepart: new Date(data.dateDepart),
-    dateRetour: new Date(data.dateRetour),
-    destination: data.destination,
-    typeTransport: data.typeTransport,
-    autreTransport: data.autreTransport || null,
-    vehiculeId: data.vehiculeId || null,
-    fraisTransport: parseDecimal(data.fraisTransport).toString(),
-    fraisHebergement: parseDecimal(data.fraisHebergement).toString(),
-    fraisRepas: parseDecimal(data.fraisRepas).toString(),
-    fraisDivers: parseDecimal(data.fraisDivers).toString(),
-    totalEstime: totalEstime.toString(),
-    avanceRequise: data.avanceRequise || false,
-    montantAvance: data.avanceRequise
-      ? parseDecimal(data.montantAvance).toString()
-      : null,
-    description: data.description || null,
-    modifieLe: new Date(),
-  }
+  // #292: the bound wraps the WHOLE creation, not the insert. Once a
+  // statement fails inside a transaction, that transaction is poisoned —
+  // every later statement in it is refused until it ends — so a retry
+  // attempted inside the same transaction cannot succeed. So the loop below
+  // holds the read of the counter, the transaction, the row, the JournalAudit
+  // entry and the Notification, and each attempt re-reads the counter: a
+  // retry that reused the previous attempt's numéro would collide again on
+  // the very same index.
+  for (
+    let tentative = 1;
+    tentative <= NUMERO_COLLISION_ATTEMPTS;
+    tentative++
+  ) {
+    const numero = await generateNumero()
 
-  // #293 removed the submit branch and the duplicate modification stamp:
-  // `etat`, `auditAction` and `notificationEvent` above come from the pipeline.
-  // What remains is #291's shape — the creation inside a try that recognises the
-  // numbering collision at the transaction's boundary.
-  let demande: DemandeDeplacementRow
-  try {
-    ;[demande] = await db.transaction(async (tx) => {
-      const [created] = await tx
-        .insert(demandesDeplacement)
-        .values(createValues as never)
-        .returning()
+    const createValues: Record<string, unknown> = {
+      id: crypto.randomUUID(),
+      numero,
+      employeId: userRow.id,
+      ...etat.champs,
+      employeNom: userRow.nom,
+      employePrenom: userRow.prenom,
+      employePoste: userRow.poste,
+      employeDepartement: userRow.departementNom ?? userRow.departementId,
+      motif: JSON.stringify(motifArray),
+      dateDepart: new Date(data.dateDepart),
+      dateRetour: new Date(data.dateRetour),
+      destination: data.destination,
+      typeTransport: data.typeTransport,
+      autreTransport: data.autreTransport || null,
+      vehiculeId: data.vehiculeId || null,
+      fraisTransport: parseDecimal(data.fraisTransport).toString(),
+      fraisHebergement: parseDecimal(data.fraisHebergement).toString(),
+      fraisRepas: parseDecimal(data.fraisRepas).toString(),
+      fraisDivers: parseDecimal(data.fraisDivers).toString(),
+      totalEstime: totalEstime.toString(),
+      avanceRequise: data.avanceRequise || false,
+      montantAvance: data.avanceRequise
+        ? parseDecimal(data.montantAvance).toString()
+        : null,
+      description: data.description || null,
+      modifieLe: new Date(),
+    }
 
-      await appliquerEffets(tx, {
-        audit: {
-          utilisateurId: userRow.id,
-          action: auditAction,
-          entiteId: created.id,
-          numero,
-        },
-        notification: notificationEvent
-          ? {
-              event: notificationEvent,
-              demandeId: created.id,
-              numero,
-              employe: {
-                id: userRow.id,
-                prenom: userRow.prenom,
-                nom: userRow.nom,
-                departementId: userRow.departementId ?? "",
-              },
-              assigneAId: null,
-            }
-          : null,
+    try {
+      const [demande] = await db.transaction(async (tx) => {
+        const [created] = await tx
+          .insert(demandesDeplacement)
+          .values(createValues as never)
+          .returning()
+
+        await appliquerEffets(tx, {
+          audit: {
+            utilisateurId: userRow.id,
+            action: auditAction,
+            entiteId: created.id,
+            numero,
+          },
+          notification: notificationEvent
+            ? {
+                event: notificationEvent,
+                demandeId: created.id,
+                numero,
+                employe: {
+                  id: userRow.id,
+                  prenom: userRow.prenom,
+                  nom: userRow.nom,
+                  departementId: userRow.departementId ?? "",
+                },
+                assigneAId: null,
+              }
+            : null,
+        })
+
+        return [created]
       })
 
-      return [created]
-    })
-  } catch (e) {
-    if (isNumeroUniqueViolation(e)) throw new NumeroCollisionError()
-    throw e
+      return demande
+    } catch (e) {
+      // The transaction has rolled back and ended here; it holds nothing of
+      // the failed attempt. Anything else is not a numbering collision and
+      // reaches the caller as itself.
+      if (!isNumeroUniqueViolation(e)) throw e
+      if (tentative === NUMERO_COLLISION_ATTEMPTS) throw new NumeroCollisionError()
+    }
   }
 
-  return demande
+  // Unreachable: the last attempt either returns its DemandeDeplacement or
+  // refuses with the collision above. Written so every path returns.
+  throw new NumeroCollisionError()
 }
 
 export async function createDraft(
