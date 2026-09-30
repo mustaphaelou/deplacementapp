@@ -609,4 +609,98 @@ describe("UtilisateurService", { timeout: TIMEOUT }, () => {
       expect(result.avatarUrl).toBeNull()
     })
   })
+
+  // #314 — the reader that owns the rule that a Utilisateur may act, and the
+  // proof that its handle can be redirected.
+  //
+  // These live here rather than in a new file because this suite already owns
+  // a PGlite instance with migrations applied and a Societe/Departement to
+  // satisfy the table's foreign keys; a second file would pay another boot for
+  // nothing. Nothing above is touched.
+  //
+  // The handle is reached by module redirection, NOT by passing it as an
+  // argument: the claim under test is that the DEFAULT handle resolves through
+  // the module binding at call time, so a test can substitute the database it
+  // reads. Passing `pgliteDb` explicitly would pass even if that default were
+  // captured at import time, which is exactly the defect #313 turned on this
+  // shape. So every case below calls `peutAgir(id)` with one argument.
+  //
+  // The module is imported dynamically rather than added to the file's import
+  // header: this block is strictly append-only, and Vite's module registry
+  // hands back the same namespace object a static import would have.
+  describe("peutAgir — the rule that a Utilisateur may act", () => {
+    let dbModule: typeof import("../db")
+    let peutAgir: typeof import("./utilisateur-service").peutAgir
+    let actifId: string
+    let inactifId: string
+
+    beforeEach(async () => {
+      dbModule = await import("../db")
+      ;({ peutAgir } = await import("./utilisateur-service"))
+      // Redirect the module's own handle. The default parameter of `peutAgir`
+      // is evaluated on every call against this binding, so the reader below
+      // goes to PGlite without being told to.
+      vi.spyOn(dbModule, "db", "get").mockReturnValue(pgliteDb as any)
+
+      actifId = crypto.randomUUID()
+      inactifId = crypto.randomUUID()
+
+      await pgliteDb.insert(schema.utilisateurs).values([
+        {
+          ...makeUser(),
+          id: actifId,
+          email: `actif-${actifId}@test.com`,
+          societeId,
+          departementId,
+          actif: true,
+        },
+        {
+          ...makeUser(),
+          id: inactifId,
+          email: `inactif-${inactifId}@test.com`,
+          societeId,
+          departementId,
+          actif: false,
+        },
+      ])
+    })
+
+    it("answers true for an active Utilisateur", async () => {
+      expect(await peutAgir(actifId)).toBe(true)
+    })
+
+    it("answers false for an inactive Utilisateur", async () => {
+      expect(await peutAgir(inactifId)).toBe(false)
+    })
+
+    // The question is « may this one act ». An identifier that matches no row
+    // is a Utilisateur that does not exist, and one that does not exist may
+    // not act — so false, not a throw. This is the behaviour the session
+    // module's private `isActif` had (`row?.actif ?? false`) and the reason
+    // the fallback exists at all.
+    it("answers false for an identifier matching nothing, without throwing", async () => {
+      expect(await peutAgir(crypto.randomUUID())).toBe(false)
+    })
+
+    // Pins the redirection itself, so a test that stopped redirecting fails
+    // here before it can pass for the wrong reason: if `db` were still the
+    // module's real handle, this assertion fails.
+    it("reads through the redirected handle, not the module's own", async () => {
+      expect(dbModule.db).toBe(pgliteDb)
+      // ...and the row the reader found exists only in PGlite.
+      const [row] = await pgliteDb
+        .select({ actif: utilisateurs.actif })
+        .from(utilisateurs)
+        .where(eq(utilisateurs.id, actifId))
+      expect(row.actif).toBe(true)
+    })
+
+    // The second parameter is part of the frozen signature, so it is pinned
+    // too — but this test is NOT the evidence for the redirection; the three
+    // above are, because they omit the argument entirely.
+    it("honours an explicitly passed handle", async () => {
+      expect(await peutAgir(inactifId, pgliteDb as any)).toBe(false)
+      expect(await peutAgir(actifId, pgliteDb as any)).toBe(true)
+    })
+  })
 })

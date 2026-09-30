@@ -332,4 +332,31 @@ export class UtilisateurService {
   }
 }
 
+/**
+ * One reader owns the rule that a Utilisateur may act: the `actif` column, and
+ * nothing else. It is deliberately NOT a method on {@link UtilisateurService} —
+ * that class binds its handle at construction and the module's exported
+ * instance is built at module load, so a method there would have captured the
+ * handle before any test could substitute it. A module-level function whose
+ * handle argument defaults to this module's own `db` is redirected by exactly
+ * that substitution; #314's test does it against a real in-process Postgres.
+ *
+ * An identifier matching no Utilisateur reads `false` rather than throwing:
+ * the question asked is « may this one act », and a Utilisateur that does not
+ * exist may not. This preserves the behaviour of the private copy in
+ * `lib/auth/session.ts` (`row?.actif ?? false`), which #316 will retire in
+ * favour of a call to here.
+ */
+export async function peutAgir(
+  utilisateurId: string,
+  handle: DrizzleDb = db
+): Promise<boolean> {
+  const [row] = await handle
+    .select({ actif: utilisateurs.actif })
+    .from(utilisateurs)
+    .where(eq(utilisateurs.id, utilisateurId))
+    .limit(1)
+  return row?.actif ?? false
+}
+
 export const utilisateurService = new UtilisateurService(db)
