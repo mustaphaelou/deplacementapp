@@ -3,11 +3,13 @@ import {
   canTransition,
   buildTransition,
   checkTransition,
+  etatCreation,
   getAllowedActions,
   queueEtapes,
   committedEtapes,
   laneOrderByColumn,
   enteringEffect,
+  PIPELINE,
   TRANSITION_EFFECTS,
   TERMINAL_DECISIONS,
   isPendingDecision,
@@ -649,5 +651,147 @@ describe("guard engine sweep", () => {
         }
       })
     }
+  })
+})
+
+// ─── etatCreation: where a DemandeDeplacement is born ──────────────────────
+//
+// Nothing here names the opening Etape or the opening Decision as a literal:
+// every expectation is read from the pipeline (PIPELINE, the transition table
+// and the module's own « pending » predicate), so a change to the pipeline's
+// opening state fails this suite instead of passing quietly.
+
+describe("etatCreation", () => {
+  const roles: Role[] = [
+    "EMPLOYEE",
+    "MANAGER",
+    "FINANCE_ADMIN",
+    "GENERAL_DIRECTION",
+  ]
+  const ouverture = PIPELINE[0]
+  const effetSoumission = TRANSITION_EFFECTS.find(
+    (e) => e.from === ouverture.id && e.action === "submit"
+  )
+  const soumission = buildTransition(
+    ouverture.roleCanAct as Role,
+    ouverture.id,
+    "submit"
+  )
+
+  it("exists in the pipeline: the opening Etape has a submit effect and a role that may act", () => {
+    expect(ouverture.roleCanAct).toBeDefined()
+    expect(effetSoumission).toBeDefined()
+    expect(soumission).not.toBeNull()
+  })
+
+  it("answers every Role on both paths with the frozen five-field shape", () => {
+    for (const role of roles) {
+      for (const soumis of [false, true]) {
+        expect(Object.keys(etatCreation(role, soumis)).sort()).toEqual([
+          "auditAction",
+          "champs",
+          "decision",
+          "etape",
+          "notification",
+        ])
+      }
+    }
+  })
+
+  it("puts a draft at the opening Etape with the non-terminal Decision, for every Role", () => {
+    for (const role of roles) {
+      const etat = etatCreation(role, false)
+      expect(etat.etape).toBe(ouverture.id)
+      expect(isPendingDecision(etat.decision)).toBe(true)
+      expect(etat.champs).toEqual({ etape: ouverture.id, decision: etat.decision })
+    }
+  })
+
+  it("records CREATION and announces nothing for a draft", () => {
+    for (const role of roles) {
+      const etat = etatCreation(role, false)
+      expect(etat.auditAction).toBe("CREATION")
+      expect(etat.notification).toBeNull()
+    }
+  })
+
+  it("a submitted creation is the submit action the transition path performs", () => {
+    for (const role of roles) {
+      const etat = etatCreation(role, true)
+      expect(etat.etape).toBe(soumission!.transition.newEtape)
+      expect(etat.decision).toBe(soumission!.transition.newDecision)
+      expect(etat.auditAction).toBe(soumission!.auditAction)
+      expect(etat.notification).toBe(soumission!.notificationEvent)
+    }
+  })
+
+  it("a submitted creation writes the effect's Etape, Decision and timestamps, and nothing else", () => {
+    const expected = [
+      "etape",
+      "decision",
+      ...effetSoumission!.timestamps,
+    ].sort()
+    for (const role of roles) {
+      expect(Object.keys(etatCreation(role, true).champs).sort()).toEqual(
+        expected
+      )
+      for (const ts of effetSoumission!.timestamps) {
+        expect(etatCreation(role, true).champs[ts]).toBeInstanceOf(Date)
+      }
+    }
+  })
+
+  it("never lets the creating Role move where a DemandeDeplacement is born", () => {
+    for (const soumis of [false, true]) {
+      const answers = roles.map((role) => {
+        const etat = etatCreation(role, soumis)
+        return {
+          etape: etat.etape,
+          decision: etat.decision,
+          auditAction: etat.auditAction,
+          notification: etat.notification,
+        }
+      })
+      for (const answer of answers) {
+        expect(answer).toEqual(answers[0])
+      }
+    }
+  })
+
+  it("only ever answers with an Etape of the pipeline and a pending Decision", () => {
+    for (const role of roles) {
+      for (const soumis of [false, true]) {
+        const etat = etatCreation(role, soumis)
+        expect(PIPELINE.some((stage) => stage.id === etat.etape)).toBe(true)
+        expect(isPendingDecision(etat.decision)).toBe(true)
+      }
+    }
+  })
+
+  it("champs always carries the Etape and the Decision it returns", () => {
+    for (const role of roles) {
+      for (const soumis of [false, true]) {
+        const etat = etatCreation(role, soumis)
+        expect(etat.champs.etape).toBe(etat.etape)
+        expect(etat.champs.decision).toBe(etat.decision)
+      }
+    }
+  })
+
+  it("never hands the caller the modification timestamp to write", () => {
+    for (const role of roles) {
+      for (const soumis of [false, true]) {
+        expect(etatCreation(role, soumis).champs).not.toHaveProperty("modifieLe")
+      }
+    }
+  })
+
+  it("hands each caller its own field set, never a shared one", () => {
+    const first = etatCreation("EMPLOYEE", true)
+    first.champs.soumiseLe = null
+    first.champs.etape = null
+    const second = etatCreation("EMPLOYEE", true)
+    expect(second.champs.soumiseLe).toBeInstanceOf(Date)
+    expect(second.champs.etape).toBe(second.etape)
   })
 })

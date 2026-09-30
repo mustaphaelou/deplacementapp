@@ -930,7 +930,6 @@ describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT }, () => {
       expect(recipientIds).not.toContain(inactiveFinanceAdminId)
     })
   })
-
   // ─── numero collision — a named refusal, not a bare 500 (#291) ───
 
   describe("numero collision", () => {
@@ -1173,6 +1172,141 @@ describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT }, () => {
       })
       expect(next.numero).toBe(numeroFor(afterSoftDelete + 1))
       expect(next.numero).not.toBe(deleted.numero)
+    })
+  })
+
+  // ─── The creation path asks the pipeline where it starts (#293) ───────────
+  //
+  // `etatCreation` and `readFile` are pulled in here rather than at the top of
+  // the file: this block is appended, and a shared import block is where a
+  // concurrent edit would collide.
+
+  describe("the creation path reads its opening state from the pipeline", () => {
+    it("writes a draft at the pipeline's own answer for the creating Role, not at a literal", async () => {
+      const { etatCreation } = await import("../workflow")
+      const demande = await createDraft(sampleData, {
+        id: employeeId,
+        role: "EMPLOYEE",
+      })
+
+      const attendu = etatCreation("EMPLOYEE", false)
+      expect(demande.etape).toBe(attendu.etape)
+      expect(demande.decision).toBe(attendu.decision)
+    })
+
+    // The assertion above moves with the pipeline's answer, so it cannot fail
+    // on its own: if the opening Etape changed, the row and the call would
+    // change together. This one is read from the pipeline's own table instead,
+    // so a drifted opening state fails here rather than passing quietly.
+    it("writes a draft at the Etape the submit effect leaves from, with the pending Decision", async () => {
+      const { TRANSITION_EFFECTS, isPendingDecision } = await import(
+        "../workflow"
+      )
+      type Decision = import("../workflow").Decision
+      const demande = await createDraft(sampleData, {
+        id: employeeId,
+        role: "EMPLOYEE",
+      })
+
+      const effetSoumission = TRANSITION_EFFECTS.find(
+        (e) => e.action === "submit"
+      )
+      expect(effetSoumission).toBeDefined()
+      expect(demande.etape).toBe(effetSoumission!.from)
+      expect(
+        isPendingDecision(demande.decision as Decision)
+      ).toBe(true)
+    })
+
+    it("writes a submission at the pipeline's own answer for the creating Role, not at a literal", async () => {
+      const { etatCreation } = await import("../workflow")
+      const demande = await createAndSubmit(sampleData, {
+        id: employeeId,
+        role: "EMPLOYEE",
+      })
+
+      const attendu = etatCreation("EMPLOYEE", true)
+      expect(demande.etape).toBe(attendu.etape)
+      expect(demande.decision).toBe(attendu.decision)
+    })
+
+    it("stamps the modification timestamp once on both paths, and never through the pipeline", async () => {
+      const { etatCreation } = await import("../workflow")
+      const avant = new Date()
+      const draft = await createDraft(sampleData, {
+        id: employeeId,
+        role: "EMPLOYEE",
+      })
+      const soumis = await createAndSubmit(sampleData, {
+        id: employeeId,
+        role: "EMPLOYEE",
+      })
+      const apres = new Date()
+
+      // The stamp belongs to the creation, so the pipeline's field set never
+      // carries it, on either path. Both rows are stamped once, inside the
+      // window of the creation itself.
+      expect(etatCreation("EMPLOYEE", false).champs).not.toHaveProperty(
+        "modifieLe"
+      )
+      expect(etatCreation("EMPLOYEE", true).champs).not.toHaveProperty(
+        "modifieLe"
+      )
+      for (const row of [draft, soumis]) {
+        expect(row.modifieLe.getTime()).toBeGreaterThanOrEqual(avant.getTime())
+        expect(row.modifieLe.getTime()).toBeLessThanOrEqual(apres.getTime())
+      }
+    })
+
+    // A second stamping of modifieLe would still land inside the window above,
+    // so the pin that makes a re-stamp red is structural: the creation
+    // function's own source must carry the field exactly once.
+    it("stamps modifieLe exactly once in the creation function, on both paths", async () => {
+      const { readFile } = await import("node:fs/promises")
+      const source = await readFile(
+        new URL("./mutations.ts", import.meta.url),
+        "utf8"
+      )
+      const start = source.indexOf("async function createDemande(")
+      const end = source.indexOf("export async function createDraft(")
+      // The anchors are asserted BEFORE slicing: `indexOf` answers -1 when an
+      // anchor is gone, and a -1 would silently slice the wrong region.
+      expect(start).toBeGreaterThan(-1)
+      expect(end).toBeGreaterThan(start)
+
+      const corps = source.slice(start, end)
+      expect(corps.match(/modifieLe/g)).toHaveLength(1)
+      expect(corps).toContain("modifieLe: new Date()")
+    })
+
+    it("keeps every Etape and Decision literal out of the creation function", async () => {
+      const { readFile } = await import("node:fs/promises")
+      const source = await readFile(
+        new URL("./mutations.ts", import.meta.url),
+        "utf8"
+      )
+      const start = source.indexOf("async function createDemande(")
+      const end = source.indexOf("export async function createDraft(")
+      expect(start).toBeGreaterThan(-1)
+      expect(end).toBeGreaterThan(start)
+
+      const corps = source.slice(start, end)
+      for (const etape of [
+        "DRAFT",
+        "MANAGER_REVIEW",
+        "FINANCE_REVIEW",
+        "DIRECTION_REVIEW",
+        "FINAL",
+      ]) {
+        expect(corps, etape).not.toContain(`"${etape}"`)
+      }
+      for (const decision of ["PENDING", "APPROVED", "REJECTED", "WITHDRAWN"]) {
+        expect(corps, decision).not.toContain(`"${decision}"`)
+      }
+      // The creation path must not build a transition of its own either:
+      // submitting at creation is the pipeline's business, not this caller's.
+      expect(corps).not.toContain("buildTransition")
+      expect(corps).toContain("etatCreation(actor.role, submit)")
     })
   })
 })
