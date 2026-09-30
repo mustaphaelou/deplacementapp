@@ -15,6 +15,7 @@ import {
   findAllForExport,
 } from "./queries"
 import { DemandeNotFoundError } from "../errors"
+import { PIPELINE, TERMINAL_DECISIONS, type Decision } from "../workflow"
 
 const TIMEOUT = 30_000
 
@@ -573,19 +574,12 @@ describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT }, () => {
   // omitted. Both arms restore the rows they touch, so they do not lean on
   // (or disturb) any other test's ordering.
   describe("countDemandes — the profile page's own count", () => {
-    const ALL_ETAPES = [
-      "DRAFT",
-      "MANAGER_REVIEW",
-      "FINANCE_REVIEW",
-      "DIRECTION_REVIEW",
-      "FINAL",
-    ] as const
-    const ALL_DECISIONS = [
-      "PENDING",
-      "APPROVED",
-      "REJECTED",
-      "WITHDRAWN",
-    ] as const
+    // Derived from the workflow module, never re-declared: `PIPELINE` owns the
+    // Etape set and `TERMINAL_DECISIONS` owns three of the four Decisions.
+    // A hardcoded copy could silently under-count if either union grew, which
+    // would make the decomposition sums below pass for the wrong reason.
+    const ALL_ETAPES = PIPELINE.map((stage) => stage.id)
+    const ALL_DECISIONS: readonly Decision[] = ["PENDING", ...TERMINAL_DECISIONS]
 
     it("counts own rows only — no Etape filter, no Decision filter", async () => {
       // Exactly the call the page makes: `{ employeId }` and nothing else.

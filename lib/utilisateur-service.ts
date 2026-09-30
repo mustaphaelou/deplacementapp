@@ -24,17 +24,18 @@ import {
 // model (`countDemandes`) and asked for at the page, not here. #288 removed
 // the `_count: { demandes }` this interface used to promise.
 //
-// The selection and this shape agree exactly, so no assertion is needed to
-// reconcile them. The blanket `as unknown as ProfileResult` that used to sit
-// on this return existed for the fabricated `_count` alone: it was the only
-// mismatch, and `departement`'s nullability forced nothing (departementId is
-// NOT NULL, so the relation is non-nullable here). With the fabrication gone
-// the assertion had no reason to exist and was deleted rather than narrowed.
+// The blanket `as unknown as ProfileResult` that used to sit on this return
+// existed for the fabricated `_count` alone. That is measured, not assumed:
+// with `_count` still on the return value, deleting the assertion typechecks
+// clean; with `_count` gone from both the type and the value, nothing is left
+// to reconcile. So no narrowing was needed, the assertion was deleted rather
+// than replaced, and no explicit-and-local narrowing comment is owed here.
 //
-// Known, deliberately not fixed here: this still mirrors a persistence row
-// closely — it is a subset of the utilisateurs table that still carries
-// departementId/societeId/actif/modifieLe and friends the profile page never
-// presents. Tightening it to exactly what a profile shows is future work.
+// Known, deliberately not fixed here, and recorded by the spec rather than
+// promised by this comment: the shape still mirrors a persistence row — a
+// subset of the utilisateurs table carrying departementId/societeId/actif/
+// modifieLe and friends the profile page never presents. Tightening it to
+// exactly what a profile shows is future work (#287, Further Notes).
 export interface ProfileResult {
   id: string
   email: string
@@ -80,7 +81,9 @@ export class UtilisateurService {
       },
     })
     if (!user) throw new UtilisateurNotFoundError()
-    return { ...user }
+    // The selection IS the declared shape — no reshaping, so no spread that
+    // only reads as if it narrowed one, and no assertion to reconcile it.
+    return user
   }
 
   async create(
@@ -123,7 +126,10 @@ export class UtilisateurService {
           prenom: data.prenom,
           poste: data.poste,
           role: data.role as
-            "EMPLOYEE" | "MANAGER" | "FINANCE_ADMIN" | "GENERAL_DIRECTION",
+            | "EMPLOYEE"
+            | "MANAGER"
+            | "FINANCE_ADMIN"
+            | "GENERAL_DIRECTION",
           societeId: societe.id,
           departementId: data.departementId,
           telephone: data.telephone || null,
@@ -258,11 +264,7 @@ export class UtilisateurService {
       if (!data.currentPassword) {
         throw new EmailChangeRequiresPasswordError()
       }
-      const isValid = await verifyCredential(
-        this._db,
-        userId,
-        data.currentPassword
-      )
+      const isValid = await verifyCredential(this._db, userId, data.currentPassword)
       if (!isValid) throw new MotDePasseIncorrectError()
       updateData.email = data.email
     }

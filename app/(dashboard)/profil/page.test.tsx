@@ -15,7 +15,10 @@ vi.mock("@/lib/utilisateur-service", () => ({
 // `_count: { demandes: 3 }` on a stub — a value the implementation could never
 // return for any input. A read-model stub can only be handed a number the
 // query can actually produce, so that hole closes.
-vi.mock("@/lib/demande/queries", () => ({
+//
+// Mocked at the barrel the page imports from, so the read model's real import
+// graph — the database included — never loads here.
+vi.mock("@/lib/demande", () => ({
   countDemandes: vi.fn(),
 }))
 
@@ -69,7 +72,7 @@ function mockUser(role = "EMPLOYEE") {
 async function renderPage(demandesCount = 7, role = "EMPLOYEE") {
   const { getAuthUser } = await import("@/lib/auth/server")
   const { utilisateurService } = await import("@/lib/utilisateur-service")
-  const { countDemandes } = await import("@/lib/demande/queries")
+  const { countDemandes } = await import("@/lib/demande")
   ;(getAuthUser as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser(role))
   ;(
     utilisateurService.findProfile as ReturnType<typeof vi.fn>
@@ -146,7 +149,7 @@ describe("Profil page — the « Demandes » count", { timeout: 30_000 }, () => 
   })
 
   it("asks the read model for the signed-in Utilisateur's OWN rows — no etape, no decision filter", async () => {
-    const { countDemandes } = await import("@/lib/demande/queries")
+    const { countDemandes } = await import("@/lib/demande")
 
     await renderPage()
 
@@ -157,20 +160,21 @@ describe("Profil page — the « Demandes » count", { timeout: 30_000 }, () => 
     expect(countDemandes).toHaveBeenCalledWith({ employeId: "u-1" })
   })
 
-  it("asks the same question for every Role — a fact about the person, not their reach", async () => {
-    const { countDemandes } = await import("@/lib/demande/queries")
+  it("asks the same question for every Role — a fact about the Utilisateur, not their VisibiliteDemande", async () => {
+    const { countDemandes } = await import("@/lib/demande")
+    const { NAV_LANES } = await import("@/lib/auth/roles")
 
     // A MANAGER, a FINANCE_ADMIN and a GENERAL_DIRECTION see the same card as
     // an EMPLOYEE: the number of DemandesDeplacement THEY created, not the
     // number they can see. A role branch here — a reach count for approvers,
     // say — would change the call and fail this.
-    for (const role of [
-      "EMPLOYEE",
-      "MANAGER",
-      "FINANCE_ADMIN",
-      "GENERAL_DIRECTION",
-      "ADMIN",
-    ]) {
+    //
+    // The set comes from `NAV_LANES`, which is declared `Record<Role, …>`, so
+    // its keys ARE the Role union: a new Role cannot be added without this
+    // loop covering it, and a Role this test names but the app does not have
+    // is not expressible.
+    expect(Object.keys(NAV_LANES).length).toBeGreaterThan(1)
+    for (const role of Object.keys(NAV_LANES)) {
       vi.resetAllMocks()
       await renderPage(7, role)
       expect(countDemandes).toHaveBeenCalledWith({ employeId: "u-1" })
@@ -178,14 +182,15 @@ describe("Profil page — the « Demandes » count", { timeout: 30_000 }, () => 
   })
 
   it("renders the number the read model returned, not a value of its own", async () => {
-    // Anchored on the stat <p> that immediately precedes the « Demandes »
-    // label, so this cannot be satisfied by the number appearing anywhere on
-    // the page. Rendered for three different counts: a fixed literal would
-    // pass the first and fail these.
+    // Anchored on the stat <p> immediately preceding the « Demandes » label, so
+    // the number cannot be satisfied by appearing anywhere else on the page.
+    // Deliberately NOT coupled to the card's class strings: `DashboardCard` is
+    // a file this change does not touch, and `prettier-plugin-tailwindcss` is
+    // configured repo-wide, so pinning `tabular-nums` as the last class would
+    // break this test — blaming the profile page — the first time anyone
+    // formatted that component.
     const demandesStat = (html: string) => {
-      const match = html.match(
-        /tabular-nums">([^<]*)<\/p><p class="truncate text-xs text-muted-foreground">Demandes<\/p>/
-      )
+      const match = html.match(/>([^<]*)<\/p><p[^>]*>Demandes<\/p>/)
       expect(match).not.toBeNull()
       return match![1]
     }
@@ -203,8 +208,7 @@ describe("Profil page — the « Demandes » count", { timeout: 30_000 }, () => 
     // `d&#x27;embauche`.
     expect(html).toContain("Date d&#x27;embauche")
     expect(html).toContain("Membre depuis")
-    // Still the first of the three borderless stat cards.
-    expect(html.indexOf("sm:grid-cols-3")).toBeGreaterThan(-1)
+    expect(html).toContain("sm:grid-cols-3")
     expect(html.indexOf(">Demandes<")).toBeLessThan(
       html.indexOf(">Date d&#x27;embauche<")
     )

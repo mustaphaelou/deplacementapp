@@ -30,18 +30,37 @@ const TIMEOUT = 30_000
 // A type is erased at runtime, so no assertion inside `it()` can observe the
 // DECLARED shape; only the value the read returns is visible to the suite.
 // This alias is therefore the pin for the declaration, and `npm run typecheck`
-// (part of the `verify` gate) is what enforces it: re-adding any of these keys
-// to `ProfileResult` makes `ProfileResultCountKeys` stop being `never`, which
-// violates `AssertNever`'s constraint and fails the build.
+// (part of the `verify` gate) is what enforces it.
+//
+// The assertion is POSITIVE — the exact key set — rather than a denylist of
+// count-shaped names. A denylist can only catch the spellings it was written
+// with, so `nombreDemandes` or `demandesTotal` would slip past both this and
+// the runtime key check. Pinning the whole set means ANY field added to
+// `ProfileResult` fails the build, which is what "cannot be re-added
+// silently" actually asks for.
 //
 // Exported so `@typescript-eslint/no-unused-vars` does not flag it.
-type AssertNever<T extends never> = T
-type ProfileResultCountKeys = Extract<
-  keyof ProfileResult,
-  "_count" | "count" | "demandesCount" | "nbDemandes" | "demandes"
+type Equals<A, B> =
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2
+    ? true
+    : false
+type Assert<T extends true> = T
+export type _PinProfileResultDeclaresNoCount = Assert<
+  Equals<
+    keyof ProfileResult,
+    | "id"
+    | "email"
+    | "nom"
+    | "prenom"
+    | "poste"
+    | "telephone"
+    | "avatarUrl"
+    | "role"
+    | "departement"
+    | "dateEmbauche"
+    | "creeLe"
+  >
 >
-export type _PinProfileResultDeclaresNoCount =
-  AssertNever<ProfileResultCountKeys>
 
 function mockAvatarStorage(): AvatarStorage & {
   save: ReturnType<typeof vi.fn>
@@ -189,10 +208,17 @@ describe("UtilisateurService", { timeout: TIMEOUT }, () => {
         new URL("./utilisateur-service.ts", import.meta.url),
         "utf8"
       )
-      const findProfileBody = source.slice(
-        source.indexOf("async findProfile"),
-        source.indexOf("async create")
-      )
+      const start = source.indexOf("async findProfile")
+      const end = source.indexOf("async create")
+      // The anchors are asserted BEFORE slicing. `indexOf` answers -1 when a
+      // needle is absent, and `slice` then yields "" — against which both
+      // `not.toContain` assertions pass trivially. Without these two, a rename
+      // of `findProfile` or a reorder that put `create` above it would silently
+      // disarm this pin rather than fail it.
+      expect(start).toBeGreaterThan(-1)
+      expect(end).toBeGreaterThan(start)
+      const findProfileBody = source.slice(start, end)
+      expect(findProfileBody.length).toBeGreaterThan(0)
 
       expect(findProfileBody).not.toContain("as unknown as")
       expect(findProfileBody).not.toContain("_count")

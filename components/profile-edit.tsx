@@ -27,7 +27,7 @@ import { usePasswordChange } from "@/hooks/use-password-change"
 
 // The profile's own facts. `demandesCount` is passed as a plain number rather
 // than nested under a persistence-shaped key: it is a DemandeDeplacement fact,
-// counted by the demande read model at the page (ADR 0020), and the component
+// counted by the demande read model at the page (ADR-0020), and the component
 // only renders the number it is handed. Before #289 this arrived as
 // `user._count.demandes`, a count the profile read declared and fabricated.
 interface UserData {
