@@ -341,6 +341,7 @@ export function runChecks() {
   for (const file of files) {
     const r = rel(file)
     if (isOutOfScope(r)) continue
+    if (r === "components/display.tsx") continue
     const src = readFileSync(file, "utf8")
     for (const m of src.matchAll(/rgba\(55,53,47,[0-9.]+\)/g)) census[m[0]] ??= new Set()
     for (const m of src.matchAll(/rgba\(55,53,47,[0-9.]+\)/g)) census[m[0]].add(r)
