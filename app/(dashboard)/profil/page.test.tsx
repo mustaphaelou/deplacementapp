@@ -10,6 +10,15 @@ vi.mock("@/lib/utilisateur-service", () => ({
   UtilisateurNotFoundError: class extends Error {},
 }))
 
+// #289: the page asks the demande read model for the « Demandes » count, so
+// the suite stubs THAT instead of the profile read. The old fixture answered
+// `_count: { demandes: 3 }` on a stub — a value the implementation could never
+// return for any input. A read-model stub can only be handed a number the
+// query can actually produce, so that hole closes.
+vi.mock("@/lib/demande/queries", () => ({
+  countDemandes: vi.fn(),
+}))
+
 vi.mock("next/navigation", () => ({
   redirect: vi.fn((path: string) => {
     throw new Error(`NEXT_REDIRECT: ${path}`)
@@ -25,6 +34,11 @@ vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }))
 
+// The profile read's real result shape since #288: the Utilisateur and its
+// Departement, and no count. There is deliberately no `_count` key here — the
+// read does not return one, so a fixture that invents one would be asserting
+// against a value the implementation cannot produce, which is the hole #289
+// closes.
 const mockProfile = {
   id: "u-1",
   email: "yasmine@example.ma",
@@ -37,15 +51,14 @@ const mockProfile = {
   departement: { nom: "IT" },
   dateEmbauche: new Date("2024-03-01"),
   creeLe: new Date("2024-03-01"),
-  _count: { demandes: 3 },
 }
 
-function mockUser() {
+function mockUser(role = "EMPLOYEE") {
   return {
     id: "u-1",
     email: "yasmine@example.ma",
     name: "Yasmine Benali",
-    role: "EMPLOYEE",
+    role,
     departementId: "d-1",
     departement: "IT",
     poste: "Dev",
@@ -53,13 +66,15 @@ function mockUser() {
   }
 }
 
-async function renderPage() {
+async function renderPage(demandesCount = 7, role = "EMPLOYEE") {
   const { getAuthUser } = await import("@/lib/auth/server")
   const { utilisateurService } = await import("@/lib/utilisateur-service")
-  ;(getAuthUser as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser())
+  const { countDemandes } = await import("@/lib/demande/queries")
+  ;(getAuthUser as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser(role))
   ;(
     utilisateurService.findProfile as ReturnType<typeof vi.fn>
   ).mockResolvedValue(mockProfile)
+  ;(countDemandes as ReturnType<typeof vi.fn>).mockResolvedValue(demandesCount)
 
   const { default: ProfilPage } = await import("./page")
   const element = await ProfilPage()
@@ -119,6 +134,80 @@ describe("Profil page", () => {
     expect(html).toContain("Mot de passe actuel")
     expect(html).toContain("h-9 rounded-[3px]")
     expect(html).toContain("focus-visible:ring-1 focus-visible:ring-(--brand)")
+  })
+})
+
+// #289 — the « Demandes » card used to read « 0 » for every Utilisateur,
+// because the number it rendered was never computed. These pin where the
+// number now comes from and that the card shows it.
+describe("Profil page — the « Demandes » count", { timeout: 30_000 }, () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  it("asks the read model for the signed-in Utilisateur's OWN rows — no etape, no decision filter", async () => {
+    const { countDemandes } = await import("@/lib/demande/queries")
+
+    await renderPage()
+
+    // « How many DemandesDeplacement did I create», not « how many can I see »
+    // and not « how many are waiting ». An etape or decision filter here would
+    // silently narrow a card whose label promises none of that.
+    expect(countDemandes).toHaveBeenCalledTimes(1)
+    expect(countDemandes).toHaveBeenCalledWith({ employeId: "u-1" })
+  })
+
+  it("asks the same question for every Role — a fact about the person, not their reach", async () => {
+    const { countDemandes } = await import("@/lib/demande/queries")
+
+    // A MANAGER, a FINANCE_ADMIN and a GENERAL_DIRECTION see the same card as
+    // an EMPLOYEE: the number of DemandesDeplacement THEY created, not the
+    // number they can see. A role branch here — a reach count for approvers,
+    // say — would change the call and fail this.
+    for (const role of [
+      "EMPLOYEE",
+      "MANAGER",
+      "FINANCE_ADMIN",
+      "GENERAL_DIRECTION",
+      "ADMIN",
+    ]) {
+      vi.resetAllMocks()
+      await renderPage(7, role)
+      expect(countDemandes).toHaveBeenCalledWith({ employeId: "u-1" })
+    }
+  })
+
+  it("renders the number the read model returned, not a value of its own", async () => {
+    // Anchored on the stat <p> that immediately precedes the « Demandes »
+    // label, so this cannot be satisfied by the number appearing anywhere on
+    // the page. Rendered for three different counts: a fixed literal would
+    // pass the first and fail these.
+    const demandesStat = (html: string) => {
+      const match = html.match(
+        /tabular-nums">([^<]*)<\/p><p class="truncate text-xs text-muted-foreground">Demandes<\/p>/
+      )
+      expect(match).not.toBeNull()
+      return match![1]
+    }
+
+    expect(demandesStat(await renderPage(0))).toBe("0")
+    expect(demandesStat(await renderPage(7))).toBe("7")
+    expect(demandesStat(await renderPage(142))).toBe("142")
+  })
+
+  it("leaves the card's label, position and styling untouched", async () => {
+    const html = await renderPage(7)
+
+    expect(html).toContain("Demandes")
+    // renderToStaticMarkup escapes the apostrophe, so the markup carries
+    // `d&#x27;embauche`.
+    expect(html).toContain("Date d&#x27;embauche")
+    expect(html).toContain("Membre depuis")
+    // Still the first of the three borderless stat cards.
+    expect(html.indexOf("sm:grid-cols-3")).toBeGreaterThan(-1)
+    expect(html.indexOf(">Demandes<")).toBeLessThan(
+      html.indexOf(">Date d&#x27;embauche<")
+    )
   })
 })
 

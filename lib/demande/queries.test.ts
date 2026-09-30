@@ -566,6 +566,86 @@ describe("DemandeDeplacement queries (PGLite)", { timeout: TIMEOUT }, () => {
     })
   })
 
+  // #289 — the exact query the profile page makes. `countDemandes` already
+  // pins per-employee counts and soft-delete exclusion; what was unstated is
+  // the profile's OWN shape, so « all of mine, including the ones already
+  // decided » is a contract rather than an accident of which filters were
+  // omitted. Both arms restore the rows they touch, so they do not lean on
+  // (or disturb) any other test's ordering.
+  describe("countDemandes — the profile page's own count", () => {
+    const ALL_ETAPES = [
+      "DRAFT",
+      "MANAGER_REVIEW",
+      "FINANCE_REVIEW",
+      "DIRECTION_REVIEW",
+      "FINAL",
+    ] as const
+    const ALL_DECISIONS = [
+      "PENDING",
+      "APPROVED",
+      "REJECTED",
+      "WITHDRAWN",
+    ] as const
+
+    it("counts own rows only — no Etape filter, no Decision filter", async () => {
+      // Exactly the call the page makes: `{ employeId }` and nothing else.
+      const mine = await countDemandes({ employeId: employeeId })
+
+      expect(mine).toBeGreaterThan(0)
+      // Own rows only. Another Utilisateur's DemandesDeplacement must not
+      // leak in, and the global count must not equal the personal one.
+      const theirs = await countDemandes({ employeId: secondEmployeeId })
+      const everyone = await countDemandes({})
+      expect(mine).toBeLessThan(everyone)
+      expect(mine).toBe(everyone - theirs)
+
+      // Every Etape: the personal count equals the sum of the per-Etape
+      // counts, which can only hold if no lane is excluded and none is
+      // double-counted.
+      const perEtape = await Promise.all(
+        ALL_ETAPES.map((etape) =>
+          countDemandes({ employeId: employeeId, etape })
+        )
+      )
+      expect(perEtape.reduce((a, b) => a + b, 0)).toBe(mine)
+
+      // Every Decision: the same decomposition across the Decision union. A
+      // decision filter left in place — or a « pending » one — breaks this,
+      // because the REJECTED, APPROVED and WITHDRAWN rows are all mine.
+      const perDecision = await Promise.all(
+        ALL_DECISIONS.map((decision) =>
+          countDemandes({ employeId: employeeId, decision })
+        )
+      )
+      expect(perDecision.reduce((a, b) => a + b, 0)).toBe(mine)
+      // Each terminal Decision is genuinely present, so the sum is not
+      // trivially satisfied by PENDING alone.
+      expect(perDecision[1]).toBeGreaterThan(0) // APPROVED
+      expect(perDecision[2]).toBeGreaterThan(0) // REJECTED
+      expect(perDecision[3]).toBeGreaterThan(0) // WITHDRAWN
+    })
+
+    it("excludes soft-deleted rows", async () => {
+      const before = await countDemandes({ employeId: employeeId })
+
+      await pgliteDb
+        .update(schema.demandesDeplacement)
+        .set({ deletedAt: new Date() })
+        .where(eq(schema.demandesDeplacement.id, withdrawnDraftId))
+      const afterDelete = await countDemandes({ employeId: employeeId })
+
+      expect(afterDelete).toBe(before - 1)
+
+      // Restored so this arm proves the exclusion without making the row's
+      // absence permanent for whatever runs next.
+      await pgliteDb
+        .update(schema.demandesDeplacement)
+        .set({ deletedAt: null })
+        .where(eq(schema.demandesDeplacement.id, withdrawnDraftId))
+      expect(await countDemandes({ employeId: employeeId })).toBe(before)
+    })
+  })
+
   // ─── countDemandes ─────────────────────────────────────────────────
 
   describe("countDemandes", () => {
