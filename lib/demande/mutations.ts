@@ -6,7 +6,7 @@ import { departements } from "../../db/schema/departements"
 import { documents } from "../../db/schema/documents"
 import type { CreateDemandeData } from "../demande-utils"
 import type { Actor } from "../demande-types"
-import { checkTransition, buildTransition } from "../workflow"
+import { checkTransition, buildTransition, etatCreation } from "../workflow"
 import type { Etape, Decision } from "../workflow"
 import type { NotificationEventType } from "../notification-events"
 import { appliquerEffets } from "./effets-transition"
@@ -14,6 +14,7 @@ import {
   DemandeNotFoundError,
   UnauthorizedActionError,
   InvalidTransitionError,
+  NumeroCollisionError,
 } from "../errors"
 
 export type DemandeDeplacementRow = typeof demandesDeplacement.$inferSelect
@@ -48,6 +49,22 @@ function computeTotalEstime(data: CreateDemandeData): number {
   )
 }
 
+/**
+ * Postgres SQLSTATE for a unique violation, on the unique index
+ * `demandes_deplacement_numero_index` that guards the numéro. Drizzle wraps
+ * the driver error in a `DrizzleQueryError` and keeps the driver error — the
+ * one carrying `code`/`constraint` — as its `cause`, so the chain is walked.
+ * Matching the code alone is deliberate: only the numéro insert can raise it
+ * inside this transaction, and a broader match would swallow an unrelated
+ * database failure into a refusal that does not describe it.
+ */
+function isNumeroUniqueViolation(e: unknown): boolean {
+  for (let cause: unknown = e; cause; cause = (cause as Error).cause) {
+    if ((cause as { code?: unknown }).code === "23505") return true
+  }
+  return false
+}
+
 async function generateNumero(): Promise<string> {
   const [result] = await db.select({ value: count() }).from(demandesDeplacement)
   const nextNum = (result?.value ?? 0) + 1
@@ -78,12 +95,20 @@ async function createDemande(
   const motifArray = processMotif(data.motif, data.motifAutre)
   const totalEstime = computeTotalEstime(data)
 
+  // The pipeline owns where a DemandeDeplacement is born: this one call
+  // answers the Etape, the Decision, the fields to write, the JournalAudit
+  // action and the Notification event, for a draft and for a submission
+  // alike. There is no Etape or Decision literal here, and no branch that
+  // reconciles a first value with a second (#293).
+  const etat = etatCreation(actor.role, submit)
+  const auditAction: string = etat.auditAction
+  const notificationEvent: NotificationEventType | null = etat.notification
+
   const createValues: Record<string, unknown> = {
     id: crypto.randomUUID(),
     numero,
     employeId: userRow.id,
-    etape: "DRAFT",
-    decision: "PENDING",
+    ...etat.champs,
     employeNom: userRow.nom,
     employePrenom: userRow.prenom,
     employePoste: userRow.poste,
@@ -108,49 +133,47 @@ async function createDemande(
     modifieLe: new Date(),
   }
 
-  let auditAction = "CREATION"
-  let notificationEvent: NotificationEventType | null = null
+  // #293 removed the submit branch and the duplicate modification stamp:
+  // `etat`, `auditAction` and `notificationEvent` above come from the pipeline.
+  // What remains is #291's shape — the creation inside a try that recognises the
+  // numbering collision at the transaction's boundary.
+  let demande: DemandeDeplacementRow
+  try {
+    ;[demande] = await db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(demandesDeplacement)
+        .values(createValues as never)
+        .returning()
 
-  if (submit) {
-    const transition = buildTransition("EMPLOYEE", "DRAFT", "submit")
-    if (!transition) throw new InvalidTransitionError("Soumission impossible")
-    Object.assign(createValues, transition.transition.fields)
-    createValues.modifieLe = new Date()
-    auditAction = transition.auditAction
-    notificationEvent = transition.notificationEvent
-  }
+      await appliquerEffets(tx, {
+        audit: {
+          utilisateurId: userRow.id,
+          action: auditAction,
+          entiteId: created.id,
+          numero,
+        },
+        notification: notificationEvent
+          ? {
+              event: notificationEvent,
+              demandeId: created.id,
+              numero,
+              employe: {
+                id: userRow.id,
+                prenom: userRow.prenom,
+                nom: userRow.nom,
+                departementId: userRow.departementId ?? "",
+              },
+              assigneAId: null,
+            }
+          : null,
+      })
 
-  const [demande] = await db.transaction(async (tx) => {
-    const [demande] = await tx
-      .insert(demandesDeplacement)
-      .values(createValues as never)
-      .returning()
-
-    await appliquerEffets(tx, {
-      audit: {
-        utilisateurId: userRow.id,
-        action: auditAction,
-        entiteId: demande.id,
-        numero,
-      },
-      notification: notificationEvent
-        ? {
-            event: notificationEvent,
-            demandeId: demande.id,
-            numero,
-            employe: {
-              id: userRow.id,
-              prenom: userRow.prenom,
-              nom: userRow.nom,
-              departementId: userRow.departementId ?? "",
-            },
-            assigneAId: null,
-          }
-        : null,
+      return [created]
     })
-
-    return [demande]
-  })
+  } catch (e) {
+    if (isNumeroUniqueViolation(e)) throw new NumeroCollisionError()
+    throw e
+  }
 
   return demande
 }

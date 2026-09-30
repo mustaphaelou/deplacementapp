@@ -311,6 +311,78 @@ export function buildTransition(
   }
 }
 
+// ─── Creation state (where a DemandeDeplacement is born) ────────────────────
+
+// The Decision a DemandeDeplacement is born with, and the one it keeps while
+// it travels: the non-terminal one. « PENDING ⟺ non-terminal » is the rule
+// isPendingDecision above states, so the test pins this constant against the
+// predicate rather than letting the two drift.
+const DECISION_OUVERTURE: Decision = "PENDING"
+
+// A creation that is not a submission records a CREATION and announces
+// nothing: the Notification event exists only once the DemandeDeplacement
+// leaves the draft lane.
+const AUDIT_CREATION = "CREATION"
+
+export interface EtatCreation {
+  etape: Etape
+  decision: Decision
+  champs: Record<string, unknown>
+  auditAction: string
+  notification: NotificationEventType | null
+}
+
+/**
+ * The pipeline's answer to « where does a DemandeDeplacement start? ».
+ *
+ * The opening Etape is the pipeline's first stage and the opening Decision is
+ * the non-terminal one, for every Role: a Role creating a DemandeDeplacement
+ * does not move where it is born. `soumis` is the only thing that changes the
+ * answer, and it does so by being the submit action itself — the same effect,
+ * the same Etape, the same timestamp, the same JournalAudit action and the
+ * same Notification event that « submit » performs on a row that already
+ * exists.
+ *
+ * `champs` never carries `modifieLe`: the modification timestamp belongs to
+ * the creation, not to the pipeline, and is written once (#293).
+ */
+export function etatCreation(role: Role, soumis: boolean): EtatCreation {
+  const ouverture = PIPELINE[0]
+  const decision = DECISION_OUVERTURE
+  const champs: Record<string, unknown> = { etape: ouverture.id, decision }
+
+  if (!soumis) {
+    return {
+      etape: ouverture.id,
+      decision,
+      champs,
+      auditAction: AUDIT_CREATION,
+      notification: null,
+    }
+  }
+
+  // A DemandeDeplacement is born owned by its creator, so the Role that may
+  // leave the opening Etape is the one the pipeline attributes to it — not the
+  // Role of whoever calls the creation.
+  const roleProprietaire = ouverture.roleCanAct ?? role
+  const transition = buildTransition(
+    roleProprietaire,
+    ouverture.id,
+    "submit"
+  )
+  if (!transition) {
+    throw new Error(`Aucune soumission possible depuis l'etape: ${ouverture.id}`)
+  }
+
+  return {
+    etape: transition.transition.newEtape,
+    decision: transition.transition.newDecision,
+    champs: transition.transition.fields,
+    auditAction: transition.auditAction,
+    notification: transition.notificationEvent,
+  }
+}
+
 export function getAllowedActions(
   role: string,
   userId: string,

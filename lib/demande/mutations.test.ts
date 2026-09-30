@@ -10,6 +10,7 @@ import {
   executeTransition,
   recordDocument,
 } from "./mutations"
+import { handleServiceError, NumeroCollisionError } from "../errors"
 
 const TIMEOUT = 30_000
 
@@ -927,6 +928,385 @@ describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT }, () => {
       expect(recipientIds).toContain(financeAdminId)
       expect(recipientIds).not.toContain(inactiveManagerId)
       expect(recipientIds).not.toContain(inactiveFinanceAdminId)
+    })
+  })
+  // ─── numero collision — a named refusal, not a bare 500 (#291) ───
+
+  describe("numero collision", () => {
+    async function rowCount(): Promise<number> {
+      const rows = await pgliteDb
+        .select({ id: schema.demandesDeplacement.id })
+        .from(schema.demandesDeplacement)
+      return rows.length
+    }
+
+    function numeroFor(counter: number): string {
+      return `DD-${new Date().getFullYear()}-${String(counter).padStart(4, "0")}`
+    }
+
+    function rawRow(numero: string) {
+      return {
+        id: crypto.randomUUID(),
+        numero,
+        employeId: employeeId,
+        employeNom: "Dupont",
+        employePrenom: "Jean",
+        employePoste: "Developpeur",
+        employeDepartement: "Test Departement",
+        motif: "[]",
+        dateDepart: new Date("2025-07-01"),
+        dateRetour: new Date("2025-07-03"),
+        destination: "Casablanca",
+        typeTransport: "AVION" as const,
+        modifieLe: new Date(),
+      }
+    }
+
+    /**
+     * Occupy the numéro the NEXT creation is about to allocate, without
+     * mocking anything: the counter reads `count()`, so filling the row the
+     * count points past and then removing a different row puts the allocator
+     * back onto an occupied numéro. The database really refuses the write.
+     */
+    async function occupyNextNumero(): Promise<string> {
+      const filler = await createDraft(sampleData, {
+        id: employeeId,
+        role: "EMPLOYEE",
+      })
+      const occupied = numeroFor(Number(filler.numero.split("-")[2]) + 1)
+      await pgliteDb
+        .insert(schema.demandesDeplacement)
+        .values(rawRow(occupied))
+      await pgliteDb
+        .delete(schema.demandesDeplacement)
+        .where(eq(schema.demandesDeplacement.id, filler.id))
+      return occupied
+    }
+
+    it("carries a numeric status and a sentence that names the collision", () => {
+      const refusal = new NumeroCollisionError()
+      expect(refusal).toBeInstanceOf(Error)
+      expect(refusal.name).toBe("NumeroCollisionError")
+      expect(refusal.status).toBe(409)
+      expect(refusal.message).toBe("Le numéro de la demande est déjà utilisé")
+    })
+
+    it("answers a collided creation with its own status and sentence, at the handler", async () => {
+      const occupied = await occupyNextNumero()
+      let thrown: unknown
+      try {
+        await createDraft(sampleData, { id: employeeId, role: "EMPLOYEE" })
+      } catch (e) {
+        thrown = e
+      } finally {
+        await pgliteDb
+          .delete(schema.demandesDeplacement)
+          .where(eq(schema.demandesDeplacement.numero, occupied))
+      }
+
+      expect(thrown).toBeInstanceOf(NumeroCollisionError)
+
+      const res = handleServiceError(thrown)
+      expect(res.status).toBe(409)
+      await expect(res.json()).resolves.toEqual({
+        error: "Le numéro de la demande est déjà utilisé",
+      })
+    })
+
+    it("refuses a collided submission the same way", async () => {
+      const occupied = await occupyNextNumero()
+      let thrown: unknown
+      try {
+        await createAndSubmit(sampleData, { id: employeeId, role: "EMPLOYEE" })
+      } catch (e) {
+        thrown = e
+      } finally {
+        await pgliteDb
+          .delete(schema.demandesDeplacement)
+          .where(eq(schema.demandesDeplacement.numero, occupied))
+      }
+
+      expect(thrown).toBeInstanceOf(NumeroCollisionError)
+      expect(handleServiceError(thrown).status).toBe(409)
+    })
+
+    it("leaves no trace of a refused creation: no row, no audit, no retry", async () => {
+      const occupied = await occupyNextNumero()
+      const rowsBefore = await rowCount()
+      const auditBefore = await pgliteDb.select().from(schema.journalAudit)
+
+      try {
+        await expect(
+          createDraft(sampleData, { id: employeeId, role: "EMPLOYEE" })
+        ).rejects.toBeInstanceOf(NumeroCollisionError)
+        expect(await rowCount()).toBe(rowsBefore)
+        const auditAfter = await pgliteDb.select().from(schema.journalAudit)
+        expect(auditAfter).toHaveLength(auditBefore.length)
+      } finally {
+        await pgliteDb
+          .delete(schema.demandesDeplacement)
+          .where(eq(schema.demandesDeplacement.numero, occupied))
+      }
+    })
+
+    it("does NOT swallow an unrelated database error into the collision refusal", async () => {
+      await pgliteDb.execute(sql`
+        CREATE OR REPLACE FUNCTION fail_demande_insert()
+        RETURNS TRIGGER
+        LANGUAGE plpgsql
+        AS $body$ BEGIN RAISE EXCEPTION 'Simulated demande insert failure'; END; $body$;
+      `)
+      await pgliteDb.execute(sql`
+        CREATE TRIGGER trg_fail_demande_insert
+        BEFORE INSERT ON demandes_deplacement
+        FOR EACH ROW EXECUTE FUNCTION fail_demande_insert();
+      `)
+
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {})
+      let thrown: unknown
+      try {
+        await createDraft(sampleData, { id: employeeId, role: "EMPLOYEE" })
+      } catch (e) {
+        thrown = e
+      } finally {
+        await pgliteDb.execute(
+          sql`DROP TRIGGER IF EXISTS trg_fail_demande_insert ON demandes_deplacement`
+        )
+        await pgliteDb.execute(
+          sql`DROP FUNCTION IF EXISTS fail_demande_insert()`
+        )
+      }
+
+      // The simulated failure is NOT a 23505, so it must reach the caller as
+      // itself — never as the collision refusal.
+      expect(thrown).toBeTruthy()
+      expect(thrown).not.toBeInstanceOf(NumeroCollisionError)
+      const chain: string[] = []
+      for (let cause: unknown = thrown; cause; cause = (cause as Error).cause) {
+        chain.push(String((cause as Error).message))
+      }
+      expect(chain.join(" | ")).toContain("Simulated demande insert failure")
+      expect(chain.join(" | ")).not.toContain("numéro de la demande")
+
+      const res = handleServiceError(thrown)
+      expect(res.status).toBe(500)
+      await expect(res.json()).resolves.toEqual({ error: "Erreur interne" })
+      consoleError.mockRestore()
+    })
+
+    it("creates exactly as before when the numéro does not collide", async () => {
+      const before = await rowCount()
+      const demande = await createDraft(sampleData, {
+        id: employeeId,
+        role: "EMPLOYEE",
+      })
+
+      expect(await rowCount()).toBe(before + 1)
+      expect(demande.numero).toBe(numeroFor(before + 1))
+      expect(demande.etape).toBe("DRAFT")
+      expect(demande.decision).toBe("PENDING")
+      expect(demande.employeNom).toBe("Dupont")
+      expect(Number(demande.totalEstime)).toBe(4600)
+
+      const rows = await pgliteDb
+        .select()
+        .from(schema.demandesDeplacement)
+        .where(eq(schema.demandesDeplacement.id, demande.id))
+      expect(rows).toHaveLength(1)
+
+      const auditRows = await pgliteDb
+        .select()
+        .from(schema.journalAudit)
+        .where(eq(schema.journalAudit.entiteId, demande.id))
+      expect(auditRows).toHaveLength(1)
+      expect(auditRows[0].action).toBe("CREATION")
+
+      const notifRows = await pgliteDb
+        .select()
+        .from(schema.notifications)
+        .where(eq(schema.notifications.demandeId, demande.id))
+      expect(notifRows).toHaveLength(0)
+    })
+
+    it("keeps the year prefix from the clock", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] })
+      try {
+        vi.setSystemTime(new Date("2031-03-04T12:00:00Z"))
+        const demande = await createDraft(sampleData, {
+          id: employeeId,
+          role: "EMPLOYEE",
+        })
+        expect(demande.numero).toMatch(/^DD-2031-\d{4}$/)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it("keeps the padding at 4 digits", async () => {
+      const demande = await createDraft(sampleData, {
+        id: employeeId,
+        role: "EMPLOYEE",
+      })
+      expect(demande.numero).toMatch(/^DD-\d{4}-\d{4}$/)
+    })
+
+    it("keeps the counter global: a soft-deleted DemandeDeplacement still consumes its numero", async () => {
+      const before = await rowCount()
+      const deleted = await createDraft(sampleData, {
+        id: employeeId,
+        role: "EMPLOYEE",
+      })
+      await pgliteDb
+        .update(schema.demandesDeplacement)
+        .set({ deletedAt: new Date() })
+        .where(eq(schema.demandesDeplacement.id, deleted.id))
+
+      // The soft-deleted row is still a row: the count that feeds the numéro
+      // counts it, so its numéro is consumed and never handed out again.
+      const afterSoftDelete = await rowCount()
+      expect(afterSoftDelete).toBe(before + 1)
+
+      const next = await createDraft(sampleData, {
+        id: employeeId,
+        role: "EMPLOYEE",
+      })
+      expect(next.numero).toBe(numeroFor(afterSoftDelete + 1))
+      expect(next.numero).not.toBe(deleted.numero)
+    })
+  })
+
+  // ─── The creation path asks the pipeline where it starts (#293) ───────────
+  //
+  // `etatCreation` and `readFile` are pulled in here rather than at the top of
+  // the file: this block is appended, and a shared import block is where a
+  // concurrent edit would collide.
+
+  describe("the creation path reads its opening state from the pipeline", () => {
+    it("writes a draft at the pipeline's own answer for the creating Role, not at a literal", async () => {
+      const { etatCreation } = await import("../workflow")
+      const demande = await createDraft(sampleData, {
+        id: employeeId,
+        role: "EMPLOYEE",
+      })
+
+      const attendu = etatCreation("EMPLOYEE", false)
+      expect(demande.etape).toBe(attendu.etape)
+      expect(demande.decision).toBe(attendu.decision)
+    })
+
+    // The assertion above moves with the pipeline's answer, so it cannot fail
+    // on its own: if the opening Etape changed, the row and the call would
+    // change together. This one is read from the pipeline's own table instead,
+    // so a drifted opening state fails here rather than passing quietly.
+    it("writes a draft at the Etape the submit effect leaves from, with the pending Decision", async () => {
+      const { TRANSITION_EFFECTS, isPendingDecision } = await import(
+        "../workflow"
+      )
+      type Decision = import("../workflow").Decision
+      const demande = await createDraft(sampleData, {
+        id: employeeId,
+        role: "EMPLOYEE",
+      })
+
+      const effetSoumission = TRANSITION_EFFECTS.find(
+        (e) => e.action === "submit"
+      )
+      expect(effetSoumission).toBeDefined()
+      expect(demande.etape).toBe(effetSoumission!.from)
+      expect(
+        isPendingDecision(demande.decision as Decision)
+      ).toBe(true)
+    })
+
+    it("writes a submission at the pipeline's own answer for the creating Role, not at a literal", async () => {
+      const { etatCreation } = await import("../workflow")
+      const demande = await createAndSubmit(sampleData, {
+        id: employeeId,
+        role: "EMPLOYEE",
+      })
+
+      const attendu = etatCreation("EMPLOYEE", true)
+      expect(demande.etape).toBe(attendu.etape)
+      expect(demande.decision).toBe(attendu.decision)
+    })
+
+    it("stamps the modification timestamp once on both paths, and never through the pipeline", async () => {
+      const { etatCreation } = await import("../workflow")
+      const avant = new Date()
+      const draft = await createDraft(sampleData, {
+        id: employeeId,
+        role: "EMPLOYEE",
+      })
+      const soumis = await createAndSubmit(sampleData, {
+        id: employeeId,
+        role: "EMPLOYEE",
+      })
+      const apres = new Date()
+
+      // The stamp belongs to the creation, so the pipeline's field set never
+      // carries it, on either path. Both rows are stamped once, inside the
+      // window of the creation itself.
+      expect(etatCreation("EMPLOYEE", false).champs).not.toHaveProperty(
+        "modifieLe"
+      )
+      expect(etatCreation("EMPLOYEE", true).champs).not.toHaveProperty(
+        "modifieLe"
+      )
+      for (const row of [draft, soumis]) {
+        expect(row.modifieLe.getTime()).toBeGreaterThanOrEqual(avant.getTime())
+        expect(row.modifieLe.getTime()).toBeLessThanOrEqual(apres.getTime())
+      }
+    })
+
+    // A second stamping of modifieLe would still land inside the window above,
+    // so the pin that makes a re-stamp red is structural: the creation
+    // function's own source must carry the field exactly once.
+    it("stamps modifieLe exactly once in the creation function, on both paths", async () => {
+      const { readFile } = await import("node:fs/promises")
+      const source = await readFile(
+        new URL("./mutations.ts", import.meta.url),
+        "utf8"
+      )
+      const start = source.indexOf("async function createDemande(")
+      const end = source.indexOf("export async function createDraft(")
+      // The anchors are asserted BEFORE slicing: `indexOf` answers -1 when an
+      // anchor is gone, and a -1 would silently slice the wrong region.
+      expect(start).toBeGreaterThan(-1)
+      expect(end).toBeGreaterThan(start)
+
+      const corps = source.slice(start, end)
+      expect(corps.match(/modifieLe/g)).toHaveLength(1)
+      expect(corps).toContain("modifieLe: new Date()")
+    })
+
+    it("keeps every Etape and Decision literal out of the creation function", async () => {
+      const { readFile } = await import("node:fs/promises")
+      const source = await readFile(
+        new URL("./mutations.ts", import.meta.url),
+        "utf8"
+      )
+      const start = source.indexOf("async function createDemande(")
+      const end = source.indexOf("export async function createDraft(")
+      expect(start).toBeGreaterThan(-1)
+      expect(end).toBeGreaterThan(start)
+
+      const corps = source.slice(start, end)
+      for (const etape of [
+        "DRAFT",
+        "MANAGER_REVIEW",
+        "FINANCE_REVIEW",
+        "DIRECTION_REVIEW",
+        "FINAL",
+      ]) {
+        expect(corps, etape).not.toContain(`"${etape}"`)
+      }
+      for (const decision of ["PENDING", "APPROVED", "REJECTED", "WITHDRAWN"]) {
+        expect(corps, decision).not.toContain(`"${decision}"`)
+      }
+      // The creation path must not build a transition of its own either:
+      // submitting at creation is the pipeline's business, not this caller's.
+      expect(corps).not.toContain("buildTransition")
+      expect(corps).toContain("etatCreation(actor.role, submit)")
     })
   })
 })
