@@ -28,16 +28,18 @@ export default async function DemandeDetailPage({
     throw e
   }
 
-  const userRole = user.role
+  const userRole = user.role as Role
   const userId = user.id
   const isOwner = demande.employeId === userId
+  // The ownership fact goes in as itself; the verdicts come back from the
+  // guard. The reader used to take a `userId` and compare it here, which put
+  // the ownership decision on this page rather than in the pipeline (#299).
   const { canApprove, canReject, canWithdraw } = getAllowedActions(
     userRole,
-    userId,
+    isOwner,
     {
       etape: demande.etape as Etape,
       decision: demande.decision as Decision,
-      employeId: demande.employeId,
     }
   )
 

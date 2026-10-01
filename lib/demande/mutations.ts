@@ -6,14 +6,13 @@ import { departements } from "../../db/schema/departements"
 import { documents } from "../../db/schema/documents"
 import type { CreateDemandeData } from "../demande-utils"
 import type { Actor } from "../demande-types"
-import { checkTransition, buildTransition, etatCreation } from "../workflow"
+import { resoudreTransition, etatCreation } from "../workflow"
 import type { Etape, Decision } from "../workflow"
 import type { NotificationEventType } from "../notification-events"
 import { appliquerEffets } from "./effets-transition"
 import {
   DemandeNotFoundError,
   UnauthorizedActionError,
-  InvalidTransitionError,
   NumeroCollisionError,
 } from "../errors"
 
@@ -211,9 +210,20 @@ export async function executeTransition(
   const decision = demande.decision as Decision
 
   const ownerMatch = demande.employeId === actor.id
-  const check = checkTransition(actor.role, etape, action, decision, ownerMatch)
-  if (!check.ok) {
-    if (check.reason === "NOT_OWNER") {
+
+  // One call into the guard, asked with the real ownership fact: the actor
+  // either is the DemandeDeplacement's employee or is not, and the row says
+  // which. The old path asked here and then asked again inside the builder
+  // with ownership hardcoded to « yes », so a caller could reach a transition
+  // for an action it had no ownership of without ever saying so (#299).
+  const resolution = resoudreTransition(actor.role, etape, action, {
+    decision,
+    ownerMatch,
+    comment: params.comment,
+    actorId: actor.id,
+  })
+  if (!resolution.ok) {
+    if (resolution.reason === "NOT_OWNER") {
       throw new UnauthorizedActionError(
         "Seul le proprietaire peut " +
           (action === "submit" ? "soumettre" : "retirer") +
@@ -223,20 +233,7 @@ export async function executeTransition(
     throw new UnauthorizedActionError()
   }
 
-  const transitionParams: {
-    comment?: string
-    actorId?: string
-    decision?: Decision
-  } = { actorId: actor.id, decision }
-  if (params.comment) transitionParams.comment = params.comment
-
-  const transition = buildTransition(
-    actor.role,
-    etape,
-    action,
-    transitionParams
-  )
-  if (!transition) throw new InvalidTransitionError()
+  const transition = resolution.transition
 
   const fields = { ...transition.transition.fields, modifieLe: new Date() }
 

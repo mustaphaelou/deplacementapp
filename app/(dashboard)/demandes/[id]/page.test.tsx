@@ -287,6 +287,21 @@ describe("Demande detail page", () => {
 
     expect(html).toContain("Retirer la demande")
   })
+
+  // #299: the page no longer decides ownership and hands the verdict to
+  // getAllowedActions as `isOwner`. The distinction is invisible in the
+  // owner's markup — both draw the button — so the page's own source is what
+  // pins it: the fact crosses the boundary, and the verdict crosses back.
+  it("passes the ownership fact in and reads the verdicts back", async () => {
+    const { readFile } = await import("node:fs/promises")
+    const source = await readFile(new URL("./page.tsx", import.meta.url), "utf8")
+
+    expect(source).toMatch(/getAllowedActions\(\s*userRole,\s*isOwner,/)
+    // The reader used to receive the userId and the employeId and compare them
+    // itself, which put the ownership decision on this page rather than in the
+    // pipeline. The comparison stays where the guard can see it.
+    expect(source).not.toMatch(/getAllowedActions\([^)]*userId/)
+  })
 })
 
 // #274: the detail page displayed the Motif list straight out of the storage

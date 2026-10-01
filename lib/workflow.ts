@@ -218,12 +218,22 @@ export type TransitionCheckReason =
   | "WRONG_ROLE"
   | "NO_EFFECT"
 
+/**
+ * The one entry into the guard that answers « apply this transition, or say
+ * why not ». `ownerMatch` is required and has NO default, deliberately: the
+ * old builder's default of `true` was how a caller silently asserted
+ * ownership it had never checked (#299).
+ *
+ * The order of the checks below is the guard's, unchanged: the Etape's seat is
+ * read before the Decision, so at FINAL the reason is WRONG_ROLE and never
+ * TERMINAL.
+ */
 export function checkTransition(
   role: Role,
   etape: Etape,
   action: WorkflowAction,
-  decision?: Decision,
-  ownerMatch = true
+  decision: Decision | undefined,
+  ownerMatch: boolean
 ): { ok: true } | { ok: false; reason: TransitionCheckReason } {
   const stage = PIPELINE.find((s) => s.id === etape)
   if (!stage || !stage.roleCanAct) {
@@ -263,19 +273,63 @@ export function canTransition(
   return checkTransition(role, etape, action, decision, true).ok
 }
 
-export function buildTransition(
+// ─── The one way in (#299) ─────────────────────────────────────────────────
+
+export interface TransitionParams {
+  /** The Decision the DemandeDeplacement carries today, if any. */
+  decision?: Decision
+  /**
+   * Whether the actor is the DemandeDeplacement's own employee. REQUIRED, with
+   * no default: the old builder hardcoded `true`, which let a caller obtain a
+   * transition for an action its actor had no ownership of without ever saying
+   * so. A required input makes the omission a compile error rather than a
+   * silent permission.
+   */
+  ownerMatch: boolean
+  comment?: string
+  actorId?: string
+}
+
+export type Resolution =
+  | { ok: true; transition: WorkflowResult }
+  | { ok: false; reason: TransitionCheckReason }
+
+/**
+ * The pipeline's one entry into the guard: either the transition to apply, or
+ * the reason it will not be applied. There is no third answer.
+ *
+ * The refusal is a VALUE on the result, so a caller can never confuse it with
+ * « nothing to do » — the old builder's `null` covered both. The transition is
+ * on the success arm alone, so a caller cannot obtain one the guard refused:
+ * the field does not exist to read.
+ */
+export function resoudreTransition(
   role: Role,
   etape: Etape,
   action: WorkflowAction,
-  params?: { comment?: string; actorId?: string; decision?: Decision }
-): WorkflowResult | null {
-  if (!checkTransition(role, etape, action, params?.decision, true).ok) {
-    return null
-  }
+  params: TransitionParams
+): Resolution {
+  const check = checkTransition(
+    role,
+    etape,
+    action,
+    params.decision,
+    params.ownerMatch
+  )
+  if (!check.ok) return { ok: false, reason: check.reason }
 
   const effect = findEffect(action, etape)
-  if (!effect) return null
+  if (!effect) return { ok: false, reason: "NO_EFFECT" }
 
+  return { ok: true, transition: construireTransition(effect, action, params) }
+}
+
+/** The fields a transition writes, given an effect the guard already admitted. */
+function construireTransition(
+  effect: TransitionEffect,
+  action: WorkflowAction,
+  params: TransitionParams
+): WorkflowResult {
   let newDecision: Decision
   if (action === "retirer") {
     newDecision = "WITHDRAWN"
@@ -296,11 +350,11 @@ export function buildTransition(
     fields[ts] = new Date()
   }
 
-  if (effect.commentField && params?.comment) {
+  if (effect.commentField && params.comment) {
     fields[effect.commentField] = params.comment
   }
 
-  if (effect.setAssignee && params?.actorId) {
+  if (effect.setAssignee && params.actorId) {
     fields.assigneAId = params.actorId
   }
 
@@ -309,6 +363,46 @@ export function buildTransition(
     auditAction: effect.auditAction,
     notificationEvent: effect.notificationEvent,
   }
+}
+
+// ─── The creation path's projection (#299) ──────────────────────────────────
+
+/**
+ * A DemandeDeplacement is born owned by its creator — the fact `etatCreation`
+ * already states. It is a NAMED FACT here, not the unexamined `true` the old
+ * builder hardcoded: the creation path knows who owns a row that does not
+ * exist yet, because it is about to create it.
+ */
+const PROPRIETAIRE_A_LA_NAISSANCE = true
+
+/**
+ * A projection over the one call, kept for the creation path only.
+ *
+ * `etatCreation` asks « what does a submitted creation become? » and reads a
+ * transition or nothing; it has no owner to compare and no Decision to weigh,
+ * because the row it describes is being born. So this projection states the
+ * two facts a creation holds (ownership by birth, no Decision yet) and maps the
+ * refusal back to `null` — the shape `etatCreation` was written against, and
+ * the one its call site keeps using.
+ *
+ * A caller acting on an EXISTING DemandeDeplacement does not come here: it
+ * knows the owner and the Decision, so it calls `resoudreTransition` and reads
+ * the reason for itself.
+ */
+export function buildTransition(
+  role: Role,
+  etape: Etape,
+  action: WorkflowAction,
+  params?: { comment?: string; actorId?: string; decision?: Decision }
+): WorkflowResult | null {
+  const resolution = resoudreTransition(role, etape, action, {
+    decision: params?.decision,
+    ownerMatch: PROPRIETAIRE_A_LA_NAISSANCE,
+    comment: params?.comment,
+    actorId: params?.actorId,
+  })
+
+  return resolution.ok ? resolution.transition : null
 }
 
 // ─── Creation state (where a DemandeDeplacement is born) ────────────────────
@@ -383,20 +477,32 @@ export function etatCreation(role: Role, soumis: boolean): EtatCreation {
   }
 }
 
+/**
+ * What the reader asks the one call, four times — once per button the detail
+ * page may draw. The ownership fact goes IN as `ownerMatch`, and each verdict
+ * is the guard's own answer; there is no `&& isOwner` bolted on afterwards,
+ * which is how the reader used to reach an ownership verdict the guard had
+ * never been asked for.
+ *
+ * `role` takes the Role's own vocabulary: the reader is a consumer of the
+ * guard, so the cast that used to launder a `string` into a `Role` here is
+ * gone, and a caller outside the Role union cannot compile here.
+ */
 export function getAllowedActions(
-  role: string,
-  userId: string,
-  demande: { etape: Etape; decision: Decision; employeId: string }
+  role: Role,
+  ownerMatch: boolean,
+  demande: { etape: Etape; decision: Decision | undefined }
 ): AllowedActions {
-  const isOwner = demande.employeId === userId
-  const r = role as Role
+  const allowed = (action: WorkflowAction): boolean =>
+    resoudreTransition(role, demande.etape, action, {
+      decision: demande.decision,
+      ownerMatch,
+    }).ok
 
   return {
-    canSubmit:
-      canTransition(r, demande.etape, "submit", demande.decision) && isOwner,
-    canApprove: canTransition(r, demande.etape, "approuver", demande.decision),
-    canReject: canTransition(r, demande.etape, "rejeter", demande.decision),
-    canWithdraw:
-      canTransition(r, demande.etape, "retirer", demande.decision) && isOwner,
+    canSubmit: allowed("submit"),
+    canApprove: allowed("approuver"),
+    canReject: allowed("rejeter"),
+    canWithdraw: allowed("retirer"),
   }
 }
