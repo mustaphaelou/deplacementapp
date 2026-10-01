@@ -288,6 +288,41 @@ describe("Demande detail page", () => {
     expect(html).toContain("Retirer la demande")
   })
 
+  // #299 (review finding 1): the owner case above cannot catch a predicate
+  // that is wrong in the permissive direction, because it also satisfies
+  // `demande.employeId === userId`. This holds EVERY other field constant —
+  // same role, same etape, same decision — and varies only the predicate's
+  // input, so the ownership comparison is the only thing that can decide it.
+  // Without this, `demande.employeId === userId || demande.etape === "DRAFT"`
+  // ships green and shows « Retirer la demande » to a non-owner.
+  it("hides withdraw from a non-owner on a DRAFT", async () => {
+    const html = await renderPage({
+      role: "EMPLOYEE",
+      etape: "DRAFT",
+      employeId: "u-9",
+    })
+
+    expect(html).not.toContain("Retirer la demande")
+  })
+
+  // The mirror of the case above, so the pin cannot be satisfied by a
+  // predicate that denies everyone: the owner at the SAME etape still sees it.
+  it("hides withdraw from a non-owner at a DRAFT while the owner still sees it", async () => {
+    const owner = await renderPage({
+      role: "EMPLOYEE",
+      etape: "DRAFT",
+      employeId: "u-1",
+    })
+    const other = await renderPage({
+      role: "EMPLOYEE",
+      etape: "DRAFT",
+      employeId: "u-9",
+    })
+
+    expect(owner).toContain("Retirer la demande")
+    expect(other).not.toContain("Retirer la demande")
+  })
+
   // #299: the page no longer decides ownership and hands the verdict to
   // getAllowedActions as `isOwner`. The distinction is invisible in the
   // owner's markup — both draw the button — so the page's own source is what
