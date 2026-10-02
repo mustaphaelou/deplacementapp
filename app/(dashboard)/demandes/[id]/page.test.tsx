@@ -162,8 +162,12 @@ describe("Demande detail page", () => {
     const html = await renderPage()
 
     expect(html).toContain('aria-label="breadcrumb"')
+    // Owned by components/page-header.tsx (the h1's md: breakpoint), pinned in
+    // full at components/page-header.test.tsx.
     expect(html).toContain("text-[40px]")
     expect(html).toContain("Demande DD-2025-0001")
+    // The header module's OWN icon tile, not this page's stepper pills below —
+    // those carry their own bg-primary/10 text-primary runs.
     expect(html).toContain("bg-primary/10")
     expect(html).toContain("Créée le")
   })
@@ -396,9 +400,6 @@ describe("Demande detail page — the shared page header", () => {
     // The detail page's own trail: a link crumb back to the list, then this
     // demande's numero in page treatment.
     expect(html).toContain('href="/demandes"')
-    expect(html).toContain(
-      'class="text-foreground min-w-0 truncate font-medium">N° DD-2025-0001</span>'
-    )
     expect(html.match(/data-slot="breadcrumb-separator"/g)).toHaveLength(1)
   })
 })

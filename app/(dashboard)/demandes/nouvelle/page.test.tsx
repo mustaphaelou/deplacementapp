@@ -15,8 +15,12 @@ describe("Nouvelle demande page", { timeout: 30000 }, () => {
     const html = renderToStaticMarkup(<NouvelleDemandePage />)
 
     expect(html).toContain('aria-label="breadcrumb"')
+    // Owned by components/page-header.tsx (the h1's md: breakpoint), pinned in
+    // full at components/page-header.test.tsx.
     expect(html).toContain("text-[40px]")
     expect(html).toContain("Nouvelle Demande")
+    // The header module's icon tile, reached here through components/
+    // demande-form.tsx — the form's own fields below carry their own classes.
     expect(html).toContain("bg-primary/10")
     expect(html).toContain("Renseignez les informations du déplacement")
   })
@@ -99,9 +103,6 @@ describe("Nouvelle demande page — the shared page header", () => {
     // The form's own three-item trail, link crumb in the middle (#263).
     expect(html).toContain(">Espace</span>")
     expect(html).toContain('href="/demandes"')
-    expect(html).toContain(
-      'class="text-foreground min-w-0 truncate font-medium">Nouvelle Demande</span>'
-    )
     expect(html.match(/data-slot="breadcrumb-separator"/g)).toHaveLength(2)
   })
 })

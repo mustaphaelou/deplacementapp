@@ -40,7 +40,11 @@ describe("Société administration page", () => {
 
     expect(html).toContain('aria-label="breadcrumb"')
     expect(html).toContain("Administration")
+    // Owned by components/page-header.tsx (the h1's md: breakpoint), pinned in
+    // full at components/page-header.test.tsx. Kept here as this page's cheap
+    // "the header is here" marker; the class itself is not re-pinned.
     expect(html).toContain("text-[40px]")
+    // The page's OWN 720px document column — no module owns this one.
     expect(html).toContain("max-w-[720px]")
     expect(html).not.toContain('data-slot="card"')
   })
@@ -145,9 +149,6 @@ describe("Société administration page — the shared page header", () => {
     // page element) is the module's marker — a copy would have to reproduce
     // all three to pass.
     expect(html).toContain(">Administration</span>")
-    expect(html).toContain(
-      'class="text-foreground min-w-0 truncate font-medium">Société</span>'
-    )
     expect(html.match(/data-slot="breadcrumb-separator"/g)).toHaveLength(1)
   })
 })

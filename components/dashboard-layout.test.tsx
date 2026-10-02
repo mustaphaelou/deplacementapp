@@ -136,6 +136,8 @@ describe("DashboardLayout — the page chrome matches its sibling pages", () => 
     expect(html).toContain("Espace")
     expect(html).toContain("Tableau de bord")
     // The primary action sits top-right, above the title — not beside it.
+    // Owned by components/page-header.tsx (the h1's md: breakpoint and the icon
+    // tile), pinned in full at components/page-header.test.tsx.
     expect(html).toContain("text-[40px]")
     expect(html).toContain("Nouvelle demande")
     expect(html).toContain("bg-primary/10")
@@ -382,6 +384,11 @@ describe("DashboardLayout — the row chevron is reachable without a pointer", (
   })
 })
 
+// #320: the class-string assertions this file RETAINS are not header
+// leftovers. The `hideClassFor` block below belongs to spec #305's shared
+// display module, which owns the hide rule — the header module owns neither.
+// #320 removed only the breadcrumb truncation class this file duplicated from
+// components/page-header.tsx.
 // #307: this module carried its OWN hideClassFor — a byte-identical duplicate of
 // the shared one, serving a DIFFERENT table (the config-driven home widget, not
 // the three list pages). The rendered markup cannot show the difference: both
@@ -438,9 +445,8 @@ describe("DashboardLayout — the shared page header", () => {
     // The layout's own trail, plus the CTA it configures — the one call site
     // that already carried gap-4, so the row keeps the module's form.
     expect(html).toContain(">Espace</span>")
-    expect(html).toContain(
-      'class="text-foreground min-w-0 truncate font-medium">Tableau de bord</span>'
-    )
+    // Owned by components/page-header.tsx (the breadcrumb row), pinned in full
+    // at components/page-header.test.tsx.
     expect(html).toContain(
       '<div class="flex items-center justify-between gap-4">'
     )
