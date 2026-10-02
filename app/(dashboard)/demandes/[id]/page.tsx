@@ -6,7 +6,7 @@ import { DemandeDetail } from "@/components/demande-detail"
 import type { DemandeWithRelations } from "@/lib/demande-types"
 import type { Role } from "@/lib/auth"
 import { notFound } from "next/navigation"
-import { getAllowedActions, type Etape, type Decision } from "@/lib/workflow"
+import { getAllowedActions } from "@/lib/workflow"
 
 export default async function DemandeDetailPage({
   params,
@@ -38,8 +38,8 @@ export default async function DemandeDetailPage({
     userRole,
     isOwner,
     {
-      etape: demande.etape as Etape,
-      decision: demande.decision as Decision,
+      etape: demande.etape,
+      decision: demande.decision,
     }
   )
 

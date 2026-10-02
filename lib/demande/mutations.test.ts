@@ -1202,7 +1202,6 @@ describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT }, () => {
       const { TRANSITION_EFFECTS, isPendingDecision } = await import(
         "../workflow"
       )
-      type Decision = import("../workflow").Decision
       const demande = await createDraft(sampleData, {
         id: employeeId,
         role: "EMPLOYEE",
@@ -1213,9 +1212,9 @@ describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT }, () => {
       )
       expect(effetSoumission).toBeDefined()
       expect(demande.etape).toBe(effetSoumission!.from)
-      expect(
-        isPendingDecision(demande.decision as Decision)
-      ).toBe(true)
+      // No cast: the row's Decision is the pipeline's union, read off the
+      // schema's inferred row (#295).
+      expect(isPendingDecision(demande.decision)).toBe(true)
     })
 
     it("writes a submission at the pipeline's own answer for the creating Role, not at a literal", async () => {
