@@ -166,6 +166,14 @@ export async function findMany(
   ]
 
   if (etape) {
+    // Still a cast, and deliberately so (#295). The other three casts this
+    // ticket removed laundered a ROW's widened fields; this one launders a
+    // VALUE OFF THE WIRE. `etape` arrives from the query string through
+    // `demandeQuerySchema`, which validates it as a bare `z.string()` — a
+    // request can carry any lane name at all. Narrowing it belongs at that
+    // schema, not here, and doing it would change which requests are accepted
+    // (a behaviour change this ticket forbids). The sibling `decision` filter
+    // below needs no cast because its schema IS a `z.enum`.
     conditions.push(eq(demandesDeplacement.etape, etape as Etape))
   }
 
