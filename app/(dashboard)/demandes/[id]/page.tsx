@@ -21,6 +21,9 @@ export default async function DemandeDetailPage({
   try {
     demande = await findById(id, {
       id: user.id,
+      // The Role arrives as the `string` the auth seam declares, so the reader's
+      // own vocabulary needs a bridge here and at `userRole` below. Both casts
+      // go with the seam's shape, which #297 narrows to the Role union (#296).
       role: user.role as Role,
     })
   } catch (e) {
