@@ -128,10 +128,11 @@ describe("Véhicules administration page — the shared page header", () => {
 
     // This asserts the page's OWN trail rendered through the module, not that
     // an <h1> exists somewhere: a hand-inlined header satisfies a title
-    // assertion and is exactly the regression #261 removed. The breadcrumb
-    // truncation contract (nowrap list, shrinkable last item, truncate on the
-    // page element) is the module's marker — a copy would have to reproduce
-    // all three to pass.
+    // assertion and is exactly the regression #261 removed. What is left here
+    // is the trail the module BUILDS — the page's own crumb labels and the one
+    // separator per crumb, which only the module's breadcrumb emits. #320
+    // removed this block's duplication of the truncation contract, which
+    // components/page-header.tsx pins in full on its own suite.
     expect(html).toContain(">Administration</span>")
     expect(html).toContain("véhicule(s)</p>")
   })
