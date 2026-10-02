@@ -15,9 +15,6 @@ describe("Nouvelle demande page", { timeout: 30000 }, () => {
     const html = renderToStaticMarkup(<NouvelleDemandePage />)
 
     expect(html).toContain('aria-label="breadcrumb"')
-    // Owned by components/page-header.tsx (the h1's md: breakpoint), pinned in
-    // full at components/page-header.test.tsx.
-    expect(html).toContain("text-[40px]")
     expect(html).toContain("Nouvelle Demande")
     // The header module's icon tile, reached here through components/
     // demande-form.tsx — the form's own fields below carry their own classes.
@@ -29,6 +26,7 @@ describe("Nouvelle demande page", { timeout: 30000 }, () => {
     const { default: NouvelleDemandePage } = await import("./page")
     const html = renderToStaticMarkup(<NouvelleDemandePage />)
 
+    // The page's OWN 720px document column — no module owns this one.
     expect(html).toContain("max-w-[720px]")
   })
 

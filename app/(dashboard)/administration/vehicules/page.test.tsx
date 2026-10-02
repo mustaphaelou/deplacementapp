@@ -30,9 +30,6 @@ describe("Véhicules administration page", () => {
 
     expect(html).toContain('aria-label="breadcrumb"')
     expect(html).toContain("Administration")
-    // Owned by components/page-header.tsx (the h1's md: breakpoint), pinned in
-    // full at components/page-header.test.tsx.
-    expect(html).toContain("text-[40px]")
     expect(html).toContain("Ajouter un véhicule")
     expect(html).toContain("véhicule(s)")
     expect(html).not.toContain('data-slot="card"')
@@ -109,6 +106,8 @@ describe("Véhicules administration page", () => {
       />
     )
 
+    // The pill tones are components/status-pill.tsx's TONE_CLASSES
+    // (neutral/pending/success/danger); this page only chooses one.
     expect(html).toContain("bg-[#E5F3EE]")
     expect(html).toContain("bg-[#FBF0DB]")
     expect(html).toContain("Disponible")

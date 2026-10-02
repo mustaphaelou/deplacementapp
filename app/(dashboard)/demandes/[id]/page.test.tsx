@@ -155,6 +155,7 @@ describe("Demande detail page", () => {
 
   it("renders the 720px document column", async () => {
     const html = await renderPage()
+    // The page's OWN 720px document column — no module owns this one.
     expect(html).toContain("max-w-[720px]")
   })
 
@@ -162,9 +163,6 @@ describe("Demande detail page", () => {
     const html = await renderPage()
 
     expect(html).toContain('aria-label="breadcrumb"')
-    // Owned by components/page-header.tsx (the h1's md: breakpoint), pinned in
-    // full at components/page-header.test.tsx.
-    expect(html).toContain("text-[40px]")
     expect(html).toContain("Demande DD-2025-0001")
     // The header module's OWN icon tile, not this page's stepper pills below —
     // those carry their own bg-primary/10 text-primary runs.

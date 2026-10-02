@@ -155,9 +155,6 @@ describe("Rapports page", () => {
 
     expect(html).toContain('aria-label="breadcrumb"')
     expect(html).toContain("Administration")
-    // Owned by components/page-header.tsx (the h1's md: breakpoint), pinned in
-    // full at components/page-header.test.tsx.
-    expect(html).toContain("text-[40px]")
     expect(html).toContain("CSV")
     expect(html).toContain('href="/api/csv"')
     expect(html).toContain('data-slot="tooltip-trigger"')

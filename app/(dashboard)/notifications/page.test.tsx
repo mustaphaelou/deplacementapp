@@ -50,9 +50,6 @@ describe("Notifications page", () => {
     const html = renderToStaticMarkup(<NotificationsPage />)
 
     expect(html).toContain('aria-label="breadcrumb"')
-    // Owned by components/page-header.tsx (the h1's md: breakpoint), pinned in
-    // full at components/page-header.test.tsx.
-    expect(html).toContain("text-[40px]")
     expect(html).toContain("Notifications")
     expect(html).not.toContain('aria-label="Menu"')
     expect(html).not.toContain('data-slot="card"')

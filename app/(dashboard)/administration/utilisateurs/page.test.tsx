@@ -46,9 +46,6 @@ describe("Utilisateurs administration page", () => {
 
     expect(html).toContain('aria-label="breadcrumb"')
     expect(html).toContain("Administration")
-    // Owned by components/page-header.tsx (the h1's md: breakpoint), pinned in
-    // full at components/page-header.test.tsx.
-    expect(html).toContain("text-[40px]")
     expect(html).toContain("Nouvel utilisateur")
     expect(html).toContain("utilisateur(s)")
     expect(html).not.toContain('data-slot="card"')

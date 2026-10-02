@@ -102,6 +102,8 @@ describe("DashboardLayout — the row pill for a DemandeDeplacement", () => {
     )
 
     expect(html).toContain(">Approuvée</span>")
+    // The pill tones are components/status-pill.tsx's TONE_CLASSES
+    // (neutral/pending/success/danger); the layout only chooses one.
     expect(html).toContain("bg-[#E5F3EE]")
     expect(html).toContain('dark:text-zinc-300">Retirée</span>')
     expect(html).toContain(">En attente (Finance)</span>")
@@ -138,7 +140,6 @@ describe("DashboardLayout — the page chrome matches its sibling pages", () => 
     // The primary action sits top-right, above the title — not beside it.
     // Owned by components/page-header.tsx (the h1's md: breakpoint and the icon
     // tile), pinned in full at components/page-header.test.tsx.
-    expect(html).toContain("text-[40px]")
     expect(html).toContain("Nouvelle demande")
     expect(html).toContain("bg-primary/10")
     // The h1 is no longer the 2xl semibold heading the old home page used

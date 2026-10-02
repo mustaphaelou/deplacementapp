@@ -67,9 +67,6 @@ describe("Demandes list page", () => {
     const html = renderToStaticMarkup(<DemandesListPage />)
 
     expect(html).toContain('aria-label="breadcrumb"')
-    // Owned by components/page-header.tsx (the h1's md: breakpoint), pinned in
-    // full at components/page-header.test.tsx.
-    expect(html).toContain("text-[40px]")
     expect(html).toContain("Demandes")
     expect(html).toContain("demande(s)")
     expect(html).not.toContain('aria-label="Menu"')
@@ -178,11 +175,17 @@ describe("Demandes list page", () => {
     // #307: the shell and the row tint belong to the shared module now, so they
     // are asserted as the module's own output rather than re-pinned as literals.
     expect(html).toContain(tableShellClass)
+    // The cell padding and the table's min-width are this page's own
+    // shell — no module owns them, so they stay here. The row-hover
+    // tint beside them IS spec #305's display module, named below.
     expect(html).toContain("px-2 py-2 font-normal text-muted-foreground")
     expect(html).toContain("px-2 py-2.5")
     expect(html).toContain(rowHoverInkTint)
     expect(html).toContain("min-w-[640px]")
     expect(html).toContain("rounded-full")
+    // The pill tones are components/status-pill.tsx's TONE_CLASSES
+    // (neutral/pending/success/danger); the pill's rounded-full shape is
+    // the same module. This page only chooses the tone.
     expect(html).toContain("bg-[#FBF0DB]")
     expect(html).toContain("En attente (Finance)")
     expect(html).toContain("sm:opacity-0 sm:group-hover:opacity-100")

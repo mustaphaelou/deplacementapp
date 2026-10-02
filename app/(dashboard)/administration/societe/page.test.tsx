@@ -40,10 +40,6 @@ describe("Société administration page", () => {
 
     expect(html).toContain('aria-label="breadcrumb"')
     expect(html).toContain("Administration")
-    // Owned by components/page-header.tsx (the h1's md: breakpoint), pinned in
-    // full at components/page-header.test.tsx. Kept here as this page's cheap
-    // "the header is here" marker; the class itself is not re-pinned.
-    expect(html).toContain("text-[40px]")
     // The page's OWN 720px document column — no module owns this one.
     expect(html).toContain("max-w-[720px]")
     expect(html).not.toContain('data-slot="card"')
