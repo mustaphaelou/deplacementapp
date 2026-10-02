@@ -1,10 +1,12 @@
 import { describe, it, expect } from "vitest"
+import { readFile } from "node:fs/promises"
 import {
   canTransition,
   buildTransition,
   checkTransition,
   etatCreation,
   getAllowedActions,
+  resoudreTransition,
   queueEtapes,
   committedEtapes,
   laneOrderByColumn,
@@ -14,8 +16,71 @@ import {
   TERMINAL_DECISIONS,
   isPendingDecision,
 } from "./workflow"
-import type { Etape, Decision, WorkflowAction } from "./workflow"
+import type {
+  Etape,
+  Decision,
+  WorkflowAction,
+  Resolution,
+  WorkflowResult,
+} from "./workflow"
 import type { Role } from "./auth"
+
+// ─── The tuple space, declared once ─────────────────────────────────────────
+//
+// The guard is a function of five things, and a sweep that forgets the fifth is
+// a sweep over a smaller world than the one the guard answers for. Ownership is
+// in here from the start (#299): it is a dimension of the question, not an
+// afterthought bolted on by a caller.
+
+const ROLES: readonly Role[] = [
+  "EMPLOYEE",
+  "MANAGER",
+  "FINANCE_ADMIN",
+  "GENERAL_DIRECTION",
+]
+
+const ETAPES: readonly Etape[] = [
+  "DRAFT",
+  "MANAGER_REVIEW",
+  "FINANCE_REVIEW",
+  "DIRECTION_REVIEW",
+  "FINAL",
+]
+
+const ACTIONS: readonly WorkflowAction[] = [
+  "submit",
+  "approuver",
+  "rejeter",
+  "retirer",
+]
+
+// `undefined` is a real input: a DemandeDeplacement read before the Decision
+// column is populated reaches the guard that way.
+const DECISIONS: readonly (Decision | undefined)[] = [
+  "PENDING",
+  "APPROVED",
+  "REJECTED",
+  "WITHDRAWN",
+  undefined,
+]
+
+const OWNERSHIP: readonly boolean[] = [true, false]
+
+/**
+ * The success arm, read. The check is the assertion — a refused call names the
+ * reason in the failure — and the throw after it is what narrows the union for
+ * the type-checker. `expect(x.ok).toBe(true)` alone does not narrow, and the
+ * alternative (`!`) would hand back exactly the `undefined` this ticket
+ * removes from the refusal's reach.
+ */
+function attendu(resolution: Resolution): WorkflowResult {
+  expect(
+    resolution.ok,
+    `la garde a refuse: ${JSON.stringify(resolution)}`
+  ).toBe(true)
+  if (!resolution.ok) throw new Error("unreachable")
+  return resolution.transition
+}
 
 // ─── The « pending » predicate: the one definition of waiting ───────────────
 
@@ -64,7 +129,8 @@ describe("isPendingDecision / TERMINAL_DECISIONS", () => {
         "MANAGER",
         "MANAGER_REVIEW",
         "rejeter",
-        decision
+        decision,
+        true
       )
       expect(!result.ok).toBe(!isPendingDecision(decision))
     }
@@ -259,14 +325,21 @@ describe("canTransition", () => {
 
   it("reports TERMINAL for an APPROVED decision at a stage a role can act on", () => {
     expect(
-      checkTransition("MANAGER", "MANAGER_REVIEW", "rejeter", "APPROVED")
+      checkTransition(
+        "MANAGER",
+        "MANAGER_REVIEW",
+        "rejeter",
+        "APPROVED",
+        true
+      )
     ).toEqual({ ok: false, reason: "TERMINAL" })
     expect(
       checkTransition(
         "GENERAL_DIRECTION",
         "DIRECTION_REVIEW",
         "approuver",
-        "APPROVED"
+        "APPROVED",
+        true
       )
     ).toEqual({ ok: false, reason: "TERMINAL" })
   })
@@ -297,7 +370,13 @@ describe("canTransition", () => {
     for (const role of roles) {
       for (const etape of etapes) {
         for (const action of actions) {
-          const result = checkTransition(role, etape, action, "APPROVED")
+          const result = checkTransition(
+            role,
+            etape,
+            action,
+            "APPROVED",
+            true
+          )
           expect(result.ok).toBe(false)
         }
       }
@@ -411,18 +490,16 @@ describe("buildTransition", () => {
 // ─── getAllowedActions ───────────────────────────────────────────────────────
 
 describe("getAllowedActions", () => {
-  const makeDemande = (etape: string, decision: string, employeId: string) => ({
-    etape: etape as import("./workflow").Etape,
-    decision: decision as import("./workflow").Decision,
-    employeId,
+  // The reader takes the ownership FACT (`ownerMatch`), not the ids to derive
+  // it from: the comparison that decides ownership belongs to the guard, and
+  // the page passes its answer in (#299).
+  const demande = (etape: Etape, decision: Decision | undefined) => ({
+    etape,
+    decision,
   })
 
   it("employee can submit and withdraw a DRAFT demande they own", () => {
-    const actions = getAllowedActions(
-      "EMPLOYEE",
-      "user-1",
-      makeDemande("DRAFT", "PENDING", "user-1")
-    )
+    const actions = getAllowedActions("EMPLOYEE", true, demande("DRAFT", "PENDING"))
     expect(actions.canSubmit).toBe(true)
     expect(actions.canWithdraw).toBe(true)
     expect(actions.canApprove).toBe(false)
@@ -432,8 +509,8 @@ describe("getAllowedActions", () => {
   it("employee cannot act on a DRAFT demande they do not own", () => {
     const actions = getAllowedActions(
       "EMPLOYEE",
-      "user-1",
-      makeDemande("DRAFT", "PENDING", "user-2")
+      false,
+      demande("DRAFT", "PENDING")
     )
     expect(actions.canSubmit).toBe(false)
     expect(actions.canWithdraw).toBe(false)
@@ -442,8 +519,8 @@ describe("getAllowedActions", () => {
   it("manager can approve and reject a MANAGER_REVIEW demande", () => {
     const actions = getAllowedActions(
       "MANAGER",
-      "user-2",
-      makeDemande("MANAGER_REVIEW", "PENDING", "user-1")
+      false,
+      demande("MANAGER_REVIEW", "PENDING")
     )
     expect(actions.canApprove).toBe(true)
     expect(actions.canReject).toBe(true)
@@ -454,8 +531,8 @@ describe("getAllowedActions", () => {
   it("finance can approve and reject an FINANCE_REVIEW demande", () => {
     const actions = getAllowedActions(
       "FINANCE_ADMIN",
-      "user-3",
-      makeDemande("FINANCE_REVIEW", "PENDING", "user-1")
+      false,
+      demande("FINANCE_REVIEW", "PENDING")
     )
     expect(actions.canApprove).toBe(true)
     expect(actions.canReject).toBe(true)
@@ -464,8 +541,8 @@ describe("getAllowedActions", () => {
   it("direction can approve and reject an DIRECTION_REVIEW demande", () => {
     const actions = getAllowedActions(
       "GENERAL_DIRECTION",
-      "user-4",
-      makeDemande("DIRECTION_REVIEW", "PENDING", "user-1")
+      false,
+      demande("DIRECTION_REVIEW", "PENDING")
     )
     expect(actions.canApprove).toBe(true)
     expect(actions.canReject).toBe(true)
@@ -474,8 +551,8 @@ describe("getAllowedActions", () => {
   it("no actions allowed on terminal FINAL demande", () => {
     const actions = getAllowedActions(
       "GENERAL_DIRECTION",
-      "user-4",
-      makeDemande("FINAL", "APPROVED", "user-1")
+      true,
+      demande("FINAL", "APPROVED")
     )
     expect(actions.canApprove).toBe(false)
     expect(actions.canReject).toBe(false)
@@ -486,13 +563,148 @@ describe("getAllowedActions", () => {
   it("no actions allowed on WITHDRAWN demande", () => {
     const actions = getAllowedActions(
       "EMPLOYEE",
-      "user-1",
-      makeDemande("DRAFT", "WITHDRAWN", "user-1")
+      true,
+      demande("DRAFT", "WITHDRAWN")
     )
     expect(actions.canSubmit).toBe(false)
     expect(actions.canWithdraw).toBe(false)
     expect(actions.canApprove).toBe(false)
     expect(actions.canReject).toBe(false)
+  })
+
+  // The reader reaches no ownership verdict of its own: it asks the one call
+  // and reports what came back. If the `&& isOwner` conjunction were bolted on
+  // again — ownership decided after the verdict rather than passed into the
+  // question — this fails, and it fails on BOTH ownership values: the old code
+  // passed on the non-owner side by accident and only disagreed for a Role
+  // whose verdict the conjunction happened not to gate.
+  it("reports the guard's own verdict per button, ownership included", () => {
+    for (const role of ROLES) {
+      for (const etape of ETAPES) {
+        for (const decision of DECISIONS) {
+          for (const ownerMatch of OWNERSHIP) {
+            const reported = getAllowedActions(role, ownerMatch, {
+              etape,
+              decision,
+            })
+            const verdict = (action: WorkflowAction) =>
+              resoudreTransition(role, etape, action, {
+                decision,
+                ownerMatch,
+              }).ok
+            const where = `${role}/${etape}/${String(decision)}/owner=${ownerMatch}`
+
+            expect(reported.canSubmit, `submit ${where}`).toBe(
+              verdict("submit")
+            )
+            expect(reported.canApprove, `approuver ${where}`).toBe(
+              verdict("approuver")
+            )
+            expect(reported.canReject, `rejeter ${where}`).toBe(
+              verdict("rejeter")
+            )
+            expect(reported.canWithdraw, `retirer ${where}`).toBe(
+              verdict("retirer")
+            )
+          }
+        }
+      }
+    }
+  })
+})
+
+// ─── resoudreTransition: the one call, and what it refuses ────────────────
+
+describe("resoudreTransition", () => {
+  // The case the old shape could not express. `buildTransition` had no way to
+  // say « this actor does not own the row »: ownership was hardcoded to « yes »
+  // inside it, so `buildTransition("EMPLOYEE","DRAFT","submit", {actorId:
+  // "someone-else"})` returned a transition and claimed nothing about who the
+  // actor was. Here the same question is asked with the fact stated, and the
+  // guard's answer is a refusal with a reason on it.
+  it("refuses a non-owner's owner action, naming NOT_OWNER", () => {
+    expect(
+      resoudreTransition("EMPLOYEE", "DRAFT", "submit", {
+        decision: "PENDING",
+        ownerMatch: false,
+        actorId: "someone-else",
+      })
+    ).toEqual({ ok: false, reason: "NOT_OWNER" })
+
+    expect(
+      resoudreTransition("EMPLOYEE", "DRAFT", "retirer", {
+        decision: "PENDING",
+        ownerMatch: false,
+        actorId: "someone-else",
+      })
+    ).toEqual({ ok: false, reason: "NOT_OWNER" })
+  })
+
+  // The same call, the same row, one fact changed: this actor IS the owner, and
+  // the answer flips to a transition. The pair is the claim — the verdict
+  // depends on the ownership fact, so it cannot have been assumed.
+  it("yields the transition to the owner of the same DRAFT", () => {
+    const transition = attendu(
+      resoudreTransition("EMPLOYEE", "DRAFT", "submit", {
+        decision: "PENDING",
+        ownerMatch: true,
+        actorId: "the-owner",
+      })
+    )
+    expect(transition.transition.newEtape).toBe("MANAGER_REVIEW")
+    expect(transition.auditAction).toBe("SOUMISSION")
+  })
+
+  it("hands back the comment and the assignee it was given", () => {
+    const fields = attendu(
+      resoudreTransition("MANAGER", "MANAGER_REVIEW", "approuver", {
+        decision: "PENDING",
+        ownerMatch: true,
+        comment: "Looks good",
+        actorId: "user-2",
+      })
+    ).transition.fields
+    expect(fields).toHaveProperty("commentaireManager", "Looks good")
+    expect(fields).toHaveProperty("assigneAId", "user-2")
+  })
+
+  // A refused call cannot hand over a transition: the success arm is the only
+  // place the field exists, so reading it off a refusal is a type error, not a
+  // runtime `undefined` a caller might have passed on.
+  it("has no transition to read when it refuses", () => {
+    const resolution = resoudreTransition("EMPLOYEE", "DRAFT", "submit", {
+      decision: "WITHDRAWN",
+      ownerMatch: true,
+    })
+    expect(resolution.ok).toBe(false)
+    expect(Object.keys(resolution).sort()).toEqual(["ok", "reason"])
+  })
+
+  it("reports the four reasons the guard has always reported", () => {
+    expect(
+      resoudreTransition("MANAGER", "MANAGER_REVIEW", "rejeter", {
+        decision: "REJECTED",
+        ownerMatch: true,
+      })
+    ).toEqual({ ok: false, reason: "TERMINAL" })
+    expect(
+      resoudreTransition("EMPLOYEE", "DRAFT", "submit", {
+        decision: "PENDING",
+        ownerMatch: false,
+      })
+    ).toEqual({ ok: false, reason: "NOT_OWNER" })
+    expect(
+      resoudreTransition("MANAGER", "DRAFT", "submit", {
+        decision: "PENDING",
+        ownerMatch: true,
+      })
+    ).toEqual({ ok: false, reason: "WRONG_ROLE" })
+    expect(
+      resoudreTransition("EMPLOYEE", "DRAFT", "approuver", {
+        decision: "PENDING",
+        ownerMatch: true,
+      })
+    ).toEqual({ ok: false, reason: "NO_EFFECT" })
   })
 })
 
@@ -557,100 +769,268 @@ describe("checkTransition", () => {
   })
 })
 
-// ─── Exhaustive sweep: one implementation, behavior locked ────────────────
+// ─── The one call: exhaustive sweep over the whole tuple space ────────────
+//
+// Five dimensions, not four: Role × Etape × action × Decision × ownership.
+// The old sweep had no ownership axis at all, which is precisely why the
+// reader could reach an ownership verdict the guard had never been asked for
+// and the suite stayed green (#299).
+//
+// What this claims is stronger than « two projections agree »: it claims the
+// ONE call refuses or yields correctly at every tuple, that the reader and the
+// writer both reach it, and that the creation projection is its own shadow.
 
-describe("guard engine sweep", () => {
-  const roles: Role[] = [
-    "EMPLOYEE",
-    "MANAGER",
-    "FINANCE_ADMIN",
-    "GENERAL_DIRECTION",
-  ]
-  const etapes: Etape[] = [
-    "DRAFT",
-    "MANAGER_REVIEW",
-    "FINANCE_REVIEW",
-    "DIRECTION_REVIEW",
-    "FINAL",
-  ]
-  const actions: WorkflowAction[] = [
-    "submit",
-    "approuver",
-    "rejeter",
-    "retirer",
-  ]
-  const decisions: (Decision | undefined)[] = [
-    "PENDING",
-    "APPROVED",
-    "REJECTED",
-    "WITHDRAWN",
-    undefined,
-  ]
-
-  function sweepTransitionSpace(
+describe("resoudreTransition sweep", () => {
+  function sweep(
     fn: (
       role: Role,
       etape: Etape,
       action: WorkflowAction,
-      decision: Decision | undefined
+      decision: Decision | undefined,
+      ownerMatch: boolean
     ) => void
   ): void {
-    for (const role of roles) {
-      for (const etape of etapes) {
-        for (const action of actions) {
-          for (const decision of decisions) {
-            fn(role, etape, action, decision)
+    for (const role of ROLES) {
+      for (const etape of ETAPES) {
+        for (const action of ACTIONS) {
+          for (const decision of DECISIONS) {
+            for (const ownerMatch of OWNERSHIP) {
+              fn(role, etape, action, decision, ownerMatch)
+            }
           }
         }
       }
     }
   }
 
-  it("canTransition and buildTransition never disagree across the full tuple space", () => {
-    sweepTransitionSpace((role, etape, action, decision) => {
-      const viaCan = canTransition(role, etape, action, decision)
-      const viaBuild =
-        buildTransition(role, etape, action, { decision }) !== null
-      expect({ role, etape, action, decision, allowed: viaCan }).toEqual({
-        role,
-        etape,
-        action,
+  it("is the guard's own answer, at every tuple, ownership included", () => {
+    sweep((role, etape, action, decision, ownerMatch) => {
+      const guard = checkTransition(role, etape, action, decision, ownerMatch)
+      const resolution = resoudreTransition(role, etape, action, {
         decision,
-        allowed: viaBuild,
+        ownerMatch,
       })
+      const where = `${role}/${etape}/${action}/${String(decision)}/owner=${ownerMatch}`
+
+      expect(resolution.ok, where).toBe(guard.ok)
+      if (!guard.ok) {
+        expect(resolution, where).toEqual({ ok: false, reason: guard.reason })
+      }
     })
   })
 
-  it("both public functions are owner-neutral projections of checkTransition", () => {
-    sweepTransitionSpace((role, etape, action, decision) => {
-      const ownerNeutral = checkTransition(role, etape, action, decision, true)
-      expect(canTransition(role, etape, action, decision)).toBe(ownerNeutral.ok)
-      expect(buildTransition(role, etape, action, { decision }) !== null).toBe(
-        ownerNeutral.ok
+  // The shape IS the ticket: the transition exists only on the success arm, so
+  // a caller that did not get permission has no transition to read — the field
+  // does not exist on the result it holds.
+  it("puts the transition on the success arm and nothing else", () => {
+    sweep((role, etape, action, decision, ownerMatch) => {
+      const resolution = resoudreTransition(role, etape, action, {
+        decision,
+        ownerMatch,
+      })
+      const keys = Object.keys(resolution).sort()
+
+      if (resolution.ok) {
+        expect(keys, `${role}/${etape}/${action}`).toEqual([
+          "ok",
+          "transition",
+        ])
+      } else {
+        expect(keys, `${role}/${etape}/${action}`).toEqual(["ok", "reason"])
+        expect(resolution.reason).toBeDefined()
+      }
+    })
+  })
+
+  // The refusal is a REASON, never an absence: every denied tuple says which of
+  // the four it is. A `null` could not.
+  it("always names a reason when it refuses, and it is one of the four", () => {
+    const reasons = ["TERMINAL", "NOT_OWNER", "WRONG_ROLE", "NO_EFFECT"]
+    sweep((role, etape, action, decision, ownerMatch) => {
+      const resolution = resoudreTransition(role, etape, action, {
+        decision,
+        ownerMatch,
+      })
+      if (!resolution.ok) {
+        expect(reasons).toContain(resolution.reason)
+      }
+    })
+  })
+
+  // Ownership is a dimension of the ANSWER, not a filter applied afterwards.
+  // The two claims: a non-owner never reaches an owner action, and ownership
+  // never changes the verdict for an action that is not the owner's.
+  it("gates only the owner actions, and never broadens access", () => {
+    sweep((role, etape, action, decision, ownerMatch) => {
+      const resolution = resoudreTransition(role, etape, action, {
+        decision,
+        ownerMatch,
+      })
+      const isOwnerAction = action === "submit" || action === "retirer"
+      const where = `${role}/${etape}/${action}/${String(decision)}/owner=${ownerMatch}`
+
+      if (isOwnerAction && !ownerMatch) {
+        // Not a blanket denial: a tuple refused for a different reason first
+        // still reports THAT reason. The seat is read before the Decision, and
+        // the Decision before ownership, so the guard's precedence shows here.
+        expect(resolution.ok, where).toBe(false)
+      } else if (!isOwnerAction) {
+        // The VERDICT, not the payload: a granted transition carries a
+        // `new Date()` stamp, so two calls a millisecond apart are never
+        // deeply equal and comparing them would measure the clock, not the
+        // guard.
+        const verdictOf = (owner: boolean) => {
+          const other = resoudreTransition(role, etape, action, {
+            decision,
+            ownerMatch: owner,
+          })
+          return other.ok ? "ok" : other.reason
+        }
+        expect(verdictOf(ownerMatch), where).toBe(verdictOf(true))
+      }
+    })
+  })
+
+  // The precedence the guard has always had, pinned through the one call: at
+  // FINAL no role may act, so the seat is the reason even when the Decision is
+  // terminal. Reordering those two checks would show here as TERMINAL.
+  it("reads the Etape's seat before the Decision, so FINAL is WRONG_ROLE", () => {
+    for (const role of ROLES) {
+      for (const action of ACTIONS) {
+        for (const decision of TERMINAL_DECISIONS) {
+          for (const ownerMatch of OWNERSHIP) {
+            const resolution = resoudreTransition(
+              role,
+              "FINAL",
+              action,
+              { decision, ownerMatch }
+            )
+            expect(resolution, `${role}/FINAL/${action}/${decision}`).toEqual({
+              ok: false,
+              reason: "WRONG_ROLE",
+            })
+          }
+        }
+      }
+    }
+  })
+
+  // The creation path's projection is a shadow of the one call, never a second
+  // opinion: it states ownership by birth, so its answer is the owner-side
+  // answer at every tuple, and it is null exactly where the guard refuses.
+  it("leaves buildTransition as its own shadow: the owner-side answer, or null", () => {
+    sweep((role, etape, action, decision, _ownerMatch) => {
+      const built = buildTransition(role, etape, action, { decision })
+      const ownerSide = resoudreTransition(role, etape, action, {
+        decision,
+        ownerMatch: true,
+      })
+
+      expect(built !== null, `${role}/${etape}/${action}/${String(decision)}`)
+        .toBe(ownerSide.ok)
+      if (!ownerSide.ok) expect(built).toBeNull()
+    })
+  })
+
+  // canTransition stays the cheap owner-neutral QUERY — it is how a caller asks
+  // « can I? » without building anything — and it must never become a way to
+  // obtain a transition.
+  it("leaves canTransition an owner-neutral query that yields nothing", () => {
+    sweep((role, etape, action, decision, _ownerMatch) => {
+      expect(canTransition(role, etape, action, decision)).toBe(
+        checkTransition(role, etape, action, decision, true).ok
       )
     })
   })
+})
 
-  it("ownerMatch never broadens access and only gates owner actions", () => {
-    for (const ownerMatch of [true, false]) {
-      sweepTransitionSpace((role, etape, action, decision) => {
-        const result = checkTransition(
-          role,
-          etape,
-          action,
-          decision,
-          ownerMatch
-        )
-        const isOwnerAction = action === "submit" || action === "retirer"
-        if (isOwnerAction && !ownerMatch) {
-          expect(result.ok).toBe(false)
-        } else if (!isOwnerAction) {
-          expect(result).toEqual(
-            checkTransition(role, etape, action, decision, true)
-          )
-        }
-      })
-    }
+// ─── One way in: the pins that make the shape structural ───────────────────
+//
+// Behavioural sweeps cannot see a function that does not exist. These read the
+// sources, so re-introducing a second way in fails here even if every verdict
+// it produces happens to match.
+
+describe("the pipeline has one way in", () => {
+  it("asks the guard once in the transition writer, with the ownership fact", async () => {
+    const source = await readFile(
+      new URL("./demande/mutations.ts", import.meta.url),
+      "utf8"
+    )
+    const start = source.indexOf("export async function executeTransition(")
+    const end = source.indexOf("export async function recordDocument(")
+    expect(start).toBeGreaterThan(-1)
+    expect(end).toBeGreaterThan(start)
+    const corps = source.slice(start, end)
+
+    // Exactly one call into the guard. The old body asked here AND asked again
+    // inside buildTransition with ownership hardcoded to « yes ».
+    expect(corps.match(/resoudreTransition\(/g) ?? []).toHaveLength(1)
+    expect(corps).not.toContain("checkTransition")
+    expect(corps).not.toContain("buildTransition")
+
+    // And the fact is stated at the call site, not left to a default. Both
+    // spellings count: `ownerMatch,` (shorthand) or `ownerMatch: <expr>`.
+    expect(corps).toMatch(/ownerMatch\s*[,:]/)
+  })
+
+  it("asks the guard once in the action reader, with no hand-applied conjunction", async () => {
+    const source = await readFile(
+      new URL("./workflow.ts", import.meta.url),
+      "utf8"
+    )
+    const start = source.indexOf("export function getAllowedActions(")
+    expect(start).toBeGreaterThan(-1)
+    const reader = source.slice(start)
+
+    expect(reader).toContain("resoudreTransition(")
+    // The conjunction the reader used to reach an ownership verdict outside the
+    // guard. Its absence is the acceptance criterion, made mechanical.
+    expect(reader).not.toContain("isOwner")
+    expect(reader).not.toMatch(/&&\s*ownerMatch/)
+  })
+
+  it("gives the guard's ownership input no default", async () => {
+    const source = await readFile(
+      new URL("./workflow.ts", import.meta.url),
+      "utf8"
+    )
+    // The parameter list itself, up to the closing paren. `ownerMatch = true`
+    // is the defect in one token: a default is how a caller comes to believe
+    // it asserted something it never checked.
+    const signature = source
+      .slice(source.indexOf("export function checkTransition("))
+      .slice(
+        0,
+        source
+          .slice(source.indexOf("export function checkTransition("))
+          .indexOf("\n)")
+      )
+
+    // The ownership fact is a REQUIRED boolean on a line of its own, with
+    // nothing after the type. This one assertion covers both holes: a default
+    // (`ownerMatch: boolean = true`) and an optional (`ownerMatch?:`) each
+    // leave something after the colon or the type, so the line no longer ends
+    // where this says it must. A default is how a caller comes to believe it
+    // asserted something it never checked.
+    expect(signature).toMatch(/^\s*ownerMatch:\s*boolean\s*$/m)
+  })
+
+  it("keeps the creation path calling the builder it was written against", async () => {
+    const source = await readFile(
+      new URL("./workflow.ts", import.meta.url),
+      "utf8"
+    )
+    const start = source.indexOf("export function etatCreation(")
+    expect(start).toBeGreaterThan(-1)
+    const creation = source.slice(start, source.indexOf("export function getAllowedActions("))
+
+    // `etatCreation`'s call is untouched, and the builder it reaches still
+    // exists and still returns nothing rather than throwing.
+    expect(creation).toContain("buildTransition(")
+    expect(creation).toContain("if (!transition) {")
+    expect(source).toMatch(
+      /export function buildTransition\([\s\S]*?\): WorkflowResult \| null/
+    )
   })
 })
 
