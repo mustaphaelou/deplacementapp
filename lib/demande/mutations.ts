@@ -7,7 +7,6 @@ import { documents } from "../../db/schema/documents"
 import type { CreateDemandeData } from "../demande-utils"
 import type { Actor } from "../demande-types"
 import { resoudreTransition, etatCreation } from "../workflow"
-import type { Etape, Decision } from "../workflow"
 import type { NotificationEventType } from "../notification-events"
 import { appliquerEffets } from "./effets-transition"
 import {
@@ -206,8 +205,10 @@ export async function executeTransition(
   })
   if (!demande || demande.deletedAt) throw new DemandeNotFoundError()
 
-  const etape = demande.etape as Etape
-  const decision = demande.decision as Decision
+  // No cast: the row's `etape` / `decision` are the pipeline's unions, read
+  // off a native pgEnum column through the schema's inferred row (#295).
+  const etape = demande.etape
+  const decision = demande.decision
 
   const ownerMatch = demande.employeId === actor.id
 
