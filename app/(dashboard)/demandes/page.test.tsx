@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { hideClassFor, rowHoverInkTint, tableShellClass } from "@/components/display"
 
 const { mockSearchParams, mockUseAuthUser } = vi.hoisted(() => ({
   mockSearchParams: { etape: "", decision: "" },
@@ -172,10 +173,12 @@ describe("Demandes list page", () => {
     )
 
     expect(html).not.toContain('data-slot="card"')
-    expect(html).toContain("border-y border-border")
+    // #307: the shell and the row tint belong to the shared module now, so they
+    // are asserted as the module's own output rather than re-pinned as literals.
+    expect(html).toContain(tableShellClass)
     expect(html).toContain("px-2 py-2 font-normal text-muted-foreground")
     expect(html).toContain("px-2 py-2.5")
-    expect(html).toContain("hover:bg-[rgba(55,53,47,0.024)]")
+    expect(html).toContain(rowHoverInkTint)
     expect(html).toContain("min-w-[640px]")
     expect(html).toContain("rounded-full")
     expect(html).toContain("bg-[#FBF0DB]")
@@ -186,18 +189,48 @@ describe("Demandes list page", () => {
     expect(html).not.toContain(">Actions</th>")
   })
 
+  // #307: the three hidden columns now ask the shared rule for their half of
+  // the pair. The pin is the module's own output reaching this page's DOM at
+  // each breakpoint, plus the count and the absence of a hand-written pair — so
+  // it fails both if a migrated cell stops hiding and if the page keeps a
+  // private copy beside the import.
   it("hides the Employé column for employees but keeps it ≥sm for managers", async () => {
     const { DemandesTable } = await import("./page")
 
     const managerHtml = renderToStaticMarkup(
       <DemandesTable demandes={[DEMANDE]} role="MANAGER" />
     )
-    expect(managerHtml).toContain("hidden px-2 py-2 font-normal text-muted-foreground sm:table-cell")
+    expect(
+      managerHtml,
+      `no cell carries ${hideClassFor({ hideAt: "sm" })} — the Employé column ` +
+        `has stopped hiding on a phone`,
+    ).toContain(hideClassFor({ hideAt: "sm" }))
 
     const employeeHtml = renderToStaticMarkup(
       <DemandesTable demandes={[DEMANDE]} role="EMPLOYEE" />
     )
     expect(employeeHtml).not.toContain("Employé")
+
+    const src = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "page.tsx"),
+      "utf8"
+    )
+    for (const breakpoint of ["sm", "md", "lg"] as const) {
+      expect(
+        managerHtml,
+        `the ${breakpoint} column no longer hides — the class never reached the cell`,
+      ).toContain(hideClassFor({ hideAt: breakpoint }))
+    }
+    expect(
+      /className="[^"]*hidden[^"]*(sm|md|lg):table-cell/.test(src),
+      "the page still spells a hide pair inline instead of calling hideClassFor",
+    ).toBe(false)
+    // Six call sites: Employé, Dates and Total, each in a header and a body cell.
+    // The role-conditional Employé pair is one pair of them, not two.
+    expect(
+      (src.match(/hideClassFor\(\{\s*hideAt:/g) ?? []).length,
+      "the Demandes table hides six cells below a breakpoint (3 headers + 3 body)",
+    ).toBe(6)
   })
 
   it("renders the module's compact label for a rejected demande: Rejetée (Manager)", async () => {

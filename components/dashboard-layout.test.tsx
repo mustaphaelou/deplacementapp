@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest"
 import { renderToStaticMarkup } from "react-dom/server"
+import { readFileSync } from "node:fs"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
 import { DashboardLayout } from "@/components/dashboard-layout"
+import { hideClassFor, tableShellClass } from "@/components/display"
 import type { DashboardConfig, DashboardDemandeSummary } from "@/lib/dashboard"
 import type { NavItem } from "@/lib/auth"
 
@@ -149,8 +153,12 @@ describe("DashboardLayout — the page chrome matches its sibling pages", () => 
       />
     )
 
-    expect(html).toContain("border-y border-border")
+    // #307: the shell is the shared module's value now — asserted as the
+    // module's own output rather than re-pinned as a literal substring.
+    expect(html).toContain(tableShellClass)
     expect(html).toContain("font-normal text-muted-foreground")
+    // The row tint is a DIFFERENT decision (the darker action tint at 0.06),
+    // so it is not this module's value and stays pinned here by its own token.
     expect(html).toContain("hover:bg-[rgba(55,53,47,0.024)]")
     // shadcn's Table is gone: it brings its own border-b rows and a
     // hover:bg-muted/50 that reads heavier than the rest of the app.
@@ -177,8 +185,12 @@ describe("DashboardLayout — the page chrome matches its sibling pages", () => 
       />
     )
 
-    expect(html).toContain("hidden sm:table-cell")
-    expect(html).toContain("hidden lg:table-cell")
+    // #307: the rule itself is the shared module's, so the assertion asks the
+    // module for its value rather than spelling "hidden … :table-cell" here.
+    // Both breakpoints are checked: a rule that always answered `sm:` would
+    // satisfy a single pin.
+    expect(html).toContain(hideClassFor({ hideAt: "sm" }))
+    expect(html).toContain(hideClassFor({ hideAt: "lg" }))
     // Every row is reachable without knowing its numéro: the trailing control
     // carries an accessible name.
     expect(html).toContain('aria-label="Ouvrir la demande D-2026-001"')
@@ -367,6 +379,40 @@ describe("DashboardLayout — the row chevron is reachable without a pointer", (
     // numero ever becomes an anchor, this pin is the one that should break.
     expect(html).toContain('<span class="font-medium">D-2026-001</span>')
     expect(html).not.toContain('href="/demandes/d-1" class="font-medium"')
+  })
+})
+
+// #307: this module carried its OWN hideClassFor — a byte-identical duplicate of
+// the shared one, serving a DIFFERENT table (the config-driven home widget, not
+// the three list pages). The rendered markup cannot show the difference: both
+// copies return the same string, so a markup assertion passes either way. The
+// source is the only place the duplication is observable, and this is the pin
+// that fails when a private copy is restored.
+describe("DashboardLayout — the responsive-hide rule is not redefined here", () => {
+  const src = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), "dashboard-layout.tsx"),
+    "utf8"
+  )
+
+  it("declares no hideClassFor of its own", () => {
+    expect(
+      /function\s+hideClassFor\b/.test(src),
+      "components/dashboard-layout.tsx declares its own hideClassFor — the " +
+        "duplicate #307 deleted. The rule is owned once, by @/components/display.",
+    ).toBe(false)
+  })
+
+  it("imports the rule from the shared module and still calls it at both sites", () => {
+    expect(
+      /import\s*\{[^}]*\bhideClassFor\b[^}]*\}\s*from\s*"@\/components\/display"/.test(src),
+      "the layout calls hideClassFor without importing it from the shared module",
+    ).toBe(true)
+    // Two call sites — the header cell and the body cell. The duplicate was
+    // silent at one of them, so a count is the pin, not a presence check.
+    expect(
+      (src.match(/hideClassFor\(/g) ?? []).length,
+      "the layout's widget table hides a cell in BOTH its header and its body",
+    ).toBe(2)
   })
 })
 

@@ -14,6 +14,13 @@ import { toDemandePresentation } from "@/lib/demande-presentation"
 import { queueEtapes } from "@/lib/workflow"
 import { PageHeader } from "@/components/page-header"
 import {
+  hideClassFor,
+  LoadingBlock,
+  rowHoverInkTint,
+  searchFieldIconClass,
+  tableShellClass,
+} from "@/components/display"
+import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -40,9 +47,6 @@ interface Demande {
   employeId: string
 }
 
-const rowHover =
-  "hover:bg-[rgba(55,53,47,0.024)] dark:hover:bg-sidebar-accent/40"
-
 export function DemandesTable({
   demandes,
   role,
@@ -53,7 +57,7 @@ export function DemandesTable({
   const router = useRouter()
 
   return (
-    <div className="overflow-x-auto border-y border-border text-sm">
+    <div className={tableShellClass}>
       <table className="w-full min-w-[640px]">
         <thead>
           <tr className="border-b border-border text-left">
@@ -61,17 +65,32 @@ export function DemandesTable({
               N°
             </th>
             {role !== "EMPLOYEE" && (
-              <th className="hidden px-2 py-2 font-normal text-muted-foreground sm:table-cell">
+              <th
+                className={cn(
+                  "px-2 py-2 font-normal text-muted-foreground",
+                  hideClassFor({ hideAt: "sm" })
+                )}
+              >
                 Employé
               </th>
             )}
             <th className="px-2 py-2 font-normal text-muted-foreground">
               Destination
             </th>
-            <th className="hidden px-2 py-2 font-normal text-muted-foreground md:table-cell">
+            <th
+              className={cn(
+                "px-2 py-2 font-normal text-muted-foreground",
+                hideClassFor({ hideAt: "md" })
+              )}
+            >
               Dates
             </th>
-            <th className="hidden px-2 py-2 font-normal text-muted-foreground lg:table-cell">
+            <th
+              className={cn(
+                "px-2 py-2 font-normal text-muted-foreground",
+                hideClassFor({ hideAt: "lg" })
+              )}
+            >
               Total
             </th>
             <th className="px-2 py-2 font-normal text-muted-foreground">
@@ -94,20 +113,35 @@ export function DemandesTable({
                 tabIndex={0}
                 className={cn(
                   "group cursor-pointer transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  rowHover
+                  rowHoverInkTint
                 )}
               >
                 <td className="px-2 py-2.5 font-medium">{d.numero}</td>
                 {role !== "EMPLOYEE" && (
-                  <td className="hidden px-2 py-2.5 sm:table-cell">
+                  <td
+                    className={cn(
+                      "px-2 py-2.5",
+                      hideClassFor({ hideAt: "sm" })
+                    )}
+                  >
                     {d.employe.prenom} {d.employe.nom}
                   </td>
                 )}
                 <td className="px-2 py-2.5">{d.destination}</td>
-                <td className="hidden px-2 py-2.5 md:table-cell">
+                <td
+                  className={cn(
+                    "px-2 py-2.5",
+                    hideClassFor({ hideAt: "md" })
+                  )}
+                >
                   {formatDate(d.dateDepart)} → {formatDate(d.dateRetour)}
                 </td>
-                <td className="hidden px-2 py-2.5 lg:table-cell">
+                <td
+                  className={cn(
+                    "px-2 py-2.5",
+                    hideClassFor({ hideAt: "lg" })
+                  )}
+                >
                   {formatCurrency(Number(d.totalEstime ?? 0))}
                 </td>
                 <td className="px-2 py-2.5">
@@ -281,7 +315,7 @@ export default function DemandesListPage() {
           })}
         </div>
         <div className="relative">
-          <Search className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Search className={searchFieldIconClass} />
           <Input
             className="w-60 pl-8"
             placeholder="Rechercher"
@@ -295,9 +329,7 @@ export default function DemandesListPage() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center p-8">
-          <p className="text-sm text-muted-foreground">Chargement...</p>
-        </div>
+        <LoadingBlock />
       ) : demandes.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-2 p-8">
           <FileText className="size-8 text-muted-foreground/50" />

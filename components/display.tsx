@@ -19,7 +19,9 @@ import { Label } from "@/components/ui/label"
  * confirmation stays the manual light-and-dark eyeball.
  *
  * #306 creates this module and moves no call site; #307 migrates the pages and
- * #308 lowers the drift gate's ratchet to what remains.
+ * the dashboard layout onto it; #308 lowers the drift gate's ratchet to what
+ * remains. The copy left in `app/(auth)/login/**` and `app/prototype/**` is
+ * out of both tickets' scope and is left where it is.
  */
 
 /**
@@ -128,10 +130,12 @@ export type HideBreakpoint = "sm" | "md" | "lg"
  * A cell hidden below one breakpoint reappears at the next one.
  *
  * A caller that hides a cell no longer states the reappearance, because there
- * is nothing left to state. Sixteen call sites wrote the pair out longhand;
- * this rule was already a function in the dashboard layout module, which keeps
- * its own copy until #307 — both copies are byte-identical, so the migration
- * is a change of import and nothing else.
+ * is nothing left to state. Sixteen call sites wrote the pair out longhand —
+ * eight `th`/`td` pairs each in the Utilisateurs, Demandes and Véhicules
+ * tables, on the list pages that render their own `<table>` markup and so never
+ * pass a column descriptor at all. The dashboard layout module carried a
+ * duplicate of this function for its config-driven widget table; #307 deleted
+ * it, so this is the only definition left in the tree.
  *
  * `undefined` when no breakpoint is given: an always-visible cell carries no
  * class at all, and `cn` drops an `undefined` argument, so a caller can pass

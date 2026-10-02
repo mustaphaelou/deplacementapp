@@ -3,8 +3,8 @@
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { PageHeader } from "@/components/page-header"
+import { Field, SectionHeading, textInputClass } from "@/components/display"
 import { toast } from "sonner"
 import { Loader2, Settings } from "lucide-react"
 
@@ -16,42 +16,6 @@ interface Societe {
   couleurPrimaire: string | null
   nomExpediteurEmail: string | null
   domaineEmail: string | null
-}
-
-const FIELD_INPUT =
-  "h-9 rounded-[3px] focus-visible:ring-1 focus-visible:ring-(--brand)"
-
-function SectionHeading({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex items-center gap-3">
-      <h2 className="text-xs font-medium tracking-[0.06em] text-muted-foreground uppercase">
-        {children}
-      </h2>
-      <span className="h-px flex-1 bg-border" />
-    </div>
-  )
-}
-
-function Field({
-  label,
-  htmlFor,
-  hint,
-  children,
-}: {
-  label: string
-  htmlFor?: string
-  hint?: string
-  children: React.ReactNode
-}) {
-  return (
-    <div>
-      <Label htmlFor={htmlFor} className="mb-1.5 block text-sm font-medium">
-        {label}
-      </Label>
-      {children}
-      {hint && <p className="mt-1.5 text-xs text-muted-foreground">{hint}</p>}
-    </div>
-  )
 }
 
 function ColorField({
@@ -71,7 +35,7 @@ function ColorField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="#0F766E"
-        className={FIELD_INPUT}
+        className={textInputClass}
       />
       <button
         type="button"
@@ -129,7 +93,7 @@ export function SocieteSettings({
               value={nom}
               onChange={(e) => onNomChange(e.target.value)}
               required
-              className={FIELD_INPUT}
+              className={textInputClass}
             />
           </Field>
           <Field label="Couleur primaire" htmlFor="couleurPrimaire">
@@ -166,7 +130,7 @@ export function SocieteSettings({
               value={nomExpediteurEmail}
               onChange={(e) => onNomExpediteurEmailChange(e.target.value)}
               placeholder="Ma Société"
-              className={FIELD_INPUT}
+              className={textInputClass}
             />
           </Field>
           <Field
@@ -179,7 +143,7 @@ export function SocieteSettings({
               value={domaineEmail}
               onChange={(e) => onDomaineEmailChange(e.target.value)}
               placeholder="masociete.ma"
-              className={FIELD_INPUT}
+              className={textInputClass}
             />
           </Field>
         </div>

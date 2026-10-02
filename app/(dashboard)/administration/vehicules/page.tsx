@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
@@ -13,34 +12,20 @@ import {
 } from "@/components/ui/dialog"
 import { PageHeader } from "@/components/page-header"
 import { StatusPill } from "@/components/status-pill"
+import {
+  Field,
+  hideClassFor,
+  LoadingBlock,
+  rowHoverInkTint,
+  searchFieldIconClass,
+  searchFieldInputClass,
+  tableShellClass,
+  textInputClass,
+} from "@/components/display"
 import { toast } from "sonner"
 import { Plus, Loader2, Pencil, Trash2, Search, Car } from "lucide-react"
 import type { Vehicule } from "@/lib/demande-types"
 import { cn } from "@/lib/utils"
-
-const FIELD_INPUT =
-  "h-9 rounded-[3px] focus-visible:ring-1 focus-visible:ring-(--brand)"
-const rowHover =
-  "hover:bg-[rgba(55,53,47,0.024)] dark:hover:bg-sidebar-accent/40"
-
-function Field({
-  label,
-  htmlFor,
-  children,
-}: {
-  label: string
-  htmlFor?: string
-  children: React.ReactNode
-}) {
-  return (
-    <div>
-      <Label htmlFor={htmlFor} className="mb-1.5 block text-sm font-medium">
-        {label}
-      </Label>
-      {children}
-    </div>
-  )
-}
 
 export function VehiculesTable({
   vehicules,
@@ -52,7 +37,7 @@ export function VehiculesTable({
   onDelete: (id: string) => void
 }) {
   return (
-    <div className="overflow-x-auto border-y border-border text-sm">
+    <div className={tableShellClass}>
       <table className="w-full min-w-[300px]">
         <thead>
           <tr className="border-b border-border text-left">
@@ -60,7 +45,12 @@ export function VehiculesTable({
             <th className="px-2 py-2 font-normal text-muted-foreground">
               Immatriculation
             </th>
-            <th className="hidden px-2 py-2 font-normal text-muted-foreground sm:table-cell">
+            <th
+              className={cn(
+                "px-2 py-2 font-normal text-muted-foreground",
+                hideClassFor({ hideAt: "sm" })
+              )}
+            >
               Statut
             </th>
             <th className="w-8 px-2 py-2 text-right font-normal text-muted-foreground">
@@ -74,14 +64,14 @@ export function VehiculesTable({
               key={v.id}
               className={cn(
                 "group border-b border-border transition-colors last:border-0",
-                rowHover
+                rowHoverInkTint
               )}
             >
               <td className="px-2 py-2.5 font-medium">{v.nom}</td>
               <td className="px-2 py-2.5 font-mono text-xs">
                 {v.immatriculation}
               </td>
-              <td className="hidden px-2 py-2.5 sm:table-cell">
+              <td className={cn("px-2 py-2.5", hideClassFor({ hideAt: "sm" }))}>
                 <StatusPill
                   label={v.disponible ? "Disponible" : "En mission"}
                   tone={v.disponible ? "success" : "pending"}
@@ -223,20 +213,18 @@ export default function VehiculesPage() {
 
       <div className="flex justify-end">
         <div className="relative">
-          <Search className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Search className={searchFieldIconClass} />
           <Input
             placeholder="Rechercher"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="h-8 w-60 pl-8"
+            className={searchFieldInputClass}
           />
         </div>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center p-8">
-          <p className="text-sm text-muted-foreground">Chargement...</p>
-        </div>
+        <LoadingBlock />
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-2 p-8">
           <Car className="size-8 text-muted-foreground/50" />
@@ -265,7 +253,7 @@ export default function VehiculesPage() {
                 value={form.nom}
                 onChange={(e) => setForm({ ...form, nom: e.target.value })}
                 required
-                className={FIELD_INPUT}
+                className={textInputClass}
               />
             </Field>
             <Field label="Immatriculation">
@@ -275,7 +263,7 @@ export default function VehiculesPage() {
                   setForm({ ...form, immatriculation: e.target.value })
                 }
                 required
-                className={FIELD_INPUT}
+                className={textInputClass}
               />
             </Field>
             <label className="flex items-center gap-2 text-sm">
