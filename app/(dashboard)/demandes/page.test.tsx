@@ -67,6 +67,8 @@ describe("Demandes list page", () => {
     const html = renderToStaticMarkup(<DemandesListPage />)
 
     expect(html).toContain('aria-label="breadcrumb"')
+    // Owned by components/page-header.tsx (the h1's md: breakpoint), pinned in
+    // full at components/page-header.test.tsx.
     expect(html).toContain("text-[40px]")
     expect(html).toContain("Demandes")
     expect(html).toContain("demande(s)")
@@ -189,6 +191,11 @@ describe("Demandes list page", () => {
     expect(html).not.toContain(">Actions</th>")
   })
 
+  // #320: the class-string assertions this file RETAINS are not header
+  // leftovers. This one and the `hideClassFor` block below belong to spec
+  // #305's shared display module, which owns the hide rule — the header module
+  // owns neither. #320 removed only the breadcrumb truncation class this file
+  // duplicated from components/page-header.tsx.
   // #307: the three hidden columns now ask the shared rule for their half of
   // the pair. The pin is the module's own output reaching this page's DOM at
   // each breakpoint, plus the count and the absence of a hand-written pair — so
@@ -270,8 +277,5 @@ describe("Demandes list page — the shared page header", () => {
     expect(html).toContain(">Espace</span>")
     expect(html).toContain(">Demandes de déplacement</span>")
     expect(html.match(/data-slot="breadcrumb-separator"/g)).toHaveLength(2)
-    expect(html).toContain(
-      'class="text-foreground min-w-0 truncate font-medium">'
-    )
   })
 })

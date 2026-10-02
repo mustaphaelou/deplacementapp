@@ -30,6 +30,8 @@ describe("Véhicules administration page", () => {
 
     expect(html).toContain('aria-label="breadcrumb"')
     expect(html).toContain("Administration")
+    // Owned by components/page-header.tsx (the h1's md: breakpoint), pinned in
+    // full at components/page-header.test.tsx.
     expect(html).toContain("text-[40px]")
     expect(html).toContain("Ajouter un véhicule")
     expect(html).toContain("véhicule(s)")
@@ -62,6 +64,11 @@ describe("Véhicules administration page", () => {
     expect(html).toContain('aria-label="Supprimer Dacia Logan"')
   })
 
+  // #320: the class-string assertions this file RETAINS are not header
+  // leftovers. This one and the `hideClassFor` block below belong to spec
+  // #305's shared display module, which owns the hide rule — the header module
+  // owns neither. #320 removed only the breadcrumb truncation class this file
+  // duplicated from components/page-header.tsx.
   // #307: the Statut column's header and its one body cell now ask the shared
   // rule. Asserted as the module's output reaching the DOM, plus the count and
   // the absence of a hand-written pair — so it fails both if a migrated cell
@@ -126,9 +133,6 @@ describe("Véhicules administration page — the shared page header", () => {
     // page element) is the module's marker — a copy would have to reproduce
     // all three to pass.
     expect(html).toContain(">Administration</span>")
-    expect(html).toContain(
-      'class="text-foreground min-w-0 truncate font-medium">Véhicules</span>'
-    )
     expect(html).toContain("véhicule(s)</p>")
   })
 })

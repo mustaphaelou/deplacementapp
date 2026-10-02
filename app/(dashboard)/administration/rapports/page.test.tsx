@@ -155,6 +155,8 @@ describe("Rapports page", () => {
 
     expect(html).toContain('aria-label="breadcrumb"')
     expect(html).toContain("Administration")
+    // Owned by components/page-header.tsx (the h1's md: breakpoint), pinned in
+    // full at components/page-header.test.tsx.
     expect(html).toContain("text-[40px]")
     expect(html).toContain("CSV")
     expect(html).toContain('href="/api/csv"')
@@ -196,6 +198,10 @@ describe("Rapports page", () => {
     // Scoped to the stat tile's own class run: the CSV action button legitimately
     // keeps its `rounded-lg` button variant, so a bare `rounded-lg` assertion
     // over the whole page would fail on the wrong element.
+    // NOT the header module's icon tile: that one is `size-10 ... md:size-12`
+    // with no `text-primary` and no value line. This run is components/ui/
+    // dashboard-card.tsx — the shared stat card's own icon tile — which no
+    // page-header module owns, and its value weight below is the same card's.
     expect(html).toContain(
       'class="flex size-11 shrink-0 items-center justify-center rounded-[3px] bg-primary/10 text-primary'
     )
@@ -316,12 +322,6 @@ describe("Rapports page — the shared page header", () => {
     // page element) is the module's marker — a copy would have to reproduce
     // all three to pass.
     expect(html).toContain(">Administration</span>")
-    expect(html).toContain(
-      'class="text-foreground min-w-0 truncate font-medium">Rapports</span>'
-    )
     expect(html.match(/data-slot="breadcrumb-separator"/g)).toHaveLength(1)
-    expect(html).toContain(
-      'class="flex items-center gap-1.5 text-sm wrap-break-word text-muted-foreground flex-nowrap"'
-    )
   })
 })

@@ -46,6 +46,8 @@ describe("Utilisateurs administration page", () => {
 
     expect(html).toContain('aria-label="breadcrumb"')
     expect(html).toContain("Administration")
+    // Owned by components/page-header.tsx (the h1's md: breakpoint), pinned in
+    // full at components/page-header.test.tsx.
     expect(html).toContain("text-[40px]")
     expect(html).toContain("Nouvel utilisateur")
     expect(html).toContain("utilisateur(s)")
@@ -94,6 +96,11 @@ describe("Utilisateurs administration page", () => {
     expect(html).toContain("Responsable")
   })
 
+  // #320: the class-string assertions this file RETAINS are not header
+  // leftovers. This one and the `hideClassFor` block below belong to spec
+  // #305's shared display module, which owns the hide rule — the header module
+  // owns neither. #320 removed only the breadcrumb truncation class this file
+  // duplicated from components/page-header.tsx.
   // #307: the eight hidden cells now ask the shared rule for their half of the
   // pair. This asserts the module's own output REACHES this page's DOM, at each
   // breakpoint the table uses, and that the page spells no pair of its own. Both
@@ -182,9 +189,6 @@ describe("Utilisateurs administration page — the shared page header", () => {
     // page element) is the module's marker — a copy would have to reproduce
     // all three to pass.
     expect(html).toContain(">Administration</span>")
-    expect(html).toContain(
-      'class="text-foreground min-w-0 truncate font-medium">Utilisateurs</span>'
-    )
     // The subtitle is this page's own live count, passed as a node.
     expect(html).toContain("utilisateur(s)</p>")
   })
