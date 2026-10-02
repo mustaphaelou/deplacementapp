@@ -166,7 +166,7 @@ export async function findMany(
   ]
 
   if (etape) {
-    // Still a cast, and deliberately so (#295). The other three casts this
+    // Still a cast, and deliberately so (#295). The other four casts this
     // ticket removed laundered a ROW's widened fields; this one launders a
     // VALUE OFF THE WIRE. `etape` arrives from the query string through
     // `demandeQuerySchema`, which validates it as a bare `z.string()` — a
