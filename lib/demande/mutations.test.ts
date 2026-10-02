@@ -1657,8 +1657,14 @@ describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT }, () => {
 
       // The bound is named and finite — and a bound of one would be no retry
       // at all — and it is what refuses here, not the first collision.
+      // The expectation above is DERIVED from the source, so on its own it
+      // would read a bound of 99 as correct and happily sit through 99
+      // transactions. The ceiling is what pins « small » (#292): a retry
+      // bound that grew without limit would hold a Utilisateur's request
+      // through an unbounded number of transactions.
       expect(born).not.toBeNull()
       expect(born!).toBeGreaterThanOrEqual(2)
+      expect(born!).toBeLessThanOrEqual(5)
       expect(appels()).toBe(born!)
 
       // The refusal is the collision's own sentence and response code, not
