@@ -1,7 +1,9 @@
 import { headers } from "next/headers"
 import { NextResponse } from "next/server"
+import { createHash } from "node:crypto"
 import { peutAgir } from "../utilisateur-service"
 import { toAuthUser } from "./user-mapper"
+import type { BetterAuthSessionUser } from "./user-mapper"
 import { auth } from "./better-auth"
 import type { Role } from "./roles"
 import { hasAnyRole } from "./roles"
@@ -56,15 +58,84 @@ function forbidden(): NextResponse {
   return NextResponse.json({ error: "Accès refusé" }, { status: 403 })
 }
 
+/**
+ * A short, stable fingerprint of a stored value the vocabulary does not name.
+ *
+ * WHY NOT THE VALUE ITSELF: `stored` is untrusted input out of a session row.
+ * Before #297 a mis-provisioned Role produced a redirect loop nobody could
+ * see; the refusal that replaced it would be just as invisible if it logged an
+ * arbitrary attacker-chosen string into production logs. A hash is grep-able
+ * and log-injection-safe — no newlines, no terminal escapes, nothing that
+ * could forge a second log line — while still telling an operator that two
+ * Utilisateurs share one bad value, which is the thing worth knowing.
+ */
+function empreinteRole(stored: string): string {
+  return createHash("sha256").update(stored, "utf8").digest("hex").slice(0, 12)
+}
+
+/**
+ * One line per Utilisateur refused for a Role this build cannot name.
+ *
+ * This is the operator-facing half of the refusal: spec #294 asks for an
+ * unrecognised Role to be VISIBLE as a refusal rather than as a redirect loop,
+ * so a mis-provisioned Utilisateur is diagnosable. The redirect loop was
+ * invisible; a silent `null` is no better. A log grep is what makes it
+ * diagnosable, and this is the one line that turns it into a grep.
+ *
+ * The house style is `lib/auth/refusal-log.ts` — "one line per refusal here
+ * turns that into a log grep" — but NOT its `logRefusal`: that function takes a
+ * `Response` and reads a Google sign-in redirect's OAuth code, so calling it
+ * here would name a data condition in a sign-in refusal's vocabulary, which
+ * spec #294 explicitly rejects. This emits its own line.
+ *
+ * Logged: the Utilisateur's id and email, and a fingerprint of the stored
+ * value. Withheld: the stored value itself (see `empreinteRole`), and the
+ * reason is not restated per Role — the fingerprint is the discriminator.
+ *
+ * Observability, never part of the contract: a broken log sink must not turn
+ * the refusal below into a 500, so the line is emitted inside a `try` that
+ * swallows — exactly as `withRefusalLog` does.
+ */
+function logRoleRefus(
+  user: BetterAuthSessionUser,
+  stored: string | null | undefined
+): void {
+  try {
+    console.warn("[RoleRefus] Rôle stocké non reconnu", {
+      utilisateur: user.id ?? null,
+      email: user.email ?? null,
+      // `absent` is a distinct real case — `user.role ?? ""` used to hand the
+      // pages an empty string — so it is named rather than folded into a hash.
+      valeur: typeof stored === "string" ? empreinteRole(stored) : "absent",
+    })
+  } catch {
+    /* a broken log sink must not turn a 401 into a 500 */
+  }
+}
+
 async function currentUser(): Promise<AuthUser | null> {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) return null
   // The rule is asked, not spelled: one reader owns « a Utilisateur may act
-  // only while active », and this module no longer carries a second copy of
-  // the query. The cost is the same one the interface now states — one read of
+  // only while active », and this module no longer carries a second copy of the
+  // query. The cost is the same one the interface now states — one read of
   // `utilisateurs` per call, unchanged from the private helper this replaced.
   if (!(await peutAgir(session.user.id))) return null
-  return toAuthUser(session.user)
+  // The Role check sits beside the `peutAgir` check because it IS the same
+  // refusal: a stored Role `lireRole` cannot name yields the `null` below, the
+  // one this function has always returned for a Utilisateur who may not act —
+  // so `getAuthUser` hands back `null` and `requireAuth` answers 401 « Non
+  // autorisé », identically to a deactivated Utilisateur. The check itself
+  // lives in `toAuthUser` so the client half cannot forget it (#297).
+  const user = toAuthUser(session.user)
+  // …and a `null` HERE, with an active Utilisateur and a session that reads,
+  // is that refusal and nothing else: `toAuthUser` returns `null` for exactly
+  // one reason, a Role the vocabulary does not name. So the line goes here, at
+  // the point the refusal is taken, where both causes are in view — and it
+  // goes only on this branch, because a Utilisateur refused for ACTIVITY is
+  // not a mis-provisioned one and must not be reported as one.
+  if (!user) logRoleRefus(session.user, session.user.role)
+  return user
 }
 
 /**

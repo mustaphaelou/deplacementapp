@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest"
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest"
 import { NextResponse } from "next/server"
 import { PGlite } from "@electric-sql/pglite"
 import { eq } from "drizzle-orm"
@@ -44,6 +44,7 @@ import {
   getAuthUser,
 } from "./session"
 import type { AuthUser } from "./session"
+import { lireRole, type Role } from "./roles"
 
 const TIMEOUT = 30_000
 
@@ -124,7 +125,9 @@ function sessionUser(id: string = actifId) {
   }
 }
 
-function makeUser(role: string): AuthUser {
+// The Role the mapper hands the seam is the union, not a string (#297), so a
+// fixture building one by hand names a Role and nothing else.
+function makeUser(role: Role): AuthUser {
   return {
     id: "user-1",
     email: "test@example.com",
@@ -305,6 +308,217 @@ describe("the session module's guarded calls", { timeout: TIMEOUT }, () => {
     })
   })
 
+  // THE SEAM REFUSES (#297) — end to end, against a real in-process Postgres.
+  //
+  // The Utilisateur below is ACTIVE and their row EXISTS: the only thing
+  // unusual is the Role stored on the session, which is outside the vocabulary.
+  // So a `null` here cannot be explained by deactivation, by a missing row, or
+  // by the session read — which is exactly why this case had to be written
+  // against the real query path rather than by asserting on the mapper alone.
+  //
+  // What changed for such a Utilisateur: before #297 they were signed in with
+  // the raw string as their Role and the pages swallowed it in a redirect loop;
+  // now they are refused once, at the door, with the same `null` an inactive
+  // Utilisateur produces.
+  describe("the seam refuses a stored Role outside the vocabulary", () => {
+    const UNNAMED_ROLES = ["NOT_A_ROLE", "ADMINISTRATEUR", "finance_admin"]
+
+    for (const stored of UNNAMED_ROLES) {
+      it(`getAuthUser returns null for ${stored}, and requireAuth 401s`, async () => {
+        expect(lireRole(stored), `${stored} must be refused by the reader`).toBeNull()
+
+        mockGetSession.mockResolvedValue({
+          user: { ...sessionUser(actifId), role: stored },
+        })
+
+        expect(await getAuthUser(), stored).toBeNull()
+
+        const guarded = await requireAuth()
+        expect(guarded.ok).toBe(false)
+        if (!guarded.ok) {
+          // The SAME refusal an inactive Utilisateur receives — same status,
+          // same French wording. A refused Role is not a 403 « Accès refusé »:
+          // the identity is perfectly good, there is simply no such Utilisateur.
+          expect(guarded.response.status).toBe(401)
+          const body = await guarded.response.json()
+          expect(body.error).toBe("Non autorisé")
+        }
+      })
+    }
+
+    // An ABSENT stored role is the likeliest way a real Utilisateur meets this
+    // change: `user.role ?? ""` used to hand the pages an empty string, which is
+    // itself outside the vocabulary. It is a refusal now, not a default.
+    it("refuses an absent stored Role rather than defaulting it", async () => {
+      for (const role of [null, undefined, ""]) {
+        mockGetSession.mockResolvedValue({
+          user: { ...sessionUser(actifId), role },
+        })
+        expect(await getAuthUser(), String(role)).toBeNull()
+      }
+    })
+
+    // The refusal must not be a second query. The cost this module's interface
+    // promises is one read of the activity column per guarded call, and a
+    // Utilisateur refused for their Role is still one read — the Role check
+    // reads a field the engine already returned.
+    it("costs the same single activity read as any other guarded call", async () => {
+      mockGetSession.mockResolvedValue({
+        user: { ...sessionUser(actifId), role: "NOT_A_ROLE" },
+      })
+      resetQueryLog()
+
+      expect(await requireAuth()).toMatchObject({ ok: false })
+
+      expect(activityQueriesRunSinceReset()).toHaveLength(1)
+      expect(executedQueries).toHaveLength(1)
+    })
+
+    // Non-vacuity for the whole block: the SAME Utilisateur, with the same row
+    // and the same session, is admitted the moment the Role is one the union
+    // names. Without this, "everything is refused" would pass every case above.
+    it("admits the very same Utilisateur when the Role is one the union names", async () => {
+      mockGetSession.mockResolvedValue({
+        user: { ...sessionUser(actifId), role: "NOT_A_ROLE" },
+      })
+      expect(await getAuthUser()).toBeNull()
+
+      mockGetSession.mockResolvedValue({
+        user: { ...sessionUser(actifId), role: "EMPLOYEE" },
+      })
+      expect(await getAuthUser()).toMatchObject({ id: actifId, role: "EMPLOYEE" })
+    })
+  })
+
+  // THE REFUSAL IS LOGGED (spec #294) — the operator's half.
+  //
+  // The refusal is correct and it is invisible: a mis-provisioned Utilisateur
+  // is refused at the door, and before this line nothing said so anywhere. The
+  // spec asks for the refusal to be VISIBLE as a refusal rather than as the
+  // redirect loop it replaced, and the only thing that makes it visible to an
+  // operator is a line in the log to grep.
+  //
+  // Both halves are asserted on every path that runs below: the line is emitted
+  // when the stored Role is outside the vocabulary, and it is NOT emitted when
+  // the same Utilisateur's Role is one the union names. The second half is the
+  // one that makes the first mean anything — a logger that fired on every
+  // guarded call would satisfy "it logs the refusal" and tell an operator
+  // nothing at all, because then the line would name every signed-in user in
+  // the deployment rather than the mis-provisioned one.
+  describe("the refusal for an unnamed stored Role is logged", () => {
+    let warn: ReturnType<typeof vi.spyOn>
+
+    beforeEach(() => {
+      warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    })
+
+    afterEach(() => {
+      warn.mockRestore()
+    })
+
+    /** The lines this module emitted, as the structured pairs it emitted them. */
+    function refusLines(): unknown[][] {
+      return warn.mock.calls.filter(
+        (call: unknown[]) =>
+          typeof call[0] === "string" && call[0].startsWith("[RoleRefus]")
+      )
+    }
+
+    it("emits one line naming the Utilisateur when the stored Role is unrecognisable", async () => {
+      mockGetSession.mockResolvedValue({
+        user: { ...sessionUser(actifId), role: "NOT_A_ROLE" },
+      })
+
+      expect(await getAuthUser()).toBeNull()
+
+      const lines = refusLines()
+      expect(lines).toHaveLength(1)
+      const [label, detail] = lines[0] as [string, Record<string, unknown>]
+      expect(label).toBe("[RoleRefus] Rôle stocké non reconnu")
+      // Named, so an operator can find the row and fix the provisioning.
+      expect(detail.utilisateur).toBe(actifId)
+      expect(detail.email).toBe("jean@example.com")
+      // Enough to correlate two Utilisateurs sharing one bad value, and
+      // enough to grep — without the value itself, which is untrusted input
+      // from a session row. The absence of the raw value is asserted too: a
+      // hash and a verbatim echo look identical in a passing run, and only the
+      // negative says which one shipped.
+      expect(detail.valeur).toMatch(/^[0-9a-f]{12}$/)
+      expect(JSON.stringify(detail)).not.toContain("NOT_A_ROLE")
+    })
+
+    // The same Utilisateur, the same row, the same session — only the stored
+    // Role differs. This is the non-vacuity half.
+    it("emits nothing for the very same Utilisateur once the Role is a named one", async () => {
+      mockGetSession.mockResolvedValue({
+        user: { ...sessionUser(actifId), role: "EMPLOYEE" },
+      })
+
+      expect(await getAuthUser()).toMatchObject({ id: actifId, role: "EMPLOYEE" })
+
+      expect(refusLines()).toEqual([])
+      expect(warn).not.toHaveBeenCalled()
+    })
+
+    // A Utilisateur refused for being INACTIVE reaches the same `null` and is
+    // not mis-provisioned. Reporting them the same way would point an operator
+    // at a Role when the row to fix is `actif`.
+    it("emits nothing for a Utilisateur refused for being inactive", async () => {
+      mockGetSession.mockResolvedValue({
+        user: { ...sessionUser(inactifId), role: "EMPLOYEE" },
+      })
+
+      expect(await getAuthUser()).toBeNull()
+
+      expect(refusLines()).toEqual([])
+    })
+
+    // One line per refusal, the rule `refusal-log.ts` states: two Utilisateurs
+    // with the same bad value are two occurrences to grep, and one line each.
+    it("emits one line per refused Utilisateur", async () => {
+      for (const stored of ["NOT_A_ROLE", "ADMINISTRATEUR"]) {
+        mockGetSession.mockResolvedValue({
+          user: { ...sessionUser(actifId), role: stored },
+        })
+        expect(await getAuthUser()).toBeNull()
+      }
+
+      expect(refusLines()).toHaveLength(2)
+    })
+
+    // An absent stored Role is the likeliest real case (`user.role ?? ""` used
+    // to hand the pages an empty string), and it is named rather than hashed:
+    // there is no value to fingerprint, and « absent » is the diagnosis.
+    it("names an absent stored Role rather than fingerprinting nothing", async () => {
+      mockGetSession.mockResolvedValue({
+        user: { ...sessionUser(actifId), role: null },
+      })
+
+      expect(await getAuthUser()).toBeNull()
+
+      const lines = refusLines()
+      expect(lines).toHaveLength(1)
+      expect((lines[0] as unknown[])[1]).toMatchObject({
+        utilisateur: actifId,
+        valeur: "absent",
+      })
+    })
+
+    // A log sink that throws is not a 500. The refusal is the contract; the
+    // line is observability.
+    it("still refuses when the log sink throws", async () => {
+      warn.mockImplementation(() => {
+        throw new Error("sink down")
+      })
+      mockGetSession.mockResolvedValue({
+        user: { ...sessionUser(actifId), role: "NOT_A_ROLE" },
+      })
+
+      expect(await getAuthUser()).toBeNull()
+      expect(await requireAuth()).toMatchObject({ ok: false })
+    })
+  })
+
   // The cost, measured.
   //
   // The module's interface states what a guarded call costs: one read of the
@@ -390,16 +604,15 @@ describe("requireRole", () => {
     }
   })
 
-  it("returns ok:false with 403 when the role casing differs", async () => {
-    const result = requireRole(makeUser("finance_admin"), "FINANCE_ADMIN")
-
-    expect(result.ok).toBe(false)
-    if (!result.ok) {
-      expect(result.response.status).toBe(403)
-      const body = await result.response.json()
-      expect(body.error).toBe("Accès refusé")
-    }
-  })
+  // The differently-cased role used to be refused HERE, by `requireRole`, on a
+  // `user` built by hand with `makeUser("finance_admin")`. It cannot be asked
+  // here any more, and that is the point of #297: `AuthUser.role` is `Role`, so
+  // the seam can no longer be handed a Utilisateur carrying a Role it has not
+  // read — the fixture itself stopped compiling. The refusal did not disappear,
+  // it moved UP the seam to the reader, so it is asserted there: in
+  // `roles.test.ts` for the reader, and in « the seam refuses » below for the
+  // end-to-end outcome. Asserting nothing in its place would have been the
+  // weakening; asserting it one layer earlier is not.
 })
 
 describe("requireAnyRole", () => {
@@ -475,12 +688,6 @@ describe("hasAnyRole", () => {
 
   it("returns false when the allowed list is empty", () => {
     expect(hasAnyRole("FINANCE_ADMIN", [])).toBe(false)
-  })
-
-  it("returns false when the role casing differs from the allowed roles", () => {
-    expect(
-      hasAnyRole("finance_admin", ["FINANCE_ADMIN", "GENERAL_DIRECTION"])
-    ).toBe(false)
   })
 })
 
