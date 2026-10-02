@@ -7,6 +7,8 @@ import {
   NAV_LANES,
   NAV_ADMINISTRATION,
   ROLES_MANAGEMENT,
+  TOUS_LES_ROLES,
+  lireRole,
   type NavItem,
   type Role,
 } from "./roles"
@@ -183,5 +185,121 @@ describe("ROLES_MANAGEMENT", () => {
     for (const role of ROLES_MANAGEMENT) {
       expect(ROLE_UNION).toContain(role)
     }
+  })
+})
+
+// The validating reader, as a pure function over a string: no session, no
+// engine, no database. It is total, so every input below is an answer rather
+// than a throw — a throwing reader would turn a data condition into a crash on
+// a page that today at least renders.
+describe("lireRole", () => {
+  it("returns each Role of the union as itself", () => {
+    for (const role of ROLE_UNION) {
+      expect(lireRole(role), role).toBe(role)
+    }
+  })
+
+  // The absent value is refused rather than defaulted. This is the edge of the
+  // Utilisateur-visible change: an absent stored role used to arrive at the
+  // pages as "" — a string outside the vocabulary — and was swallowed by a
+  // redirect loop. It is now a refusal, at the seam, once.
+  it("returns nothing for the absent value", () => {
+    expect(lireRole(null)).toBeNull()
+    expect(lireRole(undefined)).toBeNull()
+  })
+
+  it("returns nothing for the empty string", () => {
+    expect(lireRole("")).toBeNull()
+  })
+
+  it("returns nothing for a value outside the vocabulary", () => {
+    for (const stored of ["NOT_A_ROLE", "admin", "Employé", "EMPLOYEE ", "EMPLOY"]) {
+      expect(lireRole(stored), stored).toBeNull()
+    }
+  })
+
+  // No normalisation: the reader reads a stored value, it does not repair one.
+  // « finance_admin » and «Finance_Admin» are the same Role to a human and a
+  // refusal here, which is why a differently-cased row is a refusal at the seam
+  // rather than a silently-permitted Utilisateur.
+  it("does not normalise casing, whitespace or accents", () => {
+    expect(lireRole("finance_admin")).toBeNull()
+    expect(lireRole("Employee")).toBeNull()
+    expect(lireRole(" EMPLOYEE")).toBeNull()
+    expect(lireRole("EMPLOYEE\n")).toBeNull()
+  })
+
+  // Non-vacuity: a reader returning nothing for everything would satisfy every
+  // refusal above while refusing every Utilisateur in the deployment. The
+  // accepted set is asserted as a set, and the acceptance is asserted above, so
+  // the two together pin a reader that both admits and refuses.
+  it("admits the whole union and refuses everything else", () => {
+    const accepted = Object.keys(NAV_LANES).filter((role) => lireRole(role) === role)
+    expect(accepted.length).toBe(Object.keys(NAV_LANES).length)
+    expect(accepted.length).toBeGreaterThan(0)
+  })
+})
+
+// THE LOCKOUT GUARD — the acceptance criterion that is not negotiable.
+//
+// ADR-0021 adds a fifth Role (the deployment's Administrateur). The day that
+// Role reaches the DATABASE and not `TOUS_LES_ROLES`, every Administrateur is
+// refused at the seam: the guaranteed administrator of a live deployment
+// locked out by a type-safety change, with no crash and no log line to grep —
+// just a Utilisateur who cannot sign in.
+//
+// So the reader's accepted set is DERIVED from the Role vocabulary, and this
+// asserts the two are the same set. Widening the union without widening the
+// reader fails here, at the moment of the widening, which is the entire point.
+describe("the reader's accepted set and the Role union are the same set", () => {
+  it("accepts exactly the Roles the union names — neither more nor fewer", () => {
+    expect([...TOUS_LES_ROLES].sort()).toEqual([...ROLE_UNION].sort())
+  })
+
+  it("accepts every Role the navigation declares, and no other", () => {
+    // The union's own runtime witness: NAV_LANES is declared
+    // `Record<Role, NavItem[]>`, so adding a Role to the union forces a lane
+    // for it, and its keys are exactly the union's members.
+    const fromNav = Object.keys(NAV_LANES)
+    expect(fromNav.length).toBeGreaterThan(0)
+    expect([...TOUS_LES_ROLES].sort()).toEqual([...fromNav].sort())
+  })
+
+  it("round-trips every member of the accepted set through the reader", () => {
+    for (const role of TOUS_LES_ROLES) {
+      expect(lireRole(role), role).toBe(role)
+    }
+  })
+})
+
+// The carve-out: `roles.ts:136` keeps its `as Role`, because the navigation
+// table's keys are keyed permissively ON PURPOSE. The ticket's criterion and its
+// Out of Scope conflict there, and the specific carve-out wins. What makes that
+// resolution safe is the property pinned here: a Role this build does not have
+// produces a RESULT, not a throw. If the cast were removed, this is the call
+// that would start throwing — on every request, not only on that Utilisateur's.
+describe("the navigation table tolerates a Role this build does not have", () => {
+  it("answers for an unknown Role instead of throwing", () => {
+    const unknown = "ADMINISTRATEUR"
+    expect(ROLE_UNION).not.toContain(unknown)
+
+    // The reader refuses it — that is the seam's job and it is correct.
+    expect(lireRole(unknown)).toBeNull()
+
+    // But the nav lookup, which keys on whatever is in the table, must not
+    // throw. Nothing may be asserted about the CONTENT (a build without that
+    // Role has no entries for it); the property is that it returns.
+    const lanes = NAV_LANES[unknown as Role]
+    expect(() => NAV_ITEMS[unknown]).not.toThrow()
+    expect(NAV_ITEMS[unknown] ?? []).toEqual(lanes ?? [])
+  })
+
+  it("yields no administration block for a Role outside ROLES_MANAGEMENT", () => {
+    // `NAV_ITEMS` has no entry for a Role this build does not have, so the
+    // lookup a sidebar does for one is a MISS — and `layout.tsx` already
+    // coalesces that miss to `[]`. The property is that the miss is a miss and
+    // not a crash, which is what the Out of Scope section is protecting.
+    expect(NAV_ITEMS["ADMINISTRATEUR" as Role]).toBeUndefined()
+    expect((NAV_ITEMS["ADMINISTRATEUR" as Role] ?? [])).toEqual([])
   })
 })

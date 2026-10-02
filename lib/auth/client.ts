@@ -20,6 +20,10 @@ export function useAuthUser(): {
   refetch: () => void
 } {
   const { data: session, isPending, refetch } = authClient.useSession()
+  // Read through the SAME `toAuthUser` the server seam reads through, so the
+  // two halves cannot drift: a stored Role `lireRole` cannot name is a `null`
+  // here exactly as it is in `currentUser` (#297). `user` was already nullable,
+  // so the refusal needed no new shape.
   const user = session?.user
     ? toAuthUser(session.user as BetterAuthSessionUser)
     : null

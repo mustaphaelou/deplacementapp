@@ -60,10 +60,16 @@ async function currentUser(): Promise<AuthUser | null> {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) return null
   // The rule is asked, not spelled: one reader owns « a Utilisateur may act
-  // only while active », and this module no longer carries a second copy of
-  // the query. The cost is the same one the interface now states — one read of
+  // only while active », and this module no longer carries a second copy of the
+  // query. The cost is the same one the interface now states — one read of
   // `utilisateurs` per call, unchanged from the private helper this replaced.
   if (!(await peutAgir(session.user.id))) return null
+  // The Role check sits beside the `peutAgir` check because it IS the same
+  // refusal: a stored Role `lireRole` cannot name yields the `null` below, the
+  // one this function has always returned for a Utilisateur who may not act —
+  // so `getAuthUser` hands back `null` and `requireAuth` answers 401 « Non
+  // autorisé », identically to a deactivated Utilisateur. The check itself
+  // lives in `toAuthUser` so the client half cannot forget it (#297).
   return toAuthUser(session.user)
 }
 

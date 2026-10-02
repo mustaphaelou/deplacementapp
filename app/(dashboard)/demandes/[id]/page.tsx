@@ -4,7 +4,6 @@ import { findById } from "@/lib/demande"
 import { DemandeNotFoundError } from "@/lib/errors"
 import { DemandeDetail } from "@/components/demande-detail"
 import type { DemandeWithRelations } from "@/lib/demande-types"
-import type { Role } from "@/lib/auth"
 import { notFound } from "next/navigation"
 import { getAllowedActions } from "@/lib/workflow"
 
@@ -21,17 +20,16 @@ export default async function DemandeDetailPage({
   try {
     demande = await findById(id, {
       id: user.id,
-      // The Role arrives as the `string` the auth seam declares, so the reader's
-      // own vocabulary needs a bridge here and at `userRole` below. Both casts
-      // go with the seam's shape, which #297 narrows to the Role union (#296).
-      role: user.role as Role,
+      // The Role arrives as the union: the seam narrowed its own output in
+      // #297, so there is nothing left here to re-assert by hand.
+      role: user.role,
     })
   } catch (e) {
     if (e instanceof DemandeNotFoundError) notFound()
     throw e
   }
 
-  const userRole = user.role as Role
+  const userRole = user.role
   const userId = user.id
   const isOwner = demande.employeId === userId
   // The ownership fact goes in as itself; the verdicts come back from the
