@@ -1308,4 +1308,583 @@ describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT }, () => {
       expect(corps).toContain("etatCreation(actor.role, submit)")
     })
   })
+
+// ─── un numéro en collision est rejoué, pas refusé (#292) ───────────────
+  //
+  // Appended at the end of the file. Its helpers are declared here rather
+  // than hoisted into the shared import block, so a concurrent edit of the
+  // blocks above cannot collide.
+
+  describe("un numéro en collision est rejoué, pas refusé (#292)", () => {
+    const TABLE_ESPIONNEES = [
+      "demandes_deplacement",
+      "journal_audit",
+      "notifications",
+    ]
+
+    function numeroPour(compteur: number): string {
+      return `DD-${new Date().getFullYear()}-${String(compteur).padStart(4, "0")}`
+    }
+
+    async function compterLignes(): Promise<number> {
+      const rows = await pgliteDb
+        .select({ id: schema.demandesDeplacement.id })
+        .from(schema.demandesDeplacement)
+      return rows.length
+    }
+
+    function ligneBrute(numero: string) {
+      return {
+        id: crypto.randomUUID(),
+        numero,
+        employeId: employeeId,
+        employeNom: "Dupont",
+        employePrenom: "Jean",
+        employePoste: "Developpeur",
+        employeDepartement: "Test Departement",
+        motif: "[]",
+        dateDepart: new Date("2025-07-01"),
+        dateRetour: new Date("2025-07-03"),
+        destination: "Casablanca",
+        typeTransport: "AVION" as const,
+        modifieLe: new Date(),
+      }
+    }
+
+    /**
+     * Occupy the numéro the NEXT creation is about to allocate, and leave the
+     * counter still pointing at it. `generateNumero` reads `count()`, so
+     * writing a raw row one above a real one and then removing the real one
+     * moves the count without moving the numéro the allocator is about to
+     * hand out. Nothing is mocked: the real unique index refuses the real
+     * write, with the real SQLSTATE.
+     *
+     * The caller must call `liberer(occupe)` when it is done, or every later
+     * test in this file reads a count one row too high.
+     */
+    async function occuperLeProchainNumero(): Promise<{
+      occupe: string
+      compteur: number
+    }> {
+      const remplacant = await createDraft(sampleData, {
+        id: employeeId,
+        role: "EMPLOYEE",
+      })
+      const occupe = numeroPour(Number(remplacant.numero.split("-")[2]) + 1)
+      await pgliteDb
+        .insert(schema.demandesDeplacement)
+        .values(ligneBrute(occupe))
+      await pgliteDb
+        .delete(schema.demandesDeplacement)
+        .where(eq(schema.demandesDeplacement.id, remplacant.id))
+      return { occupe, compteur: await compterLignes() }
+    }
+
+    /**
+     * Remove every row a test added, so the next test reads the same counter.
+     *
+     * The numéro is allocated from `count()`, so a test that adds rows and
+     * removes only some of them leaves the count BELOW the highest numéro in
+     * use — and the allocator then walks back onto an occupied numéro, which
+     * looks like a collision and is not one. Every test here therefore hands
+     * back all three: the occupant, the rival, and the DemandeDeplacement it
+     * created.
+     */
+    async function liberer(...numeros: string[]): Promise<void> {
+      for (const numero of numeros) {
+        await pgliteDb
+          .delete(schema.demandesDeplacement)
+          .where(eq(schema.demandesDeplacement.numero, numero))
+      }
+    }
+
+    /** The bound, read out of the source so this file cannot drift from it. */
+    async function lireLaBorn(): Promise<number | null> {
+      const { readFile } = await import("node:fs/promises")
+      const source = await readFile(
+        new URL("./mutations.ts", import.meta.url),
+        "utf8"
+      )
+      const trouve = source.match(/const NUMERO_COLLISION_ATTEMPTS = (\d+)/)
+      return trouve ? Number(trouve[1]) : null
+    }
+
+    /**
+     * Count the transactions the creation opens, without changing what they
+     * do: the real `db.transaction` runs inside the spy.
+     */
+    function surveillerTransactions() {
+      const vrai = pgliteDb.transaction.bind(pgliteDb)
+      let appels = 0
+      const spy = vi
+        .spyOn(pgliteDb, "transaction")
+        .mockImplementation((async (...args: any[]) => {
+          appels++
+          return (vrai as any)(...args)
+        }) as any)
+      return { appels: () => appels, restaurer: () => spy.mockRestore() }
+    }
+
+    /**
+     * A lost race, made real.
+     *
+     * The numéro the creation has just read stays occupied, and a rival
+     * creation commits its own row before the first transaction opens — the
+     * exact instant a concurrent Utilisateur would have won it. Nothing is
+     * stubbed: the first write is refused by the real unique index, and the
+     * retry lands only because it reads the counter again and finds it one
+     * higher. A retry that reused the numéro just refused would collide again.
+     *
+     * The seam lives on this test file's own PGlite handle. The production
+     * creation path has no hook of its own, and the happy path never needs
+     * one.
+     */
+    function coursePerduee(numeroRival: string) {
+      const vrai = pgliteDb.transaction.bind(pgliteDb)
+      let rivalCommit = false
+      let tentatives = 0
+      const spy = vi
+        .spyOn(pgliteDb, "transaction")
+        .mockImplementation((async (...args: any[]) => {
+          if (!rivalCommit) {
+            rivalCommit = true
+            await pgliteDb
+              .insert(schema.demandesDeplacement)
+              .values(ligneBrute(numeroRival))
+          }
+          tentatives++
+          return (vrai as any)(...args)
+        }) as any)
+      return {
+        tentatives: () => tentatives,
+        restaurer: () => spy.mockRestore(),
+      }
+    }
+
+    /**
+     * A trigger that stamps the transaction each row was written in, keyed by
+     * the DemandeDeplacement it belongs to. The database's own answer to
+     * « were these written together? », not the shape of the code.
+     */
+    async function poserEspionDeTransaction(): Promise<void> {
+      await pgliteDb.execute(sql`
+        CREATE TABLE IF NOT EXISTS xid_espion (
+          id serial primary key,
+          moment text not null,
+          xid text not null
+        );
+      `)
+      await pgliteDb.execute(sql`
+        CREATE OR REPLACE FUNCTION noter_xid() RETURNS TRIGGER LANGUAGE plpgsql
+        AS $body$ BEGIN
+          INSERT INTO xid_espion (moment, xid) VALUES (
+            TG_TABLE_NAME || ':' || COALESCE(
+              to_jsonb(NEW) ->> 'entiteId',
+              to_jsonb(NEW) ->> 'demandeId',
+              to_jsonb(NEW) ->> 'id'
+            ),
+            pg_current_xact_id()::text
+          );
+          RETURN NULL;
+        END; $body$;
+      `)
+      for (const table of TABLE_ESPIONNEES) {
+        await pgliteDb.execute(
+          sql`DROP TRIGGER IF EXISTS trg_xid_espion ON ${sql.raw(table)}`
+        )
+        await pgliteDb.execute(sql`
+          CREATE TRIGGER trg_xid_espion AFTER INSERT ON ${sql.raw(table)}
+          FOR EACH ROW EXECUTE FUNCTION noter_xid();
+        `)
+      }
+    }
+
+    async function deposerEspionDeTransaction(): Promise<void> {
+      for (const table of TABLE_ESPIONNEES) {
+        await pgliteDb.execute(
+          sql`DROP TRIGGER IF EXISTS trg_xid_espion ON ${sql.raw(table)}`
+        )
+      }
+      await pgliteDb.execute(sql`DROP TABLE IF EXISTS xid_espion;`)
+    }
+
+    async function momentsDe(demandeId: string): Promise<string[]> {
+      const result = (await pgliteDb.execute(
+        sql`SELECT moment FROM xid_espion WHERE moment LIKE ${"%" + demandeId}`
+      )) as unknown as { rows: { moment: string }[] }
+      return result.rows.map((r) => r.moment)
+    }
+
+    async function transactionsDe(demandeId: string): Promise<string[]> {
+      const result = (await pgliteDb.execute(
+        sql`SELECT xid FROM xid_espion WHERE moment LIKE ${"%" + demandeId}`
+      )) as unknown as { rows: { xid: string }[] }
+      return result.rows.map((r) => r.xid)
+    }
+
+    /** How many transactions have ever written a row that stuck. */
+    async function transactionsDistinctes(): Promise<string[]> {
+      const result = (await pgliteDb.execute(
+        sql`SELECT DISTINCT xid FROM xid_espion ORDER BY xid`
+      )) as unknown as { rows: { xid: string }[] }
+      return result.rows.map((r) => r.xid)
+    }
+
+    // ── une collision se résout sans refus ─────────────────────────────────
+
+    it("rejoue toute la création et aboutit, avec un numéro unique qui n'appartient à personne d'autre", async () => {
+      const { occupe, compteur } = await occuperLeProchainNumero()
+      const lignesAvant = await compterLignes()
+      const journalAvant = (
+        await pgliteDb.select().from(schema.journalAudit)
+      ).length
+      const notifsAvant = (
+        await pgliteDb.select().from(schema.notifications)
+      ).length
+      const course = coursePerduee(numeroPour(compteur + 500))
+      let creee: string | undefined
+
+      try {
+        const demande = await createDraft(sampleData, {
+          id: employeeId,
+          role: "EMPLOYEE",
+        })
+        creee = demande.numero
+
+        // The Utilisateur's DemandeDeplacement exists...
+        const row = await pgliteDb
+          .select()
+          .from(schema.demandesDeplacement)
+          .where(eq(schema.demandesDeplacement.id, demande.id))
+        expect(row).toHaveLength(1)
+
+        // ...with a numéro that is unique, correctly prefixed, correctly
+        // padded, and nobody else's. It is one past the count the retry read:
+        // reusing the numéro the database had just refused would collide
+        // again, so this is only reachable by re-reading the counter.
+        expect(demande.numero).toBe(numeroPour(compteur + 2))
+        expect(demande.numero).not.toBe(occupe)
+        expect(demande.numero).toMatch(/^DD-\d{4}-\d{4}$/)
+        const titulaires = await pgliteDb
+          .select({ numero: schema.demandesDeplacement.numero })
+          .from(schema.demandesDeplacement)
+        expect(
+          titulaires.filter((r) => r.numero === demande.numero)
+        ).toHaveLength(1)
+
+        // One retry, and nothing of the refused attempt survived it: the rows
+        // grew by the rival's and this one's, the journal by exactly this
+        // creation's entry, and a draft notifies nobody.
+        expect(course.tentatives()).toBe(2)
+        expect(await compterLignes()).toBe(lignesAvant + 2)
+        expect(
+          (await pgliteDb.select().from(schema.journalAudit)).length
+        ).toBe(journalAvant + 1)
+        expect(
+          (
+            await pgliteDb
+              .select()
+              .from(schema.notifications)
+              .where(eq(schema.notifications.demandeId, demande.id))
+          ).length
+        ).toBe(0)
+        expect(
+          (await pgliteDb.select().from(schema.notifications)).length
+        ).toBe(notifsAvant)
+      } finally {
+        course.restaurer()
+        await liberer(occupe, numeroPour(compteur + 500), creee!)
+      }
+    })
+
+    it("rejoue une soumission tout aussi bien, notification comprise", async () => {
+      const { occupe, compteur } = await occuperLeProchainNumero()
+      const course = coursePerduee(numeroPour(compteur + 500))
+      let creee: string | undefined
+
+      try {
+        const demande = await createAndSubmit(sampleData, {
+          id: employeeId,
+          role: "EMPLOYEE",
+        })
+        creee = demande.numero
+
+        expect(course.tentatives()).toBe(2)
+        expect(demande.numero).toBe(numeroPour(compteur + 2))
+        expect(demande.numero).not.toBe(occupe)
+        expect(demande.etape).toBe("MANAGER_REVIEW")
+
+        const audit = await pgliteDb
+          .select()
+          .from(schema.journalAudit)
+          .where(eq(schema.journalAudit.entiteId, demande.id))
+        expect(audit).toHaveLength(1)
+
+        const notifs = await pgliteDb
+          .select()
+          .from(schema.notifications)
+          .where(eq(schema.notifications.demandeId, demande.id))
+        expect(notifs.length).toBeGreaterThan(0)
+      } finally {
+        course.restaurer()
+        await liberer(occupe, numeroPour(compteur + 500), creee!)
+      }
+    })
+
+    // ── la borne ───────────────────────────────────────────────────────────
+
+    it("refuse une création qui collisionne toujours, avec la collision nommée", async () => {
+      const { occupe } = await occuperLeProchainNumero()
+      const born = await lireLaBorn()
+      const { appels, restaurer } = surveillerTransactions()
+      const lignesAvant = await compterLignes()
+      const journalAvant = (
+        await pgliteDb.select().from(schema.journalAudit)
+      ).length
+      const notifsAvant = (
+        await pgliteDb.select().from(schema.notifications)
+      ).length
+
+      let thrown: unknown
+      try {
+        thrown = await createAndSubmit(sampleData, {
+          id: employeeId,
+          role: "EMPLOYEE",
+        })
+      } catch (e) {
+        thrown = e
+      }
+
+      // The bound is named and finite — and a bound of one would be no retry
+      // at all — and it is what refuses here, not the first collision.
+      // The expectation above is DERIVED from the source, so on its own it
+      // would read a bound of 99 as correct and happily sit through 99
+      // transactions. The ceiling is what pins « small » (#292): a retry
+      // bound that grew without limit would hold a Utilisateur's request
+      // through an unbounded number of transactions.
+      expect(born).not.toBeNull()
+      expect(born!).toBeGreaterThanOrEqual(2)
+      expect(born!).toBeLessThanOrEqual(5)
+      expect(appels()).toBe(born!)
+
+      // The refusal is the collision's own sentence and response code, not
+      // « Erreur interne ».
+      expect(thrown).toBeInstanceOf(NumeroCollisionError)
+      const res = handleServiceError(thrown)
+      expect(res.status).toBe(409)
+      await expect(res.json()).resolves.toEqual({
+        error: "Le numéro de la demande est déjà utilisé",
+      })
+
+      // None of the attempts left a trace: no row, no journal, no
+      // notification. The occupant is still there, so it is part of the
+      // count.
+      expect(await compterLignes()).toBe(lignesAvant)
+      expect((await pgliteDb.select().from(schema.journalAudit)).length).toBe(
+        journalAvant
+      )
+      expect((await pgliteDb.select().from(schema.notifications)).length).toBe(
+        notifsAvant
+      )
+
+      restaurer()
+      await liberer(occupe)
+    })
+
+    // ── une transaction par tentative, et rien de plus ─────────────────────
+
+    it("n'ouvre qu'une transaction, et y écrit la ligne, son journal et sa notification", async () => {
+      await poserEspionDeTransaction()
+      const { appels, restaurer } = surveillerTransactions()
+
+      try {
+        await pgliteDb.execute(sql`DELETE FROM xid_espion;`)
+        const demande = await createAndSubmit(sampleData, {
+          id: employeeId,
+          role: "EMPLOYEE",
+        })
+
+        // The retry adds no transaction of its own: one creation, one
+        // transaction.
+        expect(appels()).toBe(1)
+
+        // The row, its journal entry and its notification were written by the
+        // SAME transaction — the database's own transaction says so.
+        const moments = await momentsDe(demande.id)
+        expect(
+          moments.filter((m) => m.startsWith("demandes_deplacement:"))
+        ).toHaveLength(1)
+        expect(
+          moments.filter((m) => m.startsWith("journal_audit:"))
+        ).toHaveLength(1)
+        expect(
+          moments.filter((m) => m.startsWith("notifications:")).length
+        ).toBeGreaterThan(0)
+        expect(new Set(await transactionsDe(demande.id)).size).toBe(1)
+
+        await liberer(demande.numero)
+      } finally {
+        restaurer()
+        await deposerEspionDeTransaction()
+      }
+    })
+
+    it("n'ouvre pas de seconde transaction pour un rejeu, et la tentative refusée n'écrit rien", async () => {
+      const { occupe, compteur } = await occuperLeProchainNumero()
+      await poserEspionDeTransaction()
+      const course = coursePerduee(numeroPour(compteur + 500))
+      let creee: string | undefined
+
+      try {
+        await pgliteDb.execute(sql`DELETE FROM xid_espion;`)
+        const demande = await createAndSubmit(sampleData, {
+          id: employeeId,
+          role: "EMPLOYEE",
+        })
+        creee = demande.numero
+
+        // One transaction per attempt: two attempts, two transactions, and no
+        // transaction of the retry's own.
+        expect(course.tentatives()).toBe(2)
+
+        // The winning attempt wrote its row, its journal entry and its
+        // notifications in ONE transaction...
+        const moments = await momentsDe(demande.id)
+        expect(
+          moments.filter((m) => m.startsWith("demandes_deplacement:"))
+        ).toHaveLength(1)
+        expect(
+          moments.filter((m) => m.startsWith("journal_audit:"))
+        ).toHaveLength(1)
+        expect(
+          moments.filter((m) => m.startsWith("notifications:")).length
+        ).toBeGreaterThan(0)
+        expect(new Set(await transactionsDe(demande.id)).size).toBe(1)
+
+        // ...and only two transactions ever wrote a row that stuck: the
+        // rival's, and the winning attempt's. The refused attempt's rolled
+        // back, so it left neither a row, a journal entry nor a notification.
+        const toutes = await transactionsDistinctes()
+        expect(toutes).toHaveLength(2)
+      } finally {
+        course.restaurer()
+        await deposerEspionDeTransaction()
+        await liberer(occupe, numeroPour(compteur + 500), creee!)
+      }
+    })
+
+    // ── le numéro garde ses propriétés après un rejeu ──────────────────────
+
+    it("garde le préfixe d'année lu dans l'horloge après un rejeu", async () => {
+      // The clock is frozen BEFORE the race is set up: the numéro is allocated
+      // from the year, so an occupant carrying this year's prefix would not
+      // collide with a 2031 numéro at all.
+      vi.useFakeTimers({ toFake: ["Date"] })
+      vi.setSystemTime(new Date("2031-03-04T12:00:00Z"))
+      let occupe: string | undefined
+      let compteur = 0
+      let creee: string | undefined
+      let course: ReturnType<typeof coursePerduee> | undefined
+
+      try {
+        const courseSetup = await occuperLeProchainNumero()
+        occupe = courseSetup.occupe
+        compteur = courseSetup.compteur
+        course = coursePerduee(numeroPour(compteur + 500))
+
+        const demande = await createDraft(sampleData, {
+          id: employeeId,
+          role: "EMPLOYEE",
+        })
+        creee = demande.numero
+
+        expect(course.tentatives()).toBe(2)
+        expect(demande.numero).toMatch(/^DD-2031-\d{4}$/)
+        expect(demande.numero).not.toBe(occupe)
+      } finally {
+        vi.useRealTimers()
+        course?.restaurer()
+        // Every row the test added, or the next test reads a count one too
+        // low and walks onto an occupied numéro.
+        await liberer(occupe!, numeroPour(compteur + 500), creee!)
+      }
+    })
+
+    it("garde un compteur global après un rejeu : une ligne supprimée logiquement consomme toujours son numéro", async () => {
+      const avant = await createDraft(sampleData, {
+        id: employeeId,
+        role: "EMPLOYEE",
+      })
+      await pgliteDb
+        .update(schema.demandesDeplacement)
+        .set({ deletedAt: new Date() })
+        .where(eq(schema.demandesDeplacement.id, avant.id))
+
+      // The soft-deleted row is still a row, so the count the retry reads
+      // still counts it and its numéro stays consumed.
+      const { occupe, compteur } = await occuperLeProchainNumero()
+      const course = coursePerduee(numeroPour(compteur + 500))
+      let creee: string | undefined
+
+      try {
+        const demande = await createDraft(sampleData, {
+          id: employeeId,
+          role: "EMPLOYEE",
+        })
+        creee = demande.numero
+
+        expect(course.tentatives()).toBe(2)
+        expect(demande.numero).toBe(numeroPour(compteur + 2))
+        expect(demande.numero).not.toBe(avant.numero)
+        expect(demande.numero).not.toBe(occupe)
+      } finally {
+        course.restaurer()
+        await liberer(occupe, numeroPour(compteur + 500), creee!)
+      }
+    })
+
+    it("ne rejoue pas une erreur qui n'est pas une collision de numéro", async () => {
+      await pgliteDb.execute(sql`
+        CREATE OR REPLACE FUNCTION fail_demande_insert_rejeu()
+        RETURNS TRIGGER
+        LANGUAGE plpgsql
+        AS $body$ BEGIN RAISE EXCEPTION 'Simulated demande insert failure (retry)'; END; $body$;
+      `)
+      await pgliteDb.execute(sql`
+        CREATE TRIGGER trg_fail_demande_insert_rejeu
+        BEFORE INSERT ON demandes_deplacement
+        FOR EACH ROW EXECUTE FUNCTION fail_demande_insert_rejeu();
+      `)
+
+      const { appels, restaurer } = surveillerTransactions()
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {})
+      let thrown: unknown
+      try {
+        thrown = await createDraft(sampleData, {
+          id: employeeId,
+          role: "EMPLOYEE",
+        })
+      } catch (e) {
+        thrown = e
+      } finally {
+        restaurer()
+        await pgliteDb.execute(
+          sql`DROP TRIGGER IF EXISTS trg_fail_demande_insert_rejeu ON demandes_deplacement`
+        )
+        await pgliteDb.execute(
+          sql`DROP FUNCTION IF EXISTS fail_demande_insert_rejeu()`
+        )
+      }
+
+      // Not a 23505: one attempt, no replay, and the error reaches the caller
+      // as itself.
+      expect(appels()).toBe(1)
+      expect(thrown).toBeTruthy()
+      expect(thrown).not.toBeInstanceOf(NumeroCollisionError)
+      expect(handleServiceError(thrown).status).toBe(500)
+      consoleError.mockRestore()
+    })
+  })
 })
