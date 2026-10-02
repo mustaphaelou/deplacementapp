@@ -5,6 +5,7 @@ import type {
 } from "better-auth"
 import type { DrizzleDb } from "../../db"
 import { utilisateurs } from "../../db/schema/utilisateurs"
+import { peutAgir } from "../utilisateur-service"
 import { GOOGLE_REFUSAL_CODES, googleRefusalMessage } from "./google-refusals"
 import type { GoogleRefusalCode } from "./google-refusals"
 
@@ -51,7 +52,17 @@ export function createGoogleGate(db: DrizzleDb) {
       .limit(1)
 
     if (utilisateur) {
-      if (!utilisateur.actif) {
+      // The activity answer is ASKED of the Utilisateur module's reader, not
+      // read off the row this gate already holds (#315).  The cost is a second
+      // call to learn one field of a row already in hand — paid knowingly,
+      // once per sign-in attempt, because the alternative is a third spelling
+      // of a rule the Utilisateur module now owns in one place.
+      //
+      // `db` is the handle the gate was built with, and it is passed through so
+      // the reader reads through the same database this gate reads (the tests
+      // build the gate on an in-process Postgres).  The refusal vocabulary is
+      // untouched: the same cause is named for the same case.
+      if (!(await peutAgir(utilisateur.id, db))) {
         return refuse(GOOGLE_REFUSAL_CODES.UTILISATEUR_DESACTIVE)
       }
       if (!utilisateur.googleAuthEnabled) {

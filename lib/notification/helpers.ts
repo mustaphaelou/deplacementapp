@@ -1,6 +1,7 @@
 import { eq, and } from "drizzle-orm"
 import type { DrizzleTransactionClient } from "../../db"
 import { utilisateurs } from "../../db/schema/utilisateurs"
+import { conditionActif } from "../utilisateur-service"
 import type {
   NotificationEventType,
   NotificationMessage,
@@ -80,6 +81,18 @@ const EMPLOYEE_EVENTS: NotificationEventType[] = [
 
 const ASSIGNEE_EVENTS: NotificationEventType[] = ["DEMANDE_RETIREE"]
 
+/**
+ * The Utilisateurs a Notification event goes to.
+ *
+ * A SET is being filtered here, so the activity rule is composed into the
+ * query rather than asked per candidate: asking `peutAgir` once per row would
+ * turn one query into one-per-manager. The rule itself is still the Utilisateur
+ * module's — `conditionActif` is the same fragment the reader's per-Utilisateur
+ * answer is derived from (#315), so « only active Utilisateurs are notified »
+ * cannot drift from « a Utilisateur may act only while active ».  This module
+ * keeps its own recipient rules: the role, the department scope, and the
+ * employee/assignee additions are unchanged.
+ */
 export async function resolveRecipients(
   event: NotificationEventType,
   payload: NotificationPayload,
@@ -89,10 +102,7 @@ export async function resolveRecipients(
 
   const roleTargets = EVENT_ROLE_MAP[event]
   for (const target of roleTargets) {
-    const conditions = [
-      eq(utilisateurs.role, target.role),
-      eq(utilisateurs.actif, true),
-    ]
+    const conditions = [eq(utilisateurs.role, target.role), conditionActif]
     if (target.departmentScoped) {
       if (!payload.employe.departementId) continue
       conditions.push(
