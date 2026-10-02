@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { requireAuth, type Role } from "@/lib/auth/server"
+import { requireAuth } from "@/lib/auth/server"
 import { findById } from "@/lib/demande"
 import { handleServiceError } from "@/lib/errors"
 
@@ -13,7 +13,7 @@ export async function GET(
   try {
     const demande = await findById(id, {
       id: auth.user.id,
-      role: auth.user.role as Role,
+      role: auth.user.role,
     })
     return NextResponse.json({ demande })
   } catch (e) {

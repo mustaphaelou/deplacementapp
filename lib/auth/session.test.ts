@@ -44,6 +44,7 @@ import {
   getAuthUser,
 } from "./session"
 import type { AuthUser } from "./session"
+import { lireRole, type Role } from "./roles"
 
 const TIMEOUT = 30_000
 
@@ -124,7 +125,9 @@ function sessionUser(id: string = actifId) {
   }
 }
 
-function makeUser(role: string): AuthUser {
+// The Role the mapper hands the seam is the union, not a string (#297), so a
+// fixture building one by hand names a Role and nothing else.
+function makeUser(role: Role): AuthUser {
   return {
     id: "user-1",
     email: "test@example.com",
@@ -305,6 +308,88 @@ describe("the session module's guarded calls", { timeout: TIMEOUT }, () => {
     })
   })
 
+  // THE SEAM REFUSES (#297) — end to end, against a real in-process Postgres.
+  //
+  // The Utilisateur below is ACTIVE and their row EXISTS: the only thing
+  // unusual is the Role stored on the session, which is outside the vocabulary.
+  // So a `null` here cannot be explained by deactivation, by a missing row, or
+  // by the session read — which is exactly why this case had to be written
+  // against the real query path rather than by asserting on the mapper alone.
+  //
+  // What changed for such a Utilisateur: before #297 they were signed in with
+  // the raw string as their Role and the pages swallowed it in a redirect loop;
+  // now they are refused once, at the door, with the same `null` an inactive
+  // Utilisateur produces.
+  describe("the seam refuses a stored Role outside the vocabulary", () => {
+    const UNNAMED_ROLES = ["NOT_A_ROLE", "ADMINISTRATEUR", "finance_admin"]
+
+    for (const stored of UNNAMED_ROLES) {
+      it(`getAuthUser returns null for ${stored}, and requireAuth 401s`, async () => {
+        expect(lireRole(stored), `${stored} must be refused by the reader`).toBeNull()
+
+        mockGetSession.mockResolvedValue({
+          user: { ...sessionUser(actifId), role: stored },
+        })
+
+        expect(await getAuthUser(), stored).toBeNull()
+
+        const guarded = await requireAuth()
+        expect(guarded.ok).toBe(false)
+        if (!guarded.ok) {
+          // The SAME refusal an inactive Utilisateur receives — same status,
+          // same French wording. A refused Role is not a 403 « Accès refusé »:
+          // the identity is perfectly good, there is simply no such Utilisateur.
+          expect(guarded.response.status).toBe(401)
+          const body = await guarded.response.json()
+          expect(body.error).toBe("Non autorisé")
+        }
+      })
+    }
+
+    // An ABSENT stored role is the likeliest way a real Utilisateur meets this
+    // change: `user.role ?? ""` used to hand the pages an empty string, which is
+    // itself outside the vocabulary. It is a refusal now, not a default.
+    it("refuses an absent stored Role rather than defaulting it", async () => {
+      for (const role of [null, undefined, ""]) {
+        mockGetSession.mockResolvedValue({
+          user: { ...sessionUser(actifId), role },
+        })
+        expect(await getAuthUser(), String(role)).toBeNull()
+      }
+    })
+
+    // The refusal must not be a second query. The cost this module's interface
+    // promises is one read of the activity column per guarded call, and a
+    // Utilisateur refused for their Role is still one read — the Role check
+    // reads a field the engine already returned.
+    it("costs the same single activity read as any other guarded call", async () => {
+      mockGetSession.mockResolvedValue({
+        user: { ...sessionUser(actifId), role: "NOT_A_ROLE" },
+      })
+      resetQueryLog()
+
+      expect(await requireAuth()).toMatchObject({ ok: false })
+
+      expect(activityQueriesRunSinceReset()).toHaveLength(1)
+      expect(executedQueries).toHaveLength(1)
+    })
+
+    // Non-vacuity for the whole block: the SAME Utilisateur, with the same row
+    // and the same session, is admitted the moment the Role is one the union
+    // names. Without this, "everything is refused" would pass every case above.
+    it("admits the very same Utilisateur when the Role is one the union names", async () => {
+      mockGetSession.mockResolvedValue({
+        user: { ...sessionUser(actifId), role: "NOT_A_ROLE" },
+      })
+      expect(await getAuthUser()).toBeNull()
+
+      mockGetSession.mockResolvedValue({
+        user: { ...sessionUser(actifId), role: "EMPLOYEE" },
+      })
+      expect(await getAuthUser()).toMatchObject({ id: actifId, role: "EMPLOYEE" })
+    })
+  })
+
   // The cost, measured.
   //
   // The module's interface states what a guarded call costs: one read of the
@@ -390,16 +475,15 @@ describe("requireRole", () => {
     }
   })
 
-  it("returns ok:false with 403 when the role casing differs", async () => {
-    const result = requireRole(makeUser("finance_admin"), "FINANCE_ADMIN")
-
-    expect(result.ok).toBe(false)
-    if (!result.ok) {
-      expect(result.response.status).toBe(403)
-      const body = await result.response.json()
-      expect(body.error).toBe("Accès refusé")
-    }
-  })
+  // The differently-cased role used to be refused HERE, by `requireRole`, on a
+  // `user` built by hand with `makeUser("finance_admin")`. It cannot be asked
+  // here any more, and that is the point of #297: `AuthUser.role` is `Role`, so
+  // the seam can no longer be handed a Utilisateur carrying a Role it has not
+  // read — the fixture itself stopped compiling. The refusal did not disappear,
+  // it moved UP the seam to the reader, so it is asserted there: in
+  // `roles.test.ts` for the reader, and in « the seam refuses » below for the
+  // end-to-end outcome. Asserting nothing in its place would have been the
+  // weakening; asserting it one layer earlier is not.
 })
 
 describe("requireAnyRole", () => {
@@ -475,12 +559,6 @@ describe("hasAnyRole", () => {
 
   it("returns false when the allowed list is empty", () => {
     expect(hasAnyRole("FINANCE_ADMIN", [])).toBe(false)
-  })
-
-  it("returns false when the role casing differs from the allowed roles", () => {
-    expect(
-      hasAnyRole("finance_admin", ["FINANCE_ADMIN", "GENERAL_DIRECTION"])
-    ).toBe(false)
   })
 })
 

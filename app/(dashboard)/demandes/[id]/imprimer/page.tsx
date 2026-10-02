@@ -3,7 +3,6 @@ import { redirect } from "next/navigation"
 import { findById } from "@/lib/demande"
 import { getSocieteBranding } from "@/lib/societe"
 import { DemandeNotFoundError } from "@/lib/errors"
-import type { Role } from "@/lib/auth"
 import {
   formatCurrency,
   formatDate,
@@ -29,7 +28,7 @@ export default async function ImprimerPage({
   try {
     demande = await findById(id, {
       id: user.id,
-      role: user.role as Role,
+      role: user.role,
     })
   } catch (e) {
     if (e instanceof DemandeNotFoundError) redirect("/demandes")

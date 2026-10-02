@@ -177,9 +177,7 @@ export default function DemandesListPage() {
   const role = user?.role
 
   const title = role === "EMPLOYEE" ? "Mes demandes" : "Demandes"
-  const queueEtape = role
-    ? queueEtapes(role as Parameters<typeof queueEtapes>[0])[0]
-    : undefined
+  const queueEtape = role ? queueEtapes(role)[0] : undefined
   const tabs =
     role === "EMPLOYEE"
       ? [
