@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { requireAuth, type Role } from "@/lib/auth/server"
+import { requireAuth } from "@/lib/auth/server"
 import { findById, generateDemandeDocumentPdf } from "@/lib/demande"
 import { getSocieteBranding } from "@/lib/societe"
 import { pdfAdapter } from "@/components/pdf/travel-request-pdf-adapter"
@@ -16,7 +16,7 @@ export async function GET(
   try {
     const demande = await findById(id, {
       id: auth.user.id,
-      role: auth.user.role as Role,
+      role: auth.user.role,
     })
     const branding = await getSocieteBranding()
     const buffer = await generateDemandeDocumentPdf({
