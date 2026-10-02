@@ -56,9 +56,12 @@ describe("Nouvelle demande page", { timeout: 30000 }, () => {
     const { default: NouvelleDemandePage } = await import("./page")
     const html = renderToStaticMarkup(<NouvelleDemandePage />)
 
+    // The form's own control geometry — the app's 3px radius spelled
+    // the way every surface spells it. No module owns these controls.
     expect(html).toContain("h-9 rounded-[3px]")
     expect(html).toContain("focus-visible:ring-1 focus-visible:ring-(--brand)")
     expect(html).toContain('data-slot="checkbox"')
+    // The page's own <select> treatment, same as the controls above.
     expect(html).toContain("appearance-none rounded-full border")
     expect(html).not.toContain("shadow-lg")
     expect(html).not.toContain('data-slot="card"')

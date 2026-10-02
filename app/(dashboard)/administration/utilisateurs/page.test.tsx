@@ -65,6 +65,8 @@ describe("Utilisateurs administration page", () => {
     // are asserted as the module's own output rather than as literals spelled
     // here — a page test that re-pins them is a second copy of the pin.
     expect(html).toContain(tableShellClass)
+    // The cell padding and the table's min-width are this page's own
+    // shell; components/display.tsx's tableShellClass does not own them.
     expect(html).toContain("px-2 py-2 font-normal text-muted-foreground")
     expect(html).toContain("px-2 py-2.5")
     expect(html).toContain(rowHoverInkTint)
@@ -84,6 +86,8 @@ describe("Utilisateurs administration page", () => {
       />
     )
 
+    // The pill tones below are components/status-pill.tsx's
+    // TONE_CLASSES (neutral/pending/success/danger).
     expect(html).toContain("bg-[#F1F1EF]")
     expect(html).toContain("Google")
     expect(html).toContain("bg-[#E5F3EE]")

@@ -49,6 +49,9 @@ describe("Véhicules administration page", () => {
     // #307: the shell and the row tint belong to the shared module now, so they
     // are asserted as the module's own output rather than re-pinned as literals.
     expect(html).toContain(tableShellClass)
+    // The cell padding and the table's min-width are this page's own
+    // shell. components/display.tsx's tableShellClass owns the
+    // overflow/border/text-sm run, not these — so they stay here.
     expect(html).toContain("px-2 py-2 font-normal text-muted-foreground")
     expect(html).toContain("px-2 py-2.5")
     expect(html).toContain(rowHoverInkTint)
@@ -109,9 +112,11 @@ describe("Véhicules administration page", () => {
     // The pill tones are components/status-pill.tsx's TONE_CLASSES
     // (neutral/pending/success/danger); this page only chooses one.
     expect(html).toContain("bg-[#E5F3EE]")
+    // The pending tone is components/status-pill.tsx's TONE_CLASSES.
     expect(html).toContain("bg-[#FBF0DB]")
     expect(html).toContain("Disponible")
     expect(html).toContain("En mission")
+    // The page's own mono treatment for the plate column.
     expect(html).toContain("font-mono")
   })
 })

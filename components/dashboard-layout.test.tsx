@@ -107,6 +107,7 @@ describe("DashboardLayout — the row pill for a DemandeDeplacement", () => {
     expect(html).toContain("bg-[#E5F3EE]")
     expect(html).toContain('dark:text-zinc-300">Retirée</span>')
     expect(html).toContain(">En attente (Finance)</span>")
+    // The pending tone is components/status-pill.tsx's TONE_CLASSES.
     expect(html).toContain("bg-[#FBF0DB]")
   })
 
@@ -119,6 +120,7 @@ describe("DashboardLayout — the row pill for a DemandeDeplacement", () => {
       />
     )
 
+    // StatusPill's own shape (status-pill.tsx:24).
     expect(html).toContain("rounded-full")
     expect(html).not.toContain('data-slot="badge"')
   })

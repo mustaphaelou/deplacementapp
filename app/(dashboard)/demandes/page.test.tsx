@@ -162,6 +162,9 @@ describe("Demandes list page", () => {
     const { default: DemandesListPage } = await import("./page")
     const html = renderToStaticMarkup(<DemandesListPage />)
 
+    // The ACTIVE TAB's own state (page.tsx), not StatusPill's neutral
+    // tone: the pill spells that colour with a text tone and no
+    // font-medium. No module owns this one.
     expect(html).toContain("bg-[#F1F1EF] font-medium")
   })
 
@@ -182,6 +185,7 @@ describe("Demandes list page", () => {
     expect(html).toContain("px-2 py-2.5")
     expect(html).toContain(rowHoverInkTint)
     expect(html).toContain("min-w-[640px]")
+    // StatusPill's own shape (status-pill.tsx), not the tab's.
     expect(html).toContain("rounded-full")
     // The pill tones are components/status-pill.tsx's TONE_CLASSES
     // (neutral/pending/success/danger); the pill's rounded-full shape is
@@ -254,6 +258,7 @@ describe("Demandes list page", () => {
 
     expect(html).toContain("Rejetée (Manager)")
     expect(html).not.toContain("En attente")
+    // The danger tone is components/status-pill.tsx's TONE_CLASSES.
     expect(html).toContain("bg-[#FBE9E9]")
   })
 })
