@@ -331,4 +331,172 @@ export default function Page() {
 `)
     expect(runOnTree(dir).status).toBe(0)
   })
+
+  it("RULE_DISPLAY_CONSTANT_RATCHET fires on a re-declared display constant", () => {
+    const before = runOnTree(dir)
+    expect(before.status, "the real tree starts at its baseline").toBe(0)
+
+    // The exact FIELD_INPUT shape in components/profile-edit.tsx: a module that
+    // stops importing the constant and spells the class string again. This is
+    // the defect the rule is FOR, so it has to be the real file mutated in
+    // place rather than a hand-written stub — a stub would pass even if the
+    // rule matched on something a stub cannot carry (the import line, the
+    // constant's NAME, the surrounding JSX).
+    //
+    // textInputClass is ratcheted at 2 files, so a THIRD copy is new debt.
+    // `app/(dashboard)/demandes/page.tsx` currently imports hideClassFor,
+    // rowHoverInkTint and tableShellClass from the module.
+    const page = "app/(dashboard)/demandes/page.tsx"
+    const src = readFileSync(join(dir, page), "utf8")
+    expect(src).toContain('from "@/components/display"')
+
+    // Drop the import and re-declare the value locally, the way profile-edit
+    // spells its own FIELD_INPUT.
+    const withoutImport = src.replace(/import \{[^}]*\} from "@\/components\/display"\n/, "")
+    expect(withoutImport, "the import was actually removed").not.toContain(
+      'from "@/components/display"'
+    )
+    write(
+      page,
+      `const FIELD_INPUT = "h-9 rounded-[3px] focus-visible:ring-1 focus-visible:ring-(--brand)"\n\n${withoutImport}`
+    )
+
+    const { stdout, status } = runOnTree(dir)
+    expect(status).toBe(1)
+    expect(stdout).toContain("RULE_DISPLAY_CONSTANT_RATCHET")
+    expect(stdout).toContain("textInputClass")
+    // The finding names the offending file, so a maintainer knows where to look.
+    expect(stdout).toContain(page)
+  })
+
+  it("RULE_DISPLAY_CONSTANT_RATCHET is silent on a module that IMPORTS the constant", () => {
+    // The inverse, and the half that catches a rule matching on the import
+    // NAME or on `from "@/components/display"` instead of on the value. Four
+    // covered constants are in play here, including the two zero-baseline ones
+    // that no file spells out today.
+    write(
+      "components/drift-display-importer.tsx",
+      `import {
+  tableShellClass,
+  searchFieldInputClass,
+  fieldHintClass,
+  fieldLabelClass,
+} from "@/components/display"
+export const Importer = () => (
+  <div className={tableShellClass}>
+    <input className={searchFieldInputClass} />
+    <span className={fieldHintClass}>{fieldLabelClass}</span>
+  </div>
+)
+`
+    )
+    const { stdout, status } = runOnTree(dir)
+    expect(status, stdout).toBe(0)
+  })
+
+  it("RULE_DISPLAY_CONSTANT_RATCHET counts FILES, not occurrences", () => {
+    // Regression: `fieldLabelClass` is spelled eleven times across TWO files
+    // (demande-form 3, profile-edit 8) and its baseline is 2. An occurrence
+    // count would read 11 there and blow the baseline on a clean tree, forcing
+    // either a permanent red or a baseline that no longer describes the tree —
+    // the "cry wolf" outcome that gets a checker ignored. The unit is distinct
+    // FILES, matching RULE_INK_TINT_RATCHET.
+    //
+    // The proof adds five MORE sites to a file that ALREADY holds the string, so
+    // the occurrence count moves (16) while the file count does not (still 2).
+    // An occurrence-counting implementation fires here; this one must not.
+    // Adding the string to a NEW file is the other case and does fire — that is
+    // the first test in this block.
+    const holder = "components/demande-form.tsx"
+    expect(
+      readFileSync(join(dir, holder), "utf8"),
+      "demande-form is already one of the two baseline holders"
+    ).toContain("mb-1.5 block text-sm font-medium")
+
+    const extra = [1, 2, 3, 4, 5]
+      .map((n) => `<Label className="mb-1.5 block text-sm font-medium">extra-${n}</Label>`)
+      .join("\n")
+    appendTo(
+      holder,
+      `export const ExtraLabels = () => (\n  <div>\n    ${extra}\n  </div>\n)`
+    )
+
+    const { stdout, status } = runOnTree(dir)
+    expect(status, `five more sites in an EXISTING holder is still two files:\n${stdout}`).toBe(0)
+  })
+
+  it("RULE_DISPLAY_CONSTANT_RATCHET fires when a constant reaches a NEW file", () => {
+    // The other half of the files-not-occurrences pin, and the direction the
+    // ratchet exists for: one more FILE is new debt even though the string was
+    // already in the tree. `fieldHintClass` is ratcheted at ZERO, so this is a
+    // single new holder with one site.
+    write(
+      "components/drift-hint-copy.tsx",
+      `export const Hint = () => <p className="mt-1.5 text-xs text-muted-foreground">hint</p>
+`
+    )
+    const { stdout, status } = runOnTree(dir)
+    expect(status).toBe(1)
+    expect(stdout).toContain("RULE_DISPLAY_CONSTANT_RATCHET")
+    expect(stdout).toContain("fieldHintClass")
+    expect(stdout).toContain("components/drift-hint-copy.tsx")
+  })
+
+  it("RULE_DISPLAY_CONSTANT_RATCHET does not judge the module against itself", () => {
+    // The module holds every one of these strings BY DEFINITION. Counting it
+    // would fire the rule on the source of truth — the same class of bug
+    // RULE_HEADER_ADOPTION documents for page-header.tsx, which is filtered
+    // out of its delegate candidates for exactly this reason.
+    //
+    // `tableShellClass` is ratcheted at ZERO, so this only holds because the
+    // module is skipped. Read its census through the CLI to prove the skip is
+    // real rather than incidental.
+    const { stdout, status } = runOnTree(dir)
+    expect(status, `the module must not be counted against itself:\n${stdout}`).toBe(0)
+    const census = execFileSync("node", [SCRIPT, "--census"], { encoding: "utf8" })
+    expect(census).toContain("tableShellClass: 0")
+    expect(census).toContain("searchFieldIconClass: 0")
+  })
+
+  it("RULE_DISPLAY_CONSTANT_RATCHET reports a covered constant the module stopped exporting", () => {
+    // A hole that looks like a clean run: if `fieldHintClass` is renamed or
+    // deleted in components/display.tsx, its baseline would silently stop being
+    // checked and the rule would go quiet on a tree that had just gained a copy
+    // of that geometry. The rule fails on the dangling reference instead.
+    const p = join(dir, "components/display.tsx")
+    const src = readFileSync(p, "utf8")
+    write("components/display.tsx", src.replace(/export const fieldHintClass =/, "export const fieldHintRenamed ="))
+
+    const { stdout, status } = runOnTree(dir)
+    expect(status).toBe(1)
+    expect(stdout).toContain("RULE_DISPLAY_CONSTANT_RATCHET")
+    expect(stdout).toContain("fieldHintClass")
+    expect(stdout).toContain("no longer exports it")
+  })
+
+  it("RULE_DISPLAY_CONSTANT_RATCHET fails on an exported constant nobody classified", () => {
+    // The named failure mode of this rule: a SILENTLY SMALLER rule set. A new
+    // export in components/display.tsx that is neither ratcheted nor excluded
+    // would widen the module's ownership while the rule quietly stopped
+    // watching it — and a gate that shrinks without saying so is worse than no
+    // gate. The constant has to be classified on purpose.
+    //
+    // This also keeps DISPLAY_CONSTANT_EXCLUDED load-bearing: dropping the last
+    // excluded name would turn that list into decoration.
+    const p = join(dir, "components/display.tsx")
+    const src = readFileSync(p, "utf8")
+    appendTo("components/display.tsx", `export const brandNewClass = "tracking-tight italic"`)
+
+    const { stdout, status } = runOnTree(dir)
+    expect(status).toBe(1)
+    expect(stdout).toContain("RULE_DISPLAY_CONSTANT_RATCHET")
+    expect(stdout).toContain("brandNewClass")
+    expect(stdout).toContain("unclassified")
+
+    // ...and every constant that IS classified stays quiet, so the guard is not
+    // just "any module edit fails".
+    rmSync(p)
+    write("components/display.tsx", src)
+    expect(runOnTree(dir).status, "the unmodified module still classifies cleanly").toBe(0)
+  })
 })
