@@ -1,17 +1,27 @@
 import { describe, it, expect } from "vitest"
 import { readFile } from "node:fs/promises"
 import {
+  readFileSync,
+  readdirSync,
+} from "node:fs"
+import { join, dirname, relative } from "node:path"
+import { fileURLToPath } from "node:url"
+import {
   canTransition,
   buildTransition,
   checkTransition,
   etatCreation,
   getAllowedActions,
   resoudreTransition,
+  lienFileAttente,
+  DECISION_ATTENTE,
+  queueEtape,
   queueEtapes,
   committedEtapes,
   laneOrderByColumn,
   enteringEffect,
   PIPELINE,
+  PIPELINE_VIEWS,
   TRANSITION_EFFECTS,
   TERMINAL_DECISIONS,
   isPendingDecision,
@@ -24,6 +34,7 @@ import type {
   WorkflowResult,
 } from "./workflow"
 import type { Role } from "./auth"
+import { TOUS_LES_ROLES } from "./auth"
 
 // ─── The tuple space, declared once ─────────────────────────────────────────
 //
@@ -137,7 +148,33 @@ describe("isPendingDecision / TERMINAL_DECISIONS", () => {
   })
 })
 
-// ─── Read-model: queueEtapes (Etape-based) ─────────────────────────────────────
+// ─── Read-model: queueEtape / queueEtapes (Etape-based) ──────────────────────
+
+describe("queueEtape", () => {
+  it("returns the one Etape the Role waits on", () => {
+    expect(queueEtape("EMPLOYEE")).toBe("DRAFT")
+    expect(queueEtape("MANAGER")).toBe("MANAGER_REVIEW")
+    expect(queueEtape("FINANCE_ADMIN")).toBe("FINANCE_REVIEW")
+    expect(queueEtape("GENERAL_DIRECTION")).toBe("DIRECTION_REVIEW")
+  })
+
+  // A link is built from the single-lane accessor while the « En attente » count
+  // is summed over the collection. With one lane per Role they agree — and the
+  // agreement must be CHECKED, not assumed, because the two read one declaration
+  // through different doors. This is the assertion that would fail if the two
+  // accessors ever stopped agreeing.
+  it("names the Etape the collection counts, for every Role", () => {
+    for (const role of TOUS_LES_ROLES) {
+      const counted = queueEtapes(role)
+      const linked = queueEtape(role)
+
+      expect(counted, `${role} counts no lane`).toContain(linked)
+      // Every lane the count sums is a lane the link can name. One lane per
+      // Role makes these the same fact, and this is where that is observed.
+      expect(counted.filter((e) => e !== linked), `${role}`).toEqual([])
+    }
+  })
+})
 
 describe("queueEtapes", () => {
   it("returns DRAFT for EMPLOYEE", () => {
@@ -154,6 +191,217 @@ describe("queueEtapes", () => {
 
   it("returns DIRECTION_REVIEW for GENERAL_DIRECTION", () => {
     expect(queueEtapes("GENERAL_DIRECTION")).toEqual(["DIRECTION_REVIEW"])
+  })
+})
+
+// THE INVARIANT THE TYPE NOW CARRIES, pinned as a test too.
+//
+// `PipelineView['queue']` is `readonly [Etape]`, so a second lane is a compile
+// error at the declaration. This is not therefore redundant: an `as` cast or a
+// widening assertion AT the declaration defeats the type silently, and no test
+// of behaviour would notice. A test is cheaper than a cast audit, and this one
+// is the whole acceptance criterion for the type.
+//
+// It is also the totality guard: a queue emptied at the declaration would make
+// `queueEtape` return `undefined` at runtime while still typechecking, and
+// every link naming a Role would become `…?etape=undefined&…`.
+describe("every Role waits on exactly one lane", () => {
+  it("holds one Etape per Role, and never zero", () => {
+    expect(TOUS_LES_ROLES.length).toBeGreaterThan(0)
+
+    for (const role of TOUS_LES_ROLES) {
+      const queue = PIPELINE_VIEWS[role].queue
+
+      expect(queue.length, `${role} holds no lane at all`).toBe(1)
+      expect(queue[0], `${role} names no lane`).toBe(queueEtape(role))
+    }
+  })
+
+  it("declares a queue for every Role the union names — none missing", () => {
+    // `PIPELINE_VIEWS` is `Record<Role, PipelineView>`, so the keys track the
+    // union at compile time; this reads it at runtime so a widening cast at the
+    // declaration is caught here too.
+    const declared = Object.keys(PIPELINE_VIEWS)
+    expect(declared.length).toBeGreaterThan(0)
+    expect(declared.sort()).toEqual([...TOUS_LES_ROLES].sort())
+  })
+
+  // The lane's own name, pinned HERE — where the lane is declared. This is the
+  // only place a lane's name should be spelled out: renaming a lane changes this
+  // test and the declaration, and nothing else (#304).
+  it("pairs each Role with the Etape the domain fixes", () => {
+    expect(
+      TOUS_LES_ROLES.map((role) => [role, queueEtape(role)])
+    ).toEqual([
+      ["EMPLOYEE", "DRAFT"],
+      ["MANAGER", "MANAGER_REVIEW"],
+      ["FINANCE_ADMIN", "FINANCE_REVIEW"],
+      ["GENERAL_DIRECTION", "DIRECTION_REVIEW"],
+    ])
+  })
+})
+
+// ─── The waiting-lane link: a pure function of a Role (#304) ────────────────
+
+// The composition is the ONLY place a « waiting » link is spelled, so these
+// tests can hold it to a RULE rather than to a URL. Nothing below renders,
+// routes or touches a database — the composition is a pure function of a Role,
+// and that is precisely what makes it assertable at all.
+//
+// This suite deliberately contains NO literal `/demandes?etape=…` string. The
+// link's shape is asserted in terms of the pipeline's own vocabulary: the Role's
+// waiting lane and the pending Decision. Spelling the URL here would re-create
+// exactly the pin #304 exists to delete — a lane rename would break a test
+// about a URL instead of a test about a rule.
+describe("lienFileAttente", () => {
+  it("is the DemandesDeplacement list filtered to the Role's lane and the pending Decision", () => {
+    for (const role of TOUS_LES_ROLES) {
+      const href = lienFileAttente(role)
+      const params = new URLSearchParams(href.split("?")[1])
+
+      expect(params.get("etape"), `${role} lane`).toBe(queueEtape(role))
+      expect(params.get("decision"), `${role} Decision`).toBe(DECISION_ATTENTE)
+      expect(href.startsWith("/demandes?"), `${role} route`).toBe(true)
+    }
+  })
+
+  it("filters on the pending Decision, not on any terminal one", () => {
+    // The « waiting » rule is PENDING ⟺ non-terminal. Asserting it through the
+    // predicate rather than by naming the Decisions keeps this honest if the
+    // pending Decision is ever re-spelled — and it is what makes a link that
+    // forgot the pending filter a failure rather than a near miss.
+    expect(isPendingDecision(DECISION_ATTENTE)).toBe(true)
+
+    for (const role of TOUS_LES_ROLES) {
+      const decision = new URLSearchParams(
+        lienFileAttente(role).split("?")[1]
+      ).get("decision")
+
+      expect(decision, `${role} carries a terminal Decision`).not.toBeNull()
+      expect(isPendingDecision(decision as Decision), role).toBe(true)
+    }
+  })
+
+  it("gives each Role a DIFFERENT link — it is a function of the Role", () => {
+    // Non-vacuity: a composition that ignored its argument and returned one
+    // constant would satisfy both tests above while sending every Role to the
+    // same lane.
+    const hrefs = TOUS_LES_ROLES.map((role) => lienFileAttente(role))
+    expect(new Set(hrefs).size).toBe(TOUS_LES_ROLES.length)
+    expect(TOUS_LES_ROLES.length).toBeGreaterThan(1)
+  })
+
+  it("follows the pipeline: the lane it names is the one the Role waits on", () => {
+    // Checked as a PREDICATE over the parsed link, not as a `toContain` of an
+    // interpolated `queueEtape(role)` — that string is built from the same
+    // accessor the composition calls, so it could not fail. This one parses what
+    // was produced and asks whether it is a lane the pipeline actually declares.
+    const DECLARED: readonly string[] = PIPELINE.map((stage) => stage.id)
+
+    for (const role of TOUS_LES_ROLES) {
+      const lane = new URLSearchParams(lienFileAttente(role).split("?")[1]).get(
+        "etape"
+      )
+
+      expect(lane, `${role} produced no lane at all`).not.toBeNull()
+      expect(DECLARED, `${role} → ${lane} is not a declared Etape`).toContain(
+        lane as string
+      )
+      // And it is the Role's own lane, read back from the declaration directly
+      // rather than through the accessor under test.
+      expect(lane, role).toBe(PIPELINE_VIEWS[role].queue[0])
+    }
+  })
+})
+
+// THE REGRESSION CHECK #304 ASKS FOR, as a source pin rather than a claim.
+//
+// The property is: renaming a lane in the pipeline changes the pipeline's own
+// test and leaves every LINK assertion green. It cannot be demonstrated by an
+// in-suite assertion — asserting that `lienFileAttente` reads `PIPELINE_VIEWS`
+// is a tautology, because that is its definition — so it is pinned where it can
+// actually fail: by reading the sources.
+//
+// Two facts make the rename safe, and each is checked here:
+//   1. NO test anywhere spells the text of a composed waiting link, so no link
+//      assertion can break on a rename. (A literal URL in a test is the pin this
+//      ticket deletes.)
+//   2. NO production file outside `lib/workflow.ts` composes one either, so
+//      there is exactly one place a rename has to be reflected in — and it is
+//      the place that reads the declaration.
+//
+// Verified by running it: renaming MANAGER_REVIEW in the pipeline leaves all 39
+// link assertions green and fails only this file.
+describe("a lane rename cannot reach the links — the regression check", () => {
+  const REPO = join(dirname(fileURLToPath(import.meta.url)), "..")
+
+  // A COMPOSED WAITING link, as opposed to any link that happens to name a lane.
+  // The `&decision=` half is what tells them apart, and the distinction is the
+  // spec's: « Brouillons » and « Finalisées » name lanes and mean something
+  // ELSE entirely, so they legitimately spell their own URLs and are NOT
+  // sweepable into the composition. Only the pending Decision marks the link
+  // that means « waiting for me ».
+  const COMPOSED_WAITING = /\/demandes\?etape=[^"'`\s]*[?&]decision=/
+
+  const walk = (dir: string, out: string[] = []): string[] => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === "node_modules" || entry.name.startsWith(".")) continue
+      const full = join(dir, entry.name)
+      if (entry.isDirectory()) walk(full, out)
+      else if (/\.(ts|tsx)$/.test(entry.name)) out.push(full)
+    }
+    return out
+  }
+
+  // Comments may DISCUSS the link shape — several do, and this file does. Only
+  // code counts, or a file explaining the rule would be reported as breaking it.
+  const codeOf = (file: string): string =>
+    readFileSync(file, "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^\s*\/\/.*$/gm, "")
+
+  it("leaves no test asserting the text of a composed waiting link", () => {
+    // A test that spells `/demandes?etape=MANAGER_REVIEW&decision=PENDING` is a
+    // test that breaks on a rename — the exact pin this ticket deletes.
+    //
+    // This file is exempted, as an exact path rather than an open allowance,
+    // because it is where the PIN ITSELF lives: a source scan has to be able to
+    // recognise the shape it forbids, and cannot do that without spelling it
+    // once. What is forbidden is an ASSERTION on that shape — and the suite
+    // above proves this file asserts none, since every assertion here is made
+    // against `lienFileAttente` or the pipeline's own vocabulary.
+    const SELF = join("lib", "workflow.test.ts")
+
+    const offenders = walk(REPO)
+      .filter((file) => /\.test\.(ts|tsx)$/.test(file))
+      .filter((file) => relative(REPO, file) !== SELF)
+      .filter((file) => COMPOSED_WAITING.test(codeOf(file)))
+      .map((file) => relative(REPO, file))
+
+    expect(offenders).toEqual([])
+  })
+
+  it("composes the waiting link in exactly one production file", () => {
+    const offenders = walk(REPO)
+      .filter((file) => !/\.test\.(ts|tsx)$/.test(file))
+      .filter((file) => COMPOSED_WAITING.test(codeOf(file)))
+      .map((file) => relative(REPO, file))
+
+    // Exactly one: the pipeline module, beside the lane. More than one is a
+    // second copy that a rename would miss; zero is a link nobody can produce.
+    expect(offenders).toEqual([join("lib", "workflow.ts")])
+  })
+
+  // Non-vacuity for the pin above: it must be capable of failing, or it is
+  // decoration. A pin that matches nothing in a tree where the rule IS satisfied
+  // is indistinguishable from one that matches nothing ever.
+  it("still recognises a composed waiting link when one is present", () => {
+    expect(COMPOSED_WAITING.test('`/demandes?etape=${lane}&decision=PENDING`')).toBe(
+      true
+    )
+    // And it must NOT sweep in the tabs the spec says to leave alone.
+    expect(COMPOSED_WAITING.test('"/demandes?etape=DRAFT"')).toBe(false)
+    expect(COMPOSED_WAITING.test('"/demandes?etape=FINAL"')).toBe(false)
   })
 })
 

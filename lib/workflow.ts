@@ -130,7 +130,26 @@ export type TimestampColumn =
   (typeof TRANSITION_EFFECTS)[number]["timestamps"][number]
 
 export interface PipelineView {
-  queue: Etape[]
+  /**
+   * The Etape this Role WAITS ON — exactly one, and the TYPE says so.
+   *
+   * This was `Etape[]` and the one-lane fact was a property of the literal
+   * below rather than of the interface (#302). Nothing checked it: give a Role
+   * a second lane and every link that took `[0]` kept naming the first while
+   * the dashboard's queue read and its « En attente » count spanned both. The
+   * pill said seven, the link showed three, and nothing failed.
+   *
+   * `readonly [Etape]` moves the invariant into the type — a second lane is a
+   * compile error AT THE DECLARATION rather than a silent truncation at a call
+   * site. Deliberately not a runtime assertion: that would be a weaker version
+   * of a compile-time fact, costing a branch in code a React module reads and
+   * throwing at a moment the interface was supposed to make unreachable.
+   *
+   * The pairing of one Role to one Etape is fixed by the domain; this change
+   * makes no edit to WHICH lane waits on which Role, only to what may be
+   * declared there.
+   */
+  queue: readonly [Etape]
   committed: Etape[]
 }
 
@@ -153,12 +172,83 @@ export const PIPELINE_VIEWS: Record<Role, PipelineView> = {
   },
 }
 
-export function queueEtapes(role: Role): Etape[] {
+/**
+ * The ONE Etape this Role waits on — the single lane, named.
+ *
+ * The link a Role follows to « the DemandeDeplacements waiting for me » is a
+ * function of that Etape, so this is the accessor that composition asks (#303).
+ * Before it, every one of those call sites wrote `queueEtapes(role)[0]` by
+ * hand: the `[0]` was the only thing expressing « exactly one », which is why
+ * the invariant could be violated at the declaration without anything failing.
+ *
+ * It cannot return `undefined` and cannot be a guess: the declared type admits
+ * exactly one Etape, so the first element IS the only element.
+ */
+export function queueEtape(role: Role): Etape {
+  return PIPELINE_VIEWS[role].queue[0]
+}
+
+/**
+ * The whole queue, for the readers that genuinely SPAN it.
+ *
+ * This is not duplication of the accessor above — it is one declaration read
+ * two ways, and the second is the first widened. The dashboard's queue read
+ * (`findPendingByEtapes`) and its per-lane count both take the collection, so
+ * dropping it would push the derivation back to the reader — the second home
+ * #303 deletes.
+ */
+export function queueEtapes(role: Role): readonly Etape[] {
   return PIPELINE_VIEWS[role].queue
 }
 
 export function committedEtapes(role: Role): Etape[] {
   return PIPELINE_VIEWS[role].committed
+}
+
+// ─── The waiting-lane link (#303) ────────────────────────────────────────────
+
+/**
+ * The Decision a DemandeDeplacement is WAITING on: the non-terminal one.
+ *
+ * Named as a value, and exported, because the link below passes it as one. It
+ * is the same Decision a row is born with (`DECISION_OUVERTURE` in
+ * `etatCreation`) and the same one `isPendingDecision` admits — asserted
+ * against the predicate by the test beside them, so the three cannot drift.
+ */
+export const DECISION_ATTENTE: Decision = "PENDING"
+
+/**
+ * « The DemandeDeplacements waiting for me », for a Role — composed ONCE.
+ *
+ * The link is « this Role's waiting lane, filtered to the pending Decision »,
+ * and both halves of that are facts the pipeline already owns: `queueEtape`
+ * above, and `DECISION_ATTENTE` beside it. Six call sites used to reassemble
+ * them by hand — the navigation table typed its lane literally because it had
+ * no way to ask, so a lane rename left it pointing at a lane that no longer
+ * exists, and the click came back as a bare « Erreur interne » (the list's lane
+ * parameter is validated as a plain string, so an unknown lane reaches the
+ * database and is refused there, with no response code to name).
+ *
+ * WHY IT LIVES HERE, with the cost stated, because a future review will want to
+ * flip it: putting the composition beside the lane is the only arrangement in
+ * which a rename cannot leave a stale link behind — which is the whole defect.
+ * The cost is real: this module now names one route and two query parameters,
+ * presentation vocabulary in an otherwise pure module. The alternative, a
+ * separate link module while the pipeline keeps the lane, is a module with one
+ * implementation and nothing substitutable behind it that still has to import
+ * the pipeline for the lane — a hop that adds a place to look and nothing else.
+ * Accepted deliberately.
+ *
+ * The pending Decision is PASSED here as a value, per the settled decision; the
+ * « waiting » rule is not re-derived, and no call site enumerates or negates the
+ * terminal Decisions. Pure: no database, no rendering, no route — the one thing
+ * a test can call directly, which is what #304 does.
+ *
+ * A caller's Role may arrive as the vocabulary or as a string it has to bridge;
+ * the composition works either way, so nothing here launders an untyped value.
+ */
+export function lienFileAttente(role: Role): string {
+  return `/demandes?etape=${queueEtape(role)}&decision=${DECISION_ATTENTE}`
 }
 
 export function enteringEffect<E extends readonly TransitionEffect[]>(

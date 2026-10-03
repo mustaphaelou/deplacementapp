@@ -11,6 +11,7 @@ import {
   executeTransition,
 } from "./demande/mutations"
 import type { Role } from "@/lib/auth"
+import { lienFileAttente, queueEtape } from "./workflow"
 
 const TIMEOUT = 30_000
 
@@ -228,8 +229,14 @@ describe(
       expect(payload.config.table.title).toBe(
         "Demandes en attente d'approbation"
       )
+      // #304: the « voir tout » link IS the pipeline's composition for
+      // this Role — asserted as a rule, not as a URL literal. A dashboard
+      // that re-derived it by hand would differ here and fail.
+      expect(payload.config.table.viewAllHref).toBe(lienFileAttente("MANAGER"))
       for (const d of payload.demandes) {
-        expect(d.etape).toBe("MANAGER_REVIEW")
+        // #304: the lane is asked of the pipeline, not spelled here —
+        // a lane name belongs to the declaration that carries it.
+        expect(d.etape).toBe(queueEtape("MANAGER"))
         expect(d.decision).toBe("PENDING")
         expect(d.employe).toBeDefined()
       }
@@ -253,8 +260,14 @@ describe(
       expect(payload.config.table.title).toBe(
         "Demandes en attente d'approbation financière"
       )
+      // #304: the « voir tout » link IS the pipeline's composition for
+      // this Role — asserted as a rule, not as a URL literal. A dashboard
+      // that re-derived it by hand would differ here and fail.
+      expect(payload.config.table.viewAllHref).toBe(lienFileAttente("FINANCE_ADMIN"))
       for (const d of payload.demandes) {
-        expect(d.etape).toBe("FINANCE_REVIEW")
+        // #304: the lane is asked of the pipeline, not spelled here —
+        // a lane name belongs to the declaration that carries it.
+        expect(d.etape).toBe(queueEtape("FINANCE_ADMIN"))
         expect(d.decision).toBe("PENDING")
         expect(d.employe).toBeDefined()
       }
@@ -284,8 +297,14 @@ describe(
       expect(payload.config.table.title).toBe(
         "Demandes en attente d'approbation finale"
       )
+      // #304: the « voir tout » link IS the pipeline's composition for
+      // this Role — asserted as a rule, not as a URL literal. A dashboard
+      // that re-derived it by hand would differ here and fail.
+      expect(payload.config.table.viewAllHref).toBe(lienFileAttente("GENERAL_DIRECTION"))
       for (const d of payload.demandes) {
-        expect(d.etape).toBe("DIRECTION_REVIEW")
+        // #304: the lane is asked of the pipeline, not spelled here —
+        // a lane name belongs to the declaration that carries it.
+        expect(d.etape).toBe(queueEtape("GENERAL_DIRECTION"))
         expect(d.decision).toBe("PENDING")
         expect(d.employe).toBeDefined()
       }

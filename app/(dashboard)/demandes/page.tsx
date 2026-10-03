@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useAuthUser } from "@/lib/auth/client"
-import { hasAnyRole, ROLES_MANAGEMENT } from "@/lib/auth"
+import { hasAnyRole, ROLES_MANAGEMENT, type Role } from "@/lib/auth"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { StatusPill } from "@/components/status-pill"
 import { formatCurrency, formatDate } from "@/lib/constants"
 import { toDemandePresentation } from "@/lib/demande-presentation"
-import { queueEtapes } from "@/lib/workflow"
+import { lienFileAttente, queueEtape, type Etape } from "@/lib/workflow"
 import { PageHeader } from "@/components/page-header"
 import {
   hideClassFor,
@@ -45,6 +45,64 @@ interface Demande {
   decision: string
   employe: { prenom: string; nom: string }
   employeId: string
+}
+
+/** A tab: what it says, where it goes, and the Etape that makes it active. */
+export interface ListeTab {
+  label: string
+  href: string
+  /** The Etape whose rows this tab shows — `""` for « Toutes », no filter. */
+  match: Etape | ""
+}
+
+// The two tabs that are the same whatever the viewer is: the unfiltered list and
+// the Utilisateur's own finalised rows. Declared once because « Finalisées »
+// means a DIFFERENT thing per Role — a reviewer's own DemandesDeplacement is
+// not « the DemandeDeplacements waiting for me » — and writing the pair twice
+// invited the second copy to drift into the queue link this change removes.
+const TOUTES: ListeTab = { label: "Toutes", href: "/demandes", match: "" }
+const FINALISEES: ListeTab = {
+  label: "Finalisées",
+  href: "/demandes?etape=FINAL",
+  match: "FINAL",
+}
+
+/**
+ * The list's tabs, for a viewer — the « En attente » href is a VALUE a test can
+ * ask for, not a string to be hunted out of rendered markup (#304).
+ *
+ * Exported and pure, which is the whole point: before this, the only way to
+ * read the tab's href was to boot the page and search the HTML for it, so the
+ * one assertion available about this link was on its literal text. A pure
+ * function of the Role turns that into an assertion on what the link IS.
+ *
+ * The « En attente » tab is the pipeline's composition for the viewer — this
+ * page does not spell a lane or a Decision. « Brouillons » and « Finalisées »
+ * are NOT compositions of it and never were: they name the draft and final
+ * lanes for a Utilisateur's OWN DemandesDeplacement, which is a different
+ * question from « what is waiting for me ». An EMPLOYEE is offered neither the
+ * queue tab nor the pending filter — « my drafts » is not « the drafts waiting
+ * on someone else ».
+ */
+export function tabsPourRole(role: Role | undefined): ListeTab[] {
+  if (role === "EMPLOYEE") {
+    return [
+      TOUTES,
+      { label: "Brouillons", href: "/demandes?etape=DRAFT", match: "DRAFT" },
+      FINALISEES,
+    ]
+  }
+
+  // A viewer with no Role waits on nothing, and is offered no queue tab: there
+  // is no lane to name without a Role to wait for it. `queueEtape` cannot
+  // return `undefined`, so `waitingEtape` is derived from the same guard.
+  if (!role) return [TOUTES, FINALISEES]
+
+  return [
+    TOUTES,
+    { label: "En attente", href: lienFileAttente(role), match: queueEtape(role) },
+    FINALISEES,
+  ]
 }
 
 export function DemandesTable({
@@ -177,27 +235,7 @@ export default function DemandesListPage() {
   const role = user?.role
 
   const title = role === "EMPLOYEE" ? "Mes demandes" : "Demandes"
-  const queueEtape = role ? queueEtapes(role)[0] : undefined
-  const tabs =
-    role === "EMPLOYEE"
-      ? [
-          { label: "Toutes", href: "/demandes", match: "" },
-          { label: "Brouillons", href: "/demandes?etape=DRAFT", match: "DRAFT" },
-          { label: "Finalisées", href: "/demandes?etape=FINAL", match: "FINAL" },
-        ]
-      : [
-          { label: "Toutes", href: "/demandes", match: "" },
-          ...(queueEtape
-            ? [
-                {
-                  label: "En attente",
-                  href: `/demandes?etape=${queueEtape}&decision=PENDING`,
-                  match: queueEtape,
-                },
-              ]
-            : []),
-          { label: "Finalisées", href: "/demandes?etape=FINAL", match: "FINAL" },
-        ]
+  const tabs = tabsPourRole(role)
 
   const fetchDemandes = useCallback(async () => {
     setLoading(true)

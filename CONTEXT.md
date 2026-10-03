@@ -53,6 +53,17 @@ The outcome recorded at a given Etape. One of: PENDING, APPROVED, REJECTED, WITH
 PENDING is the non-terminal Decision, and the « pending » rule is defined once — beside the Etape/Decision unions in the workflow module (`TERMINAL_DECISIONS` + `isPendingDecision`). Surfaces that mean « waiting » ask for it, never for a lane alone: a decided DemandeDeplacement keeps its Etape, so an Etape filter on its own cannot mean waiting.
 _Avoid_: reading a lane alone as « waiting », re-deriving « pending » or the terminal set per surface
 
+The link that means « the DemandeDeplacements waiting for me » is also defined
+once, beside the lane it names: `lienFileAttente(role)` in the workflow module
+returns the DemandesDeplacement list filtered to that Role's single waiting
+lane and to the pending Decision (`DECISION_ATTENTE`, which is the pending value
+passed as a filter — the rule is not re-derived). Every composing site — the
+navigation table, the dashboard's « voir tout », the list's « En attente » tab —
+calls it rather than spelling the URL, so a lane rename cannot leave a stale
+link behind. What does NOT mean « waiting for me », and is not a composition of
+it: « my drafts » and « finalised », which name the draft and final lanes for a
+Utilisateur's OWN DemandesDeplacement.
+
 ### Pipeline actors
 
 At each Etape exactly one Role is permitted to act. The pairing is fixed:

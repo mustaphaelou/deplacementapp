@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { hideClassFor, rowHoverInkTint, tableShellClass } from "@/components/display"
+import { lienFileAttente } from "@/lib/workflow"
 
 const { mockSearchParams, mockUseAuthUser } = vi.hoisted(() => ({
   mockSearchParams: { etape: "", decision: "" },
@@ -82,12 +83,59 @@ describe("Demandes list page", () => {
     expect(html).toContain("Toutes")
     expect(html).toContain("En attente")
     expect(html).toContain("Finalisées")
-    // renderToStaticMarkup escapes `&` as `&amp;`; decode to pin the href itself.
-    expect(html.replace(/&amp;/g, "&")).toContain(
-      "?etape=MANAGER_REVIEW&decision=PENDING"
-    )
     expect(html).toContain("?etape=FINAL")
     expect(html).not.toContain("Brouillons")
+  })
+
+  // #304: the « En attente » href is now a VALUE, asked of the exported pure
+  // function — the assertion no longer has to render the page and hunt for a
+  // string in the markup, and no longer spells the URL.
+  it("builds the « En attente » tab as the composition for the viewer's Role", async () => {
+    const { tabsPourRole } = await import("./page")
+
+    for (const role of ["MANAGER", "FINANCE_ADMIN", "GENERAL_DIRECTION"] as const) {
+      const onWaiting = tabsPourRole(role).find((t) => t.label === "En attente")
+
+      expect(onWaiting, `${role} has no « En attente » tab`).toBeDefined()
+      expect(onWaiting?.href, role).toBe(lienFileAttente(role))
+    }
+  })
+
+  // The scoping rule, pinned in the direction that keeps it from creeping: the
+  // links that mean something ELSE are not compositions of the waiting link, and
+  // are still named by their own lanes.
+  it("keeps « Brouillons » and « Finalisées » out of the waiting-lane composition", async () => {
+    const { tabsPourRole } = await import("./page")
+
+    const waiting = lienFileAttente("MANAGER")
+    for (const tab of tabsPourRole("MANAGER")) {
+      if (tab.label === "En attente") continue
+      expect(tab.href, tab.label).not.toBe(waiting)
+    }
+
+    const employee = tabsPourRole("EMPLOYEE")
+    expect(employee.map((t) => t.label)).toEqual([
+      "Toutes",
+      "Brouillons",
+      "Finalisées",
+    ])
+    // An EMPLOYEE waits on nobody's queue: no queue tab, no pending filter.
+    for (const tab of employee) {
+      expect(tab.href, tab.label).not.toContain("decision=")
+    }
+  })
+
+  // The rendering above proves the page still DRAWS its tabs; this proves the
+  // drawn href is the composed one, which the string assertions used to carry.
+  it("renders the composed waiting href into the tab", async () => {
+    mockUseAuthUser.mockReturnValue({ user: mockUser("MANAGER") })
+    const { default: DemandesListPage, tabsPourRole } = await import("./page")
+
+    const html = renderToStaticMarkup(<DemandesListPage />)
+    // renderToStaticMarkup escapes `&` as `&amp;`; decode to compare the href.
+    const href = tabsPourRole("MANAGER").find((t) => t.label === "En attente")?.href
+
+    expect(html.replace(/&amp;/g, "&")).toContain(href as string)
   })
 
   it("gives employees Brouillons tab and the Nouvelle demande action", async () => {
