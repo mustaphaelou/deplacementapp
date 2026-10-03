@@ -241,8 +241,17 @@ type EtapesQueryOptions = {
   orderBy?: OrderByTimestamp
 }
 
+/**
+ * The lane collection this read spans.
+ *
+ * `readonly Etape[]`, not `Etape[]`, because the caller does NOT own these
+ * lanes — it borrowed the pipeline's declaration. Under the mutable signature a
+ * caller's own `Etape[]` was fine but a `readonly` one was refused, which is
+ * the wrong way round: the pipeline is the only module that mutates lanes, and
+ * no caller does.
+ */
 async function findEtapes(
-  etapes: Etape[],
+  etapes: readonly Etape[],
   opts: EtapesQueryOptions,
   extraCondition?: SQL
 ): Promise<DashboardDemandeSummary[]> {
@@ -270,7 +279,7 @@ async function findEtapes(
 // The queue read: pending rows only — a decided demande keeps its Etape
 // (CONTEXT.md), so an Etape filter alone would list rejected rows.
 export async function findPendingByEtapes(
-  etapes: Etape[],
+  etapes: readonly Etape[],
   opts: EtapesQueryOptions = {}
 ): Promise<DashboardDemandeSummary[]> {
   return findEtapes(etapes, opts, pendingDecisionCondition())
@@ -301,7 +310,9 @@ export async function countDemandes(
   return result[0]?.value ?? 0
 }
 
-export async function aggregateBudget(etapes: Etape[]): Promise<number> {
+export async function aggregateBudget(
+  etapes: readonly Etape[]
+): Promise<number> {
   const result = await db
     .select({ total: sum(demandesDeplacement.totalEstime) })
     .from(demandesDeplacement)

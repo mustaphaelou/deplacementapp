@@ -7,11 +7,13 @@ import {
   etatCreation,
   getAllowedActions,
   resoudreTransition,
+  queueEtape,
   queueEtapes,
   committedEtapes,
   laneOrderByColumn,
   enteringEffect,
   PIPELINE,
+  PIPELINE_VIEWS,
   TRANSITION_EFFECTS,
   TERMINAL_DECISIONS,
   isPendingDecision,
@@ -24,6 +26,7 @@ import type {
   WorkflowResult,
 } from "./workflow"
 import type { Role } from "./auth"
+import { TOUS_LES_ROLES } from "./auth"
 
 // ─── The tuple space, declared once ─────────────────────────────────────────
 //
@@ -137,7 +140,25 @@ describe("isPendingDecision / TERMINAL_DECISIONS", () => {
   })
 })
 
-// ─── Read-model: queueEtapes (Etape-based) ─────────────────────────────────────
+// ─── Read-model: queueEtape / queueEtapes (Etape-based) ──────────────────────
+
+describe("queueEtape", () => {
+  it("returns the one Etape the Role waits on", () => {
+    expect(queueEtape("EMPLOYEE")).toBe("DRAFT")
+    expect(queueEtape("MANAGER")).toBe("MANAGER_REVIEW")
+    expect(queueEtape("FINANCE_ADMIN")).toBe("FINANCE_REVIEW")
+    expect(queueEtape("GENERAL_DIRECTION")).toBe("DIRECTION_REVIEW")
+  })
+
+  // The accessor and the collection must not drift: if they did, a link built
+  // from one and a count summed over the other would disagree — the exact shape
+  // of the defect this accessor's existence is meant to make impossible.
+  it("names the same Etape the collection holds, for every Role", () => {
+    for (const role of TOUS_LES_ROLES) {
+      expect(queueEtape(role), role).toBe(queueEtapes(role)[0])
+    }
+  })
+})
 
 describe("queueEtapes", () => {
   it("returns DRAFT for EMPLOYEE", () => {
@@ -154,6 +175,53 @@ describe("queueEtapes", () => {
 
   it("returns DIRECTION_REVIEW for GENERAL_DIRECTION", () => {
     expect(queueEtapes("GENERAL_DIRECTION")).toEqual(["DIRECTION_REVIEW"])
+  })
+})
+
+// THE INVARIANT THE TYPE NOW CARRIES, pinned as a test too.
+//
+// `PipelineView['queue']` is `readonly [Etape]`, so a second lane is a compile
+// error at the declaration. This is not therefore redundant: an `as` cast or a
+// widening assertion AT the declaration defeats the type silently, and no test
+// of behaviour would notice. A test is cheaper than a cast audit, and this one
+// is the whole acceptance criterion for the type.
+//
+// It is also the totality guard: a queue emptied at the declaration would make
+// `queueEtape` return `undefined` at runtime while still typechecking, and
+// every link naming a Role would become `…?etape=undefined&…`.
+describe("every Role waits on exactly one lane", () => {
+  it("holds one Etape per Role, and never zero", () => {
+    expect(TOUS_LES_ROLES.length).toBeGreaterThan(0)
+
+    for (const role of TOUS_LES_ROLES) {
+      const queue = PIPELINE_VIEWS[role].queue
+
+      expect(queue.length, `${role} holds no lane at all`).toBe(1)
+      expect(queue[0], `${role} names no lane`).toBe(queueEtape(role))
+    }
+  })
+
+  it("declares a queue for every Role the union names — none missing", () => {
+    // `PIPELINE_VIEWS` is `Record<Role, PipelineView>`, so the keys track the
+    // union at compile time; this reads it at runtime so a widening cast at the
+    // declaration is caught here too.
+    const declared = Object.keys(PIPELINE_VIEWS)
+    expect(declared.length).toBeGreaterThan(0)
+    expect(declared.sort()).toEqual([...TOUS_LES_ROLES].sort())
+  })
+
+  // The lane's own name, pinned HERE — where the lane is declared. This is the
+  // only place a lane's name should be spelled out: renaming a lane changes this
+  // test and the declaration, and nothing else (#304).
+  it("pairs each Role with the Etape the domain fixes", () => {
+    expect(
+      TOUS_LES_ROLES.map((role) => [role, queueEtape(role)])
+    ).toEqual([
+      ["EMPLOYEE", "DRAFT"],
+      ["MANAGER", "MANAGER_REVIEW"],
+      ["FINANCE_ADMIN", "FINANCE_REVIEW"],
+      ["GENERAL_DIRECTION", "DIRECTION_REVIEW"],
+    ])
   })
 })
 

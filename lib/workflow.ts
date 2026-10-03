@@ -130,8 +130,27 @@ export type TimestampColumn =
   (typeof TRANSITION_EFFECTS)[number]["timestamps"][number]
 
 export interface PipelineView {
-  queue: Etape[]
-  committed: Etape[]
+  /**
+   * The Etape this Role WAITS ON — exactly one, and the TYPE says so.
+   *
+   * This was `Etape[]` and the one-lane fact was a property of the literal
+   * below rather than of the interface (#302). Nothing checked it: give a Role
+   * a second lane and every link that took `[0]` kept naming the first while
+   * the dashboard's queue read and its « En attente » count spanned both. The
+   * pill said seven, the link showed three, and nothing failed.
+   *
+   * `readonly [Etape]` moves the invariant into the type — a second lane is a
+   * compile error AT THE DECLARATION rather than a silent truncation at a call
+   * site. Deliberately not a runtime assertion: that would be a weaker version
+   * of a compile-time fact, costing a branch in code a React module reads and
+   * throwing at a moment the interface was supposed to make unreachable.
+   *
+   * The pairing of one Role to one Etape is fixed by the domain; this change
+   * makes no edit to WHICH lane waits on which Role, only to what may be
+   * declared there.
+   */
+  queue: readonly [Etape]
+  committed: readonly Etape[]
 }
 
 export const PIPELINE_VIEWS: Record<Role, PipelineView> = {
@@ -153,11 +172,36 @@ export const PIPELINE_VIEWS: Record<Role, PipelineView> = {
   },
 }
 
-export function queueEtapes(role: Role): Etape[] {
+/**
+ * The ONE Etape this Role waits on — the single lane, named.
+ *
+ * The link a Role follows to « the DemandeDeplacements waiting for me » is a
+ * function of that Etape, so this is the accessor that composition asks (#303).
+ * Before it, every one of those call sites wrote `queueEtapes(role)[0]` by
+ * hand: the `[0]` was the only thing expressing « exactly one », which is why
+ * the invariant could be violated at the declaration without anything failing.
+ *
+ * It cannot return `undefined` and cannot be a guess: the declared type admits
+ * exactly one Etape, so the first element IS the only element.
+ */
+export function queueEtape(role: Role): Etape {
+  return PIPELINE_VIEWS[role].queue[0]
+}
+
+/**
+ * The whole queue, for the readers that genuinely SPAN it.
+ *
+ * This is not duplication of the accessor above — it is one declaration read
+ * two ways, and the second is the first widened. The dashboard's queue read
+ * (`findPendingByEtapes`) and its per-lane count both take the collection, so
+ * dropping it would push the derivation back to the reader — the second home
+ * #303 deletes.
+ */
+export function queueEtapes(role: Role): readonly Etape[] {
   return PIPELINE_VIEWS[role].queue
 }
 
-export function committedEtapes(role: Role): Etape[] {
+export function committedEtapes(role: Role): readonly Etape[] {
   return PIPELINE_VIEWS[role].committed
 }
 

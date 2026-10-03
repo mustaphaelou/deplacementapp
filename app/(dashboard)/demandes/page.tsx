@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { StatusPill } from "@/components/status-pill"
 import { formatCurrency, formatDate } from "@/lib/constants"
 import { toDemandePresentation } from "@/lib/demande-presentation"
-import { queueEtapes } from "@/lib/workflow"
+import { queueEtape } from "@/lib/workflow"
 import { PageHeader } from "@/components/page-header"
 import {
   hideClassFor,
@@ -177,7 +177,8 @@ export default function DemandesListPage() {
   const role = user?.role
 
   const title = role === "EMPLOYEE" ? "Mes demandes" : "Demandes"
-  const queueEtape = role ? queueEtapes(role)[0] : undefined
+  // The single lane this viewer's Role waits on, named — not indexed for.
+  const waitingEtape = role ? queueEtape(role) : undefined
   const tabs =
     role === "EMPLOYEE"
       ? [
@@ -187,12 +188,12 @@ export default function DemandesListPage() {
         ]
       : [
           { label: "Toutes", href: "/demandes", match: "" },
-          ...(queueEtape
+          ...(waitingEtape
             ? [
                 {
                   label: "En attente",
-                  href: `/demandes?etape=${queueEtape}&decision=PENDING`,
-                  match: queueEtape,
+                  href: `/demandes?etape=${waitingEtape}&decision=PENDING`,
+                  match: waitingEtape,
                 },
               ]
             : []),
