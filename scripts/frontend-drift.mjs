@@ -25,11 +25,13 @@
  *
  * ## Ratchet, not gate
  *
- * RULE_INK_TINT_RATCHET is a ratchet: it fails only when the known duplication
- * GROWS past the recorded baseline. The existing duplication is real debt
- * (the handoff flags it as a candidate for extraction, deliberately deferred),
- * and blocking the suite on it would be a permanent red that trains everyone
- * to ignore this file. The baseline only ever moves down.
+ * RULE_INK_TINT_RATCHET and RULE_DISPLAY_CONSTANT_RATCHET are ratchets: they
+ * fail only when the known duplication GROWS past the recorded baseline. The
+ * existing duplication is real debt — the #251 handoff flags the ink tints as a
+ * candidate for extraction, deliberately deferred, and the display module's own
+ * extraction (#305) is only 4 of its 7 surfaces — and blocking the suite on it
+ * would be a permanent red that trains everyone to ignore this file. Every
+ * baseline only ever moves down.
  */
 
 import { readFileSync, readdirSync, statSync } from "node:fs"
@@ -94,10 +96,121 @@ const ALLOWLIST = {
  * this as a deliberate deferral. The ratchet fails only if the count rises —
  * i.e. a NEW file copies the literal instead of the constant being extracted.
  * Lower this number as the extraction lands; never raise it.
+ *
+ * Lowered to the census in #308, after the #307 migration:
+ *
+ *   `0.024`  4 -> 1  — components/dashboard-layout.tsx:50 keeps a private
+ *                      `rowHover`. It imports `hideClassFor` and
+ *                      `tableShellClass` but not `rowHoverInkTint`; migrating
+ *                      that one is #307's open edge, not a reason to keep a
+ *                      baseline that no longer describes the tree.
+ *   `0.06`   stays 4 — this tint is NOT part of the display module's
+ *                      `rowHoverInkTint` (which is the 0.024 literal). It lives
+ *                      in the sidebar, the theme toggle, the Demandes list and
+ *                      dashboard-layout, four files, and `components/display.tsx`
+ *                      deliberately does not own it. Lowering it to the number
+ *                      the extraction "ought" to have produced would make the
+ *                      ratchet fire on a correct tree — the silent hole this
+ *                      rule exists to avoid. The census is the authority, not
+ *                      the extraction's ambition.
  */
 const INK_TINT_BASELINE = {
-  "rgba(55,53,47,0.024)": 4,
+  "rgba(55,53,47,0.024)": 1,
   "rgba(55,53,47,0.06)": 4,
+}
+
+/** The shared display module, and the only file allowed to hold these strings. */
+const DISPLAY_MODULE = "components/display.tsx"
+
+/**
+ * RULE_DISPLAY_CONSTANT_RATCHET — baseline in DISTINCT FILES per constant
+ * outside DISPLAY_MODULE. The unit is files: `fieldLabelClass` appears eleven
+ * times across two files and that is still two.
+ *
+ * ## Ratchet, not gate, and the baseline is NOT zero
+ *
+ * Same reasoning as the ink tints, and the same reason these numbers are
+ * measured rather than aspirational: spec #305's extraction is 4 of its 7
+ * surfaces. #307's own ticket named the profile form, the DemandeDeallocation
+ * form and the DemandeDeallocation detail view as part of its batch, and none
+ * of those three files imports anything from `@/components/display` today —
+ * they hold private copies of `textInputClass`, `fieldLabelClass` and
+ * `sectionHeadingClass`. `components/dashboard-layout.tsx` adds a fourth, a
+ * private `rowHover` holding `rowHoverInkTint`. That is real debt at a known
+ * size; a gate on top of it would be a permanent red that trains everyone to
+ * ignore this file. Lower these as #307's open edge lands. Never raise them.
+ *
+ * ## Which constants, and why the rest are not here
+ *
+ * The question each constant is put to is: **if this rule fired on a hit,
+ * would its advice be right?** The finding says "import the constant instead
+ * of copying its class string", and that advice is only correct when the hit
+ * really is that constant's thing. `fieldHintClass` is the labelled field's
+ * hint under the control, so a hit on `mt-1.5 text-xs text-muted-foreground`
+ * in that position IS the hint and the advice is right. `loadingTextClass` is
+ * the centred loading block's word, so a hit on an unrelated muted paragraph is
+ * NOT the loading block and the advice would be wrong — worse, it would train
+ * people to ignore the file.
+ *
+ * Token document frequency across the judged tree is the supporting evidence,
+ * quoted per entry in DISPLAY_CONSTANT_EXCLUDED so each call can be re-checked
+ * rather than re-argued. The consequence is the one this file's own header
+ * already names: this is where a checker earns the right to be ignored.
+ * `loadingBlockClass` is the instructive exclusion —
+ * `administration/societe/page.tsx` spells the SAME centred-box idiom one
+ * padding step away, `flex items-center justify-center p-12`, which the
+ * display module's own comment calls a deliberately different block, so a
+ * `p-8` hit is a coincidence at least as likely as a re-declaration. Its
+ * neighbour `loadingTextClass` is worse: ten files spell it, including
+ * `components/page-header.tsx` and five dashboard pages that have nothing to
+ * do with this module.
+ */
+const DISPLAY_CONSTANT_RATCHET = {
+  // 67 chars, 4 tokens; `focus-visible:ring-1` and the brand ring are in 3
+  // judged files. Two private copies (#307's open edge).
+  textInputClass: 2,
+  // 69 chars, 5 tokens — a coincidence needs all five, order included.
+  // Three inline <h2> copies in the unmigrated trio.
+  sectionHeadingClass: 3,
+  // Not a generic class run at all: the 0.024 ink tint plus its dark twin, one
+  // file each. `components/dashboard-layout.tsx` keeps a private `rowHover`.
+  rowHoverInkTint: 1,
+  // 32 chars; `mb-1.5` and `block` are in 3 judged files. Eleven sites, two
+  // files.
+  fieldLabelClass: 2,
+  // 21 chars; `h-px` and `bg-border` are in 3 judged files each. The hairline
+  // is only ever spelled as part of the section-heading row.
+  sectionHeadingRuleClass: 3,
+  // ZERO baselines below. Each of these runs has no copy outside the module
+  // today, so the ratchet fires on the FIRST one — the strongest form the rule
+  // takes, and the reason a future hand-copy of the search field's own box, its
+  // magnifier overlay or its table shell is caught rather than absorbed.
+  searchFieldIconClass: 0,
+  tableShellClass: 0,
+  fieldHintClass: 0,
+  searchFieldInputClass: 0,
+}
+
+/**
+ * The display constants this rule deliberately does NOT cover, with the reason
+ * for each. Adding a name here is a judgement that a hit would be a
+ * coincidence — carry the measurement that justifies it.
+ *
+ * Measured token document frequency (files containing the token, of 28 judged
+ * `.tsx`) is quoted per entry, so the call can be re-checked rather than
+ * re-argued.
+ */
+const DISPLAY_CONSTANT_EXCLUDED = {
+  loadingTextClass:
+    "`text-sm text-muted-foreground` (text-sm 13/28, text-muted-foreground 12/28). Ten files spell it, including components/page-header.tsx and five dashboard pages with no connection to the display module. This is how the app writes small muted text; a ratchet here would cry wolf on the tenth unrelated `<p>`.",
+  loadingBlockClass:
+    "`flex items-center justify-center p-8` (flex 17/28, items-center 18/28, justify-center 11/28). administration/societe/page.tsx already spells this exact centred-box idiom as `...p-12` — which the display module documents as a deliberately different block. A `p-8` hit is a coincidence at least as likely as a re-declaration, so ratcheting it would file a ticket against the next centred spinner.",
+  sectionHeadingRowClass:
+    "`flex items-center gap-3` (flex 17/28, items-center 18/28). This is the app's ordinary flex row; an unrelated row with a 3-unit gap spells it without any reference to the display module.",
+  propertyLabelClass:
+    "`text-xs text-muted-foreground` (text-xs 11/28, text-muted-foreground 12/28). A two-token slice of the same run `loadingTextClass` already spells 13 times; the label above a property value is not a distinguishable shape.",
+  propertyValueClass:
+    "`mt-0.5 text-sm font-medium` — only `mt-0.5` is rare (2/28); `text-sm` is 13/28 and `font-medium` 15/28, the two most-used type tokens in the tree. A small bold paragraph anywhere spells this.",
 }
 
 /** Radius utilities that resolve to the 3px spec radius in this app. */
@@ -341,7 +454,7 @@ export function runChecks() {
   for (const file of files) {
     const r = rel(file)
     if (isOutOfScope(r)) continue
-    if (r === "components/display.tsx") continue
+    if (r === DISPLAY_MODULE) continue
     const src = readFileSync(file, "utf8")
     for (const m of src.matchAll(/rgba\(55,53,47,[0-9.]+\)/g)) census[m[0]] ??= new Set()
     for (const m of src.matchAll(/rgba\(55,53,47,[0-9.]+\)/g)) census[m[0]].add(r)
@@ -358,13 +471,95 @@ export function runChecks() {
     }
   }
 
-  return { findings, census: Object.fromEntries(Object.entries(census).map(([k, v]) => [k, v.size])) }
+  // RULE_DISPLAY_CONSTANT_RATCHET — a constant the display module owns must not
+  // be re-declared in a NEW file. Same shape as the ink-tint ratchet: count
+  // DISTINCT FILES, skip the module itself, fail only when the count exceeds
+  // the recorded baseline.
+  //
+  // The module is read as the source of the strings rather than the values
+  // being duplicated here. If `textInputClass` changes in components/display.tsx
+  // this ratchet follows it automatically; a second hardcoded copy of the class
+  // string would drift the moment the design moved, and the drift would be
+  // invisible — the rule would go quiet on a tree that had just gained a copy.
+  const displaySrc = readFileSync(join(ROOT, DISPLAY_MODULE), "utf8")
+  const displayValues = new Map()
+  for (const m of displaySrc.matchAll(/export const (\w+)\s*=\s*\n?\s*"([^"]*)"/g)) {
+    displayValues.set(m[1], m[2])
+  }
+  // Every covered constant must still exist in the module. A renamed or
+  // deleted export would otherwise silently drop its baseline and the rule
+  // would stop watching that geometry — a hole that looks like a clean run.
+  const displayCensus = {}
+  for (const name of Object.keys(DISPLAY_CONSTANT_RATCHET)) {
+    if (displayValues.has(name)) continue
+    findings.push({
+      rule: "RULE_DISPLAY_CONSTANT_RATCHET",
+      file: DISPLAY_MODULE,
+      line: 0,
+      message: `${name} is ratcheted but ${DISPLAY_MODULE} no longer exports it — restore the constant or drop it from DISPLAY_CONSTANT_RATCHET with a reason`,
+    })
+  }
+  // And every exported string constant must be either ratcheted OR explicitly
+  // excluded. A new export falling through both would widen the module's
+  // ownership without widening the rule — the silently smaller rule set, which
+  // is this ratchet's one real failure mode. Classifying a constant is a
+  // judgement call; the checker's job is to stop it happening by omission
+  // rather than on purpose.
+  for (const name of displayValues.keys()) {
+    if (DISPLAY_CONSTANT_RATCHET[name] !== undefined) continue
+    if (DISPLAY_CONSTANT_EXCLUDED[name] !== undefined) continue
+    findings.push({
+      rule: "RULE_DISPLAY_CONSTANT_RATCHET",
+      file: DISPLAY_MODULE,
+      line: 0,
+      message: `${name} is exported but unclassified — give it a baseline in DISPLAY_CONSTANT_RATCHET, or a measured reason in DISPLAY_CONSTANT_EXCLUDED`,
+    })
+  }
+  for (const file of files) {
+    const r = rel(file)
+    if (isOutOfScope(r)) continue
+    // The module holds every one of these strings BY DEFINITION. Counting it
+    // would make the rule fire on the source of truth against its own
+    // declaration — the exact bug RULE_HEADER_ADOPTION documents for
+    // page-header.tsx, which is why it filters that file out of the delegate
+    // candidates.
+    if (r === DISPLAY_MODULE) continue
+    const src = readFileSync(file, "utf8")
+    for (const [name, value] of displayValues) {
+      if (DISPLAY_CONSTANT_RATCHET[name] === undefined) continue
+      if (!src.includes(value)) continue
+      displayCensus[name] ??= new Set()
+      displayCensus[name].add(r)
+    }
+  }
+  for (const [name, baseline] of Object.entries(DISPLAY_CONSTANT_RATCHET)) {
+    const holders = displayCensus[name] ?? new Set()
+    if (holders.size > baseline) {
+      findings.push({
+        rule: "RULE_DISPLAY_CONSTANT_RATCHET",
+        file: [...holders].sort().join(", "),
+        line: 0,
+        message: `${name} is re-declared in ${holders.size} file(s) outside ${DISPLAY_MODULE} (baseline ${baseline}) — import the constant instead of copying its class string (#305/#308)`,
+      })
+    }
+  }
+
+  return {
+    findings,
+    census: Object.fromEntries(Object.entries(census).map(([k, v]) => [k, v.size])),
+    displayCensus: Object.fromEntries(
+      Object.keys(DISPLAY_CONSTANT_RATCHET).map((k) => [k, (displayCensus[k] ?? new Set()).size])
+    ),
+  }
 }
 
 // CLI: `node scripts/frontend-drift.mjs`
 if (process.argv[1] && process.argv[1].endsWith("frontend-drift.mjs")) {
-  const { findings, census } = runChecks()
-  if (process.argv.includes("--census")) console.log("ink-tint census:", census)
+  const { findings, census, displayCensus } = runChecks()
+  if (process.argv.includes("--census")) {
+    console.log("ink-tint census:", census)
+    console.log("display-constant census:", displayCensus)
+  }
   if (findings.length === 0) {
     console.log("frontend drift: clean")
     process.exit(0)
