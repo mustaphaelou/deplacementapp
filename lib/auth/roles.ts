@@ -1,3 +1,16 @@
+// The queue links below are COMPOSED by the pipeline module rather than typed
+// here (#303). This file used to hand-write `?etape=MANAGER_REVIEW&…` and
+// `?etape=DIRECTION_REVIEW&…` — the copies nobody can regenerate, because this
+// table had no way to ask what lane a Role waits on. A lane rename therefore
+// left the navigation pointing at a lane that no longer exists, and the click
+// came back as a bare « Erreur interne ».
+//
+// `lib/workflow.ts` owns the link because it owns the lane, and it names this
+// route on purpose: one composition, so no site can drift. The cost —
+// presentation vocabulary inside the pipeline module — is accepted and recorded
+// there.
+import { lienFileAttente } from "../workflow"
+
 export type Role =
   "EMPLOYEE" | "MANAGER" | "FINANCE_ADMIN" | "GENERAL_DIRECTION"
 
@@ -114,7 +127,9 @@ export const NAV_ADMINISTRATION: readonly NavItem[] = [
 // The pipeline lanes « Mes Demandes », « Nouvelle Demande », « Demandes Équipe »,
 // « En Attente », « Approbations Budget » and « Approbations Finales » with their
 // ?etape=…&decision=PENDING queue links. These belong to the workflow module, not
-// to the management set, so they stay hand-written per Role and unchanged.
+// to the management set, so they stay hand-written per Role and unchanged — the
+// queue LINKS are composed by that module (#303) and the entries themselves
+// (label, icon, description) are still written here.
 export const NAV_LANES: Record<Role, NavItem[]> = {
   EMPLOYEE: [
     {
@@ -139,7 +154,7 @@ export const NAV_LANES: Record<Role, NavItem[]> = {
     },
     {
       label: "En Attente",
-      href: "/demandes?etape=MANAGER_REVIEW&decision=PENDING",
+      href: lienFileAttente("MANAGER"),
       icon: "clock",
       description: "Demandes en attente d'action",
     },
@@ -155,7 +170,7 @@ export const NAV_LANES: Record<Role, NavItem[]> = {
   GENERAL_DIRECTION: [
     {
       label: "Approbations Finales",
-      href: "/demandes?etape=DIRECTION_REVIEW&decision=PENDING",
+      href: lienFileAttente("GENERAL_DIRECTION"),
       icon: "check-circle",
       description: "Validation finale des demandes",
     },

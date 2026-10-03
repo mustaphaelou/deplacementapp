@@ -7,7 +7,7 @@ import {
 } from "./demande"
 import type { Role } from "@/lib/auth"
 import {
-  queueEtape,
+  lienFileAttente,
   queueEtapes,
   committedEtapes,
   laneOrderByColumn,
@@ -188,7 +188,7 @@ export async function getDashboardPayload(
               { id: "date", label: "Date", hideAt: "md" },
               { id: "etape", label: "Statut" },
             ],
-            viewAllHref: `/demandes?etape=${queueEtape(role)}&decision=PENDING`,
+            viewAllHref: lienFileAttente(role),
             emptyMessage: "Aucune demande en attente.",
           },
         },
@@ -221,7 +221,7 @@ export async function getDashboardPayload(
               { id: "total", label: "Total", hideAt: "md" },
               { id: "etape", label: "Statut" },
             ],
-            viewAllHref: `/demandes?etape=${queueEtape(role)}&decision=PENDING`,
+            viewAllHref: lienFileAttente(role),
             emptyMessage: "Aucune demande en attente.",
           },
         },
@@ -262,7 +262,7 @@ export async function getDashboardPayload(
               { id: "total", label: "Total", hideAt: "md" },
               { id: "etape", label: "Statut" },
             ],
-            viewAllHref: `/demandes?etape=${queueEtape(role)}&decision=PENDING`,
+            viewAllHref: lienFileAttente(role),
             emptyMessage: "Aucune demande en attente.",
           },
         },

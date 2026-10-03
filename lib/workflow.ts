@@ -205,6 +205,52 @@ export function committedEtapes(role: Role): readonly Etape[] {
   return PIPELINE_VIEWS[role].committed
 }
 
+// ─── The waiting-lane link (#303) ────────────────────────────────────────────
+
+/**
+ * The Decision a DemandeDeplacement is WAITING on: the non-terminal one.
+ *
+ * Named as a value, and exported, because the link below passes it as one. It
+ * is the same Decision a row is born with (`DECISION_OUVERTURE` in
+ * `etatCreation`) and the same one `isPendingDecision` admits — asserted
+ * against the predicate by the test beside them, so the three cannot drift.
+ */
+export const DECISION_ATTENTE: Decision = "PENDING"
+
+/**
+ * « The DemandeDeplacements waiting for me », for a Role — composed ONCE.
+ *
+ * The link is « this Role's waiting lane, filtered to the pending Decision »,
+ * and both halves of that are facts the pipeline already owns: `queueEtape`
+ * above, and `DECISION_ATTENTE` beside it. Six call sites used to reassemble
+ * them by hand — the navigation table typed its lane literally because it had
+ * no way to ask, so a lane rename left it pointing at a lane that no longer
+ * exists, and the click came back as a bare « Erreur interne » (the list's lane
+ * parameter is validated as a plain string, so an unknown lane reaches the
+ * database and is refused there, with no response code to name).
+ *
+ * WHY IT LIVES HERE, with the cost stated, because a future review will want to
+ * flip it: putting the composition beside the lane is the only arrangement in
+ * which a rename cannot leave a stale link behind — which is the whole defect.
+ * The cost is real: this module now names one route and two query parameters,
+ * presentation vocabulary in an otherwise pure module. The alternative, a
+ * separate link module while the pipeline keeps the lane, is a module with one
+ * implementation and nothing substitutable behind it that still has to import
+ * the pipeline for the lane — a hop that adds a place to look and nothing else.
+ * Accepted deliberately.
+ *
+ * The pending Decision is PASSED here as a value, per the settled decision; the
+ * « waiting » rule is not re-derived, and no call site enumerates or negates the
+ * terminal Decisions. Pure: no database, no rendering, no route — the one thing
+ * a test can call directly, which is what #304 does.
+ *
+ * A caller's Role may arrive as the vocabulary or as a string it has to bridge;
+ * the composition works either way, so nothing here launders an untyped value.
+ */
+export function lienFileAttente(role: Role): string {
+  return `/demandes?etape=${queueEtape(role)}&decision=${DECISION_ATTENTE}`
+}
+
 export function enteringEffect<E extends readonly TransitionEffect[]>(
   etape: Etape,
   effects: E

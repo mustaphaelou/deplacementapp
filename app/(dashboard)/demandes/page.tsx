@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useAuthUser } from "@/lib/auth/client"
-import { hasAnyRole, ROLES_MANAGEMENT } from "@/lib/auth"
+import { hasAnyRole, ROLES_MANAGEMENT, type Role } from "@/lib/auth"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { StatusPill } from "@/components/status-pill"
 import { formatCurrency, formatDate } from "@/lib/constants"
 import { toDemandePresentation } from "@/lib/demande-presentation"
-import { queueEtape } from "@/lib/workflow"
+import { lienFileAttente, queueEtape as queueEtapeForMatch } from "@/lib/workflow"
 import { PageHeader } from "@/components/page-header"
 import {
   hideClassFor,
@@ -45,6 +45,51 @@ interface Demande {
   decision: string
   employe: { prenom: string; nom: string }
   employeId: string
+}
+
+/** A tab: what it says, where it goes, and the Etape that makes it active. */
+export interface ListeTab {
+  label: string
+  href: string
+  match: string
+}
+
+/**
+ * The list's tabs, for a viewer — the « En attente » href is a VALUE a test can
+ * ask for, not a string to be hunted out of rendered markup (#304).
+ *
+ * Exported and pure, which is the whole point: before this, the only way to
+ * read the tab's href was to boot the page and search the HTML for it, so the
+ * one assertion available about this link was on its literal text. A pure
+ * function of the Role turns that into an assertion on what the link IS.
+ *
+ * The « En attente » tab is the pipeline's composition for the viewer — this
+ * page does not spell a lane or a Decision. « Brouillons » and « Finalisées »
+ * are NOT compositions of it and never were: they name the draft and final
+ * lanes for a Utilisateur's OWN DemandesDeplacement, which is a different
+ * question from « what is waiting for me ». An EMPLOYEE is offered neither the
+ * queue tab nor the pending filter — « my drafts » is not « the drafts waiting
+ * on someone else ».
+ */
+export function tabsPourRole(role: Role | undefined): ListeTab[] {
+  if (role === "EMPLOYEE") {
+    return [
+      { label: "Toutes", href: "/demandes", match: "" },
+      { label: "Brouillons", href: "/demandes?etape=DRAFT", match: "DRAFT" },
+      { label: "Finalisées", href: "/demandes?etape=FINAL", match: "FINAL" },
+    ]
+  }
+
+  const waitingHref = role ? lienFileAttente(role) : undefined
+  const waitingEtape = role ? queueEtapeForMatch(role) : undefined
+
+  return [
+    { label: "Toutes", href: "/demandes", match: "" },
+    ...(waitingHref
+      ? [{ label: "En attente", href: waitingHref, match: waitingEtape ?? "" }]
+      : []),
+    { label: "Finalisées", href: "/demandes?etape=FINAL", match: "FINAL" },
+  ]
 }
 
 export function DemandesTable({
@@ -177,28 +222,7 @@ export default function DemandesListPage() {
   const role = user?.role
 
   const title = role === "EMPLOYEE" ? "Mes demandes" : "Demandes"
-  // The single lane this viewer's Role waits on, named — not indexed for.
-  const waitingEtape = role ? queueEtape(role) : undefined
-  const tabs =
-    role === "EMPLOYEE"
-      ? [
-          { label: "Toutes", href: "/demandes", match: "" },
-          { label: "Brouillons", href: "/demandes?etape=DRAFT", match: "DRAFT" },
-          { label: "Finalisées", href: "/demandes?etape=FINAL", match: "FINAL" },
-        ]
-      : [
-          { label: "Toutes", href: "/demandes", match: "" },
-          ...(waitingEtape
-            ? [
-                {
-                  label: "En attente",
-                  href: `/demandes?etape=${waitingEtape}&decision=PENDING`,
-                  match: waitingEtape,
-                },
-              ]
-            : []),
-          { label: "Finalisées", href: "/demandes?etape=FINAL", match: "FINAL" },
-        ]
+  const tabs = tabsPourRole(role)
 
   const fetchDemandes = useCallback(async () => {
     setLoading(true)
