@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { StatusPill } from "@/components/status-pill"
 import { formatCurrency, formatDate } from "@/lib/constants"
 import { toDemandePresentation } from "@/lib/demande-presentation"
-import { lienFileAttente, queueEtape as queueEtapeForMatch } from "@/lib/workflow"
+import { lienFileAttente, queueEtape, type Etape } from "@/lib/workflow"
 import { PageHeader } from "@/components/page-header"
 import {
   hideClassFor,
@@ -51,7 +51,20 @@ interface Demande {
 export interface ListeTab {
   label: string
   href: string
-  match: string
+  /** The Etape whose rows this tab shows — `""` for « Toutes », no filter. */
+  match: Etape | ""
+}
+
+// The two tabs that are the same whatever the viewer is: the unfiltered list and
+// the Utilisateur's own finalised rows. Declared once because « Finalisées »
+// means a DIFFERENT thing per Role — a reviewer's own DemandesDeplacement is
+// not « the DemandeDeplacements waiting for me » — and writing the pair twice
+// invited the second copy to drift into the queue link this change removes.
+const TOUTES: ListeTab = { label: "Toutes", href: "/demandes", match: "" }
+const FINALISEES: ListeTab = {
+  label: "Finalisées",
+  href: "/demandes?etape=FINAL",
+  match: "FINAL",
 }
 
 /**
@@ -74,21 +87,21 @@ export interface ListeTab {
 export function tabsPourRole(role: Role | undefined): ListeTab[] {
   if (role === "EMPLOYEE") {
     return [
-      { label: "Toutes", href: "/demandes", match: "" },
+      TOUTES,
       { label: "Brouillons", href: "/demandes?etape=DRAFT", match: "DRAFT" },
-      { label: "Finalisées", href: "/demandes?etape=FINAL", match: "FINAL" },
+      FINALISEES,
     ]
   }
 
-  const waitingHref = role ? lienFileAttente(role) : undefined
-  const waitingEtape = role ? queueEtapeForMatch(role) : undefined
+  // A viewer with no Role waits on nothing, and is offered no queue tab: there
+  // is no lane to name without a Role to wait for it. `queueEtape` cannot
+  // return `undefined`, so `waitingEtape` is derived from the same guard.
+  if (!role) return [TOUTES, FINALISEES]
 
   return [
-    { label: "Toutes", href: "/demandes", match: "" },
-    ...(waitingHref
-      ? [{ label: "En attente", href: waitingHref, match: waitingEtape ?? "" }]
-      : []),
-    { label: "Finalisées", href: "/demandes?etape=FINAL", match: "FINAL" },
+    TOUTES,
+    { label: "En attente", href: lienFileAttente(role), match: queueEtape(role) },
+    FINALISEES,
   ]
 }
 

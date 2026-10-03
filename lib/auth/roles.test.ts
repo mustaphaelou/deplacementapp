@@ -97,10 +97,12 @@ describe("NAV_ITEMS queue links ARE the composition for their Role", () => {
       }
     }
 
-    // And the plain list entry is not a queue link at all.
-    expect(NAV_ITEMS.MANAGER.find((item) => item.label === "Demandes Équipe")?.href).toBe(
-      "/demandes"
-    )
+    // And the plain list entry is not a queue link at all. Asserted positively:
+    // a negative against `lienFileAttente` alone would also pass if the entry had
+    // been deleted, since a missing item yields `undefined`.
+    expect(
+      NAV_ITEMS.MANAGER.find((item) => item.label === "Demandes Équipe")?.href
+    ).toBe("/demandes")
   })
 })
 

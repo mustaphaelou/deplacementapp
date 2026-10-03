@@ -150,7 +150,7 @@ export interface PipelineView {
    * declared there.
    */
   queue: readonly [Etape]
-  committed: readonly Etape[]
+  committed: Etape[]
 }
 
 export const PIPELINE_VIEWS: Record<Role, PipelineView> = {
@@ -201,7 +201,7 @@ export function queueEtapes(role: Role): readonly Etape[] {
   return PIPELINE_VIEWS[role].queue
 }
 
-export function committedEtapes(role: Role): readonly Etape[] {
+export function committedEtapes(role: Role): Etape[] {
   return PIPELINE_VIEWS[role].committed
 }
 

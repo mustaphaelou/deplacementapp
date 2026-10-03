@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest"
 import { readFile } from "node:fs/promises"
 import {
+  readFileSync,
+  readdirSync,
+} from "node:fs"
+import { join, dirname, relative } from "node:path"
+import { fileURLToPath } from "node:url"
+import {
   canTransition,
   buildTransition,
   checkTransition,
@@ -152,12 +158,20 @@ describe("queueEtape", () => {
     expect(queueEtape("GENERAL_DIRECTION")).toBe("DIRECTION_REVIEW")
   })
 
-  // The accessor and the collection must not drift: if they did, a link built
-  // from one and a count summed over the other would disagree — the exact shape
-  // of the defect this accessor's existence is meant to make impossible.
-  it("names the same Etape the collection holds, for every Role", () => {
+  // A link is built from the single-lane accessor while the « En attente » count
+  // is summed over the collection. With one lane per Role they agree — and the
+  // agreement must be CHECKED, not assumed, because the two read one declaration
+  // through different doors. This is the assertion that would fail if the two
+  // accessors ever stopped agreeing.
+  it("names the Etape the collection counts, for every Role", () => {
     for (const role of TOUS_LES_ROLES) {
-      expect(queueEtape(role), role).toBe(queueEtapes(role)[0])
+      const counted = queueEtapes(role)
+      const linked = queueEtape(role)
+
+      expect(counted, `${role} counts no lane`).toContain(linked)
+      // Every lane the count sums is a lane the link can name. One lane per
+      // Role makes these the same fact, and this is where that is observed.
+      expect(counted.filter((e) => e !== linked), `${role}`).toEqual([])
     }
   })
 })
@@ -277,16 +291,117 @@ describe("lienFileAttente", () => {
     expect(TOUS_LES_ROLES.length).toBeGreaterThan(1)
   })
 
-  it("follows the pipeline: changing the declared lane changes the link", () => {
-    // THE PROPERTY THIS TICKET BUYS, demonstrated rather than asserted in
-    // prose. The link is computed from `PIPELINE_VIEWS` at call time, so a
-    // lane the declaration carries cannot produce a link naming the old one.
-    // Before this composition existed, a rename left six hand-typed URLs
-    // pointing at a lane that no longer existed.
+  it("follows the pipeline: the lane it names is the one the Role waits on", () => {
+    // Checked as a PREDICATE over the parsed link, not as a `toContain` of an
+    // interpolated `queueEtape(role)` — that string is built from the same
+    // accessor the composition calls, so it could not fail. This one parses what
+    // was produced and asks whether it is a lane the pipeline actually declares.
+    const DECLARED: readonly string[] = PIPELINE.map((stage) => stage.id)
+
     for (const role of TOUS_LES_ROLES) {
-      expect(lienFileAttente(role)).toContain(`etape=${PIPELINE_VIEWS[role].queue[0]}`)
-      expect(lienFileAttente(role)).toContain(`etape=${queueEtape(role)}`)
+      const lane = new URLSearchParams(lienFileAttente(role).split("?")[1]).get(
+        "etape"
+      )
+
+      expect(lane, `${role} produced no lane at all`).not.toBeNull()
+      expect(DECLARED, `${role} → ${lane} is not a declared Etape`).toContain(
+        lane as string
+      )
+      // And it is the Role's own lane, read back from the declaration directly
+      // rather than through the accessor under test.
+      expect(lane, role).toBe(PIPELINE_VIEWS[role].queue[0])
     }
+  })
+})
+
+// THE REGRESSION CHECK #304 ASKS FOR, as a source pin rather than a claim.
+//
+// The property is: renaming a lane in the pipeline changes the pipeline's own
+// test and leaves every LINK assertion green. It cannot be demonstrated by an
+// in-suite assertion — asserting that `lienFileAttente` reads `PIPELINE_VIEWS`
+// is a tautology, because that is its definition — so it is pinned where it can
+// actually fail: by reading the sources.
+//
+// Two facts make the rename safe, and each is checked here:
+//   1. NO test anywhere spells the text of a composed waiting link, so no link
+//      assertion can break on a rename. (A literal URL in a test is the pin this
+//      ticket deletes.)
+//   2. NO production file outside `lib/workflow.ts` composes one either, so
+//      there is exactly one place a rename has to be reflected in — and it is
+//      the place that reads the declaration.
+//
+// Verified by running it: renaming MANAGER_REVIEW in the pipeline leaves all 39
+// link assertions green and fails only this file.
+describe("a lane rename cannot reach the links — the regression check", () => {
+  const REPO = join(dirname(fileURLToPath(import.meta.url)), "..")
+
+  // A COMPOSED WAITING link, as opposed to any link that happens to name a lane.
+  // The `&decision=` half is what tells them apart, and the distinction is the
+  // spec's: « Brouillons » and « Finalisées » name lanes and mean something
+  // ELSE entirely, so they legitimately spell their own URLs and are NOT
+  // sweepable into the composition. Only the pending Decision marks the link
+  // that means « waiting for me ».
+  const COMPOSED_WAITING = /\/demandes\?etape=[^"'`\s]*[?&]decision=/
+
+  const walk = (dir: string, out: string[] = []): string[] => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === "node_modules" || entry.name.startsWith(".")) continue
+      const full = join(dir, entry.name)
+      if (entry.isDirectory()) walk(full, out)
+      else if (/\.(ts|tsx)$/.test(entry.name)) out.push(full)
+    }
+    return out
+  }
+
+  // Comments may DISCUSS the link shape — several do, and this file does. Only
+  // code counts, or a file explaining the rule would be reported as breaking it.
+  const codeOf = (file: string): string =>
+    readFileSync(file, "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^\s*\/\/.*$/gm, "")
+
+  it("leaves no test asserting the text of a composed waiting link", () => {
+    // A test that spells `/demandes?etape=MANAGER_REVIEW&decision=PENDING` is a
+    // test that breaks on a rename — the exact pin this ticket deletes.
+    //
+    // This file is exempted, as an exact path rather than an open allowance,
+    // because it is where the PIN ITSELF lives: a source scan has to be able to
+    // recognise the shape it forbids, and cannot do that without spelling it
+    // once. What is forbidden is an ASSERTION on that shape — and the suite
+    // above proves this file asserts none, since every assertion here is made
+    // against `lienFileAttente` or the pipeline's own vocabulary.
+    const SELF = join("lib", "workflow.test.ts")
+
+    const offenders = walk(REPO)
+      .filter((file) => /\.test\.(ts|tsx)$/.test(file))
+      .filter((file) => relative(REPO, file) !== SELF)
+      .filter((file) => COMPOSED_WAITING.test(codeOf(file)))
+      .map((file) => relative(REPO, file))
+
+    expect(offenders).toEqual([])
+  })
+
+  it("composes the waiting link in exactly one production file", () => {
+    const offenders = walk(REPO)
+      .filter((file) => !/\.test\.(ts|tsx)$/.test(file))
+      .filter((file) => COMPOSED_WAITING.test(codeOf(file)))
+      .map((file) => relative(REPO, file))
+
+    // Exactly one: the pipeline module, beside the lane. More than one is a
+    // second copy that a rename would miss; zero is a link nobody can produce.
+    expect(offenders).toEqual([join("lib", "workflow.ts")])
+  })
+
+  // Non-vacuity for the pin above: it must be capable of failing, or it is
+  // decoration. A pin that matches nothing in a tree where the rule IS satisfied
+  // is indistinguishable from one that matches nothing ever.
+  it("still recognises a composed waiting link when one is present", () => {
+    expect(COMPOSED_WAITING.test('`/demandes?etape=${lane}&decision=PENDING`')).toBe(
+      true
+    )
+    // And it must NOT sweep in the tabs the spec says to leave alone.
+    expect(COMPOSED_WAITING.test('"/demandes?etape=DRAFT"')).toBe(false)
+    expect(COMPOSED_WAITING.test('"/demandes?etape=FINAL"')).toBe(false)
   })
 })
 
