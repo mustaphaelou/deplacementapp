@@ -12,6 +12,14 @@ on:
         type: boolean
         default: false
 
+# One run per ref. A push that supersedes an in-flight PR run cancels it, so a
+# burst of pushes to a PR costs one gate rather than N. Release tags never
+# cancel: a tag is a deliberate act, and cancelling its publish would strand a
+# half-pushed multi-arch image and a tag that points at nothing.
+concurrency:
+  group: docker-publish-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: write
   packages: write
@@ -19,6 +27,9 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    # ~2m observed. The cap is not about speed: it stops a wedged runner from
+    # holding its concurrency group for the 6h default.
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -26,7 +37,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
@@ -48,9 +59,15 @@ jobs:
         run: npm ls --omit=dev --depth=0
 
   publish-check:
+    # Every non-PR event, branch pushes included: this job smoke-tests both
+    # images against the live tree, so it stays the one piece of Docker work
+    # that happens per merge. `is_release` is computed HERE, which is why this
+    # job cannot gate on its own output.
     if: github.event_name != 'pull_request'
     needs: verify
     runs-on: ubuntu-latest
+    # The arm64 runner leg runs under QEMU; observed ~14m with a warm cache.
+    timeout-minutes: 45
     outputs:
       is_release: ${{ steps.release-gate.outputs.is_release }}
     steps:
@@ -108,9 +125,17 @@ jobs:
         run: scripts/smoke-test.sh --image "ghcr.io/${{ github.repository }}/runner:smoke" --migrator-image "ghcr.io/${{ github.repository }}-migrator:smoke"
 
   build-and-push:
-    if: github.event_name != 'pull_request'
+    # The ONLY job that pushes an image to GHCR. A branch push gets the smoke
+    # test from publish-check and stops there: publishing `main` cost ~16 min of
+    # runner per merge and published a public `latest` aliasing unreviewed code
+    # that nothing deployed. The `workflow_dispatch` + deploy-dry-run arm is the
+    # one non-Release exception, and it is load-bearing rather than decorative:
+    # `deploy` needs this job, so without it a dry-run dispatch would find a
+    # skipped dependency and the documented dry run would silently never run.
+    if: github.event_name != 'pull_request' && (needs.publish-check.outputs.is_release == 'true' || (github.event_name == 'workflow_dispatch' && inputs.deploy-dry-run == 'true'))
     needs: publish-check
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     strategy:
       matrix:
         include:
@@ -148,7 +173,11 @@ jobs:
           tags: |
             type=semver,pattern=v{{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || needs.publish-check.outputs.is_release == 'true' }}
+            # `latest` moves ONLY on a Release. The default-branch arm this
+            # replaces was dead the moment build-and-push became release-gated,
+            # and keeping it would re-open the exact hole ADR-0015 closed: a
+            # public rolling alias for unreviewed `main`.
+            type=raw,value=latest,enable=${{ needs.publish-check.outputs.is_release == 'true' }}
             type=sha,format=long
 
       - name: Build and push ${{ matrix.id }} (multi-arch)
@@ -167,6 +196,7 @@ jobs:
     if: needs.publish-check.outputs.is_release == 'true'
     needs: [publish-check, build-and-push]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Create GitHub Release (draft)
         uses: softprops/action-gh-release@v3
@@ -180,6 +210,8 @@ jobs:
     if: needs.publish-check.outputs.is_release == 'true' || (github.event_name == 'workflow_dispatch' && inputs.deploy-dry-run == 'true')
     needs: [publish-check, build-and-push]
     runs-on: ubuntu-latest
+    # The module fires one webhook and returns; it never polls deployment status.
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v5

@@ -21,12 +21,23 @@ on:
     - cron: "37 6 * * 1"
   workflow_dispatch:
 
+# One sweep at a time. Two overlapping Monday runs would file against a moving
+# tree and burn the shared scheduler slot for no extra coverage. Never cancels:
+# a schedule trigger is not a push, and a half-written issue body is worse than
+# a duplicated one.
+concurrency:
+  group: frontend-sweep
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
 jobs:
   sweep:
     runs-on: ubuntu-latest
+    # Report-only and non-fatal by design; the cap keeps a wedged npm install
+    # from holding the concurrency group for the 6h default.
+    timeout-minutes: 20
     # `gh issue create` needs issues: write. The workflow-level default above is
     # contents: read, and a job inherits it — so without this override the
     # filing step failed with a 403 every Monday and, carrying
@@ -42,7 +53,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
