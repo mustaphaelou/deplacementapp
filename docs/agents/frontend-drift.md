@@ -156,7 +156,7 @@ differently**:
 | literal | baseline | where |
 | --- | --- | --- |
 | `rgba(55,53,47,0.024)` | 4 → **1** | `components/dashboard-layout.tsx` keeps a private `rowHover` |
-| `rgba(55,53,47,0.06)` | **4**, unchanged | `demandes/page.tsx`, `sidebar.tsx` (×3), `theme-toggle.tsx`, `dashboard-layout.tsx` |
+| `rgba(55,53,47,0.06)` | **4**, unchanged | `demandes/page.tsx`, `sidebar.tsx`, `theme-toggle.tsx`, `dashboard-layout.tsx` — four files. The baseline counts files, but the debt is larger than the count: `sidebar.tsx` alone holds **7 occurrences** across 4 lines (68, 188 ×2, 197 ×2, 203 ×2). |
 
 The `0.06` tint is deliberately *not* part of the display module's
 `rowHoverInkTint` — that constant is the `0.024` literal, and `display.tsx`
@@ -177,9 +177,14 @@ profile form, the DemandeDeallocation form and the DemandeDeallocation detail
 view as part of its batch, and none of those three files imports anything from
 `@/components/display` today — they hold private copies of `textInputClass`,
 `fieldLabelClass` and `sectionHeadingClass`. `components/dashboard-layout.tsx`
-adds a fourth, a private `rowHover`. Those three modules have no `.test.tsx` at
-all, so nothing about their display geometry is currently pinned — which is why
-a ratchet rather than a test is the right instrument here. Lower each baseline
+adds a fourth, a private `rowHover`. None of the three has a `.test.tsx` **of its
+own**, but they are rendered by their pages' suites, and those suites do pin part
+of the geometry: `demandes/[id]/page.test.tsx:206-207` and
+`profil/page.test.tsx:124-125` both assert `uppercase tracking-[0.06em]` and
+`bg-border` — the section heading and its hairline. What no test pins is the
+copies those modules carry for `textInputClass` and `fieldLabelClass`, so the
+"ratchet rather than a test" conclusion holds on the unpinned half and not on the
+whole: two of the three private copies here are unobserved by any test today. Lower each baseline
 as #307's open edge lands; never raise one.
 
 Baselines, as of #308:
@@ -218,8 +223,8 @@ each call, not the definition of it. Five constants are deliberately excluded:
 | constant | why it is excluded |
 | --- | --- |
 | `loadingTextClass` | `text-sm text-muted-foreground` (`text-sm` in 13/28 judged files, `text-muted-foreground` 12/28). Ten files spell it, including `components/page-header.tsx` and five dashboard pages with no connection to the display module. This is how the app writes small muted text. |
-| `loadingBlockClass` | `flex items-center justify-center p-8` (`flex` 17/28, `items-center` 18/28, `justify-center` 11/28). `administration/societe/page.tsx` already spells this exact centred-box idiom as `...p-12` — which `display.tsx` documents as a *deliberately different* block. A `p-8` hit is a coincidence at least as likely as a copy. |
-| `sectionHeadingRowClass` | `flex items-center gap-3` (`flex` 17/28, `items-center` 18/28). The app's ordinary flex row. |
+| `loadingBlockClass` | `flex items-center justify-center p-8` (`flex` 18/28 by token boundary — 19 by raw substring — `items-center` 18/28, `justify-center` 11/28). `administration/societe/page.tsx` already spells this exact centred-box idiom as `...p-12` — which `display.tsx` documents as a *deliberately different* block. A `p-8` hit is a coincidence at least as likely as a copy. |
+| `sectionHeadingRowClass` | `flex items-center gap-3` (`flex` 18/28, `items-center` 18/28). The app's ordinary flex row. |
 | `propertyLabelClass` | `text-xs text-muted-foreground` (`text-xs` 11/28). A two-token slice of the run above. |
 | `propertyValueClass` | `mt-0.5 text-sm font-medium` — only `mt-0.5` is rare (2/28); `text-sm` 13/28 and `font-medium` 15/28 are the two most-used type tokens in the tree. |
 
@@ -238,6 +243,15 @@ differently reads as clean. That is a deliberate trade: order-insensitive
 matching would match the surrounding class run and drag in unrelated elements.
 It also matches *text*, not code, so a class string quoted inside a comment
 counts as a hit.
+
+There is a third blind spot, and it is the one to watch: the rule reads the
+module's values with `/export const (\w+)\s*=\s*\n?\s*"([^"]*)"/`. All 14
+current exports match. An export written as a **template literal** or as string
+concatenation would match neither that pattern nor the unclassified-export guard
+below — so it would be unwatched *and* unreported as unclassified, which is
+exactly the silent-shrinking failure this rule exists to prevent. The module's
+style makes it unlikely; a maintainer adding an export must keep it a plain
+string literal or extend the pattern.
 
 **It is a ratchet, not a proof of absence.** A green run means **"no NEW
 copy"** — never "no copy". Three files still hold private copies of the display
