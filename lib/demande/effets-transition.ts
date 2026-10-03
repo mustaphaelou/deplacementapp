@@ -1,6 +1,6 @@
 import type { DrizzleTransactionClient } from "../../db"
 import { logAudit } from "../audit"
-import { dispatchRows } from "../notification"
+import { dispatchRowsAllOrNothing } from "../notification"
 import type {
   NotificationEventType,
   NotificationPayload,
@@ -51,5 +51,8 @@ export async function appliquerEffets(
     employe,
     assigneAId,
   }
-  await dispatchRows(event, payload, tx)
+  // The all-or-nothing entry: this is the one path where a failed write must
+  // take the caller's transition down with it, because the transition and the
+  // Notification rows it produced are one unit of work.
+  await dispatchRowsAllOrNothing(event, payload, tx)
 }

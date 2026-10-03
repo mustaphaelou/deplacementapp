@@ -64,99 +64,36 @@ const makePayload = (
 })
 
 describe("NotificationModule", () => {
-  it("dispatch sends DEMANDE_SOUMISE only to managers in the employee's department", async () => {
+  // The counters this test used to read (`total`, `succeeded`, `failed`,
+  // `failures`) are gone with the result type #311 deleted: they described a
+  // returned object no caller reads, and « only managers of the employee's
+  // department » is a claim about WHICH rows were written, so it is asserted
+  // as the one row the adapter was handed — and, from outside the class,
+  // through the module's own entry point in `failure-policy.test.ts`.
+  it("dispatchBestEffort writes one row per resolved recipient, managers of the employee's department only", async () => {
     const adapter = mockAdapter()
     const db = mockDb()
     db.select = mockSelectResult([{ id: "mgr-hr" }])
 
     const bus = new NotificationModule(adapter)
-    const result = await bus.dispatch(
-      "DEMANDE_SOUMISE",
-      makePayload(),
-      db as any
-    )
+    await bus.dispatchBestEffort("DEMANDE_SOUMISE", makePayload(), db as any)
 
-    expect(result.total).toBe(1)
-    expect(result.succeeded).toBe(1)
-    expect(result.failed).toBe(0)
-    expect(result.failures).toEqual([])
+    expect(adapter.send).toHaveBeenCalledTimes(1)
     const call = adapter.send.mock.calls[0][0] as NotificationMessage
     expect(call.utilisateurId).toBe("mgr-hr")
   })
 
-  it("dispatch reports per-recipient failures when adapter fails", async () => {
-    const adapter = mockAdapter()
-    adapter.send.mockResolvedValueOnce({
-      success: false,
-      error: new Error("DB write error"),
-    })
-    const db = mockDb()
-    db.select = mockSelectResult([{ id: "mgr-hr" }])
-
-    const bus = new NotificationModule(adapter)
-    const result = await bus.dispatch(
-      "DEMANDE_SOUMISE",
-      makePayload(),
-      db as any
-    )
-
-    expect(result.total).toBe(1)
-    expect(result.succeeded).toBe(0)
-    expect(result.failed).toBe(1)
-    expect(result.failures[0]).toMatchObject({
-      utilisateurId: "mgr-hr",
-      error: "DB write error",
-    })
-  })
-
-  it("dispatch aggregates mixed success/failure across multiple department recipients", async () => {
-    const adapter = mockAdapter()
-    adapter.send
-      .mockResolvedValueOnce({ success: true })
-      .mockResolvedValueOnce({
-        success: false,
-        error: new Error("Network timeout"),
-      })
-    const db = mockDb()
-    db.select = mockSelectResult([{ id: "mgr-hr-1" }, { id: "mgr-hr-2" }])
-
-    const bus = new NotificationModule(adapter)
-    const result = await bus.dispatch(
-      "DEMANDE_SOUMISE",
-      makePayload(),
-      db as any
-    )
-
-    expect(result.total).toBe(2)
-    expect(result.succeeded).toBe(1)
-    expect(result.failed).toBe(1)
-    expect(result.failures).toHaveLength(1)
-    expect(result.failures[0].utilisateurId).toBe("mgr-hr-2")
-  })
-
-  it("dispatch succeeds with zero notifications when no roles match and no employee/assignee", async () => {
-    const adapter = mockAdapter()
-    const db = mockDb()
-    db.select = mockSelectResult([])
-
-    const bus = new NotificationModule(adapter)
-    const result = await bus.dispatch(
-      "DEMANDE_APPROBATION_FINALE",
-      makePayload(),
-      db as any
-    )
-
-    expect(result.total).toBe(1)
-    expect(adapter.send).toHaveBeenCalled()
-  })
-
-  it("dispatch sends correct message format to each recipient", async () => {
+  it("dispatchBestEffort sends correct message format to each recipient", async () => {
     const adapter = mockAdapter()
     const db = mockDb()
     db.select = mockSelectResult([{ id: "fin-1" }])
 
     const bus = new NotificationModule(adapter)
-    await bus.dispatch("DEMANDE_APPROBATION_MANAGER", makePayload(), db as any)
+    await bus.dispatchBestEffort(
+      "DEMANDE_APPROBATION_MANAGER",
+      makePayload(),
+      db as any
+    )
 
     const call = adapter.send.mock.calls[0]?.[0] as
       NotificationMessage | undefined
@@ -166,13 +103,13 @@ describe("NotificationModule", () => {
     expect(call!.demandeId).toBe("d-1")
   })
 
-  it("dispatch notifies employee for rejection events", async () => {
+  it("dispatchBestEffort notifies employee for rejection events", async () => {
     const adapter = mockAdapter()
     const db = mockDb()
     const bus = new NotificationModule(adapter)
 
     const payload = makePayload()
-    await bus.dispatch("DEMANDE_REJETEE", payload, db as any)
+    await bus.dispatchBestEffort("DEMANDE_REJETEE", payload, db as any)
 
     expect(adapter.send).toHaveBeenCalledTimes(1)
     const call = adapter.send.mock.calls[0]?.[0] as NotificationMessage
@@ -180,12 +117,12 @@ describe("NotificationModule", () => {
     expect(call.titre).toBe("Demande rejetée")
   })
 
-  it("dispatch notifies assignee on withdraw with assigneAId set", async () => {
+  it("dispatchBestEffort notifies assignee on withdraw with assigneAId set", async () => {
     const adapter = mockAdapter()
     const db = mockDb()
     const bus = new NotificationModule(adapter)
 
-    await bus.dispatch(
+    await bus.dispatchBestEffort(
       "DEMANDE_RETIREE",
       makePayload({ assigneAId: "approver-1" }),
       db as any
@@ -196,12 +133,12 @@ describe("NotificationModule", () => {
     expect(call.utilisateurId).toBe("approver-1")
   })
 
-  it("dispatch does not notify assignee on withdraw when assigneAId is null", async () => {
+  it("dispatchBestEffort does not notify assignee on withdraw when assigneAId is null", async () => {
     const adapter = mockAdapter()
     const db = mockDb()
     const bus = new NotificationModule(adapter)
 
-    await bus.dispatch(
+    await bus.dispatchBestEffort(
       "DEMANDE_RETIREE",
       makePayload({ assigneAId: null }),
       db as any
@@ -210,13 +147,17 @@ describe("NotificationModule", () => {
     expect(adapter.send).not.toHaveBeenCalled()
   })
 
-  it("dispatch notifies employee on final approval", async () => {
+  it("dispatchBestEffort notifies employee on final approval", async () => {
     const adapter = mockAdapter()
     const db = mockDb()
     const bus = new NotificationModule(adapter)
 
     const payload = makePayload()
-    await bus.dispatch("DEMANDE_APPROBATION_FINALE", payload, db as any)
+    await bus.dispatchBestEffort(
+      "DEMANDE_APPROBATION_FINALE",
+      payload,
+      db as any
+    )
 
     expect(adapter.send).toHaveBeenCalledTimes(1)
     const call = adapter.send.mock.calls[0]?.[0] as NotificationMessage
@@ -224,7 +165,7 @@ describe("NotificationModule", () => {
     expect(call.titre).toBe("Demande approuvée")
   })
 
-  it("dispatch routes DEMANDE_NOTIFICATION_LUE to department managers only", async () => {
+  it("dispatchBestEffort routes DEMANDE_NOTIFICATION_LUE to department managers only", async () => {
     const adapter = mockAdapter()
     const db = mockDb()
     db.select = mockSelectResult([{ id: "mgr-hr" }])
@@ -238,13 +179,8 @@ describe("NotificationModule", () => {
         departementId: "dept-hr",
       },
     })
-    const result = await bus.dispatch(
-      "DEMANDE_NOTIFICATION_LUE",
-      payload,
-      db as any
-    )
+    await bus.dispatchBestEffort("DEMANDE_NOTIFICATION_LUE", payload, db as any)
 
-    expect(result.total).toBe(1)
     expect(adapter.send).toHaveBeenCalledTimes(1)
     const call = adapter.send.mock.calls[0][0] as NotificationMessage
     expect(call.utilisateurId).toBe("mgr-hr")
@@ -253,7 +189,7 @@ describe("NotificationModule", () => {
     expect(call.message).toContain("DD-2025-0001")
   })
 
-  it("dispatch sends zero notifications for DEMANDE_NOTIFICATION_LUE when no departementId", async () => {
+  it("dispatchBestEffort writes no row for DEMANDE_NOTIFICATION_LUE when no departementId", async () => {
     const adapter = mockAdapter()
     const db = mockDb()
     db.select = mockSelectResult([{ id: "mgr-1" }])
@@ -262,36 +198,29 @@ describe("NotificationModule", () => {
     const payload = makePayload({
       employe: { id: "emp-1", prenom: "Jean", nom: "Dupont" },
     })
-    const result = await bus.dispatch(
-      "DEMANDE_NOTIFICATION_LUE",
-      payload,
-      db as any
-    )
+    await bus.dispatchBestEffort("DEMANDE_NOTIFICATION_LUE", payload, db as any)
 
-    expect(result.total).toBe(0)
     expect(adapter.send).not.toHaveBeenCalled()
   })
 
   // This test used to read "dispatch passes the module's db to send
-  // explicitly", and asserted the handle the module was constructed with. This
-  // ticket deletes that handle, so the test's premise went with it; the
-  // assertion it was reaching for — that `send` gets the handle the call is
-  // working through — survives and is now stated in full.
+  // explicitly", and asserted the handle the module was constructed with. #310
+  // deleted that handle, so the test's premise went with it; the assertion it
+  // was reaching for — that `send` gets the handle the call is working
+  // through — survives and is now stated in full.
   //
-  // It is also the load-bearing assertion of the ticket, and the mirror of the
-  // dispatchRows test below. Before, a caller holding a transaction could reach
-  // dispatchRows with that transaction and could not reach dispatch at all:
-  // dispatch wrote through the handle captured at construction. The module is
-  // built here with an adapter and nothing else — there is no second handle it
-  // could have reached for — so if every write below is `tx`, by identity, then
-  // the transaction the caller holds is the transaction the rows are written in.
-  it("dispatch writes every row and sends mail through the caller's transaction", async () => {
+  // It is also the load-bearing assertion of #310, and the mirror of the
+  // all-or-nothing test below. The module is built here with an adapter and
+  // nothing else — there is no second handle it could have reached for — so if
+  // every write below is `tx`, by identity, then the transaction the caller
+  // holds is the transaction the rows are written in.
+  it("dispatchBestEffort writes every row and sends mail through the caller's transaction", async () => {
     const adapter = mockAdapter()
     const tx = mockDb()
     tx.select = mockSelectResult([{ id: "mgr-hr" }])
 
     const bus = new NotificationModule(adapter)
-    await bus.dispatch("DEMANDE_SOUMISE", makePayload(), tx as any)
+    await bus.dispatchBestEffort("DEMANDE_SOUMISE", makePayload(), tx as any)
 
     // Recipients resolved from the caller's transaction.
     expect(tx.select).toHaveBeenCalled()
@@ -313,13 +242,17 @@ describe("NotificationModule", () => {
     expect(emailArg).toBe(tx)
   })
 
-  it("dispatchRows resolves recipients from the caller's tx and calls send with (message, tx)", async () => {
+  it("dispatchRowsAllOrNothing resolves recipients from the caller's tx and calls send with (message, tx)", async () => {
     const adapter = mockAdapter()
     const tx = mockDb()
     tx.select = mockSelectResult([{ id: "mgr-hr" }])
 
     const bus = new NotificationModule(adapter)
-    await bus.dispatchRows("DEMANDE_SOUMISE", makePayload(), tx as any)
+    await bus.dispatchRowsAllOrNothing(
+      "DEMANDE_SOUMISE",
+      makePayload(),
+      tx as any
+    )
 
     expect(adapter.send).toHaveBeenCalledTimes(1)
     const [message, dbArg] = adapter.send.mock.calls[0] as [
@@ -331,18 +264,26 @@ describe("NotificationModule", () => {
     expect(dbArg).toBe(tx)
   })
 
-  it("dispatchRows sends no email (rows-only invariant)", async () => {
+  it("dispatchRowsAllOrNothing sends no email (rows-only invariant)", async () => {
     const adapter = mockAdapter()
     const tx = mockDb()
     tx.select = mockSelectResult([{ id: "mgr-hr" }])
 
     const bus = new NotificationModule(adapter)
-    await bus.dispatchRows("DEMANDE_SOUMISE", makePayload(), tx as any)
+    await bus.dispatchRowsAllOrNothing(
+      "DEMANDE_SOUMISE",
+      makePayload(),
+      tx as any
+    )
 
     expect(sendEmail).not.toHaveBeenCalled()
   })
 
-  it("dispatchRows throws when the adapter fails so the caller's transaction rolls back", async () => {
+  // The propagation half of this entry's promise. What it cannot show is the
+  // half that matters: that the transaction actually rolls back. That is
+  // asserted against a real in-process Postgres, from the module's exported
+  // name, in `failure-policy.test.ts`.
+  it("dispatchRowsAllOrNothing throws when the adapter fails so the caller's transaction rolls back", async () => {
     const adapter = mockAdapter()
     adapter.send.mockResolvedValueOnce({
       success: false,
@@ -353,11 +294,11 @@ describe("NotificationModule", () => {
 
     const bus = new NotificationModule(adapter)
     await expect(
-      bus.dispatchRows("DEMANDE_SOUMISE", makePayload(), tx as any)
+      bus.dispatchRowsAllOrNothing("DEMANDE_SOUMISE", makePayload(), tx as any)
     ).rejects.toThrow("DB write error")
   })
 
-  it("dispatchRows no-ops on zero recipients", async () => {
+  it("dispatchRowsAllOrNothing no-ops on zero recipients", async () => {
     const adapter = mockAdapter()
     const tx = mockDb()
     tx.select = mockSelectResult([{ id: "mgr-1" }])
@@ -366,7 +307,11 @@ describe("NotificationModule", () => {
     const payload = makePayload({
       employe: { id: "emp-1", prenom: "Jean", nom: "Dupont" },
     })
-    await bus.dispatchRows("DEMANDE_NOTIFICATION_LUE", payload, tx as any)
+    await bus.dispatchRowsAllOrNothing(
+      "DEMANDE_NOTIFICATION_LUE",
+      payload,
+      tx as any
+    )
 
     expect(adapter.send).not.toHaveBeenCalled()
     expect(sendEmail).not.toHaveBeenCalled()

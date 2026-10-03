@@ -9,7 +9,11 @@ import type {
   NotificationEventType,
   NotificationPayload,
 } from "../notification-events"
-import { NotificationNotFoundError, UnauthorizedActionError } from "../errors"
+import {
+  NotificationNotFoundError,
+  UnauthorizedActionError,
+  handleServiceError,
+} from "../errors"
 import { notifications } from "../../db/schema/notifications"
 
 export { NotificationNotFoundError, UnauthorizedActionError } from "../errors"
@@ -22,18 +26,6 @@ export type { NotificationAdapter, AdapterResult } from "./adapter"
 export { EVENT_ROLE_MAP } from "../notification-events"
 export { listForUser, countUnread } from "./queries"
 
-export interface DispatchFailure {
-  utilisateurId: string
-  error: string
-}
-
-export interface DispatchResult {
-  total: number
-  succeeded: number
-  failed: number
-  failures: DispatchFailure[]
-}
-
 /**
  * Every write the module performs goes through the handle it is given.
  *
@@ -42,50 +34,72 @@ export interface DispatchResult {
  * caller who holds a transaction has no way to hand it over. Both entry points
  * take a handle per call instead, so a caller can write Notification rows in
  * the same transaction as the DemandeDeplacement transition that produced them.
+ *
+ * It also holds no dispatch result. The two entries make different promises
+ * about failure — one refuses, one reports — so there is no single shape both
+ * could return, and a shape only the tests read is a test asserting a shape.
  */
 export class NotificationModule {
   constructor(private adapter: NotificationAdapter) {}
 
-  async dispatch(
+  /**
+   * Writes one Notification row per recipient and mails them. **Best effort.**
+   *
+   * Each recipient is written on its own; a write that fails is reported
+   * through the domain error handler, naming the recipient it failed for and
+   * the cause it failed with (ADR-0002, ADR-0022), and this entry returns
+   * normally. Work already recorded is never undone by work that failed — a
+   * read receipt that has already been written must not disappear because a
+   * mail server is down.
+   *
+   * When the caller's transaction is the whole write, and a partial
+   * Notification set is not a Notification set, use
+   * {@link NotificationModule.dispatchRowsAllOrNothing} instead.
+   */
+  async dispatchBestEffort(
     event: NotificationEventType,
     payload: NotificationPayload,
     tx: DrizzleTransactionClient
-  ): Promise<DispatchResult> {
+  ): Promise<void> {
     const recipients = await resolveRecipients(event, payload, tx)
+    if (recipients.length === 0) return
 
     const results = await Promise.allSettled(
       recipients.map(async (utilisateurId) => {
         const msg = buildNotificationMessage(event, payload, utilisateurId)
         const adapterResult = await this.adapter.send(msg, tx)
-        if (adapterResult.success) {
-          await sendEmail(msg, tx)
+        if (!adapterResult.success) {
+          throw (
+            adapterResult.error ?? new Error("Notification row write failed")
+          )
         }
-        return adapterResult
+        await sendEmail(msg, tx)
       })
     )
 
-    const failures: DispatchFailure[] = []
-    let succeeded = 0
-    let failed = 0
-
     for (let i = 0; i < results.length; i++) {
       const r = results[i]
-      if (r.status === "fulfilled" && r.value.success) {
-        succeeded++
-      } else {
-        failed++
-        const error =
-          r.status === "fulfilled"
-            ? (r.value.error?.message ?? "Unknown adapter error")
-            : (r.reason?.message ?? "Unknown rejection")
-        failures.push({ utilisateurId: recipients[i], error })
-      }
+      if (r.status === "fulfilled") continue
+      handleServiceError(
+        new Error(
+          `Notification ${event} non livrée à ${recipients[i]} : ${r.reason?.message ?? "raison inconnue"}`,
+          { cause: r.reason }
+        )
+      )
     }
-
-    return { total: recipients.length, succeeded, failed, failures }
   }
 
-  async dispatchRows(
+  /**
+   * Writes one Notification row per recipient and sends no mail. **All or
+   * nothing.**
+   *
+   * The first failed write propagates, so the caller's transaction rolls back
+   * and no partial set is left behind. The handle is required for the same
+   * reason: the caller's transaction is what makes the set atomic, so a caller
+   * must not be able to write these rows outside one while believing they were
+   * inside it.
+   */
+  async dispatchRowsAllOrNothing(
     event: NotificationEventType,
     payload: NotificationPayload,
     tx: DrizzleTransactionClient
@@ -151,7 +165,7 @@ export class NotificationModule {
       .where(eq(notifications.id, notificationId))
 
     if (notification.utilisateur.role === "EMPLOYEE" && notification.demande) {
-      await this.dispatch(
+      await this.dispatchBestEffort(
         "DEMANDE_NOTIFICATION_LUE",
         {
           demandeId: notification.demande.id,
@@ -170,8 +184,9 @@ export class NotificationModule {
 }
 
 /**
- * The module's public surface: the same three entries, each defaulting to the
- * module's own `db` so the existing call sites are unchanged.
+ * The module's public surface: three entries, each taking the handle it writes
+ * through, and the two of them that write Notification rows naming their own
+ * failure promise.
  *
  * The default lives here, in the free function that already imports `db`, and
  * not in the class — a class that defaults to a handle it captured is the
@@ -180,18 +195,34 @@ export class NotificationModule {
  * (the read-receipt route) gets the module's own.
  */
 const _default = new NotificationModule(new DrizzleNotificationAdapter())
-export const dispatch = (
+
+/**
+ * Writes a Notification row per recipient and mails them. **Best effort** — a
+ * failed write is reported through the domain error handler and this resolves;
+ * it never throws, because a read receipt that has already been recorded must
+ * not be undone by a mail server that is down. Pass a handle to write inside
+ * the caller's transaction; without one, the module's own `db` is used.
+ */
+export const dispatchBestEffort = (
   event: NotificationEventType,
   payload: NotificationPayload,
   tx: DrizzleTransactionClient = db
-) => _default.dispatch(event, payload, tx)
-export const dispatchRows = (
+): Promise<void> => _default.dispatchBestEffort(event, payload, tx)
+
+/**
+ * Writes a Notification row per recipient, sends no mail, and **refuses on the
+ * first failed write** so the caller's transaction rolls back. The handle is
+ * required: this entry's promise is only true when the caller supplies the
+ * transaction the write is atomic in.
+ */
+export const dispatchRowsAllOrNothing = (
   event: NotificationEventType,
   payload: NotificationPayload,
   tx: DrizzleTransactionClient
-) => _default.dispatchRows(event, payload, tx)
+): Promise<void> => _default.dispatchRowsAllOrNothing(event, payload, tx)
+
 export const markAsRead = (
   notificationId: string,
   userId: string,
   tx: DrizzleTransactionClient = db
-) => _default.markAsRead(notificationId, userId, tx)
+): Promise<void> => _default.markAsRead(notificationId, userId, tx)

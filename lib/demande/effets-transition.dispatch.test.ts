@@ -7,13 +7,13 @@ vi.mock("../audit", () => ({
 }))
 
 vi.mock("../notification", () => ({
-  dispatchRows: vi.fn().mockResolvedValue(undefined),
+  dispatchRowsAllOrNothing: vi.fn().mockResolvedValue(undefined),
 }))
 
 import { logAudit } from "../audit"
-import { dispatchRows } from "../notification"
+import { dispatchRowsAllOrNothing } from "../notification"
 
-const mockedDispatchRows = vi.mocked(dispatchRows)
+const mockedDispatchRows = vi.mocked(dispatchRowsAllOrNothing)
 const mockedLogAudit = vi.mocked(logAudit)
 
 const makeParams = () => ({
@@ -42,7 +42,7 @@ describe("appliquerEffets notification delegation", () => {
     vi.clearAllMocks()
   })
 
-  it("calls dispatchRows(event, payload, tx) with the caller's transaction", async () => {
+  it("calls dispatchRowsAllOrNothing(event, payload, tx) with the caller's transaction", async () => {
     const tx = { id: "tx-1" }
     await appliquerEffets(tx as any, makeParams())
 
@@ -63,7 +63,7 @@ describe("appliquerEffets notification delegation", () => {
     expect(txArg).toBe(tx)
   })
 
-  it("does not call dispatchRows when notification param is null", async () => {
+  it("does not dispatch rows when notification param is null", async () => {
     const tx = { id: "tx-1" }
     await appliquerEffets(tx as any, {
       audit: {

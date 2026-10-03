@@ -89,6 +89,28 @@ export async function countUnread(userId: string, db: DrizzleDb): Promise<number
 - **This does not change the `NotificationAdapter` interface seam** used by the orchestration test suite. The interface is preserved at its current shape. *(Post-adoption annotation: the seam has since evolved — issue #145 changed `send` to take the db per-call (`send(notification, dbOrTx)`) and added a rows-only `dispatchRows(event, payload, tx)` path; "preserved at its current shape" refers to the pre-unification shape.)*
 - **This does not add a `lib/email/` subdirectory.** Revisit if a future candidate grows the email surface beyond the current two-function shape.
 
+### Post-adoption annotation — issue #311
+
+The code sketch above returns `DispatchResult`. That type is gone: it had no
+production reader, only the test suite, so by the deletion test it earned
+nothing, and a test that reads a returned object's fields asserts a shape
+rather than a behaviour. The two entries are now named for the promise each
+one makes about failure, and both return `Promise<void>`:
+
+- `dispatchBestEffort(event, payload, tx?)` — rows and email, best effort: each
+  recipient is written on its own, a failed one is reported through
+  `handleServiceError` naming its recipient and its cause, and the entry
+  resolves. A read receipt already recorded is not undone by a mail server that
+  is down.
+- `dispatchRowsAllOrNothing(event, payload, tx)` — rows only, no mail: the first
+  failed write refuses and the caller's transaction rolls back, because the
+  caller's transaction is what makes the set atomic. The handle stays required
+  for the same reason.
+
+The interface seam, the class, and the module layout this ADR settled are all
+unchanged; only the entries' names, the failure promise they make visible, and
+the deleted result type changed.
+
 ## Rationale
 
 - **Collapsing `notification-queries.ts` satisfies ADR-0006's final outstanding target.** ADR-0006 collapsed single-adapter seams at the DemandeDeplacement DB boundary. `notification-queries.ts` was the last module outside that boundary that followed the same single-adapter-with-trivial-mock-test pattern. Deleting it and replacing the tests with PGLite integration tests completes ADR-0006's mandate.
