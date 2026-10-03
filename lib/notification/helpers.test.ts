@@ -166,6 +166,30 @@ describe("resolveRecipients — the activity rule comes from the Utilisateur rea
     )
     expect(retiree).toEqual(["assigne-1"])
   })
+
+  /**
+   * #311 — the successor to a test the result-type deletion took with it.
+   *
+   * The old module suite asserted « a department-scoped event with no
+   * `departementId` notifies nobody » through a fake that answered whatever
+   * the code asked for, and it read the answer off `result.total`. With the
+   * result type gone there was no tally to read, and the behaviour had no other
+   * home — so it is here, where the rule actually lives and where the answer
+   * comes from rows rather than from a stub.
+   *
+   * The seed above deliberately holds two active MANAGERs in `rhId`: a rule that
+   * stopped consulting `departementId` altogether would resolve to BOTH of them,
+   * so `[]` is only reachable by the department check itself.
+   */
+  it("resolves a department-scoped event to nobody when the employee has no departementId", async () => {
+    const recipients = await resolveRecipients(
+      "DEMANDE_NOTIFICATION_LUE",
+      payload({ employe: { id: "emp-1", prenom: "Jean", nom: "Dupont" } }),
+      pgliteDb as any
+    )
+
+    expect(recipients).toEqual([])
+  })
 })
 
 /**

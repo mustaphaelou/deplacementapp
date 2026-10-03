@@ -5,6 +5,8 @@ import { DrizzleNotificationAdapter } from "./adapter"
 import type { NotificationAdapter } from "./adapter"
 import { sendEmail } from "./adapter"
 import { buildNotificationMessage, resolveRecipients } from "./helpers"
+import { NotificationWriteError, reportNotificationFailure } from "./dispatch-failure"
+import type { NotificationFailureReporter } from "./dispatch-failure"
 import type {
   NotificationEventType,
   NotificationPayload,
@@ -19,20 +21,10 @@ export type {
   NotificationMessage,
 } from "../notification-events"
 export type { NotificationAdapter, AdapterResult } from "./adapter"
+export type { NotificationFailureReporter } from "./dispatch-failure"
+export { NotificationWriteError } from "./dispatch-failure"
 export { EVENT_ROLE_MAP } from "../notification-events"
 export { listForUser, countUnread } from "./queries"
-
-export interface DispatchFailure {
-  utilisateurId: string
-  error: string
-}
-
-export interface DispatchResult {
-  total: number
-  succeeded: number
-  failed: number
-  failures: DispatchFailure[]
-}
 
 /**
  * Every write the module performs goes through the handle it is given.
@@ -46,11 +38,27 @@ export interface DispatchResult {
 export class NotificationModule {
   constructor(private adapter: NotificationAdapter) {}
 
+  /**
+   * Best-effort: writes what it can and reports what it could not, and never
+   * throws.
+   *
+   * The caller reaches this entry holding something already recorded — the
+   * `lu` a read receipt just set, inside the caller's own transaction. A mail
+   * server being down is not a reason to un-record it, so the failure leaves
+   * through `reportFailure` instead of through an exception. It is a parameter
+   * for the reason the handle is one: a reporter captured at construction could
+   * only ever be the one the module was built with, which is the seam a caller
+   * has no way to reach.
+   *
+   * Nothing is returned. A tally of who was told what is a shape, and the
+   * module's whole reporting duty is the one thing the report says.
+   */
   async dispatch(
     event: NotificationEventType,
     payload: NotificationPayload,
-    tx: DrizzleTransactionClient
-  ): Promise<DispatchResult> {
+    tx: DrizzleTransactionClient,
+    reportFailure: NotificationFailureReporter = reportNotificationFailure
+  ): Promise<void> {
     const recipients = await resolveRecipients(event, payload, tx)
 
     const results = await Promise.allSettled(
@@ -64,27 +72,30 @@ export class NotificationModule {
       })
     )
 
-    const failures: DispatchFailure[] = []
-    let succeeded = 0
-    let failed = 0
-
     for (let i = 0; i < results.length; i++) {
-      const r = results[i]
-      if (r.status === "fulfilled" && r.value.success) {
-        succeeded++
-      } else {
-        failed++
-        const error =
-          r.status === "fulfilled"
-            ? (r.value.error?.message ?? "Unknown adapter error")
-            : (r.reason?.message ?? "Unknown rejection")
-        failures.push({ utilisateurId: recipients[i], error })
-      }
-    }
+      const result = results[i]
+      if (result.status === "fulfilled" && result.value.success) continue
 
-    return { total: recipients.length, succeeded, failed, failures }
+      const cause =
+        result.status === "fulfilled"
+          ? (result.value.error ?? new Error("Notification write failed"))
+          : (result.reason ?? new Error("Notification write rejected"))
+
+      reportFailure(new NotificationWriteError(recipients[i], cause))
+    }
   }
 
+  /**
+   * All-or-nothing: the first failed write throws.
+   *
+   * The throw is the whole report. There is no channel for it to leave by
+   * because the caller has one place to act on the failure and that place is
+   * deciding not to commit: its transaction is what makes the set atomic, so
+   * the rows written before the failure go with it. `dispatch` has the opposite
+   * promise and neither entry can be used in place of the other — this one
+   * makes a DemandeDeplacement transition all-or-nothing, that one makes a
+   * receipt survive a mail server being down.
+   */
   async dispatchRows(
     event: NotificationEventType,
     payload: NotificationPayload,
@@ -178,13 +189,32 @@ export class NotificationModule {
  * capture this ticket exists to remove. A caller holding a transaction passes
  * it and every write goes through it; a caller with no transaction to hand
  * (the read-receipt route) gets the module's own.
+ *
+ * The two dispatch entries make different promises about failure, and the
+ * signatures are where a reader learns it rather than having to infer it from
+ * the bodies:
+ *
+ * - `dispatchRows(event, payload, tx)` — ALL-OR-NOTHING. The first failed write
+ *   throws and the caller's transaction rolls the whole write back, the
+ *   transition's own rows included. It reports by refusing, and it takes no
+ *   reporting channel because it has nothing to report to.
+ * - `dispatch(event, payload, tx?, reportFailure?)` — BEST-EFFORT. It never
+ *   throws; it hands each failed write to `reportFailure` as a
+ *   `NotificationWriteError` carrying the failing Utilisateur and the cause.
+ *   The channel is a parameter precisely so a caller can observe it and
+ *   production can send it wherever reporting goes.
+ *
+ * Neither can stand in for the other. `dispatchRows` inside a read-receipt
+ * would undo the receipt; `dispatch` inside a DemandeDeplacement transition
+ * would let a half-applied transition commit.
  */
 const _default = new NotificationModule(new DrizzleNotificationAdapter())
 export const dispatch = (
   event: NotificationEventType,
   payload: NotificationPayload,
-  tx: DrizzleTransactionClient = db
-) => _default.dispatch(event, payload, tx)
+  tx: DrizzleTransactionClient = db,
+  reportFailure: NotificationFailureReporter = reportNotificationFailure
+) => _default.dispatch(event, payload, tx, reportFailure)
 export const dispatchRows = (
   event: NotificationEventType,
   payload: NotificationPayload,
