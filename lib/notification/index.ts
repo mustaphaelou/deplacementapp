@@ -12,7 +12,7 @@ import type {
 import {
   NotificationNotFoundError,
   UnauthorizedActionError,
-  handleServiceError,
+  reportServiceError,
 } from "../errors"
 import { notifications } from "../../db/schema/notifications"
 
@@ -80,7 +80,7 @@ export class NotificationModule {
     for (let i = 0; i < results.length; i++) {
       const r = results[i]
       if (r.status === "fulfilled") continue
-      handleServiceError(
+      reportServiceError(
         new Error(
           `Notification ${event} non livrée à ${recipients[i]} : ${r.reason?.message ?? "raison inconnue"}`,
           { cause: r.reason }

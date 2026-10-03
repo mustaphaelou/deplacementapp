@@ -99,9 +99,16 @@ one makes about failure, and both return `Promise<void>`:
 
 - `dispatchBestEffort(event, payload, tx?)` — rows and email, best effort: each
   recipient is written on its own, a failed one is reported through
-  `handleServiceError` naming its recipient and its cause, and the entry
+  `reportServiceError` naming its recipient and its cause, and the entry
   resolves. A read receipt already recorded is not undone by a mail server that
   is down.
+  *(The report goes to `reportServiceError`, not `handleServiceError`: the
+  latter returns a `NextResponse`, so a module calling it would build a response
+  and discard it, leaving the `console.error` inside as the only observable
+  effect — on a path that deliberately *handles* the error rather than leaving it
+  unhandled. `reportServiceError` is that same log split out so a caller with no
+  response to return can still report; `handleServiceError` now delegates to it,
+  so the route behaviour and the log are unchanged.)*
 - `dispatchRowsAllOrNothing(event, payload, tx)` — rows only, no mail: the first
   failed write refuses and the caller's transaction rolls back, because the
   caller's transaction is what makes the set atomic. The handle stays required

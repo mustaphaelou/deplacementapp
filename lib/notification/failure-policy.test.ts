@@ -45,7 +45,6 @@ import {
 } from "vitest"
 import { eq, sql } from "drizzle-orm"
 import * as schema from "../../db/schema"
-import * as errors from "../errors"
 import { createPgliteDb } from "../test/create-pglite-db"
 import type { PgliteDb } from "../test/create-pglite-db"
 import { dispatchBestEffort, dispatchRowsAllOrNothing } from "./index"
@@ -194,10 +193,18 @@ describe(
         .values(demandeRow(readDemandeId, "DD-2026-0001"))
     })
 
+    // Every line this run's reports reached the server log, captured rather
+    // than swallowed, so a test can assert that a failure was actually
+    // recorded and not merely that a function was entered.
+    let logged: unknown[][] = []
+
     beforeEach(async () => {
       vi.restoreAllMocks()
       await pgliteDb.execute(sql`DELETE FROM notifications`)
-      vi.spyOn(console, "error").mockImplementation(() => {})
+      logged = []
+      vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+        logged.push(args)
+      })
     })
 
     afterEach(() => {
@@ -252,7 +259,6 @@ describe(
     // is still there, and the failure was reported instead of thrown.
     it("dispatchBestEffort reports a failed write through the domain error handler and does not throw", async () => {
       const attempts = failTheSecondWrite()
-      const reported = vi.spyOn(errors, "handleServiceError")
 
       await expect(
         dispatchBestEffort(
@@ -279,8 +285,16 @@ describe(
 
       // The other half: the failure was reported, and the report names the
       // recipient it failed for and the cause it failed with (ADR-0022).
-      expect(reported).toHaveBeenCalledTimes(1)
-      const failure = reported.mock.calls[0][0] as Error
+      //
+      // Asserted on the log line the failure actually produces, NOT on a count
+      // of calls to a function whose return value this module discards. The
+      // first version of this test spied on `handleServiceError` and counted
+      // calls; that passed with the logging deleted, because a spy on a call
+      // whose result is thrown away cannot see whether anything was recorded.
+      expect(logged).toHaveLength(1)
+      const [label, reported] = logged[0]
+      expect(label).toBe("Service error:")
+      const failure = reported as Error
       expect(failure.message).toContain(refused?.utilisateurId as string)
       expect(failure.message).toContain(REFUSAL)
       expect((failure as Error & { cause?: Error }).cause?.message).toBe(

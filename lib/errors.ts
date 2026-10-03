@@ -119,11 +119,29 @@ export class NumeroCollisionError extends Error {
   }
 }
 
+/**
+ * Record a service-layer failure on the server, naming its cause.
+ *
+ * This is the half of {@link handleServiceError} that does not need an HTTP
+ * response, split out because a module that reports a failure does not always
+ * have a response to return: a best-effort write inside a service resolves
+ * normally, and its caller is a background job rather than a route. Before this
+ * split, such a module had to call `handleServiceError` and discard the
+ * `NextResponse` it built — a response allocated, never sent, and invisible to
+ * every assertion except a count of calls.
+ *
+ * The log is observability, not contract (ADR-0022): a throwing sink must
+ * never turn a handled failure into a failed operation.
+ */
+export function reportServiceError(e: unknown): void {
+  console.error("Service error:", e)
+}
+
 export function handleServiceError(e: unknown): NextResponse {
   if (e && typeof (e as Record<string, unknown>).status === "number") {
     const err = e as Error & { status: number }
     return NextResponse.json({ error: err.message }, { status: err.status })
   }
-  console.error("Unhandled service error:", e)
+  reportServiceError(e)
   return NextResponse.json({ error: "Erreur interne" }, { status: 500 })
 }
