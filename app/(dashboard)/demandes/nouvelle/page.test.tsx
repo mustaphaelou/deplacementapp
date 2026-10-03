@@ -15,8 +15,9 @@ describe("Nouvelle demande page", { timeout: 30000 }, () => {
     const html = renderToStaticMarkup(<NouvelleDemandePage />)
 
     expect(html).toContain('aria-label="breadcrumb"')
-    expect(html).toContain("text-[40px]")
     expect(html).toContain("Nouvelle Demande")
+    // The header module's icon tile, reached here through components/
+    // demande-form.tsx — the form's own fields below carry their own classes.
     expect(html).toContain("bg-primary/10")
     expect(html).toContain("Renseignez les informations du déplacement")
   })
@@ -25,6 +26,7 @@ describe("Nouvelle demande page", { timeout: 30000 }, () => {
     const { default: NouvelleDemandePage } = await import("./page")
     const html = renderToStaticMarkup(<NouvelleDemandePage />)
 
+    // The page's OWN 720px document column — no module owns this one.
     expect(html).toContain("max-w-[720px]")
   })
 
@@ -54,9 +56,12 @@ describe("Nouvelle demande page", { timeout: 30000 }, () => {
     const { default: NouvelleDemandePage } = await import("./page")
     const html = renderToStaticMarkup(<NouvelleDemandePage />)
 
+    // The form's own control geometry — the app's 3px radius spelled
+    // the way every surface spells it. No module owns these controls.
     expect(html).toContain("h-9 rounded-[3px]")
     expect(html).toContain("focus-visible:ring-1 focus-visible:ring-(--brand)")
     expect(html).toContain('data-slot="checkbox"')
+    // The page's own <select> treatment, same as the controls above.
     expect(html).toContain("appearance-none rounded-full border")
     expect(html).not.toContain("shadow-lg")
     expect(html).not.toContain('data-slot="card"')
@@ -92,16 +97,14 @@ describe("Nouvelle demande page — the shared page header", () => {
 
     // This asserts the page's OWN trail rendered through the module, not that
     // an <h1> exists somewhere: a hand-inlined header satisfies a title
-    // assertion and is exactly the regression #261 removed. The breadcrumb
-    // truncation contract (nowrap list, shrinkable last item, truncate on the
-    // page element) is the module's marker — a copy would have to reproduce
-    // all three to pass.
+    // assertion and is exactly the regression #261 removed. What is left here
+    // is the trail the module BUILDS — the page's own crumb labels and the one
+    // separator per crumb, which only the module's breadcrumb emits. #320
+    // removed this block's duplication of the truncation contract, which
+    // components/page-header.tsx pins in full on its own suite.
     // The form's own three-item trail, link crumb in the middle (#263).
     expect(html).toContain(">Espace</span>")
     expect(html).toContain('href="/demandes"')
-    expect(html).toContain(
-      'class="text-foreground min-w-0 truncate font-medium">Nouvelle Demande</span>'
-    )
     expect(html.match(/data-slot="breadcrumb-separator"/g)).toHaveLength(2)
   })
 })

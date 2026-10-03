@@ -155,7 +155,6 @@ describe("Rapports page", () => {
 
     expect(html).toContain('aria-label="breadcrumb"')
     expect(html).toContain("Administration")
-    expect(html).toContain("text-[40px]")
     expect(html).toContain("CSV")
     expect(html).toContain('href="/api/csv"')
     expect(html).toContain('data-slot="tooltip-trigger"')
@@ -196,6 +195,10 @@ describe("Rapports page", () => {
     // Scoped to the stat tile's own class run: the CSV action button legitimately
     // keeps its `rounded-lg` button variant, so a bare `rounded-lg` assertion
     // over the whole page would fail on the wrong element.
+    // NOT the header module's icon tile: that one is `size-10 ... md:size-12`
+    // with no `text-primary` and no value line. This run is components/ui/
+    // dashboard-card.tsx — the shared stat card's own icon tile — which no
+    // page-header module owns, and its value weight below is the same card's.
     expect(html).toContain(
       'class="flex size-11 shrink-0 items-center justify-center rounded-[3px] bg-primary/10 text-primary'
     )
@@ -311,17 +314,12 @@ describe("Rapports page — the shared page header", () => {
 
     // This asserts the page's OWN trail rendered through the module, not that
     // an <h1> exists somewhere: a hand-inlined header satisfies a title
-    // assertion and is exactly the regression #261 removed. The breadcrumb
-    // truncation contract (nowrap list, shrinkable last item, truncate on the
-    // page element) is the module's marker — a copy would have to reproduce
-    // all three to pass.
+    // assertion and is exactly the regression #261 removed. What is left here
+    // is the trail the module BUILDS — the page's own crumb labels and the one
+    // separator per crumb, which only the module's breadcrumb emits. #320
+    // removed this block's duplication of the truncation contract, which
+    // components/page-header.tsx pins in full on its own suite.
     expect(html).toContain(">Administration</span>")
-    expect(html).toContain(
-      'class="text-foreground min-w-0 truncate font-medium">Rapports</span>'
-    )
     expect(html.match(/data-slot="breadcrumb-separator"/g)).toHaveLength(1)
-    expect(html).toContain(
-      'class="flex items-center gap-1.5 text-sm wrap-break-word text-muted-foreground flex-nowrap"'
-    )
   })
 })

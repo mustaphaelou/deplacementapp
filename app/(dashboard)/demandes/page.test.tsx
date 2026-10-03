@@ -67,7 +67,6 @@ describe("Demandes list page", () => {
     const html = renderToStaticMarkup(<DemandesListPage />)
 
     expect(html).toContain('aria-label="breadcrumb"')
-    expect(html).toContain("text-[40px]")
     expect(html).toContain("Demandes")
     expect(html).toContain("demande(s)")
     expect(html).not.toContain('aria-label="Menu"')
@@ -163,6 +162,9 @@ describe("Demandes list page", () => {
     const { default: DemandesListPage } = await import("./page")
     const html = renderToStaticMarkup(<DemandesListPage />)
 
+    // The ACTIVE TAB's own state (page.tsx), not StatusPill's neutral
+    // tone: the pill spells that colour with a text tone and no
+    // font-medium. No module owns this one.
     expect(html).toContain("bg-[#F1F1EF] font-medium")
   })
 
@@ -176,11 +178,18 @@ describe("Demandes list page", () => {
     // #307: the shell and the row tint belong to the shared module now, so they
     // are asserted as the module's own output rather than re-pinned as literals.
     expect(html).toContain(tableShellClass)
+    // The cell padding and the table's min-width are this page's own
+    // shell — no module owns them, so they stay here. The row-hover
+    // tint beside them IS spec #305's display module, named below.
     expect(html).toContain("px-2 py-2 font-normal text-muted-foreground")
     expect(html).toContain("px-2 py-2.5")
     expect(html).toContain(rowHoverInkTint)
     expect(html).toContain("min-w-[640px]")
+    // StatusPill's own shape (status-pill.tsx), not the tab's.
     expect(html).toContain("rounded-full")
+    // The pill tones are components/status-pill.tsx's TONE_CLASSES
+    // (neutral/pending/success/danger); the pill's rounded-full shape is
+    // the same module. This page only chooses the tone.
     expect(html).toContain("bg-[#FBF0DB]")
     expect(html).toContain("En attente (Finance)")
     expect(html).toContain("sm:opacity-0 sm:group-hover:opacity-100")
@@ -189,6 +198,11 @@ describe("Demandes list page", () => {
     expect(html).not.toContain(">Actions</th>")
   })
 
+  // #320: the class-string assertions this file RETAINS are not header
+  // leftovers. This one and the `hideClassFor` block below belong to spec
+  // #305's shared display module, which owns the hide rule — the header module
+  // owns neither. #320 removed only the breadcrumb truncation class this file
+  // duplicated from components/page-header.tsx.
   // #307: the three hidden columns now ask the shared rule for their half of
   // the pair. The pin is the module's own output reaching this page's DOM at
   // each breakpoint, plus the count and the absence of a hand-written pair — so
@@ -244,6 +258,7 @@ describe("Demandes list page", () => {
 
     expect(html).toContain("Rejetée (Manager)")
     expect(html).not.toContain("En attente")
+    // The danger tone is components/status-pill.tsx's TONE_CLASSES.
     expect(html).toContain("bg-[#FBE9E9]")
   })
 })
@@ -261,17 +276,15 @@ describe("Demandes list page — the shared page header", () => {
 
     // This asserts the page's OWN trail rendered through the module, not that
     // an <h1> exists somewhere: a hand-inlined header satisfies a title
-    // assertion and is exactly the regression #261 removed. The breadcrumb
-    // truncation contract (nowrap list, shrinkable last item, truncate on the
-    // page element) is the module's marker — a copy would have to reproduce
-    // all three to pass.
+    // assertion and is exactly the regression #261 removed. What is left here
+    // is the trail the module BUILDS — the page's own crumb labels and the one
+    // separator per crumb, which only the module's breadcrumb emits. #320
+    // removed this block's duplication of the truncation contract, which
+    // components/page-header.tsx pins in full on its own suite.
     // The three-item trail is this page's own, and #262's acceptance criterion
     // for it: one separator per crumb, last item in page treatment.
     expect(html).toContain(">Espace</span>")
     expect(html).toContain(">Demandes de déplacement</span>")
     expect(html.match(/data-slot="breadcrumb-separator"/g)).toHaveLength(2)
-    expect(html).toContain(
-      'class="text-foreground min-w-0 truncate font-medium">'
-    )
   })
 })

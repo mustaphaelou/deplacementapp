@@ -155,6 +155,7 @@ describe("Demande detail page", () => {
 
   it("renders the 720px document column", async () => {
     const html = await renderPage()
+    // The page's OWN 720px document column — no module owns this one.
     expect(html).toContain("max-w-[720px]")
   })
 
@@ -162,8 +163,9 @@ describe("Demande detail page", () => {
     const html = await renderPage()
 
     expect(html).toContain('aria-label="breadcrumb"')
-    expect(html).toContain("text-[40px]")
     expect(html).toContain("Demande DD-2025-0001")
+    // The header module's OWN icon tile, not this page's stepper pills below —
+    // those carry their own bg-primary/10 text-primary runs.
     expect(html).toContain("bg-primary/10")
     expect(html).toContain("Créée le")
   })
@@ -389,16 +391,14 @@ describe("Demande detail page — the shared page header", () => {
 
     // This asserts the page's OWN trail rendered through the module, not that
     // an <h1> exists somewhere: a hand-inlined header satisfies a title
-    // assertion and is exactly the regression #261 removed. The breadcrumb
-    // truncation contract (nowrap list, shrinkable last item, truncate on the
-    // page element) is the module's marker — a copy would have to reproduce
-    // all three to pass.
+    // assertion and is exactly the regression #261 removed. What is left here
+    // is the trail the module BUILDS — the page's own crumb labels and the one
+    // separator per crumb, which only the module's breadcrumb emits. #320
+    // removed this block's duplication of the truncation contract, which
+    // components/page-header.tsx pins in full on its own suite.
     // The detail page's own trail: a link crumb back to the list, then this
     // demande's numero in page treatment.
     expect(html).toContain('href="/demandes"')
-    expect(html).toContain(
-      'class="text-foreground min-w-0 truncate font-medium">N° DD-2025-0001</span>'
-    )
     expect(html.match(/data-slot="breadcrumb-separator"/g)).toHaveLength(1)
   })
 })

@@ -102,9 +102,12 @@ describe("DashboardLayout — the row pill for a DemandeDeplacement", () => {
     )
 
     expect(html).toContain(">Approuvée</span>")
+    // The pill tones are components/status-pill.tsx's TONE_CLASSES
+    // (neutral/pending/success/danger); the layout only chooses one.
     expect(html).toContain("bg-[#E5F3EE]")
     expect(html).toContain('dark:text-zinc-300">Retirée</span>')
     expect(html).toContain(">En attente (Finance)</span>")
+    // The pending tone is components/status-pill.tsx's TONE_CLASSES.
     expect(html).toContain("bg-[#FBF0DB]")
   })
 
@@ -117,6 +120,7 @@ describe("DashboardLayout — the row pill for a DemandeDeplacement", () => {
       />
     )
 
+    // StatusPill's own shape (status-pill.tsx:24).
     expect(html).toContain("rounded-full")
     expect(html).not.toContain('data-slot="badge"')
   })
@@ -136,7 +140,8 @@ describe("DashboardLayout — the page chrome matches its sibling pages", () => 
     expect(html).toContain("Espace")
     expect(html).toContain("Tableau de bord")
     // The primary action sits top-right, above the title — not beside it.
-    expect(html).toContain("text-[40px]")
+    // Owned by components/page-header.tsx (the h1's md: breakpoint and the icon
+    // tile), pinned in full at components/page-header.test.tsx.
     expect(html).toContain("Nouvelle demande")
     expect(html).toContain("bg-primary/10")
     // The h1 is no longer the 2xl semibold heading the old home page used
@@ -382,6 +387,11 @@ describe("DashboardLayout — the row chevron is reachable without a pointer", (
   })
 })
 
+// #320: the class-string assertions this file RETAINS are not header
+// leftovers. The `hideClassFor` block below belongs to spec #305's shared
+// display module, which owns the hide rule — the header module owns neither.
+// #320 removed only the breadcrumb truncation class this file duplicated from
+// components/page-header.tsx.
 // #307: this module carried its OWN hideClassFor — a byte-identical duplicate of
 // the shared one, serving a DIFFERENT table (the config-driven home widget, not
 // the three list pages). The rendered markup cannot show the difference: both
@@ -431,16 +441,16 @@ describe("DashboardLayout — the shared page header", () => {
 
     // This asserts the page's OWN trail rendered through the module, not that
     // an <h1> exists somewhere: a hand-inlined header satisfies a title
-    // assertion and is exactly the regression #261 removed. The breadcrumb
-    // truncation contract (nowrap list, shrinkable last item, truncate on the
-    // page element) is the module's marker — a copy would have to reproduce
-    // all three to pass.
+    // assertion and is exactly the regression #261 removed. What is left here
+    // is the trail the module BUILDS — the page's own crumb labels and the one
+    // separator per crumb, which only the module's breadcrumb emits. #320
+    // removed this block's duplication of the truncation contract, which
+    // components/page-header.tsx pins in full on its own suite.
     // The layout's own trail, plus the CTA it configures — the one call site
     // that already carried gap-4, so the row keeps the module's form.
     expect(html).toContain(">Espace</span>")
-    expect(html).toContain(
-      'class="text-foreground min-w-0 truncate font-medium">Tableau de bord</span>'
-    )
+    // Owned by components/page-header.tsx (the breadcrumb row), pinned in full
+    // at components/page-header.test.tsx.
     expect(html).toContain(
       '<div class="flex items-center justify-between gap-4">'
     )
