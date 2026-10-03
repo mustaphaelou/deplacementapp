@@ -11,6 +11,7 @@ import {
   executeTransition,
 } from "./demande/mutations"
 import type { Role } from "@/lib/auth"
+import { lienFileAttente } from "./workflow"
 
 const TIMEOUT = 30_000
 
@@ -228,6 +229,10 @@ describe(
       expect(payload.config.table.title).toBe(
         "Demandes en attente d'approbation"
       )
+      // #304: the « voir tout » link IS the pipeline's composition for
+      // this Role — asserted as a rule, not as a URL literal. A dashboard
+      // that re-derived it by hand would differ here and fail.
+      expect(payload.config.table.viewAllHref).toBe(lienFileAttente("MANAGER"))
       for (const d of payload.demandes) {
         expect(d.etape).toBe("MANAGER_REVIEW")
         expect(d.decision).toBe("PENDING")
@@ -253,6 +258,10 @@ describe(
       expect(payload.config.table.title).toBe(
         "Demandes en attente d'approbation financière"
       )
+      // #304: the « voir tout » link IS the pipeline's composition for
+      // this Role — asserted as a rule, not as a URL literal. A dashboard
+      // that re-derived it by hand would differ here and fail.
+      expect(payload.config.table.viewAllHref).toBe(lienFileAttente("FINANCE_ADMIN"))
       for (const d of payload.demandes) {
         expect(d.etape).toBe("FINANCE_REVIEW")
         expect(d.decision).toBe("PENDING")
@@ -284,6 +293,10 @@ describe(
       expect(payload.config.table.title).toBe(
         "Demandes en attente d'approbation finale"
       )
+      // #304: the « voir tout » link IS the pipeline's composition for
+      // this Role — asserted as a rule, not as a URL literal. A dashboard
+      // that re-derived it by hand would differ here and fail.
+      expect(payload.config.table.viewAllHref).toBe(lienFileAttente("GENERAL_DIRECTION"))
       for (const d of payload.demandes) {
         expect(d.etape).toBe("DIRECTION_REVIEW")
         expect(d.decision).toBe("PENDING")

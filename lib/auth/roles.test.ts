@@ -12,6 +12,7 @@ import {
   type NavItem,
   type Role,
 } from "./roles"
+import { lienFileAttente } from "../workflow"
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..")
 
@@ -25,35 +26,81 @@ const ROLE_UNION = [
   "GENERAL_DIRECTION",
 ] as const
 
-// Every nav link that opens the demandes list on a queue stage asks for
-// pending rows — a decided demande is not « en attente » (spec #226).
-describe("NAV_ITEMS queue links ask pending", () => {
-  it("carries decision=PENDING on the queue-stage quick links", () => {
+// Every nav link that means « the DemandeDeplacements waiting for me » IS the
+// pipeline's composition for its Role (#304).
+//
+// This used to assert two literal URLs — which is why renaming a lane in the
+// pipeline broke a test that was asserting a STRING rather than a rule, and
+// why the hand-typed navigation literals could drift from the dashboard's
+// without anything noticing. Now the lane lives in exactly one declaration, the
+// link in exactly one composition, and each site is checked against that
+// composition. A site that re-derives its href by hand fails here; a lane rename
+// changes one declaration and this test stays green.
+//
+// The lane's own NAME is pinned in `lib/workflow.test.ts`, beside the
+// declaration that spells it — not here. Spelling it here is the pin this
+// ticket deletes.
+describe("NAV_ITEMS queue links ARE the composition for their Role", () => {
+  it("gives each Role the « waiting » link the pipeline composes for it", () => {
     expect(
       NAV_ITEMS.MANAGER.find((item) => item.label === "En Attente")?.href
-    ).toBe("/demandes?etape=MANAGER_REVIEW&decision=PENDING")
+    ).toBe(lienFileAttente("MANAGER"))
 
     expect(
       NAV_ITEMS.GENERAL_DIRECTION.find(
         (item) => item.label === "Approbations Finales"
       )?.href
-    ).toBe("/demandes?etape=DIRECTION_REVIEW&decision=PENDING")
+    ).toBe(lienFileAttente("GENERAL_DIRECTION"))
   })
 
-  it("carries the filter on every queue-stage demandes link", () => {
-    const queueLinks = Object.values(NAV_ITEMS)
-      .flat()
-      .filter((item) => /^\/demandes\?etape=/.test(item.href))
-      .filter(
+  // The rule, applied to every Role rather than to the two the table happens to
+  // carry today — so a third queue link added tomorrow is covered without a test
+  // edit. A Role with no queue link contributes nothing, which is correct: only
+  // MANAGER and GENERAL_DIRECTION are handed a « waiting » entry.
+  it("carries no hand-composed queue link that disagrees with its Role", () => {
+    const queueLinksOf = (items: NavItem[]): NavItem[] =>
+      items.filter(
         (item) =>
+          /^\/demandes\?etape=/.test(item.href) &&
           !item.href.includes("etape=DRAFT") &&
           !item.href.includes("etape=FINAL")
       )
 
-    expect(queueLinks.length).toBeGreaterThanOrEqual(2)
-    for (const item of queueLinks) {
-      expect(item.href).toContain("&decision=PENDING")
+    let checked = 0
+    for (const role of ROLE_UNION) {
+      for (const item of queueLinksOf(NAV_ITEMS[role] ?? [])) {
+        // The pending Decision is not a substring check any more: it is part of
+        // what the composition IS. A link that forgot it differs from the
+        // composition, and this fails.
+        expect(item.href, `${role} → ${item.label}`).toBe(lienFileAttente(role))
+        checked++
+      }
     }
+
+    // Non-vacuity: a table emptied of its queue links would satisfy the loop
+    // above while asserting nothing.
+    expect(checked).toBeGreaterThanOrEqual(2)
+  })
+
+  // The scoping rule, pinned in the OTHER direction: the links that mean
+  // something else are not compositions of the waiting link and must not be
+  // swept into it. « my drafts » and « finalised » name a Utilisateur's OWN
+  // DemandesDeplacement, which is a different question entirely.
+  it("leaves the links that mean something else out of the composition", () => {
+    for (const role of ROLE_UNION) {
+      for (const item of NAV_ITEMS[role] ?? []) {
+        if (item.href.includes("etape=DRAFT") || item.href.includes("etape=FINAL")) {
+          expect(item.href, `${role} → ${item.label}`).not.toBe(
+            lienFileAttente(role)
+          )
+        }
+      }
+    }
+
+    // And the plain list entry is not a queue link at all.
+    expect(NAV_ITEMS.MANAGER.find((item) => item.label === "Demandes Équipe")?.href).toBe(
+      "/demandes"
+    )
   })
 })
 

@@ -7,6 +7,8 @@ import {
   etatCreation,
   getAllowedActions,
   resoudreTransition,
+  lienFileAttente,
+  DECISION_ATTENTE,
   queueEtape,
   queueEtapes,
   committedEtapes,
@@ -222,6 +224,69 @@ describe("every Role waits on exactly one lane", () => {
       ["FINANCE_ADMIN", "FINANCE_REVIEW"],
       ["GENERAL_DIRECTION", "DIRECTION_REVIEW"],
     ])
+  })
+})
+
+// ─── The waiting-lane link: a pure function of a Role (#304) ────────────────
+
+// The composition is the ONLY place a « waiting » link is spelled, so these
+// tests can hold it to a RULE rather than to a URL. Nothing below renders,
+// routes or touches a database — the composition is a pure function of a Role,
+// and that is precisely what makes it assertable at all.
+//
+// This suite deliberately contains NO literal `/demandes?etape=…` string. The
+// link's shape is asserted in terms of the pipeline's own vocabulary: the Role's
+// waiting lane and the pending Decision. Spelling the URL here would re-create
+// exactly the pin #304 exists to delete — a lane rename would break a test
+// about a URL instead of a test about a rule.
+describe("lienFileAttente", () => {
+  it("is the DemandesDeplacement list filtered to the Role's lane and the pending Decision", () => {
+    for (const role of TOUS_LES_ROLES) {
+      const href = lienFileAttente(role)
+      const params = new URLSearchParams(href.split("?")[1])
+
+      expect(params.get("etape"), `${role} lane`).toBe(queueEtape(role))
+      expect(params.get("decision"), `${role} Decision`).toBe(DECISION_ATTENTE)
+      expect(href.startsWith("/demandes?"), `${role} route`).toBe(true)
+    }
+  })
+
+  it("filters on the pending Decision, not on any terminal one", () => {
+    // The « waiting » rule is PENDING ⟺ non-terminal. Asserting it through the
+    // predicate rather than by naming the Decisions keeps this honest if the
+    // pending Decision is ever re-spelled — and it is what makes a link that
+    // forgot the pending filter a failure rather than a near miss.
+    expect(isPendingDecision(DECISION_ATTENTE)).toBe(true)
+
+    for (const role of TOUS_LES_ROLES) {
+      const decision = new URLSearchParams(
+        lienFileAttente(role).split("?")[1]
+      ).get("decision")
+
+      expect(decision, `${role} carries a terminal Decision`).not.toBeNull()
+      expect(isPendingDecision(decision as Decision), role).toBe(true)
+    }
+  })
+
+  it("gives each Role a DIFFERENT link — it is a function of the Role", () => {
+    // Non-vacuity: a composition that ignored its argument and returned one
+    // constant would satisfy both tests above while sending every Role to the
+    // same lane.
+    const hrefs = TOUS_LES_ROLES.map((role) => lienFileAttente(role))
+    expect(new Set(hrefs).size).toBe(TOUS_LES_ROLES.length)
+    expect(TOUS_LES_ROLES.length).toBeGreaterThan(1)
+  })
+
+  it("follows the pipeline: changing the declared lane changes the link", () => {
+    // THE PROPERTY THIS TICKET BUYS, demonstrated rather than asserted in
+    // prose. The link is computed from `PIPELINE_VIEWS` at call time, so a
+    // lane the declaration carries cannot produce a link naming the old one.
+    // Before this composition existed, a rename left six hand-typed URLs
+    // pointing at a lane that no longer existed.
+    for (const role of TOUS_LES_ROLES) {
+      expect(lienFileAttente(role)).toContain(`etape=${PIPELINE_VIEWS[role].queue[0]}`)
+      expect(lienFileAttente(role)).toContain(`etape=${queueEtape(role)}`)
+    }
   })
 })
 
