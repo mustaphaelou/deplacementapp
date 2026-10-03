@@ -69,8 +69,12 @@ describe("NotificationModule", () => {
     const db = mockDb()
     db.select = mockSelectResult([{ id: "mgr-hr" }])
 
-    const bus = new NotificationModule(adapter, db as any)
-    const result = await bus.dispatch("DEMANDE_SOUMISE", makePayload())
+    const bus = new NotificationModule(adapter)
+    const result = await bus.dispatch(
+      "DEMANDE_SOUMISE",
+      makePayload(),
+      db as any
+    )
 
     expect(result.total).toBe(1)
     expect(result.succeeded).toBe(1)
@@ -89,8 +93,12 @@ describe("NotificationModule", () => {
     const db = mockDb()
     db.select = mockSelectResult([{ id: "mgr-hr" }])
 
-    const bus = new NotificationModule(adapter, db as any)
-    const result = await bus.dispatch("DEMANDE_SOUMISE", makePayload())
+    const bus = new NotificationModule(adapter)
+    const result = await bus.dispatch(
+      "DEMANDE_SOUMISE",
+      makePayload(),
+      db as any
+    )
 
     expect(result.total).toBe(1)
     expect(result.succeeded).toBe(0)
@@ -112,8 +120,12 @@ describe("NotificationModule", () => {
     const db = mockDb()
     db.select = mockSelectResult([{ id: "mgr-hr-1" }, { id: "mgr-hr-2" }])
 
-    const bus = new NotificationModule(adapter, db as any)
-    const result = await bus.dispatch("DEMANDE_SOUMISE", makePayload())
+    const bus = new NotificationModule(adapter)
+    const result = await bus.dispatch(
+      "DEMANDE_SOUMISE",
+      makePayload(),
+      db as any
+    )
 
     expect(result.total).toBe(2)
     expect(result.succeeded).toBe(1)
@@ -127,10 +139,11 @@ describe("NotificationModule", () => {
     const db = mockDb()
     db.select = mockSelectResult([])
 
-    const bus = new NotificationModule(adapter, db as any)
+    const bus = new NotificationModule(adapter)
     const result = await bus.dispatch(
       "DEMANDE_APPROBATION_FINALE",
-      makePayload()
+      makePayload(),
+      db as any
     )
 
     expect(result.total).toBe(1)
@@ -142,8 +155,8 @@ describe("NotificationModule", () => {
     const db = mockDb()
     db.select = mockSelectResult([{ id: "fin-1" }])
 
-    const bus = new NotificationModule(adapter, db as any)
-    await bus.dispatch("DEMANDE_APPROBATION_MANAGER", makePayload())
+    const bus = new NotificationModule(adapter)
+    await bus.dispatch("DEMANDE_APPROBATION_MANAGER", makePayload(), db as any)
 
     const call = adapter.send.mock.calls[0]?.[0] as
       NotificationMessage | undefined
@@ -156,10 +169,10 @@ describe("NotificationModule", () => {
   it("dispatch notifies employee for rejection events", async () => {
     const adapter = mockAdapter()
     const db = mockDb()
-    const bus = new NotificationModule(adapter, db as any)
+    const bus = new NotificationModule(adapter)
 
     const payload = makePayload()
-    await bus.dispatch("DEMANDE_REJETEE", payload)
+    await bus.dispatch("DEMANDE_REJETEE", payload, db as any)
 
     expect(adapter.send).toHaveBeenCalledTimes(1)
     const call = adapter.send.mock.calls[0]?.[0] as NotificationMessage
@@ -170,11 +183,12 @@ describe("NotificationModule", () => {
   it("dispatch notifies assignee on withdraw with assigneAId set", async () => {
     const adapter = mockAdapter()
     const db = mockDb()
-    const bus = new NotificationModule(adapter, db as any)
+    const bus = new NotificationModule(adapter)
 
     await bus.dispatch(
       "DEMANDE_RETIREE",
-      makePayload({ assigneAId: "approver-1" })
+      makePayload({ assigneAId: "approver-1" }),
+      db as any
     )
 
     expect(adapter.send).toHaveBeenCalledTimes(1)
@@ -185,9 +199,13 @@ describe("NotificationModule", () => {
   it("dispatch does not notify assignee on withdraw when assigneAId is null", async () => {
     const adapter = mockAdapter()
     const db = mockDb()
-    const bus = new NotificationModule(adapter, db as any)
+    const bus = new NotificationModule(adapter)
 
-    await bus.dispatch("DEMANDE_RETIREE", makePayload({ assigneAId: null }))
+    await bus.dispatch(
+      "DEMANDE_RETIREE",
+      makePayload({ assigneAId: null }),
+      db as any
+    )
 
     expect(adapter.send).not.toHaveBeenCalled()
   })
@@ -195,10 +213,10 @@ describe("NotificationModule", () => {
   it("dispatch notifies employee on final approval", async () => {
     const adapter = mockAdapter()
     const db = mockDb()
-    const bus = new NotificationModule(adapter, db as any)
+    const bus = new NotificationModule(adapter)
 
     const payload = makePayload()
-    await bus.dispatch("DEMANDE_APPROBATION_FINALE", payload)
+    await bus.dispatch("DEMANDE_APPROBATION_FINALE", payload, db as any)
 
     expect(adapter.send).toHaveBeenCalledTimes(1)
     const call = adapter.send.mock.calls[0]?.[0] as NotificationMessage
@@ -211,7 +229,7 @@ describe("NotificationModule", () => {
     const db = mockDb()
     db.select = mockSelectResult([{ id: "mgr-hr" }])
 
-    const bus = new NotificationModule(adapter, db as any)
+    const bus = new NotificationModule(adapter)
     const payload = makePayload({
       employe: {
         id: "emp-1",
@@ -220,7 +238,11 @@ describe("NotificationModule", () => {
         departementId: "dept-hr",
       },
     })
-    const result = await bus.dispatch("DEMANDE_NOTIFICATION_LUE", payload)
+    const result = await bus.dispatch(
+      "DEMANDE_NOTIFICATION_LUE",
+      payload,
+      db as any
+    )
 
     expect(result.total).toBe(1)
     expect(adapter.send).toHaveBeenCalledTimes(1)
@@ -236,25 +258,59 @@ describe("NotificationModule", () => {
     const db = mockDb()
     db.select = mockSelectResult([{ id: "mgr-1" }])
 
-    const bus = new NotificationModule(adapter, db as any)
+    const bus = new NotificationModule(adapter)
     const payload = makePayload({
       employe: { id: "emp-1", prenom: "Jean", nom: "Dupont" },
     })
-    const result = await bus.dispatch("DEMANDE_NOTIFICATION_LUE", payload)
+    const result = await bus.dispatch(
+      "DEMANDE_NOTIFICATION_LUE",
+      payload,
+      db as any
+    )
 
     expect(result.total).toBe(0)
     expect(adapter.send).not.toHaveBeenCalled()
   })
 
-  it("dispatch passes the module's db to send explicitly", async () => {
+  // This test used to read "dispatch passes the module's db to send
+  // explicitly", and asserted the handle the module was constructed with. This
+  // ticket deletes that handle, so the test's premise went with it; the
+  // assertion it was reaching for — that `send` gets the handle the call is
+  // working through — survives and is now stated in full.
+  //
+  // It is also the load-bearing assertion of the ticket, and the mirror of the
+  // dispatchRows test below. Before, a caller holding a transaction could reach
+  // dispatchRows with that transaction and could not reach dispatch at all:
+  // dispatch wrote through the handle captured at construction. The module is
+  // built here with an adapter and nothing else — there is no second handle it
+  // could have reached for — so if every write below is `tx`, by identity, then
+  // the transaction the caller holds is the transaction the rows are written in.
+  it("dispatch writes every row and sends mail through the caller's transaction", async () => {
     const adapter = mockAdapter()
-    const db = mockDb()
-    db.select = mockSelectResult([{ id: "mgr-hr" }])
+    const tx = mockDb()
+    tx.select = mockSelectResult([{ id: "mgr-hr" }])
 
-    const bus = new NotificationModule(adapter, db as any)
-    await bus.dispatch("DEMANDE_SOUMISE", makePayload())
+    const bus = new NotificationModule(adapter)
+    await bus.dispatch("DEMANDE_SOUMISE", makePayload(), tx as any)
 
-    expect(adapter.send.mock.calls[0][1]).toBe(db)
+    // Recipients resolved from the caller's transaction.
+    expect(tx.select).toHaveBeenCalled()
+    // The Notification row written through it.
+    expect(adapter.send).toHaveBeenCalledTimes(1)
+    const [message, sendArg] = adapter.send.mock.calls[0] as [
+      NotificationMessage,
+      unknown,
+    ]
+    expect(message.utilisateurId).toBe("mgr-hr")
+    expect(sendArg).toBe(tx)
+    // And the mail read through it, not through a handle of its own.
+    expect(sendEmail).toHaveBeenCalledTimes(1)
+    const [emailMessage, emailArg] = vi.mocked(sendEmail).mock.calls[0] as [
+      NotificationMessage,
+      unknown,
+    ]
+    expect(emailMessage).toBe(message)
+    expect(emailArg).toBe(tx)
   })
 
   it("dispatchRows resolves recipients from the caller's tx and calls send with (message, tx)", async () => {
@@ -262,7 +318,7 @@ describe("NotificationModule", () => {
     const tx = mockDb()
     tx.select = mockSelectResult([{ id: "mgr-hr" }])
 
-    const bus = new NotificationModule(adapter, tx as any)
+    const bus = new NotificationModule(adapter)
     await bus.dispatchRows("DEMANDE_SOUMISE", makePayload(), tx as any)
 
     expect(adapter.send).toHaveBeenCalledTimes(1)
@@ -280,7 +336,7 @@ describe("NotificationModule", () => {
     const tx = mockDb()
     tx.select = mockSelectResult([{ id: "mgr-hr" }])
 
-    const bus = new NotificationModule(adapter, tx as any)
+    const bus = new NotificationModule(adapter)
     await bus.dispatchRows("DEMANDE_SOUMISE", makePayload(), tx as any)
 
     expect(sendEmail).not.toHaveBeenCalled()
@@ -295,7 +351,7 @@ describe("NotificationModule", () => {
     const tx = mockDb()
     tx.select = mockSelectResult([{ id: "mgr-hr" }])
 
-    const bus = new NotificationModule(adapter, tx as any)
+    const bus = new NotificationModule(adapter)
     await expect(
       bus.dispatchRows("DEMANDE_SOUMISE", makePayload(), tx as any)
     ).rejects.toThrow("DB write error")
@@ -306,7 +362,7 @@ describe("NotificationModule", () => {
     const tx = mockDb()
     tx.select = mockSelectResult([{ id: "mgr-1" }])
 
-    const bus = new NotificationModule(adapter, tx as any)
+    const bus = new NotificationModule(adapter)
     const payload = makePayload({
       employe: { id: "emp-1", prenom: "Jean", nom: "Dupont" },
     })
@@ -334,8 +390,8 @@ describe("NotificationModule", () => {
     })
     db.select = mockSelectResult([{ id: "mgr-hr" }])
 
-    const bus = new NotificationModule(adapter, db as any)
-    await bus.markAsRead("notif-1", "emp-1")
+    const bus = new NotificationModule(adapter)
+    await bus.markAsRead("notif-1", "emp-1", db as any)
 
     expect(db.update).toHaveBeenCalled()
     expect(adapter.send).toHaveBeenCalledTimes(1)
@@ -361,8 +417,8 @@ describe("NotificationModule", () => {
       demande: { id: "d-1", numero: "DD-2025-0001" },
     })
 
-    const bus = new NotificationModule(adapter, db as any)
-    await bus.markAsRead("notif-1", "emp-1")
+    const bus = new NotificationModule(adapter)
+    await bus.markAsRead("notif-1", "emp-1", db as any)
 
     expect(db.update().set().where().returning).not.toHaveBeenCalled()
     expect(adapter.send).not.toHaveBeenCalled()
@@ -385,8 +441,8 @@ describe("NotificationModule", () => {
       demande: { id: "d-1", numero: "DD-2025-0001" },
     })
 
-    const bus = new NotificationModule(adapter, db as any)
-    await bus.markAsRead("notif-1", "mgr-1")
+    const bus = new NotificationModule(adapter)
+    await bus.markAsRead("notif-1", "mgr-1", db as any)
 
     expect(db.update).toHaveBeenCalled()
     expect(adapter.send).not.toHaveBeenCalled()
@@ -397,9 +453,9 @@ describe("NotificationModule", () => {
     const db = mockDb()
     db.query.notifications.findFirst = vi.fn().mockResolvedValue(null)
 
-    const bus = new NotificationModule(adapter, db as any)
+    const bus = new NotificationModule(adapter)
     await expect(
-      bus.markAsRead("notif-nonexistent", "emp-1")
+      bus.markAsRead("notif-nonexistent", "emp-1", db as any)
     ).rejects.toBeInstanceOf(NotificationNotFoundError)
   })
 
@@ -420,8 +476,8 @@ describe("NotificationModule", () => {
       demande: { id: "d-1", numero: "DD-2025-0001" },
     })
 
-    const bus = new NotificationModule(adapter, db as any)
-    const promise = bus.markAsRead("notif-1", "emp-2")
+    const bus = new NotificationModule(adapter)
+    const promise = bus.markAsRead("notif-1", "emp-2", db as any)
     await expect(promise).rejects.toBeInstanceOf(UnauthorizedActionError)
     await expect(promise).rejects.toMatchObject({
       status: 403,
@@ -449,10 +505,10 @@ describe("NotificationModule", () => {
       demande: { id: "d-1", numero: "DD-2025-0001" },
     })
 
-    const bus = new NotificationModule(adapter, db as any)
-    await expect(bus.markAsRead("notif-1", "mgr-2")).rejects.toBeInstanceOf(
-      UnauthorizedActionError
-    )
+    const bus = new NotificationModule(adapter)
+    await expect(
+      bus.markAsRead("notif-1", "mgr-2", db as any)
+    ).rejects.toBeInstanceOf(UnauthorizedActionError)
     expect(db.update().set().where().returning).not.toHaveBeenCalled()
   })
 
@@ -473,8 +529,8 @@ describe("NotificationModule", () => {
       demande: null,
     })
 
-    const bus = new NotificationModule(adapter, db as any)
-    await bus.markAsRead("notif-1", "emp-1")
+    const bus = new NotificationModule(adapter)
+    await bus.markAsRead("notif-1", "emp-1", db as any)
 
     expect(db.update).toHaveBeenCalled()
     expect(adapter.send).not.toHaveBeenCalled()
