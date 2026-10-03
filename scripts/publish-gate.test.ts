@@ -124,6 +124,12 @@ interface Job {
   needs?: string | string[]
   outputs?: Record<string, unknown>
   steps?: Step[]
+  // GitHub Actions accepts either spelling, but a YAML key is a literal string:
+  // `timeout-minutes` does NOT become `timeout_minutes` when parsed. Reading
+  // the underscored form returns undefined on a file that is fully compliant,
+  // which is how a gate teaches you to distrust itself.
+  "timeout-minutes"?: number
+  timeout_minutes?: number
   strategy?: {
     matrix?: {
       include?: Record<string, string>[]
@@ -415,7 +421,76 @@ describe(".github/workflows/docker-publish.yml", () => {
       expect(tags).toContain("type=sha,format=long")
       expect(tags).toContain("value=latest")
       expect(tags).toContain("needs.publish-check.outputs.is_release")
-      expect(tags).toContain("github.event.repository.default_branch")
+
+      // `latest` must move ONLY on a Release. This arm used to be a union with
+      // `github.ref == refs/heads/<default_branch>`, which meant every merge to
+      // main republished a public rolling alias of unreviewed code — the exact
+      // hole ADR-0015 closed by moving release-ness behind a gate. With
+      // build-and-push now gated on is_release, that arm was dead weight, and
+      // leaving it in place would silently re-open the hole the day the gate
+      // was ever loosened. Asserted as an ABSENCE so the union cannot be
+      // restored by appending it back: a `toContain("default_branch")` pin
+      // would pass on the very string that causes the defect.
+      expect(tags).not.toContain("github.event.repository.default_branch")
+      expect(tags).not.toContain("refs/heads/")
+    })
+
+    it("gates the only image-pushing job on is_release, with the dry-run dispatch as its sole other arm", () => {
+      const push = job("build-and-push").if ?? ""
+      // Branch pushes must never reach this job. `is_release` is the single
+      // owner of release-ness (release-gate), so the gate is that output and
+      // not a second spelling of "is this a release".
+      expect(push).toContain("needs.publish-check.outputs.is_release == 'true'")
+      // The dry-run arm is load-bearing, not decorative: `deploy` needs
+      // build-and-push, so without this arm a dry-run dispatch finds a skipped
+      // dependency and the documented dry run silently never runs.
+      expect(push).toContain("inputs.deploy-dry-run == 'true'")
+      expect(push).toContain("github.event_name")
+      // Both arms are required — either one alone is a different workflow.
+      expect(push).toContain("||")
+      expect(push).toContain("!=")
+    })
+
+    it("still smoke-tests on a branch push, so verify coverage does not depend on a Release", () => {
+      // The image PUSH is release-gated; the smoke test deliberately is not.
+      // If both were gated, a Dockerfile or compose regression would sit on
+      // main until the next Release — and the first tag cut would be the run
+      // that discovered it. publish-check must keep running on branch pushes.
+      const check = job("publish-check").if ?? ""
+      expect(check).toContain("github.event_name != 'pull_request'")
+      expect(check).not.toContain("is_release")
+      expect(job("build-and-push").needs).toContain("publish-check")
+    })
+
+    it("caps every job with a timeout so a wedged runner cannot hold its concurrency group for 6h", () => {
+      const jobs = loadWorkflow().jobs ?? {}
+      for (const name of ["verify", "publish-check", "build-and-push", "release", "deploy"]) {
+        const minutes = jobs[name]?.["timeout-minutes"]
+        expect(minutes, `${name} has no timeout-minutes`).toBeTypeOf("number")
+        expect(minutes as number).toBeGreaterThan(0)
+        expect(minutes as number).toBeLessThanOrEqual(60)
+      }
+    })
+
+    it("runs CI on the Node version the production image runs", () => {
+      // Dockerfile pins node:24-alpine. A CI runner on a different major tests
+      // a runtime production never executes, so a failure rate that says
+      // "green" can mean "never ran here". Both workflows, or the drift returns.
+      const dockerfile = readFileSync(join(ROOT, "Dockerfile"), "utf8")
+      const image = /^FROM node:(\d+)/m.exec(dockerfile)?.[1]
+      expect(image, "could not read the Node major out of the Dockerfile").toBeTruthy()
+      const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"))
+      expect(pkg.engines?.node).toContain(image as string)
+      for (const path of [
+        WORKFLOW_PATH,
+        join(ROOT, ".github/workflows/frontend-sweep.yml"),
+      ]) {
+        const workflow = readFileSync(path, "utf8")
+        expect(
+          workflow,
+          `${path} pins a Node major other than ${image}`
+        ).not.toMatch(/node-version:\s*(?!24)\d+/)
+      }
     })
 
     it("keeps a matrix job output out of gating (last-to-finish semantics)", () => {

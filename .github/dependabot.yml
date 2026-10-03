@@ -1,0 +1,63 @@
+# Dependency updates.
+#
+# Dependabot has no configuration file today, so every alert arrives as its own
+# PR and security updates ride the repo-level "grouped" setting. That setting
+# groups by ecosystem, which is too coarse for a repo whose vitest family pins
+# exact versions (@vitest/coverage-v8 and @vitest/mocker both pin vitest itself,
+# so an ordinary `npm update vitest` cannot move them — they need
+# `npm install -D vitest@X @vitest/coverage-v8@X` together).
+#
+# The grouping below is per-dependency-name on purpose: it lets a wave land as
+# one PR per package rather than one PR bundling an unrelated major with a patch.
+version: 2
+
+updates:
+  # Security first, daily. Grouped by advisory target so a single CVE's fix
+  # lands alone and is reviewable on its own merits.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: daily
+      day: friday
+      time: "07:20"
+    open-pull-requests-limit: 5
+    labels: [dependencies, security]
+    commit-message:
+      prefix: "security"
+    groups:
+      npm-security:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  # Everything else, weekly, grouped per package so a major bump never rides
+  # along with an unrelated patch.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:40"
+    open-pull-requests-limit: 10
+    labels: [dependencies]
+    commit-message:
+      prefix: "deps"
+    groups:
+      npm-patch:
+        patterns: ["*"]
+        update-types: ["patch"]
+      npm-minor:
+        patterns: ["*"]
+        update-types: ["minor"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:45"
+    labels: [dependencies, ci]
+    commit-message:
+      prefix: "ci"
+    groups:
+      actions:
+        patterns: ["*"]
