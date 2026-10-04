@@ -177,9 +177,12 @@ describe("resolveRecipients — the activity rule comes from the Utilisateur rea
    * home — so it is here, where the rule actually lives and where the answer
    * comes from rows rather than from a stub.
    *
-   * The seed above deliberately holds two active MANAGERs in `rhId`: a rule that
-   * stopped consulting `departementId` altogether would resolve to BOTH of them,
-   * so `[]` is only reachable by the department check itself.
+   * The seed above is what makes `[]` a decision rather than an accident: it
+   * holds an active MANAGER in `rhId`, so a resolver that simply dropped the
+   * `departementId` check would still resolve to somebody and this test would
+   * go red. It is one per Departement, not two — the second active MANAGER is in
+   * `marketingId`, so the department filter and the activity filter stay two
+   * independent axes rather than one entangled condition.
    */
   it("resolves a department-scoped event to nobody when the employee has no departementId", async () => {
     const recipients = await resolveRecipients(

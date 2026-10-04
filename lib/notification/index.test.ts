@@ -36,7 +36,7 @@ import { createPgliteDb } from "../test/create-pglite-db"
 import type { PgliteDb } from "../test/create-pglite-db"
 import { dispatch, dispatchRows, markAsRead } from "./index"
 import { sendEmail } from "./adapter"
-import { NotificationWriteError } from "./dispatch-failure"
+import { NotificationMailError, NotificationWriteError } from "./dispatch-failure"
 import type { NotificationFailureReporter } from "./dispatch-failure"
 import type { NotificationPayload } from "./index"
 import { NotificationNotFoundError, UnauthorizedActionError } from "../errors"
@@ -70,7 +70,7 @@ let managerAutreDept: string
 let financeId: string
 let demandeId: string
 
-/** Every Notification row, in insertion order. */
+/** Every Notification row. */
 const notificationRows = () => pgliteDb.select().from(schema.notifications)
 
 beforeEach(() => {
@@ -201,17 +201,20 @@ const mailedTo = () =>
 /**
  * « No mail went out. »
  *
- * Asserted on `mock.calls`, NOT as `expect(sendEmail).not.toHaveBeenCalled()`.
- * That form passes quietly and then, when it FAILS — which is the only time it
- * has anything to say — sends vitest off to serialize the mock's own object
- * graph, which holds the Drizzle handle and everything it references. The
- * worker died of heap exhaustion before it could print a line of failure
- * output, twice, on a suite that was otherwise green. `mock.calls` is a plain
- * array of message tuples, so a failing assertion prints the two mails that
- * should not have been sent.
+ * Asserted on the RECIPIENTS rather than as `expect(sendEmail).not
+ * .toHaveBeenCalled()` and not even on `mock.calls` length. That form passes
+ * quietly and then, when it FAILS — which is the only time it has anything to
+ * say — sends vitest off to serialize the mock's own object graph, which holds
+ * the Drizzle handle and everything it references. The worker died of heap
+ * exhaustion before printing a line of failure output, twice, on a suite that
+ * was otherwise green.
+ *
+ * `mailedTo()` reduces the calls to the ids they went to, so the failure prints
+ * WHO was mailed instead of a count — the assertion a reader actually needs —
+ * and a plain array of strings never drags the handle into the diff.
  */
 const expectNoMail = () => {
-  expect(vi.mocked(sendEmail).mock.calls).toHaveLength(0)
+  expect(mailedTo()).toEqual([])
 }
 
 /** The seeded Utilisateur as the database holds it — the seed, verified. */
@@ -560,27 +563,6 @@ describe("markAsRead reads the row and then reports on it", { timeout: TIMEOUT }
 })
 
 /**
- * #311 — the two entries' different failure promises, proved from outside.
- *
- * Everything above reaches the module through its exported names and asserts
- * against a real database; these two call the same names and assert the same
- * way. That is the point #310 bought and the reason these tests are written
- * this way — the promises are part of the interface now, so they have to be
- * observable through the interface.
- *
- * Both assertions are about ROWS. « The call threw » and « the call did not
- * throw » are about the call, not about the data, and a promise about what
- * survives a failure is only provable by looking at what survived.
- *
- * AC5 — the transition path — is NOT re-tested here. `appliquerEffets(tx, …)`
- * in `lib/demande/effets-transition.test.ts` already drives `dispatchRows`
- * through a real transaction against PGlite and asserts the audit row and the
- * notification rows together, which is the seam AC5 names: the module's own
- * entry, reached the way a DemandeDeplacement transition reaches it. Two
- * suites asserting one transition would be one seam tested twice and neither
- * better.
- */
-/**
  * Every message in an error's cause chain, outermost first.
  *
  * Drizzle wraps a driver error in its own before re-throwing, so the sentence
@@ -597,6 +579,27 @@ const causesOf = (error: Error): string[] => {
   return messages
 }
 
+/**
+ * #311 — the two entries' different failure promises, proved from outside.
+ *
+ * Everything above reaches the module through its exported names and asserts
+ * against a real database; these call the same names and assert the same way.
+ * That is the point #310 bought and the reason they are written this way — the
+ * promises are part of the interface now, so they have to be observable through
+ * the interface.
+ *
+ * Both assertions are about ROWS. « The call threw » and « the call did not
+ * throw » are about the call, not about the data, and a promise about what
+ * survives a failure is only provable by looking at what survived.
+ *
+ * AC5 — the transition path — is NOT re-tested here. `appliquerEffets(tx, …)`
+ * in `lib/demande/effets-transition.test.ts` already drives `dispatchRows`
+ * through a real transaction against PGlite and asserts the audit row and the
+ * notification rows together, which is the seam AC5 names: the module's own
+ * entry, reached the way a DemandeDeplacement transition reaches it. Two
+ * suites asserting one transition would be one seam tested twice and neither
+ * better.
+ */
 describe("the two dispatch entries' failure promises", { timeout: TIMEOUT }, () => {
   /**
    * AC3 — the all-or-nothing half, proved by rollback rather than by the throw.
@@ -713,5 +716,85 @@ describe("the two dispatch entries' failure promises", { timeout: TIMEOUT }, () 
     // And it carries the status `handleServiceError` answers in, so the route
     // it reaches needs no second translation.
     expect(reported[0].status).toBe(500)
+  })
+
+  /**
+   * The promise the doc comment makes, on the one path that was breaking it.
+   *
+   * Resolving recipients is a real query, so it can fail — and it sat OUTSIDE
+   * the settled work, which meant a failure there rejected `dispatch` outright.
+   * The caller that matters is `markAsRead`, which has already written `lu`
+   * inside its own transaction when it calls this: an exception here undid the
+   * receipt, which is the one outcome this entry exists to prevent.
+   *
+   * The handle below refuses the recipient query and nothing else, so the
+   * failure is exactly the one that used to escape.
+   */
+  it("dispatch reports a failing recipient query instead of throwing", async () => {
+    const reported: Array<NotificationWriteError | NotificationMailError> = []
+    const report: NotificationFailureReporter = (failure) => {
+      reported.push(failure)
+    }
+
+    const broken = new Proxy(pgliteDb, {
+      get(target, prop, receiver) {
+        if (prop === "select") return () => {
+          throw new Error("recipient query failed")
+        }
+        return Reflect.get(target, prop, receiver)
+      },
+    })
+
+    await expect(
+      dispatch("DEMANDE_SOUMISE", payloadFor(), broken as never, report)
+    ).resolves.toBeUndefined()
+
+    expect(reported).toHaveLength(1)
+    expect(reported[0]).toBeInstanceOf(NotificationWriteError)
+    // Nobody was named, because nobody was resolved — and saying so is more
+    // useful than naming an arbitrary Utilisateur.
+    expect(reported[0].message).toContain("recipient")
+    expect(reported[0].cause).toMatchObject({ message: "recipient query failed" })
+    // No row was written, because no recipient was ever found.
+    expect(await notificationRows()).toHaveLength(0)
+  })
+
+  /**
+   * A mail that could not be sent is not a Notification that was not written.
+   *
+   * Both happen inside the same `Promise.allSettled`, so reporting one as the
+   * other was easy and would have sent an operator to look for rows that were
+   * there all along. The two facts get separate classes so the report says which
+   * one happened.
+   *
+   * ONE of the two mails fails and the other goes out, which is the shape that
+   * makes the distinction observable: both rows exist, so « a row is missing »
+   * is false for both recipients, and the one report that comes back has to be
+   * about the mail or it is about nothing.
+   */
+  it("dispatch distinguishes a failed mail from a failed write", async () => {
+    const reported: Array<NotificationWriteError | NotificationMailError> = []
+    const report: NotificationFailureReporter = (failure) => {
+      reported.push(failure)
+    }
+
+    vi.mocked(sendEmail).mockRejectedValueOnce(new Error("smtp unreachable"))
+
+    await expect(
+      dispatch("DEMANDE_SOUMISE", payloadFor(), pgliteDb as never, report)
+    ).resolves.toBeUndefined()
+
+    // BOTH rows were written — that is the whole distinction — and neither
+    // recipient is missing a Notification.
+    expect(await notificationRows()).toHaveLength(2)
+    expect(recipientsOf(await notificationRows())).toEqual(
+      [managerA, managerB].sort()
+    )
+    // One report, and it is about the mail: an operator reading « the write
+    // failed » here would go looking for rows that exist.
+    expect(reported).toHaveLength(1)
+    expect(reported[0]).toBeInstanceOf(NotificationMailError)
+    expect(reported[0].message).toContain("not mailed")
+    expect([managerA, managerB]).toContain(reported[0].utilisateurId)
   })
 })

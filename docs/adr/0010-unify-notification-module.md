@@ -34,7 +34,7 @@ lib/notification/
 
 `DrizzleNotificationAdapter.send` becomes a thin row-writer (one concern: insert the notification row). An exported `sendEmail(notification, db)` function in `lib/notification/adapter.ts` handles recipient lookup from `utilisateurs` + HTML template build + `emailSender.send`. `dispatch` orchestrates: resolve recipients → build message → insert row via adapter → send email via `sendEmail`.
 
-The `NotificationAdapter` interface and `AdapterResult` type are declared in `adapter.ts` (moved from `notification-bus.ts`). The interface seam is preserved — the orchestration test suite continues to use the same `mockAdapter()` pattern.
+The `NotificationAdapter` interface and `AdapterResult` type are declared in `adapter.ts` (moved from `notification-bus.ts`). The interface seam is preserved — the orchestration test suite continues to use the same `mockAdapter()` pattern. *(Post-adoption annotation: the second half of that sentence no longer holds. Issue #312 deleted `mockAdapter()`, `mockSelectResult` and `mockDb` and converted the suite to PGLite; the suite no longer substitutes the interface. The interface itself stays declared, because the class is still constructed with one — what went is the tests' use of it, not the seam it declares. See the annotations in Rationale and Consequences.)*
 
 ### `buildMessage` / `resolveRecipients` relocation
 
@@ -60,6 +60,8 @@ export const dispatch = _default.dispatch.bind(_default)
 export const markAsRead = _default.markAsRead.bind(_default)
 ```
 
+*(Post-adoption annotation: this sketch records the shape as adopted and no longer describes the code. Issue #310 removed `_db` from the constructor — the handle is a per-call parameter on all three entries — and issue #311 deleted `DispatchResult`, which had no production reader, replacing it with an optional `reportFailure` reporter and a `Promise<void>`. The bound exports below were also replaced by free functions that default the handle to `db`; see the annotation in Rationale.)*
+
 `listForUser` and `countUnread` are free functions (no class wrapper):
 
 ```ts
@@ -77,7 +79,7 @@ export async function countUnread(userId: string, db: DrizzleDb): Promise<number
 
 | Layer | Seam | Rationale |
 |---|---|---|
-| `dispatch` / `markAsRead` orchestration | `NotificationAdapter` interface mock | Valid seam; no hidden SQL bug; 330-line suite migrated with import-path updates |
+| `dispatch` / `markAsRead` orchestration | PGLite, through the exported entries | *(Post-adoption annotation, #312: was `NotificationAdapter` interface mock. The mock could not be wrong — the module asked for the managers and the mock produced them — so what the suite said about recipient rules was a statement about the stub. Tests state rows now.)* |
 | `DrizzleNotificationAdapter.send` (row insert) | PGLite | Confirms row lands in `notifications` table with correct fields |
 | `sendEmail` (recipient lookup + email) | PGLite + mock `emailSender` | Real SQL for the `utilisateurs` select; transport stays mocked |
 | `listForUser` / `countUnread` | PGLite | Surfaces `lu = false` bug; real ordering and limit behaviour |
