@@ -119,6 +119,78 @@ export class NumeroCollisionError extends Error {
   }
 }
 
+/**
+ * A Notification write that did not happen, reported by the best-effort entry
+ * so the failure leaves the module instead of travelling back to a caller that
+ * cannot act on it.
+ *
+ * The class lives here and not in the Notification module because ADR-0002
+ * decides that domain error classes are consolidated in this file, and this one
+ * is a domain error by that ADR's own definition: a numeric `.status` plus a
+ * message, which is exactly what `handleServiceError` reads.
+ */
+export class NotificationWriteError extends Error {
+  /**
+   * A Notification that did not happen is a server-side failure. An error
+   * without a numeric status is an unknown error to `handleServiceError`, and it
+   * answers « Erreur interne » — the report stops naming its cause. See ADR 0022.
+   *
+   * Nothing routes this error to `handleServiceError` yet: the module's default
+   * reporter logs. The status is the shape the seam will use the day a route
+   * wires it up, not one it is used by today.
+   */
+  status = 500
+
+  /**
+   * What the failure is about, in the terms an operator needs.
+   *
+   * A Utilisateur's id on the usual path, because the question the report
+   * answers is « whose receipt is missing ». On a resolve failure it names the
+   * whole audience instead — there is no single Utilisateur to name when the
+   * query that would have found them never came back — so this is a label, not
+   * a foreign key, and nothing may look an id up by it.
+   */
+  readonly utilisateurId: string
+
+  constructor(utilisateurId: string, cause: unknown) {
+    super(
+      `Notification write failed for ${utilisateurId}: ${
+        cause instanceof Error ? cause.message : String(cause)
+      }`
+    )
+    this.name = "NotificationWriteError"
+    this.utilisateurId = utilisateurId
+    this.cause = cause
+  }
+}
+
+/**
+ * The Notification was written; its MAIL was not sent.
+ *
+ * A separate class rather than a flag on {@link NotificationWriteError}, because
+ * the two send an operator to different places. « The row is missing » means
+ * looking at the write; « the row is there and the mail is not » means looking at
+ * the transport, and an operator sent to the wrong one either way loses the time
+ * the report was supposed to save.
+ */
+export class NotificationMailError extends Error {
+  status = 500
+
+  /** The Utilisateur whose Notification was written but not mailed. */
+  readonly utilisateurId: string
+
+  constructor(utilisateurId: string, cause: unknown) {
+    super(
+      `Notification written but not mailed for Utilisateur ${utilisateurId}: ${
+        cause instanceof Error ? cause.message : String(cause)
+      }`
+    )
+    this.name = "NotificationMailError"
+    this.utilisateurId = utilisateurId
+    this.cause = cause
+  }
+}
+
 export function handleServiceError(e: unknown): NextResponse {
   if (e && typeof (e as Record<string, unknown>).status === "number") {
     const err = e as Error & { status: number }
