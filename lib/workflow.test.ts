@@ -7,7 +7,6 @@ import {
 import { join, dirname, relative } from "node:path"
 import { fileURLToPath } from "node:url"
 import {
-  buildTransition,
   checkTransition,
   etatCreation,
   getAllowedActions,
@@ -619,10 +618,12 @@ describe("the permission table — the guard's verdict at each Etape", () => {
   // resubmitted. A final-approved demande (Etape FINAL + Decision APPROVED)
   // freezes for every role and every action.
   //
-  // The second assertion in each case belongs to the OTHER projection:
-  // `buildTransition` is the creation path's `null`-shaped one (#363), not the
-  // entry this ticket deletes. It stays untouched here so that ticket finds
-  // the assertion exactly as it stands.
+  // The second assertion in each case goes through the PRODUCTION entry, so the
+  // claim is the one that matters: the same tuple the guard refuses is refused
+  // by `resoudreTransition` as a REASON. While the creation path had its own
+  // `null`-shaped projection, this second half could only be stated as
+  // `toBeNull()` — which is not a claim at all, because a projection that lost
+  // the reason could not answer anything better (#363).
   it.each([
     ["EMPLOYEE", "DRAFT", "submit"],
     ["EMPLOYEE", "DRAFT", "retirer"],
@@ -637,8 +638,11 @@ describe("the permission table — the guard's verdict at each Etape", () => {
         reason: "TERMINAL",
       })
       expect(
-        buildTransition(role, etape, action, { decision: "APPROVED" })
-      ).toBeNull()
+        resoudreTransition(role, etape, action, {
+          decision: "APPROVED",
+          ownerMatch: true,
+        })
+      ).toEqual({ ok: false, reason: "TERMINAL" })
     }
   )
 
@@ -703,106 +707,99 @@ describe("the permission table — the guard's verdict at each Etape", () => {
   })
 })
 
-// ─── buildTransition (Etape-based) ───────────────────────────────────────────
+// ─── The transition each effect yields (through the one entry) ─────────────
+//
+// These used to ask the creation path's `null`-shaped projection and answered
+// « non-null, and here is the payload ». Read through `resoudreTransition` the
+// same claims are STRONGER, because the success arm is the only place a
+// transition exists: there is no `!` left to write and no `null` that could
+// stand for a refusal the reason never named.
+//
+// The refusals these cases used to state as `toBeNull()` are not restated here.
+// They are covered by the exhaustive sweep below, which asks the production
+// entry at every tuple and compares it to the guard, and by « reports the four
+// reasons the guard has always reported », which names each one (#363).
 
-describe("buildTransition", () => {
+describe("the transition each effect yields", () => {
   it("returns transition for EMPLOYEE submitting from DRAFT", () => {
-    const result = buildTransition("EMPLOYEE", "DRAFT", "submit")
-    expect(result).not.toBeNull()
-    expect(result!.auditAction).toBe("SOUMISSION")
-    expect(result!.notificationEvent).toBe("DEMANDE_SOUMISE")
-    expect(result!.transition.newEtape).toBe("MANAGER_REVIEW")
-    expect(result!.transition.newDecision).toBe("PENDING")
-    expect(result!.transition.fields).toHaveProperty("etape", "MANAGER_REVIEW")
-    expect(result!.transition.fields).toHaveProperty("soumiseLe")
+    const result = attendu(
+      resoudreTransition("EMPLOYEE", "DRAFT", "submit", { ownerMatch: true })
+    )
+    expect(result.auditAction).toBe("SOUMISSION")
+    expect(result.notificationEvent).toBe("DEMANDE_SOUMISE")
+    expect(result.transition.newEtape).toBe("MANAGER_REVIEW")
+    expect(result.transition.newDecision).toBe("PENDING")
+    expect(result.transition.fields).toHaveProperty("etape", "MANAGER_REVIEW")
+    expect(result.transition.fields).toHaveProperty("soumiseLe")
   })
 
   it("returns transition for MANAGER approving", () => {
-    const result = buildTransition("MANAGER", "MANAGER_REVIEW", "approuver", {
-      comment: "Looks good",
-      actorId: "user-2",
-    })
-    expect(result).not.toBeNull()
-    expect(result!.auditAction).toBe("APPROBATION_MANAGER")
-    expect(result!.transition.newEtape).toBe("FINANCE_REVIEW")
-    expect(result!.transition.fields).toHaveProperty(
+    const result = attendu(
+      resoudreTransition("MANAGER", "MANAGER_REVIEW", "approuver", {
+        ownerMatch: true,
+        comment: "Looks good",
+        actorId: "user-2",
+      })
+    )
+    expect(result.auditAction).toBe("APPROBATION_MANAGER")
+    expect(result.transition.newEtape).toBe("FINANCE_REVIEW")
+    expect(result.transition.fields).toHaveProperty(
       "commentaireManager",
       "Looks good"
     )
-    expect(result!.transition.fields).toHaveProperty("assigneAId", "user-2")
+    expect(result.transition.fields).toHaveProperty("assigneAId", "user-2")
   })
 
   it("returns transition for MANAGER rejecting", () => {
-    const result = buildTransition("MANAGER", "MANAGER_REVIEW", "rejeter", {
-      comment: "Denied",
-      actorId: "user-2",
-    })
-    expect(result).not.toBeNull()
-    expect(result!.auditAction).toBe("REJET")
-    expect(result!.notificationEvent).toBe("DEMANDE_REJETEE")
-    expect(result!.transition.newEtape).toBe("MANAGER_REVIEW")
-    expect(result!.transition.newDecision).toBe("REJECTED")
-    expect(result!.transition.fields).toHaveProperty("assigneAId", "user-2")
+    const result = attendu(
+      resoudreTransition("MANAGER", "MANAGER_REVIEW", "rejeter", {
+        ownerMatch: true,
+        comment: "Denied",
+        actorId: "user-2",
+      })
+    )
+    expect(result.auditAction).toBe("REJET")
+    expect(result.notificationEvent).toBe("DEMANDE_REJETEE")
+    expect(result.transition.newEtape).toBe("MANAGER_REVIEW")
+    expect(result.transition.newDecision).toBe("REJECTED")
+    expect(result.transition.fields).toHaveProperty("assigneAId", "user-2")
   })
 
   it("returns transition for FINANCE_ADMIN approving", () => {
-    const result = buildTransition(
-      "FINANCE_ADMIN",
-      "FINANCE_REVIEW",
-      "approuver",
-      {
+    const result = attendu(
+      resoudreTransition("FINANCE_ADMIN", "FINANCE_REVIEW", "approuver", {
+        ownerMatch: true,
         comment: "Budget OK",
-      }
+      })
     )
-    expect(result).not.toBeNull()
-    expect(result!.transition.newEtape).toBe("DIRECTION_REVIEW")
-    expect(result!.transition.fields).toHaveProperty(
+    expect(result.transition.newEtape).toBe("DIRECTION_REVIEW")
+    expect(result.transition.fields).toHaveProperty(
       "commentaireFinance",
       "Budget OK"
     )
   })
 
   it("returns transition for GENERAL_DIRECTION approving to terminal", () => {
-    const result = buildTransition(
-      "GENERAL_DIRECTION",
-      "DIRECTION_REVIEW",
-      "approuver",
-      {
-        comment: "Final approval",
-      }
+    const result = attendu(
+      resoudreTransition(
+        "GENERAL_DIRECTION",
+        "DIRECTION_REVIEW",
+        "approuver",
+        { ownerMatch: true, comment: "Final approval" }
+      )
     )
-    expect(result).not.toBeNull()
-    expect(result!.transition.newEtape).toBe("FINAL")
-    expect(result!.transition.newDecision).toBe("APPROVED")
-    expect(result!.notificationEvent).toBe("DEMANDE_APPROBATION_FINALE")
+    expect(result.transition.newEtape).toBe("FINAL")
+    expect(result.transition.newDecision).toBe("APPROVED")
+    expect(result.notificationEvent).toBe("DEMANDE_APPROBATION_FINALE")
   })
 
   it("returns transition for EMPLOYEE withdrawing from DRAFT", () => {
-    const result = buildTransition("EMPLOYEE", "DRAFT", "retirer")
-    expect(result).not.toBeNull()
-    expect(result!.auditAction).toBe("RETRAIT")
-    expect(result!.transition.newEtape).toBe("DRAFT")
-    expect(result!.transition.newDecision).toBe("WITHDRAWN")
-  })
-
-  it("returns null for wrong role on a stage", () => {
-    expect(
-      buildTransition("EMPLOYEE", "MANAGER_REVIEW", "approuver")
-    ).toBeNull()
-  })
-
-  it("returns null for unsupported action on a stage", () => {
-    expect(buildTransition("MANAGER", "MANAGER_REVIEW", "submit")).toBeNull()
-  })
-
-  it("returns null for action on terminal stage", () => {
-    expect(
-      buildTransition("GENERAL_DIRECTION", "FINAL", "approuver")
-    ).toBeNull()
-  })
-
-  it("returns null for withdraw on non-DRAFT stage", () => {
-    expect(buildTransition("EMPLOYEE", "MANAGER_REVIEW", "retirer")).toBeNull()
+    const result = attendu(
+      resoudreTransition("EMPLOYEE", "DRAFT", "retirer", { ownerMatch: true })
+    )
+    expect(result.auditAction).toBe("RETRAIT")
+    expect(result.transition.newEtape).toBe("DRAFT")
+    expect(result.transition.newDecision).toBe("WITHDRAWN")
   })
 })
 
@@ -935,12 +932,13 @@ describe("getAllowedActions", () => {
 // ─── resoudreTransition: the one call, and what it refuses ────────────────
 
 describe("resoudreTransition", () => {
-  // The case the old shape could not express. `buildTransition` had no way to
-  // say « this actor does not own the row »: ownership was hardcoded to « yes »
-  // inside it, so `buildTransition("EMPLOYEE","DRAFT","submit", {actorId:
-  // "someone-else"})` returned a transition and claimed nothing about who the
-  // actor was. Here the same question is asked with the fact stated, and the
-  // guard's answer is a refusal with a reason on it.
+  // The case the old shape could not express. The creation path's projection
+  // had no way to say « this actor does not own the row »: ownership was
+  // hardcoded to « yes » inside it, so a submit from a non-owner came back as
+  // a transition that claimed nothing about who the actor was — and a refusal
+  // came back as a `null` that named nothing. Here the same question is asked
+  // with the fact stated, and the guard's answer is a refusal with a reason on
+  // it.
   it("refuses a non-owner's owner action, naming NOT_OWNER", () => {
     expect(
       resoudreTransition("EMPLOYEE", "DRAFT", "submit", {
@@ -1096,8 +1094,9 @@ describe("checkTransition", () => {
 // and the suite stayed green (#299).
 //
 // What this claims is stronger than « two projections agree »: it claims the
-// ONE call refuses or yields correctly at every tuple, that the reader and the
-// writer both reach it, and that the creation projection is its own shadow.
+// ONE call refuses or yields correctly at every tuple, and that the reader and
+// the writer both reach it. The creation path reaches it too, and states its
+// own tuple's admission at the end of this describe (#363).
 
 describe("resoudreTransition sweep", () => {
   function sweep(
@@ -1234,21 +1233,42 @@ describe("resoudreTransition sweep", () => {
     }
   })
 
-  // The creation path's projection is a shadow of the one call, never a second
-  // opinion: it states ownership by birth, so its answer is the owner-side
-  // answer at every tuple, and it is null exactly where the guard refuses.
-  it("leaves buildTransition as its own shadow: the owner-side answer, or null", () => {
-    sweep((role, etape, action, decision, _ownerMatch) => {
-      const built = buildTransition(role, etape, action, { decision })
-      const ownerSide = resoudreTransition(role, etape, action, {
-        decision,
-        ownerMatch: true,
-      })
-
-      expect(built !== null, `${role}/${etape}/${action}/${String(decision)}`)
-        .toBe(ownerSide.ok)
-      if (!ownerSide.ok) expect(built).toBeNull()
+  // The creation path's own tuple, read through the one entry: whatever Role
+  // asks to create, the DemandeDeplacement it is about to be born into leaves
+  // the opening Etape by the SEAT's submit, owned by birth, and is never
+  // refused. This is the claim the sweep's `buildTransition` shadow used to make
+  // from outside `etatCreation`; it is stated here as the fact it always was,
+  // and it is what makes the creation path's refusal arm unreachable (#363).
+  //
+  // Both halves are needed, and the second is the one a projection could not
+  // show: asking as the SEAT is admitted while asking as the CALLING Role is
+  // refused, and asking without ownership is refused. `etatCreation` therefore
+  // has to ask as the seat and state ownership by birth — which it does, and
+  // which a projection hardcoding « yes » would have hidden behind its own
+  // second opinion.
+  it("admits the creation path's submit tuple only as the seat, owned by birth", () => {
+    const ouverture = PIPELINE[0]
+    const seat = ouverture.roleCanAct as Role
+    const parBirth = resoudreTransition(seat, ouverture.id, "submit", {
+      ownerMatch: true,
     })
+
+    expect(parBirth.ok, "le siege de l'etape d'ouverture").toBe(true)
+    expect(
+      resoudreTransition(seat, ouverture.id, "submit", { ownerMatch: false }),
+      "la meme action sans proprietaire"
+    ).toEqual({ ok: false, reason: "NOT_OWNER" })
+
+    // Every other Role asking for itself is refused — so the creation path's
+    // use of the seat is load-bearing, not decorative. Derived from the union
+    // the pipeline declares rather than hand-listed, so a new Role is covered.
+    for (const role of TOUS_LES_ROLES) {
+      if (role === seat) continue
+      expect(
+        resoudreTransition(role, ouverture.id, "submit", { ownerMatch: true }),
+        role
+      ).toEqual({ ok: false, reason: "WRONG_ROLE" })
+    }
   })
 })
 
@@ -1367,22 +1387,91 @@ describe("the pipeline has one way in", () => {
     expect(signature).toMatch(/^\s*ownerMatch:\s*boolean\s*$/m)
   })
 
-  it("keeps the creation path calling the builder it was written against", async () => {
+  // What replaces the source-reading pin this suite used to carry (#363).
+  //
+  // The old pin asserted that `etatCreation`'s source CONTAINED a call to the
+  // `null`-shaped projection, and that the projection still MATCHED its return
+  // type. That proved a shape, and it held the very ambiguity it sat above in
+  // place: the projection mapped a reason-typed refusal back to `null`, one
+  // function below the fix #299 landed, and only a pin reading its signature
+  // could tell.
+  //
+  // These two cases assert BEHAVIOUR instead:
+  //
+  // 1. « the creation path's fields equal the production entry's transition »
+  //    (in the `etatCreation` describe, beside the other cases that read the
+  //    pipeline) — the equality itself, compared field by field.
+  // 2. this one: the refusal arm is a THROW and there is no `null`-returning
+  //    helper left between the creation path and the guard. Reachability is
+  //    deliberately NOT faked here: read against the guard, the creation path's
+  //    own tuple is always admitted, so a fixture engineered to reach the arm
+  //    would be testing an input the pipeline cannot produce. What can be
+  //    observed without one is the module's export surface — and that is what
+  //    is asserted, anchored and counted so it cannot pass vacuously.
+  it("raises the creation path's refusal instead of returning a null", async () => {
     const source = await readFile(
       new URL("./workflow.ts", import.meta.url),
       "utf8"
     )
     const start = source.indexOf("export function etatCreation(")
+    const end = source.indexOf("export function getAllowedActions(")
     expect(start).toBeGreaterThan(-1)
-    const creation = source.slice(start, source.indexOf("export function getAllowedActions("))
+    expect(end).toBeGreaterThan(start)
+    const creation = source.slice(start, end)
+    expect(creation.length).toBeGreaterThan(0)
 
-    // `etatCreation`'s call is untouched, and the builder it reaches still
-    // exists and still returns nothing rather than throwing.
-    expect(creation).toContain("buildTransition(")
-    expect(creation).toContain("if (!transition) {")
-    expect(source).toMatch(
-      /export function buildTransition\([\s\S]*?\): WorkflowResult \| null/
+    // The creation path asks the PRODUCTION entry — the one whose refusal is a
+    // reason — and exactly once.
+    expect(creation.match(/resoudreTransition\(/g) ?? []).toHaveLength(1)
+
+    // And it checks that answer. The `ok` test and the throw are one claim:
+    // there is no arm left that could read the refusal as an absence.
+    expect(creation).toMatch(/if \(!resolution\.ok\)\s*\{/)
+    expect(creation).toContain("Aucune soumission possible depuis l'etape")
+
+    // The refusal arm is a throw, so the sentence is inside it: asserted on the
+    // slice BETWEEN the `ok` test and its closing brace, and counted there so
+    // a throw added elsewhere cannot satisfy this.
+    const bras = creation.slice(creation.indexOf("if (!resolution.ok) {"))
+    expect(creation.indexOf("if (!resolution.ok) {")).toBeGreaterThan(-1)
+    expect(bras).toContain("throw new Error(")
+
+    // Ownership by birth stays a NAMED, declared fact: the call site states
+    // the constant, and the constant is declared in the module rather than
+    // inlined as a bare `true`. The anchor is asserted BEFORE the negative, so
+    // a drifted spelling cannot turn the absence below into the empty string.
+    expect(source).toContain("const PROPRIETAIRE_A_LA_NAISSANCE = true")
+    expect(creation).toContain("ownerMatch: PROPRIETAIRE_A_LA_NAISSANCE")
+    expect(creation).not.toMatch(/ownerMatch:\s*true\b/)
+
+    // No `null`-shaped guard projection is left in the module. Counted over the
+    // whole file, not sliced: the question is « is there a second way in that
+    // answers with an absence », and a COUNT is what a negative search cannot
+    // answer about itself.
+    expect(source.match(/export function buildTransition\(/g) ?? []).toHaveLength(
+      0
     )
+    expect(source).not.toMatch(/\): WorkflowResult \| null/)
+  })
+
+  // The export surface, asserted as a namespace so a stub cannot hide behind a
+  // re-added declaration. `expect("buildTransition" in module).toBe(false)` is
+  // the non-vacuous form: it fails loudly if the projection comes back, and it
+  // cannot pass by finding nothing to look at — the same module it asserts
+  // about is the one it enumerates. The COUNT is the control that proves the
+  // enumeration is real: the module exports names, and the deleted one is
+  // absent from a set that is not empty (#363).
+  it("exports no null projection, and the namespace it pins is not empty", async () => {
+    const surface = await import("./workflow")
+
+    expect("buildTransition" in surface).toBe(false)
+    expect(Object.keys(surface).length).toBeGreaterThan(0)
+    expect(Object.keys(surface)).not.toContain("buildTransition")
+
+    // …and the production entry the creation path now asks is among them, so
+    // the absence above cannot be satisfied by an empty or broken module.
+    expect(Object.keys(surface)).toContain("resoudreTransition")
+    expect("resoudreTransition" in surface).toBe(true)
   })
 })
 
@@ -1404,16 +1493,18 @@ describe("etatCreation", () => {
   const effetSoumission = TRANSITION_EFFECTS.find(
     (e) => e.from === ouverture.id && e.action === "submit"
   )
-  const soumission = buildTransition(
-    ouverture.roleCanAct as Role,
-    ouverture.id,
-    "submit"
+  // What the production entry answers for the same submit the creation path
+  // asks. Read off the success arm, so there is no `null` to compare against
+  // and no second opinion anywhere in this fixture (#363).
+  const soumission = attendu(
+    resoudreTransition(ouverture.roleCanAct as Role, ouverture.id, "submit", {
+      ownerMatch: true,
+    })
   )
 
   it("exists in the pipeline: the opening Etape has a submit effect and a role that may act", () => {
     expect(ouverture.roleCanAct).toBeDefined()
     expect(effetSoumission).toBeDefined()
-    expect(soumission).not.toBeNull()
   })
 
   it("answers every Role on both paths with the frozen five-field shape", () => {
@@ -1450,10 +1541,50 @@ describe("etatCreation", () => {
   it("a submitted creation is the submit action the transition path performs", () => {
     for (const role of roles) {
       const etat = etatCreation(role, true)
-      expect(etat.etape).toBe(soumission!.transition.newEtape)
-      expect(etat.decision).toBe(soumission!.transition.newDecision)
-      expect(etat.auditAction).toBe(soumission!.auditAction)
-      expect(etat.notification).toBe(soumission!.notificationEvent)
+      expect(etat.etape).toBe(soumission.transition.newEtape)
+      expect(etat.decision).toBe(soumission.transition.newDecision)
+      expect(etat.auditAction).toBe(soumission.auditAction)
+      expect(etat.notification).toBe(soumission.notificationEvent)
+    }
+  })
+
+  // The equality itself, on `champs` — the half the case above leaves implicit,
+  // and the acceptance criterion #363 asks for: the creation path's fields EQUAL
+  // what the production entry returns for the same submit.
+  //
+  // `champs` is compared as the transition's `fields` were built: same keys, and
+  // each value the one the guard wrote. The timestamps are `new Date()` created
+  // separately per call, so they are compared by KEY and by TYPE — never by
+  // value, which would measure the clock between two calls and not the guard.
+  // Every other field is compared by value, because those are stable.
+  it("writes exactly the fields the production entry returns for the same submit", () => {
+    const stable = Object.keys(soumission.transition.fields).filter(
+      (key) => !(soumission.transition.fields[key] instanceof Date)
+    )
+    const horodatages = Object.keys(soumission.transition.fields).filter(
+      (key) => soumission.transition.fields[key] instanceof Date
+    )
+    // The split is real, not vacuous: there IS a timestamp to compare by type,
+    // and there ARE stable fields to compare by value.
+    expect(horodatages.length).toBeGreaterThan(0)
+    expect(stable.length).toBeGreaterThan(0)
+
+    for (const role of roles) {
+      const champs = etatCreation(role, true).champs
+
+      // The key sets agree exactly — nothing added by the creation path, and
+      // nothing the guard wrote dropped on the way out.
+      expect(Object.keys(champs).sort(), role).toEqual(
+        Object.keys(soumission.transition.fields).sort()
+      )
+      for (const key of stable) {
+        expect(champs[key], `${role}/${key}`).toEqual(
+          soumission.transition.fields[key]
+        )
+      }
+      for (const key of horodatages) {
+        expect(champs[key], `${role}/${key}`).toBeInstanceOf(Date)
+      }
     }
   })
 
