@@ -246,11 +246,25 @@ describe("resolveRecipients — the activity rule comes from the Utilisateur rea
   })
 
   /**
-   * The rule holds when the additions are combined with a role target, which
-   * is the shape every real payload has: the employee is usually active while
-   * some other Utilisateur in the set is not. Asserted as a SET because the
-   * resolver returns a set, and a set assertion is the only one that cannot
-   * pass by ordering.
+   * A payload naming BOTH an active and an inactive Utilisateur, resolved to
+   * one set: the active employee is admitted and nothing else is. Asserted as a
+   * SET, because the resolver returns one and a set assertion is the only one
+   * that cannot pass by ordering.
+   *
+   * What this case does NOT prove, which an earlier draft of this comment
+   * claimed it did: that the two additions are exercised together, or combined
+   * with a role target. `EMPLOYEE_EVENTS` and `ASSIGNEE_EVENTS` are DISJOINT
+   * and `EVENT_ROLE_MAP` is empty for `DEMANDE_APPROBATION_FINALE`, so this one
+   * call consults the employee addition only and the `assigneAId` below is
+   * never read by the resolver at all.
+   *
+   * The assertion that survives that is the weaker, still-real one: an
+   * identifier the payload names does not reach the set without passing the
+   * activity rule, and the inactive id sitting beside the active one stays out
+   * of it. The weight of this rule is carried by the two cases above, which ask
+   * about a named Utilisateur ONE AT A TIME — active against inactive — and only
+   * that pair can tell « filtered by activity » from « this event notifies
+   * nobody ever ».
    */
   it("keeps an active addition and drops an inactive one in the same set", async () => {
     const recipients = await resolveRecipients(
@@ -567,10 +581,36 @@ describe("the activity rule is written once, in the Utilisateur module", () => {
   it("the one spelling is in the Utilisateur module", () => {
     const source = readSource("lib/utilisateur-service.ts")
 
-    const start = source.indexOf("conditionActif")
-    expect(start).toBeGreaterThan(-1)
-    expect(source.slice(start, start + 120)).toContain(
-      "eq(utilisateurs.actif, true)"
+    // Anchored on the DECLARATION, not on a fixed character count. A window of
+    // N characters measured from the name is a magic number: a reformat of the
+    // one-line definition moves the literal out of it, and a reformat is not a
+    // defect. The anchor is asserted rather than assumed, because a miss would
+    // leave a slice that proves nothing.
+    const declaration = source.indexOf("export const conditionActif")
+    expect(
+      declaration,
+      "the declaration of conditionActif is gone or has been renamed"
+    ).toBeGreaterThan(-1)
+
+    // The window ends at the end of the STATEMENT, tracked by bracket depth so
+    // a definition wrapped over several lines stays whole inside it. Whitespace
+    // is then collapsed on both sides, so the pin survives the wrap a
+    // prettier pass would produce — and it is not weakened by that: what it
+    // still refuses is the declaration SHEDDING the spelling, by delegating its
+    // body to a function elsewhere in the file, which is the drift this pin is
+    // for.
+    const lines = source.slice(declaration).split("\n")
+    const statement: string[] = []
+    let depth = 0
+    for (const line of lines) {
+      statement.push(line)
+      depth += (line.match(/[[({]/g) ?? []).length
+      depth -= (line.match(/[\])}]/g) ?? []).length
+      if (depth <= 0) break
+    }
+    const unwrapped = (text: string) => text.replace(/\s+/g, "")
+    expect(unwrapped(statement.join("\n"))).toContain(
+      unwrapped("eq(utilisateurs.actif, true)")
     )
   })
 })

@@ -117,6 +117,15 @@ const ASSIGNEE_EVENTS: NotificationEventType[] = ["DEMANDE_RETIREE"]
  * Kept from the resolver's own rules: the role targets, the department scope,
  * and the CHOICE of which events carry the employee and which carry the
  * assignee. Activity now filters; it does not decide who is named.
+ *
+ * One consequence of holding the additions to the same rule is that they now
+ * require the named Utilisateur to EXIST as well as to be active: an id
+ * matching no row is dropped, where before it was added outright. That branch
+ * is unreachable in practice, and the schema is what makes it so —
+ * `demandesDeplacement.employeId` and `assigneAId` are foreign keys to
+ * `utilisateurs.id` with `onDelete: "restrict"`, and `dispatchRows` is called
+ * from inside the transition's own transaction, so the row the payload names
+ * was read and cannot have been deleted underneath the call.
  */
 export async function resolveRecipients(
   event: NotificationEventType,
@@ -126,10 +135,17 @@ export async function resolveRecipients(
   const ids = new Set<string>()
 
   /**
-   * The one place activity is asked, for every path. A named candidate is
-   * admitted only if the Utilisateur module's rule admits it, so a Utilisateur
-   * who does not exist is dropped as well — which is what an id from a stale
-   * payload deserves, and it is the same answer `peutAgir` gives for one.
+   * The one place activity is asked ABOUT A NAMED CANDIDATE, for both
+   * additions — the employee and the assignee alike. It is not the one place
+   * activity is asked at all: the role targets below compose `conditionActif`
+   * into their own `WHERE` rather than calling this, because a SET cannot be
+   * filtered one candidate at a time without turning one query into
+   * one-per-manager.
+   *
+   * A named candidate is admitted only if the Utilisateur module's rule admits
+   * it, so a Utilisateur who does not exist is dropped as well — which is what
+   * an id from a stale payload deserves, and it is the same answer `peutAgir`
+   * gives for one.
    *
    * `conditionActif` is spelled once, in `lib/utilisateur-service.ts:359`, and
    * is derived FROM the same fragment `peutAgir` composes, so the reader's

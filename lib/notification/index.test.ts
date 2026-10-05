@@ -648,10 +648,10 @@ describe("markAsRead reads the row and then reports on it", { timeout: TIMEOUT }
    * The reader OWNS this notification (`utilisateurId: employeInactif`). An
    * earlier draft of this case left the default owner, and it passed for a
    * reason worth naming: the call then hit the OWNERSHIP refusal at
-   * `index.ts:216` and threw the same class, so the case was green before the
-   * fix and would have stayed green with the activity check deleted entirely.
-   * A refusal case that passes for the wrong reason is the one failure mode an
-   * assertion on the thrown class cannot see.
+   * `index.ts:243-244` and threw the same class, so the case was green before
+   * the fix and would have stayed green with the activity check deleted
+   * entirely. A refusal case that passes for the wrong reason is the one
+   * failure mode an assertion on the thrown class cannot see.
    *
    * `lu: true` makes the check the FIRST one to fire. On the other side of the
    * fix the already-read branch returns without throwing, so a refusal here can
