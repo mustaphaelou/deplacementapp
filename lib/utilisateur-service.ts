@@ -9,6 +9,7 @@ import {
   type AvatarStorage,
 } from "./avatar-storage"
 import { getSocieteRow } from "./societe"
+import type { Role } from "./auth/roles"
 import {
   AUCUNE_SOCIETE_CONFIGUREE,
   UtilisateurNotFoundError,
@@ -93,7 +94,15 @@ export class UtilisateurService {
       nom: string
       prenom: string
       poste: string
-      role: string
+      // The Role union, not `string`. The parameter was `string` and the write
+      // carried an inline `as` naming the union across four lines to pull it
+      // back down — a cast `lib/auth/role-casts.test.ts` cannot see, because
+      // its regex matches the SPELLED `as Role` and this one spelled the union
+      // out inline instead of naming it. Typing the parameter as the union
+      // deletes the cast rather than widening the pin: the route validates with
+      // `utilisateurSchema` (a `z.enum` over `TOUS_LES_ROLES`), so `data.role`
+      // arrives already narrowed and the laundering has nowhere to happen.
+      role: Role
       departementId: string
       telephone?: string
       googleAuthEnabled?: boolean
@@ -125,11 +134,9 @@ export class UtilisateurService {
           nom: data.nom,
           prenom: data.prenom,
           poste: data.poste,
-          role: data.role as
-            | "EMPLOYEE"
-            | "MANAGER"
-            | "FINANCE_ADMIN"
-            | "GENERAL_DIRECTION",
+          // No cast: the parameter is the union, so the value the route
+          // validated is the type the column declares.
+          role: data.role,
           societeId: societe.id,
           departementId: data.departementId,
           telephone: data.telephone || null,

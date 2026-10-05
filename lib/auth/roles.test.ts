@@ -13,18 +13,22 @@ import {
   type Role,
 } from "./roles"
 import { lienFileAttente } from "../workflow"
+import { roleEnum } from "@/db/schema/enums"
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..")
 
 // The Role union spelled out as a value, so the "no member outside the union"
-// check below is a runtime one rather than a compile-time artefact of the
+// checks below are runtime ones rather than a compile-time artefact of the
 // `readonly Role[]` annotation.
-const ROLE_UNION = [
-  "EMPLOYEE",
-  "MANAGER",
-  "FINANCE_ADMIN",
-  "GENERAL_DIRECTION",
-] as const
+//
+// This transcription used to be what the lockout guard compared `TOUS_LES_ROLES`
+// against — a constant compared against another copy of itself, with the column
+// nowhere in the assertion. It is derived from the one list now, and the
+// DATABASE is compared separately in the witness block at the end of this file,
+// so a Role that reaches the column is what the guard is actually checked
+// against. The separate name is kept because several checks here want « every
+// Role the union names », which is a claim about the union.
+const ROLE_UNION: readonly Role[] = TOUS_LES_ROLES
 
 // Every nav link that means « the DemandeDeplacements waiting for me » IS the
 // pipeline's composition for its Role (#304).
@@ -297,18 +301,23 @@ describe("lireRole", () => {
 // locked out by a type-safety change, with no crash and no log line to grep —
 // just a Utilisateur who cannot sign in.
 //
-// So the reader's accepted set is DERIVED from the Role vocabulary, and this
-// asserts the two are the same set. Widening the union without widening the
-// reader fails here, at the moment of the widening, which is the entire point.
+// So the reader's accepted set is compared against what the DATABASE declares,
+// read off the column's own `roleEnum.enumValues` at runtime rather than
+// restated. That is the pattern `demande-types.row-types.test.ts` established
+// for `Etape` and `Decision` (#357); the union is likewise derived from the one
+// list, so these are the SAME set by construction and this block is what says
+// so at runtime.
 describe("the reader's accepted set and the Role union are the same set", () => {
   it("accepts exactly the Roles the union names — neither more nor fewer", () => {
+    // The union's own runtime witness: derived from `TOUS_LES_ROLES`, which is
+    // the one list the `Role` type is read off, so a widening of one is a
+    // widening of both.
     expect([...TOUS_LES_ROLES].sort()).toEqual([...ROLE_UNION].sort())
   })
 
   it("accepts every Role the navigation declares, and no other", () => {
-    // The union's own runtime witness: NAV_LANES is declared
-    // `Record<Role, NavItem[]>`, so adding a Role to the union forces a lane
-    // for it, and its keys are exactly the union's members.
+    // `NAV_LANES` is declared `Record<Role, NavItem[]>`, so adding a Role to the
+    // union forces a lane for it, and its keys are exactly the union's members.
     const fromNav = Object.keys(NAV_LANES)
     expect(fromNav.length).toBeGreaterThan(0)
     expect([...TOUS_LES_ROLES].sort()).toEqual([...fromNav].sort())
@@ -318,6 +327,93 @@ describe("the reader's accepted set and the Role union are the same set", () => 
     for (const role of TOUS_LES_ROLES) {
       expect(lireRole(role), role).toBe(role)
     }
+  })
+})
+
+// THE DATABASE WITNESS — the half that was missing (#357).
+//
+// `roleEnum` is the copy that owns the column, and until now it was read by
+// NOTHING: the guard above compared `TOUS_LES_ROLES` against a transcription of
+// the union, so a Role added to the database passed the lockout guard and every
+// holder of it was refused at the seam. This block reads the vocabulary off the
+// column's own declaration at runtime, exactly as
+// `demande-types.row-types.test.ts:81` does for `Etape` and `Decision`.
+//
+// `TOUS_LES_ROLES` is NOT derived from `roleEnum` here even though that would be
+// the shorter way to write it: `lib/auth/roles.ts` is imported by a `"use client"`
+// page (`demandes/page.tsx` asks `hasAnyRole` in the browser), so importing
+// `db/schema/enums` there would pull drizzle into the client bundle — and
+// `scripts/management-wiring.test.ts` already pins that. So the two declarations
+// are written independently and tied together HERE, which is also the only
+// arrangement in which this test is capable of failing.
+describe("the reader's accepted set is the vocabulary the database declares", () => {
+  const ROLES_THE_COLUMN_DECLARES = [...roleEnum.enumValues] as Role[]
+
+  it("is the same set, read off the column rather than restated", () => {
+    // Sorted: the claim is about the SET. A witness and a transcription may
+    // disagree on order without either being wrong.
+    expect([...TOUS_LES_ROLES].sort()).toEqual(
+      [...ROLES_THE_COLUMN_DECLARES].sort()
+    )
+
+    // Non-vacuity: a witness that named nothing would satisfy the comparison
+    // above vacuously. Both sides are asserted to be real vocabularies first,
+    // and neither may be empty — an emptied `TOUS_LES_ROLES` would refuse every
+    // Utilisateur at the seam, which is the lockout this guards against.
+    expect(ROLES_THE_COLUMN_DECLARES.length).toBeGreaterThan(0)
+    expect(TOUS_LES_ROLES.length).toBeGreaterThan(0)
+  })
+
+  it("carries the vocabulary in both directions, so neither copy is vacuous", () => {
+    // The reader admits every Role the column declares and refuses one it does
+    // not. Read off the column, so this is the database's vocabulary being
+    // round-tripped and not the list compared with itself.
+    for (const role of ROLES_THE_COLUMN_DECLARES) {
+      expect(lireRole(role), role).toBe(role)
+    }
+    expect(lireRole("ADMINISTRATEUR")).toBeNull()
+  })
+
+  it("admits a Role added to the column, which is what the lockout turns on", () => {
+    // The lockout, stated positively rather than as an absence: whatever the
+    // column declares, the reader admits and the navigation can answer for. A
+    // fifth Role added to `roleEnum` and not to `TOUS_LES_ROLES` is caught by
+    // the set-equality case above; this one says what the reader does with it.
+    for (const role of ROLES_THE_COLUMN_DECLARES) {
+      expect(TOUS_LES_ROLES as readonly string[]).toContain(role)
+      expect(NAV_LANES[role], `no lane declared for ${role}`).toBeDefined()
+    }
+  })
+
+  // The witness must READ the column. Set-equality alone cannot tell a witness
+  // apart from a transcription: swap the two sources and every case above still
+  // passes, because a list compared against itself is trivially equal — which is
+  // the pre-#357 defect (a constant compared against another copy of itself)
+  // surviving in a new location, and it was measured going green before this
+  // case existed.
+  //
+  // So the SOURCE is pinned: this file must read `roleEnum.enumValues`, and the
+  // reading must be inside the witness declaration rather than somewhere the
+  // assertions cannot see. The slice is anchored and both indices are asserted,
+  // because `source.slice(a, b)` yields `""` when a needle is missing and
+  // `expect("").not.toContain(x)` passes for every x — a pin that disarms itself
+  // silently.
+  it("reads the witness off the column rather than off a restatement", () => {
+    const source = readFileSync(
+      join(REPO_ROOT, "lib/auth/roles.test.ts"),
+      "utf8"
+    )
+    const start = source.indexOf("const ROLES_THE_COLUMN_DECLARES")
+    expect(start).toBeGreaterThan(-1)
+    const end = source.indexOf("\n", start)
+    expect(end).toBeGreaterThan(start)
+    const declaration = source.slice(start, end)
+    expect(declaration).toContain("roleEnum.enumValues")
+
+    // And it is a SPREAD of the column, not the column object itself: the set
+    // comparisons below sort, and `enumValues` is a mutable array the column
+    // owns.
+    expect(declaration).toMatch(/\[\.\.\.roleEnum\.enumValues\]/)
   })
 })
 

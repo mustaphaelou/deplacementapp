@@ -1,3 +1,5 @@
+import type { Role } from "@/lib/auth/roles"
+
 export type NotificationEventType =
   | "DEMANDE_SOUMISE"
   | "DEMANDE_APPROBATION_MANAGER"
@@ -27,7 +29,11 @@ export type NotificationMessage = {
 }
 
 interface RoleTarget {
-  role: "EMPLOYEE" | "MANAGER" | "FINANCE_ADMIN" | "GENERAL_DIRECTION"
+  // The `Role` union, not a fourth hand-written spelling of it. `import type`
+  // so this adds no runtime import: `lib/workflow.ts` reads the event types
+  // from here, and a client bundle must not reach the database through the
+  // vocabulary.
+  role: Role
   departmentScoped: boolean
 }
 

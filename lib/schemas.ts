@@ -1,5 +1,6 @@
 import { z } from "zod"
 import { isValidCity } from "@/lib/cities-morocco"
+import { TOUS_LES_ROLES } from "@/lib/auth/roles"
 
 // ADR-0012 — Societe PATCH validation: unknown keys are a 400 (strict), and
 // at least one field must be present. `couleurPrimaire` accepts null so the
@@ -113,7 +114,14 @@ export const utilisateurSchema = z.object({
   nom: z.string().min(1, "Nom requis"),
   prenom: z.string().min(1, "Prénom requis"),
   poste: z.string().min(1, "Poste requis"),
-  role: z.enum(["EMPLOYEE", "MANAGER", "FINANCE_ADMIN", "GENERAL_DIRECTION"]),
+  // The Role vocabulary, read off the one list rather than spelled again here.
+  // This is the API boundary's validator: the set of Roles a Utilisateur may
+  // be CREATED with. It is the second of the two restatements `role-casts`
+  // could not police, because a Role added to `TOUS_LES_ROLES` and not here
+  // would refuse a legitimate Utilisateur at the door with a 400 and no other
+  // trace. `z.enum` accepts a readonly tuple of literals, so no cast is needed
+  // — which matters here: a cast would be exactly the hole this closes.
+  role: z.enum(TOUS_LES_ROLES),
   departementId: z.string().min(1, "Département requis"),
   telephone: z.string().optional(),
   motDePasse: z
