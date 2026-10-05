@@ -1221,6 +1221,50 @@ describe("the pipeline has one way in", () => {
     expect(corps).toMatch(/ownerMatch\s*[,:]/)
   })
 
+  // The writer's whole remaining job is to RAISE the refusal the reason names.
+  // It composes no sentence and picks no class, and both halves are pinned here:
+  // the composed ownership form is gone, and the raiser is imported.
+  //
+  // Guarded against vacuity on purpose. `indexOf` returns `-1` when the anchor is
+  // absent, so a `not.toContain` on a wrongly-sliced body passes for everything —
+  // including a body that was never found. So both anchors are asserted to EXIST
+  // and their order checked BEFORE the slice, and the absence is counted rather
+  // than searched for, so a second composed sentence is a failure too.
+  it("raises the named refusal in the transition writer and composes no sentence", async () => {
+    const source = await readFile(
+      new URL("./demande/mutations.ts", import.meta.url),
+      "utf8"
+    )
+    const start = source.indexOf("export async function executeTransition(")
+    const end = source.indexOf("export async function recordDocument(")
+    expect(start).toBeGreaterThan(-1)
+    expect(end).toBeGreaterThan(start)
+    const corps = source.slice(start, end)
+    expect(corps.length).toBeGreaterThan(0)
+
+    // The raise is there, once, reading the reason off the guard's own result.
+    expect(corps.match(/throw refusPourTransition\(/g) ?? []).toHaveLength(1)
+    expect(corps).toContain("resolution.reason")
+    expect(corps).toMatch(/throw refusPourTransition\(\s*resolution\.reason,\s*action\s*\)/)
+
+    // The composed ownership sentence is GONE — counted, not searched, so a
+    // second composition of any shape is also a failure.
+    expect(corps.match(/Seul le proprietaire peut\s*\+/g) ?? []).toHaveLength(0)
+    // Neither half of the old conditional survives: the writer used to name the
+    // action's two verbs and pick between them.
+    expect(corps).not.toContain("soumettre")
+    expect(corps).not.toContain("retirer")
+    // …and the writer names no refusal class of its own. It did choose between
+    // two of them before; now it imports the raiser and the table chooses.
+    expect(corps).not.toContain("new UnauthorizedActionError")
+    expect(corps).not.toContain("new InvalidTransitionError")
+    expect(corps).not.toContain("resolution.reason ===")
+
+    // The raiser is imported from the error module — beside the classes it
+    // builds — and not from the pipeline, which may never gain one.
+    expect(source).toMatch(/import \{[^}]*refusPourTransition[^}]*\} from "\.\.\/errors"/)
+  })
+
   it("asks the guard once in the action reader, with no hand-applied conjunction", async () => {
     const source = await readFile(
       new URL("./workflow.ts", import.meta.url),

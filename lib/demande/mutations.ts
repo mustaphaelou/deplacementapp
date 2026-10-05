@@ -11,8 +11,9 @@ import type { NotificationEventType } from "../notification-events"
 import { appliquerEffets } from "./effets-transition"
 import {
   DemandeNotFoundError,
-  UnauthorizedActionError,
   NumeroCollisionError,
+  UnauthorizedActionError,
+  refusPourTransition,
 } from "../errors"
 
 export type DemandeDeplacementRow = typeof demandesDeplacement.$inferSelect
@@ -252,14 +253,11 @@ export async function executeTransition(
     actorId: actor.id,
   })
   if (!resolution.ok) {
-    if (resolution.reason === "NOT_OWNER") {
-      throw new UnauthorizedActionError(
-        "Seul le proprietaire peut " +
-          (action === "submit" ? "soumettre" : "retirer") +
-          " la demande"
-      )
-    }
-    throw new UnauthorizedActionError()
+    // The reason names its own refusal: the sentence and the code both live in
+    // REFUS_TRANSITION beside the classes they are built from, so this call site
+    // composes nothing and chooses no class (#300). Reading the reason off the
+    // result and raising it is the writer's whole remaining job.
+    throw refusPourTransition(resolution.reason, action)
   }
 
   const transition = resolution.transition
