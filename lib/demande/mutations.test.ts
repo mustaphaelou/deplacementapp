@@ -11,6 +11,8 @@ import {
   recordDocument,
 } from "./mutations"
 import { handleServiceError, NumeroCollisionError } from "../errors"
+import { checkTransition } from "../workflow"
+import type { Actor } from "../demande-types"
 
 const TIMEOUT = 30_000
 
@@ -373,6 +375,10 @@ describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT }, () => {
       expect(updated.commentaireManager).toBe("Fonds insuffisants")
     })
 
+    // WRONG_ROLE: the seat is read before the Decision, and at MANAGER_REVIEW the
+    // seat belongs to the MANAGER. The refusal names the Etape and the Role's seat
+    // at it — never the Utilisateur's standing, because the EMPLOYEE here is
+    // perfectly admissible elsewhere (#300).
     it("EMPLOYEE cannot approve at MANAGER_REVIEW", async () => {
       const demande = await createDraftDemande()
       await executeTransition({
@@ -386,7 +392,7 @@ describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT }, () => {
           action: "approuver",
           actor: { id: employeeId, role: "EMPLOYEE" },
         })
-      ).rejects.toThrow("Action non autorisee")
+      ).rejects.toThrow("Aucune transition n'est possible a cette etape pour ce role")
     })
 
     it("FINANCE_ADMIN can approve at FINANCE_REVIEW", async () => {
@@ -457,6 +463,10 @@ describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT }, () => {
       expect(updated.decision).toBe("APPROVED")
     })
 
+    // TERMINAL: the Decision WITHDRAWN is already recorded, and the seat check has
+    // already passed — this is the owner refusing their OWN draft. The old answer
+    // was « Action non autorisee », which was doubly false: they may withdraw at
+    // DRAFT, and it has already been done (#300).
     it("terminal DECISION blocks all further transitions", async () => {
       const demande = await createDraftDemande()
       await executeTransition({
@@ -470,12 +480,20 @@ describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT }, () => {
           action: "submit",
           actor: { id: employeeId, role: "EMPLOYEE" },
         })
-      ).rejects.toThrow("Action non autorisee")
+      ).rejects.toThrow("La demande a deja ete decidee")
     })
 
     // CONTEXT.md — Decision: APPROVED, REJECTED and WITHDRAWN are terminal.
     // The frozen row must keep the Etape where the terminal Decision was
     // recorded (no move to a new stage), and no role may transition it again.
+    // Three attempts, THREE different (Role, action) pairs, and all three reach the
+    // SAME reason — which is the point of naming reasons. The row is frozen at
+    // MANAGER_REVIEW with Decision REJECTED, and the guard's order is seat → Decision
+    // → owner/action → effect → role: the seat check passes for each of them on its
+    // own terms (an EMPLOYEE owns a DRAFT, a MANAGER holds MANAGER_REVIEW, and
+    // ownership is never even reached). So none is refused for who is asking. The
+    // MANAGER at line 509 is exactly the reader the ticket names: authorised, and told
+    // the DemandeDeplacement is decided (#300).
     it("a REJECTED demande freezes at the rejecting Etape and cannot be resubmitted", async () => {
       const demande = await createDraftDemande()
       await executeTransition({
@@ -499,23 +517,29 @@ describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT }, () => {
           action: "submit",
           actor: { id: employeeId, role: "EMPLOYEE" },
         })
-      ).rejects.toThrow("Action non autorisee")
+      ).rejects.toThrow("La demande a deja ete decidee")
       await expect(
         executeTransition({
           demandeId: demande.id,
           action: "approuver",
           actor: { id: managerId, role: "MANAGER" },
         })
-      ).rejects.toThrow("Action non autorisee")
+      ).rejects.toThrow("La demande a deja ete decidee")
       await expect(
         executeTransition({
           demandeId: demande.id,
           action: "retirer",
           actor: { id: employeeId, role: "EMPLOYEE" },
         })
-      ).rejects.toThrow("Action non autorisee")
+      ).rejects.toThrow("La demande a deja ete decidee")
     })
 
+    // WRONG_ROLE, and the reason is the Etape rather than the Decision. The row sits at
+    // FINAL, where NO Role holds a seat, and the guard reads the seat BEFORE the
+    // Decision — so the APPROVED decision never even becomes the reason, for any of
+    // these five Roles. The last attempt is the tuple the ticket names: the
+    // GENERAL_DIRECTION who just gave the final approval is told that no transition
+    // is possible at this Etape for this Role, not that they are not allowed (#300).
     it("a finally-approved demande (FINAL + APPROVED) is frozen for every role", async () => {
       const demande = await createDraftDemande()
       await executeTransition({
@@ -568,10 +592,15 @@ describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT }, () => {
       ]) {
         await expect(
           executeTransition({ demandeId: demande.id, ...attempt })
-        ).rejects.toThrow("Action non autorisee")
+        ).rejects.toThrow("Aucune transition n'est possible a cette etape pour ce role")
       }
     })
 
+    // WRONG_ROLE again, for the same reason as the case above: the row is at FINAL, so
+    // the missing seat is read before the APPROVED decision. This is the shortest
+    // form of the ticket's complaint — the GENERAL_DIRECTION who just approved it
+    // presses « Approuver » once more and is refused for the Etape, with the sentence
+    // that says so (#300).
     it("FINAL stage blocks all transitions", async () => {
       const demande = await createDraftDemande()
       await executeTransition({
@@ -600,7 +629,7 @@ describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT }, () => {
           action: "approuver",
           actor: { id: directionId, role: "GENERAL_DIRECTION" },
         })
-      ).rejects.toThrow("Action non autorisee")
+      ).rejects.toThrow("Aucune transition n'est possible a cette etape pour ce role")
     })
 
     it("returns the honest persisted DemandeDeplacement row", async () => {
@@ -612,6 +641,209 @@ describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT }, () => {
       })
       expect(updated).not.toHaveProperty("employe")
       expect(updated).not.toHaveProperty("vehicule")
+    })
+  })
+
+  // ─── Chaque raison, jusqu'a la reponse (#300) ─────────────────────────────
+  //
+  // The criterion: every reason the guard can produce is driven through the real
+  // transition writer AND through the settled error handler, and the RESPONSE the
+  // Utilisateur receives is asserted AT THE HANDLER — both the status code and the
+  // body — not one step past it.
+  //
+  // Each case builds a real row and presses a real button, so the reason produced
+  // is the guard's own verdict rather than a restatement of it. `checkTransition`
+  // is called beside each one to say WHICH reason the fixture reaches: a case whose
+  // premise silently changed (a seat moving, an Etape renaming) then fails as a
+  // mislabelled premise instead of quietly passing on a different reason's message.
+  describe("chaque raison se nomme jusqu'a la reponse du Utilisateur", () => {
+    /** Drive the writer, catch what it raised, and answer it at the handler. */
+    async function reponseAuUtilisateur(
+      demandeId: string,
+      action: "submit" | "approuver" | "rejeter" | "retirer",
+      actor: { id: string; role: Actor["role"] }
+    ): Promise<{ status: number; body: { error: string } }> {
+      let thrown: unknown
+      try {
+        await executeTransition({ demandeId, action, actor })
+      } catch (e) {
+        thrown = e
+      }
+
+      expect(thrown, "le writer a accepte la transition").toBeInstanceOf(Error)
+      const res = handleServiceError(thrown)
+      const body = (await res.json()) as { error: string }
+      return { status: res.status, body }
+    }
+
+    // NOT_OWNER. The second Utilisateur presses « Soumettre » on the first's DRAFT.
+    it("dit au non-proprietaire qu'il ne peut pas soumettre, avec 403", async () => {
+      const demande = await createDraftDemande()
+      expect(
+        checkTransition("EMPLOYEE", "DRAFT", "submit", "PENDING", false)
+      ).toEqual({ ok: false, reason: "NOT_OWNER" })
+
+      const { status, body } = await reponseAuUtilisateur(demande.id, "submit", {
+        id: managerId,
+        role: "EMPLOYEE",
+      })
+
+      expect(status).toBe(403)
+      expect(body).toEqual({ error: "Seul le proprietaire peut soumettre la demande" })
+    })
+
+    // The second ownership sentence, driven at the handler too — the two are
+    // separate strings and the table has to keep them apart.
+    it("dit au non-proprietaire qu'il ne peut pas retirer, avec 403", async () => {
+      const demande = await createDraftDemande()
+      expect(
+        checkTransition("EMPLOYEE", "DRAFT", "retirer", "PENDING", false)
+      ).toEqual({ ok: false, reason: "NOT_OWNER" })
+
+      const { status, body } = await reponseAuUtilisateur(demande.id, "retirer", {
+        id: managerId,
+        role: "EMPLOYEE",
+      })
+
+      expect(status).toBe(403)
+      expect(body).toEqual({ error: "Seul le proprietaire peut retirer la demande" })
+    })
+
+    // WRONG_ROLE at a review Etape: an EMPLOYEE presses « Approuver » where the
+    // seat belongs to the MANAGER. 403 — this one IS about who is asking.
+    it("nomme l'Etape et le siege quand le Role n'a pas de siege la, avec 403", async () => {
+      const demande = await createDraftDemande()
+      await executeTransition({
+        demandeId: demande.id,
+        action: "submit",
+        actor: { id: employeeId, role: "EMPLOYEE" },
+      })
+      expect(
+        checkTransition("EMPLOYEE", "MANAGER_REVIEW", "approuver", "PENDING", true)
+      ).toEqual({ ok: false, reason: "WRONG_ROLE" })
+
+      const { status, body } = await reponseAuUtilisateur(
+        demande.id,
+        "approuver",
+        { id: employeeId, role: "EMPLOYEE" }
+      )
+
+      expect(status).toBe(403)
+      expect(body).toEqual({
+        error: "Aucune transition n'est possible a cette etape pour ce role",
+      })
+    })
+
+    // WRONG_ROLE at the terminal Etape — the tuple the ticket names. The
+    // GENERAL_DIRECTION who JUST approved presses « Approuver » again, and is told
+    // the Etape admits no transition for this Role rather than that they are not
+    // allowed. 403, because it is still the Role's seat at the Etape that is the
+    // claim, and it is true there.
+    it("nomme l'Etape au Role qui vient d'approuver, a FINAL", async () => {
+      const demande = await createDraftDemande()
+      for (const [action, actor] of [
+        ["submit", { id: employeeId, role: "EMPLOYEE" as const }],
+        ["approuver", { id: managerId, role: "MANAGER" as const }],
+        ["approuver", { id: financeAdminId, role: "FINANCE_ADMIN" as const }],
+        ["approuver", { id: directionId, role: "GENERAL_DIRECTION" as const }],
+      ] as const) {
+        await executeTransition({ demandeId: demande.id, action, actor })
+      }
+      expect(
+        checkTransition("GENERAL_DIRECTION", "FINAL", "approuver", "APPROVED", true)
+      ).toEqual({ ok: false, reason: "WRONG_ROLE" })
+
+      const { status, body } = await reponseAuUtilisateur(
+        demande.id,
+        "approuver",
+        { id: directionId, role: "GENERAL_DIRECTION" }
+      )
+
+      expect(status).toBe(403)
+      expect(body).toEqual({
+        error: "Aucune transition n'est possible a cette etape pour ce role",
+      })
+    })
+
+    // TERMINAL at a review Etape — the case a Utilisateur actually meets, and the
+    // one the ticket's complaint is about. The MANAGER is AUTHORISED and is told
+    // the DemandeDeplacement is decided. 422, not 403: nothing about « you may not ».
+    it("dit au MANAGER que la demande est decidee, avec 422", async () => {
+      const demande = await createDraftDemande()
+      await executeTransition({
+        demandeId: demande.id,
+        action: "submit",
+        actor: { id: employeeId, role: "EMPLOYEE" },
+      })
+      await executeTransition({
+        demandeId: demande.id,
+        action: "rejeter",
+        actor: { id: managerId, role: "MANAGER" },
+        comment: "Budget indisponible",
+      })
+      expect(
+        checkTransition("MANAGER", "MANAGER_REVIEW", "approuver", "REJECTED", false)
+      ).toEqual({ ok: false, reason: "TERMINAL" })
+
+      const { status, body } = await reponseAuUtilisateur(
+        demande.id,
+        "approuver",
+        { id: managerId, role: "MANAGER" }
+      )
+
+      expect(status).toBe(422)
+      expect(body).toEqual({ error: "La demande a deja ete decidee" })
+    })
+
+    // NO_EFFECT. The EMPLOYEE presses « Approuver » on their own DRAFT, where no
+    // such action exists. They are admissible there — for their own actions — so
+    // this cannot borrow the permission code: 422.
+    it("dit que l'action n'existe pas a cette Etape, avec 422", async () => {
+      const demande = await createDraftDemande()
+      expect(
+        checkTransition("EMPLOYEE", "DRAFT", "approuver", "PENDING", true)
+      ).toEqual({ ok: false, reason: "NO_EFFECT" })
+
+      const { status, body } = await reponseAuUtilisateur(
+        demande.id,
+        "approuver",
+        { id: employeeId, role: "EMPLOYEE" }
+      )
+
+      expect(status).toBe(422)
+      expect(body).toEqual({ error: "Cette action n'existe pas a cette etape" })
+    })
+
+    // The wire change, stated as a test. The three reasons that used to answer 403
+    // now answer 422, and none of the four answers the old generic sentence any
+    // more. Read off the responses produced here — NOT a restatement of the
+    // expectations above, so a case above that changed its code fails this too.
+    //
+    // Both calls target the SAME row on purpose: the difference between the two
+    // answers is then provably the Role asking and not the DemandeDeplacement,
+    // which is exactly the distinction the ticket is about.
+    it("distingue « qui demande » de « la demande » sur une seule ligne", async () => {
+      const autre = await createDraftDemande()
+
+      // A MANAGER asking: NOT_OWNER — 403, about who is asking.
+      const quiDemande = await reponseAuUtilisateur(autre.id, "submit", {
+        id: managerId,
+        role: "EMPLOYEE",
+      })
+      // The owner asking about an action that does not exist here: NO_EFFECT — 422,
+      // about the DemandeDeplacement.
+      const laDemande = await reponseAuUtilisateur(autre.id, "approuver", {
+        id: employeeId,
+        role: "EMPLOYEE",
+      })
+
+      expect(quiDemande.status).toBe(403)
+      expect(laDemande.status).toBe(422)
+      expect(quiDemande.body.error).not.toBe(laDemande.body.error)
+      for (const { status, body } of [quiDemande, laDemande]) {
+        expect([403, 422], body.error).toContain(status)
+        expect(body.error).not.toBe("Action non autorisee")
+      }
     })
   })
 
