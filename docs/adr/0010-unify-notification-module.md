@@ -40,6 +40,16 @@ The `NotificationAdapter` interface and `AdapterResult` type are declared in `ad
 
 Both helpers move from `lib/demande/effets-transition.ts` into `lib/notification/helpers.ts`. `effets-transition.ts` imports them back from `lib/notification`. Dependency direction becomes `lib/demande/ → lib/notification/`, which is correct: transitions depend on the notification domain.
 
+### Who receives a Notification, and who may read one
+
+**An inactive Utilisateur neither RECEIVES nor PRODUCES a Notification.** One rule, three paths, and the module applies it to all of them: the role targets, the employee the payload names, and the Assignataire it names. `markAsRead` asks the same question about its reader, so a deactivated Utilisateur cannot set `lu` and cannot produce a read receipt.
+
+The rule is not re-spelled here. It is composed from `conditionActif`, the fragment the Utilisateur module exports and the one its per-Utilisateur answer `peutAgir` is derived from — so « only active Utilisateurs are notified » cannot drift from « a Utilisateur may act only while active » (#313, #315), and the two notification paths cannot drift from each other either.
+
+*(This section was added by #355 and #356. Until then the module applied the rule to the role targets alone: the employee and the Assignataire were added outright, and `markAsRead` asked nothing. The gap was user-visible rather than academic, because `EVENT_ROLE_MAP` is empty for `DEMANDE_APPROBATION_FINALE` and `DEMANDE_REJETEE` — for those two events the employee addition IS the entire notification surface, so a Utilisateur deactivated after filing their DemandeDeplacement was told, by mail, that it had been decided. #315's narrower intent — « still adds the employee and the assignee regardless of activity », recorded deliberately then — is SUPERSEDED by this decision rather than forgotten: the additions were the resolver's own recipient rules, and « a Utilisateur who cannot act is nonetheless told about their own DemandeDeplacement » is not a distinction that survives being written down. The test that recorded the old intent was rewritten to assert this rule, not deleted.)*
+
+*(On where the read-path check lives: in the module, not at the route. `app/api/notifications/[id]/route.ts` was already closed to an inactive Utilisateur — `requireAuth()` answers 401 « Non autorisé » because `currentUser()` asks `peutAgir` — so the production path did not depend on it. It is in the module because `markAsRead` takes a handle and is called with one directly by tests and by any future caller, and an invariant that holds only because one caller remembered a check is not an invariant. This is the defect class #309 and #310 exist for.)*
+
 ### `lu = false` bug fix
 
 `countUnread` in `lib/notification/queries.ts` adds `eq(notifications.lu, false)` to its `.where()` clause. A PGLite integration test inserts both read and unread rows and asserts the count reflects only unread ones — a test that the previous mock-db suite structurally could not write.
@@ -107,4 +117,5 @@ export async function countUnread(userId: string, db: DrizzleDb): Promise<number
 - `lib/notification/` is the canonical home for all notification logic — dispatch, markAsRead, queries, email send.
 - `lib/demande/effets-transition.ts` depends on `lib/notification/` (correct direction: transitions produce notifications).
 - `dispatch` calls `sendEmail` after the adapter row insert succeeds — the two-step orchestration is explicit and independently testable.
+- **An inactive Utilisateur is neither a recipient nor a read-receipt source** (#355, #356). Three recipient paths carry the rule — role targets, the employee the payload names, the Assignataire it names — and `markAsRead` asks it of its reader. A Utilisateur deactivated mid-pipeline is therefore not told that their own DemandeDeplacement was approved or rejected, and their reading one is not announced to their Department's managers. The filter is applied by composing `conditionActif`, never by re-spelling it, so there is one definition of « active » in the codebase.
 - The `NotificationAdapter` interface remains the seam the module is constructed with; PGLite covers persistence and query correctness. *(Post-adoption annotation: #312 moved the suite off the interface — every test now reaches the exported entries against a real database, so the interface is no longer substituted in a test. It stays declared because the class is still built with one; it simply no longer earns its keep by being the thing tests inject.)*

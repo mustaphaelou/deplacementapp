@@ -86,12 +86,46 @@ const ASSIGNEE_EVENTS: NotificationEventType[] = ["DEMANDE_RETIREE"]
  *
  * A SET is being filtered here, so the activity rule is composed into the
  * query rather than asked per candidate: asking `peutAgir` once per row would
- * turn one query into one-per-manager. The rule itself is still the Utilisateur
+ * turn one query into one-per-manager. The rule itself is the Utilisateur
  * module's — `conditionActif` is the same fragment the reader's per-Utilisateur
- * answer is derived from (#315), so « only active Utilisateurs are notified »
- * cannot drift from « a Utilisateur may act only while active ».  This module
- * keeps its own recipient rules: the role, the department scope, and the
- * employee/assignee additions are unchanged.
+ * answer is derived from (#315) — so « only active Utilisateurs are notified »
+ * cannot drift from « a Utilisateur may act only while active ».
+ *
+ * ALL THREE paths below are held to it (#355), and that is one decision rather
+ * than three: an inactive Utilisateur neither RECEIVES nor PRODUCES a
+ * Notification. Before this, `conditionActif` reached the role targets only,
+ * and the employee and assignee additions were added outright — which made the
+ * gap user-visible rather than academic, because `EVENT_ROLE_MAP` is EMPTY for
+ * `DEMANDE_APPROBATION_FINALE` and `DEMANDE_REJETEE`
+ * (`lib/notification-events.ts:48-49`). For those two events the employee
+ * addition IS the whole notification surface: a Utilisateur deactivated after
+ * filing their DemandeDeplacement was told, by mail, that it had been approved
+ * or rejected.
+ *
+ * The narrower intent is superseded deliberately, not by accident. #315 moved
+ * the activity rule into the Utilisateur reader and pinned « still adds the
+ * employee and the assignee regardless of activity », which was a settled
+ * reading at the time: the additions were the resolver's OWN recipient rules,
+ * distinct from the role targets the rule had been moved for. It is now decided
+ * the other way, because « a Utilisateur who cannot act is nonetheless told
+ * about their own DemandeDeplacement » is not a distinction anyone can state
+ * once it is written down — the deactivation is normally the answer, so the
+ * Notification says nothing the Utilisateur needs and its MAIL reaches an
+ * address nobody reads any more. The test that recorded the old intent was
+ * rewritten to assert this rule rather than deleted (#355).
+ *
+ * Kept from the resolver's own rules: the role targets, the department scope,
+ * and the CHOICE of which events carry the employee and which carry the
+ * assignee. Activity now filters; it does not decide who is named.
+ *
+ * One consequence of holding the additions to the same rule is that they now
+ * require the named Utilisateur to EXIST as well as to be active: an id
+ * matching no row is dropped, where before it was added outright. That branch
+ * is unreachable in practice, and the schema is what makes it so —
+ * `demandesDeplacement.employeId` and `assigneAId` are foreign keys to
+ * `utilisateurs.id` with `onDelete: "restrict"`, and `dispatchRows` is called
+ * from inside the transition's own transaction, so the row the payload names
+ * was read and cannot have been deleted underneath the call.
  */
 export async function resolveRecipients(
   event: NotificationEventType,
@@ -99,6 +133,36 @@ export async function resolveRecipients(
   tx: DrizzleTransactionClient
 ): Promise<string[]> {
   const ids = new Set<string>()
+
+  /**
+   * The one place activity is asked ABOUT A NAMED CANDIDATE, for both
+   * additions — the employee and the assignee alike. It is not the one place
+   * activity is asked at all: the role targets below compose `conditionActif`
+   * into their own `WHERE` rather than calling this, because a SET cannot be
+   * filtered one candidate at a time without turning one query into
+   * one-per-manager.
+   *
+   * A named candidate is admitted only if the Utilisateur module's rule admits
+   * it, so a Utilisateur who does not exist is dropped as well — which is what
+   * an id from a stale payload deserves, and it is the same answer `peutAgir`
+   * gives for one.
+   *
+   * `conditionActif` is spelled once, in `lib/utilisateur-service.ts:359`, and
+   * is derived FROM the same fragment `peutAgir` composes, so the reader's
+   * per-Utilisateur answer and this SET-shaped answer cannot disagree (#313,
+   * #315). The additions read the same fragment rather than their own
+   * predicate: « active » has one definition in this repo, and a second
+   * spelling beside this one is how the rule was half-applied in the first
+   * place.
+   */
+  const ifActif = async (utilisateurId: string): Promise<boolean> => {
+    const [row] = await tx
+      .select({ id: utilisateurs.id })
+      .from(utilisateurs)
+      .where(and(eq(utilisateurs.id, utilisateurId), conditionActif))
+      .limit(1)
+    return row !== undefined
+  }
 
   const roleTargets = EVENT_ROLE_MAP[event]
   for (const target of roleTargets) {
@@ -118,11 +182,15 @@ export async function resolveRecipients(
   }
 
   if (EMPLOYEE_EVENTS.includes(event)) {
-    ids.add(payload.employe.id)
+    if (await ifActif(payload.employe.id)) {
+      ids.add(payload.employe.id)
+    }
   }
 
   if (ASSIGNEE_EVENTS.includes(event) && payload.assigneAId) {
-    ids.add(payload.assigneAId)
+    if (await ifActif(payload.assigneAId)) {
+      ids.add(payload.assigneAId)
+    }
   }
 
   return Array.from(ids)
