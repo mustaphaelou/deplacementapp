@@ -814,8 +814,10 @@ describe("DemandeDeplacement mutations (PGLite)", { timeout: TIMEOUT }, () => {
       expect(body).toEqual({ error: "Cette action n'existe pas a cette etape" })
     })
 
-    // The wire change, stated as a test. The three reasons that used to answer 403
-    // now answer 422, and none of the four answers the old generic sentence any
+    // The wire change, stated as a test. TWO of the four reasons changed CODE —
+    // the two about the DemandeDeplacement, 403 → 422 — while the two about who
+    // is asking keep 403 and changed only their sentence; all four answer a
+    // different body than before, and none answers the old generic sentence any
     // more. Read off the responses produced here — NOT a restatement of the
     // expectations above, so a case above that changed its code fails this too.
     //

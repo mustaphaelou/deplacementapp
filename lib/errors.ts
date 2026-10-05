@@ -60,15 +60,25 @@ export type RefusTransition = (action: WorkflowAction) => Error
  * error module reads the guard's reason TYPE and nothing else, which creates no
  * cycle and drags no server-only machinery into a client bundle.
  *
- * **The codes are a wire change for three of the four reasons.** `WRONG_ROLE`
- * and `NOT_OWNER` keep 403, which is what they mean: the two reasons about who
- * is asking. `TERMINAL` and `NO_EFFECT` answer 422, which is what they are — an
- * invalid transition, not a permission failure. Today all four answer 403, and
- * answering « you may not » to a DemandeDeplacement whose Decision is already
- * recorded answers a question nobody asked. Verified: the only in-repo client of
- * the transition route (`hooks/use-demande-actions.ts:27-30`) reads
- * `data.error` and ignores the status code, so nothing in the repository breaks —
- * but a client written later must not assume every refusal means « you may not ».
+ * **The codes are a wire change for TWO of the four reasons; the other two only
+ * changed sentence.** Measured against the base: `TERMINAL` and `NO_EFFECT` —
+ * the two about the DemandeDeplacement — moved 403 → 422, which is what they
+ * are: an invalid transition, not a permission failure. `WRONG_ROLE` and
+ * `NOT_OWNER` keep 403, which is what they mean, since they are the two about
+ * who is asking — but their SENTENCES changed too, so every one of the four
+ * reasons now answers a different body than it did. Before this table all four
+ * answered 403, and three of them answered the same generic sentence: answering
+ * « you may not » to a DemandeDeplacement whose Decision is already recorded
+ * answers a question nobody asked. A client that branches on the code must read
+ * the two numbers apart (403 = « you may not », 422 = invalid transition); a
+ * client that reads the body sees a new sentence on all four.
+ *
+ * The note is repeated where a client can actually reach it: the docblock above
+ * is unreachable from a client bundle (`lib/errors.ts` imports `next/server`),
+ * so `app/api/demandes/[id]/action/route.ts` carries the same note beside the
+ * route. Verified there: the only in-repo client of this route
+ * (`hooks/use-demande-actions.ts:27-30`) reads `data.error` and ignores the
+ * status code, so nothing in the repository breaks.
  *
  * **Total, with no default and no fall-through.** The `Record` type makes a
  * missing row a compile error and the sweep in `lib/errors.test.ts` makes a

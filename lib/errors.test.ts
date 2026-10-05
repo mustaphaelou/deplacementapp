@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
 import { readFile } from "node:fs/promises"
-import { checkTransition } from "./workflow"
+import { checkTransition, PIPELINE } from "./workflow"
 import type {
   Etape,
   Decision,
@@ -15,6 +15,31 @@ import {
   InvalidTransitionError,
   UnauthorizedActionError,
 } from "./errors"
+
+// ─── Why this file asserts reason codes at all (declared deviation) ─────────
+//
+// `CODING_STANDARDS.md:36` — « Assert denial outcomes, not reason codes » — is
+// CONTRADICTED by this file, and deliberately so. The rule exists because an
+// assertion on a code is coupled to a check ORDER that is not part of the
+// contract. Here the reason IS the unit under test: ticket #300's whole subject
+// is the mapping from a guard reason to the refusal it names, so an outcome-only
+// assertion could not tell a correct table from one that had swapped two reasons'
+// sentences. The rule is therefore displaced, not ignored, in two ways:
+//
+//   * The OUTCOMES are still pinned — at the handler, which is where a Utilisateur
+//     meets them. `lib/demande/mutations.test.ts` drives every reason through the
+//     transition writer and through `handleServiceError`, asserting the status and
+//     the body the Utilisateur receives. This file is the module's own unit test;
+//     the handler test is the contract test, and it did not move.
+//   * Every reason assertion here is read through `raisonDuGarde`, which ASKS the
+//     guard on that exact tuple rather than assuming which reason it returns — so
+//     no assertion below hardcodes a reason where a change in the guard's order is
+//     what would break it. The one place the ordering genuinely is the claim —
+//     WRONG_ROLE at FINAL — says so at the assertion.
+//
+// A fifth reason added to the guard fails the sweep below instead, which is the
+// stronger form of the same guarantee: the set of codes is checked against what
+// the guard actually produces, not against a transcribed list.
 
 // ─── Reading the two shapes every assertion here goes through ───────────────
 //
@@ -61,13 +86,31 @@ function raisonDuGarde(
 // So the set is collected by ASKING THE GUARD, and the table is read against what
 // came back.
 //
-// The dimensions are the guard's own signature. The VALUES are written out here
-// rather than read out of `PIPELINE`, `TOUS_LES_ROLES` or `TERMINAL_DECISIONS`, so
-// a change to any of those declarations cannot quietly shrink the space this sweep
-// covers — a sweep that reads the declaration it is sweeping would cover exactly
-// as much as that declaration says and no more.
+// The dimensions are the guard's own signature. Each is read from the
+// DECLARATION it sweeps, so a lane added to the pipeline is covered the day it is
+// added rather than the day somebody remembers this list — with ONE exception,
+// pinned below: an Etape the guard does not know is refused WRONG_ROLE rather
+// than refused at all (`if (!stage || …)`, workflow.ts), so a hardcoded Etape
+// list would invent phantom refused tuples attributed to a lane that no longer
+// exists, and the sweep would never notice. That is why the Etape dimension is
+// DERIVED from `PIPELINE` and then compared against the five names written out
+// here: the rename stays covered AND fails loudly.
+//
+// The Role dimension is read from `TOUS_LES_ROLES`, and nothing written out
+// below freezes its COUNT — ADR-0021 (Accepted) makes ADMIN a fifth Role, and a
+// pin on the number would redden a file that has nothing to do with Roles the day
+// that lands. The bound the sweep actually needs is non-vacuity, and it is
+// asserted as a floor derived from the sweep's own product: see the first test.
 
-const ETAPES: readonly Etape[] = [
+const ETAPES: readonly Etape[] = PIPELINE.map((etape) => etape.id)
+
+/**
+ * The five Etape names, WRITTEN OUT — the pin that makes the derivation above
+ * safe. The two halves are deliberately opposed: read from `PIPELINE` so a rename
+ * is covered, pinned here so it is also LOUD. A pin that only derived, or only
+ * listed, would leave one of those two failures unguarded.
+ */
+const ETAPES_ECRITES: readonly Etape[] = [
   "DRAFT",
   "MANAGER_REVIEW",
   "FINANCE_REVIEW",
@@ -157,13 +200,27 @@ describe("REFUS_TRANSITION is total over the reasons the guard produces", () => 
   it("sweeps a space the guard both enters and refuses", () => {
     const tuples = tuplesRefuses()
 
-    expect(TOUS_LES_ROLES.length).toBe(4)
-    expect(ETAPES.length).toBe(5)
+    // The floor is derived from the sweep's OWN product, so it holds for whatever
+    // Role list exists — including the fifth one ADR-0021 adds — and still cannot
+    // be satisfied by an emptied Role dimension. The ceiling is the full product,
+    // so the guard must also leave at least one tuple it accepts.
+    expect(tuples.length).toBeGreaterThan(ETAPES.length * ACTIONS.length)
     expect(ACTIONS.length).toBe(4)
     expect(DECISIONS.length).toBe(5)
     expect(OWNERSHIP.length).toBe(2)
-    expect(tuples.length).toBeGreaterThan(0)
-    expect(tuples.length).toBeLessThan(4 * 5 * 4 * 5 * 2)
+    expect(tuples.length).toBeLessThan(
+      TOUS_LES_ROLES.length * ETAPES.length * ACTIONS.length * DECISIONS.length *
+        OWNERSHIP.length
+    )
+  })
+
+  // The pin that makes deriving `ETAPES` from `PIPELINE` safe, and the reason the
+  // old comment claimed a defence the code did not have. Without this, a renamed
+  // lane would leave the sweep covering a lane that no longer exists — and since
+  // the guard refuses an unknown Etape WRONG_ROLE, those phantom tuples would
+  // look like ordinary coverage and the rename would pass unnoticed.
+  it("sweeps the Etapes the pipeline declares, spelled out", () => {
+    expect(ETAPES).toEqual([...ETAPES_ECRITES])
   })
 
   it("names a refusal for every reason the guard can produce", () => {
@@ -210,7 +267,10 @@ describe("REFUS_TRANSITION is total over the reasons the guard produces", () => 
     const table = source.slice(debut, fin)
     expect(table).not.toMatch(/\bdefault\s*:/)
     expect(table).not.toMatch(/\?\?/)
-    expect(table).not.toMatch(/\[reason\]/)
+    // No `expect(table).not.toMatch(/\[reason\]/)` here: that slice ends at the
+    // raiser, and the only index read `[reason]` in the file lives INSIDE the
+    // raiser — outside the slice. It could not have failed, and read like a guard
+    // on index-access totality. The bare read IS pinned, on the raiser below.
 
     // The raiser reads the row and returns it. It does not choose, and it does
     // not fall back.
@@ -246,6 +306,10 @@ describe("REFUS_TRANSITION is total over the reasons the guard produces", () => 
     }
   })
 
+  // The wire change, stated here too. TWO of the four reasons changed CODE
+  // (403 → 422); the other two kept 403 but changed SENTENCE, so all four
+  // answer a different body than they did before. Kept beside the codes they
+  // describe — `lib/errors.ts` holds the authoritative statement.
   // Every reason yields a FRENCH sentence, and the sentences are DISTINCT. A
   // table that put « Action non autorisee » back on one row would have changed the
   // class of two reasons and nothing a reader can see — which is the half of this
@@ -516,10 +580,43 @@ describe("refusPourTransition", () => {
   // `handleServiceError` would answer « Erreur interne » — losing the cause the
   // table exists to name. The type says it cannot happen; this says what a reader
   // would be shown if it did.
+  //
+  // The probe uses the OWNERSHIP actions, which are that row's actual domain: the
+  // only row that is a function OF the action is `NOT_OWNER`, and the guard reaches
+  // it for `submit` and `retirer` only — never for `approuver`. Probing an action
+  // outside that domain would be correct by luck on the rows that ignore it, and
+  // would exercise the sentence for an action nobody can ever attempt.
   it("has no row that is not a function of the action", () => {
     for (const [raison, refus] of Object.entries(REFUS_TRANSITION)) {
       expect(typeof refus, raison).toBe("function")
-      expect(typeof refus("submit"), raison).toBe("object")
+      expect(typeof refus("submit"), `${raison} sur submit`).toBe("object")
+      expect(typeof refus("retirer"), `${raison} sur retirer`).toBe("object")
+    }
+  })
+
+  // The row that IS a function of the action differs between its two ownership
+  // actions — asserted here because the guard's ORDERING (the seat check before
+  // the Decision, and the ownership check before the Role check) is the only
+  // thing preventing a tuple where a MANAGER would read the `retirer` sentence
+  // without ever having asked to withdraw. This assertion is what says so.
+  it("distinguishes the two ownership actions the guard can refuse", () => {
+    expect(refusPourTransition("NOT_OWNER", "submit").message).not.toBe(
+      refusPourTransition("NOT_OWNER", "retirer").message
+    )
+
+    // And each is refused for the action it names: the guard produces NOT_OWNER
+    // for exactly these two tuples, so no other action ever reaches the row.
+    for (const action of ["submit", "retirer"] as const) {
+      const raison = raisonDuGarde("EMPLOYEE", "DRAFT", action, "PENDING", false)
+      expect(raison, action).toBe("NOT_OWNER")
+      expect(
+        refusPourTransition(raison, action).message,
+        action
+      ).toBe(
+        action === "submit"
+          ? "Seul le proprietaire peut soumettre la demande"
+          : "Seul le proprietaire peut retirer la demande"
+      )
     }
   })
 })
@@ -544,6 +641,18 @@ describe("refusPourTransition", () => {
  * A French SENTENCE in code: a quoted literal of at least three alphabetic words,
  * comments stripped. Deliberately generous about accents and elisions — the point
  * is to catch a refusal a Utilisateur could read, not to adjudicate orthography.
+ *
+ * Two bounds, known and accepted, because both are closed by the repository's own
+ * configuration rather than by a sharper regex that could refuse correct code (a
+ * checker that cries wolf is worse than no checker):
+ *   1. A literal delimited by SINGLES quotes containing an apostrophe is missed,
+ *      since the capture stops at that apostrophe. `.prettierrc` sets
+ *      `singleQuote: false`, so the codebase cannot contain one: every literal is
+ *      double-quoted and the bound is closed by formatting, not by hope.
+ *   2. A sentence assembled from two or more fragments is missed, because no one
+ *      fragment carries three words. No such composed sentence exists in the
+ *      pipeline module today; the composed waiting link in `lib/workflow.test.ts`
+ *      is assembled that way and stays exempt because it holds no refusal.
  */
 function phrasesFrancaises(source: string): string[] {
   const litteral = /(["'`])((?:\\.|(?!\1)[^\\])*)\1/g
@@ -598,7 +707,60 @@ const PHRASES_INVARIANT_DU_PIPELINE: ReadonlyArray<{
   },
 ]
 
+// ─── The wire change, noted where a CLIENT can reach it (#300) ─────────────
+//
+// AC: « The wire change is noted where a client would find it ». The note in
+// `lib/errors.ts` does not qualify — that module imports `next/server`, so it
+// never reaches the bundle of the client that has to branch on the code. The
+// copy that qualifies sits on the route.
+//
+// The pins below are on FACTS, not on the note's wording: a reworded note stays
+// green, a note that stops naming a code goes red, and a client that starts
+// reading the code goes red too — which is exactly when the note must be rewritten
+// rather than trusted.
+
+describe("the transition route states the wire change a client would need", () => {
+  const routeFile = new URL(
+    "../app/api/demandes/[id]/action/route.ts",
+    import.meta.url
+  )
+
+  it("names both codes and points at the table they come from", async () => {
+    const route = await readFile(routeFile, "utf8")
+
+    // The NUMBERS, not the sentence: which reasons answer 422 rather than 403 is
+    // the content, and it is checkable without pinning a paragraph.
+    expect(route, "la route ne dit pas quel code vaut quoi").toContain("422")
+    expect(route).toContain("403")
+    // A summary that outlives its source is a second copy to drift, so the note
+    // must name the table a client author is sent to.
+    expect(route).toContain("lib/errors.ts")
+  })
+
+  // The route note claims the only in-repo client reads the message and ignores
+  // the code. That is a claim about a FILE this repository can check, so it is
+  // checked here rather than believed: the day that hook branches on the status,
+  // this fails and the note is rewritten — instead of the note quietly becoming
+  // false in the only place a client author would have read it.
+  it("keeps its claim true: the only in-repo client still ignores the code", async () => {
+    const hook = await readFile(
+      new URL("../hooks/use-demande-actions.ts", import.meta.url),
+      "utf8"
+    )
+
+    expect(hook).toContain("data.error")
+    expect(
+      hook,
+      "le client lit desormais le code de la reponse: la note de la route est perimee"
+    ).not.toMatch(/res\.status/)
+  })
+})
+
 describe("the pipeline module stays free of runtime imports and of refusals", () => {
+  // Two forms this pin does NOT catch, named so the next author knows the bound
+  // rather than assuming it is total: a runtime re-export (`export { X } from "…"`,
+  // `export * from "…"`) and a dynamic `import()`. Neither matches the
+  // `^\s*import\b` line split, and neither is present in the module today.
   it("imports nothing at runtime: every import is type-only", async () => {
     const source = await readFile(new URL("./workflow.ts", import.meta.url), "utf8")
     const imports = source.split("\n").filter((ligne) => /^\s*import\b/.test(ligne))
