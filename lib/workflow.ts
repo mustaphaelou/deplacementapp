@@ -354,15 +354,6 @@ export function checkTransition(
   return { ok: true }
 }
 
-export function canTransition(
-  role: Role,
-  etape: Etape,
-  action: WorkflowAction,
-  decision?: Decision
-): boolean {
-  return checkTransition(role, etape, action, decision, true).ok
-}
-
 // ─── The one way in (#299) ─────────────────────────────────────────────────
 
 export interface TransitionParams {
