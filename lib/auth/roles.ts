@@ -18,14 +18,15 @@ import { lienFileAttente } from "../workflow"
  * Spelling it once here rather than once per consumer is what keeps the copies
  * from reappearing. This module is deliberately importable by a client bundle
  * (see `hasAnyRole` below), so it may not import the database to read the
- * vocabulary off the column — that would pull `next/headers` and drizzle into
- * every client that asks the question. So the two declarations of the
- * vocabulary — this one, and the column's own in `db/schema/enums.ts` — are
- * written independently and tied together by a RUNTIME WITNESS:
- * `roles.test.ts` reads `[...roleEnum.enumValues]` off the column and asserts
- * set-equality with this list. Neither is derived from the other, so the
- * witness can fail; see `demande-types.row-types.test.ts` for the same pattern
- * over `Etape` and `Decision`.
+ * vocabulary off the column: `db/schema/enums.ts` imports `pgEnum` from
+ * `drizzle-orm/pg-core`, so a value import here would pull the ORM into every
+ * browser that asks a navigation question. So the two declarations of the
+ * vocabulary — this one, and the column's own — are written independently and
+ * tied together by a RUNTIME WITNESS in `roles.test.ts`, which reads
+ * `[...roleEnum.enumValues]` off the column and asserts set-equality with this
+ * list. Neither is derived from the other, so the witness can fail; see
+ * `demande-types.row-types.test.ts` for the same pattern over `Etape` and
+ * `Decision`.
  *
  * The hazard this exists to prevent is a LOCKOUT, not a crash: ADR-0021 adds a
  * fifth Role (the deployment's Administrateur), and on the day that Role

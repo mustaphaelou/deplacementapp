@@ -323,8 +323,22 @@ describe("no surface reaches around the declared set", () => {
 
     // roles.ts must stay free of server-only imports, or the client bundle
     // pulls next/headers and the database in with it.
-    expect(roles).not.toMatch(/from\s+"next\/(headers|server)"/)
+    //
+    // The specifier is matched LOOSELY on purpose. This used to be
+    // `/from\s+"\.\.\/\.\.\/db"/`, which matched the bare `"../../db"` and
+    // nothing else — so neither the alias form this repo uses everywhere
+    // (`"@/db/schema/enums"`) nor the path form the #357 ticket itself writes
+    // (`"../../db/schema/enums"`) was caught, and the pin named the hazard
+    // without guarding it. Measured, not assumed: with the old regex, adding
+    // `import { roleEnum } from "@/db/schema/enums"` to roles.ts left this
+    // suite 31/31 green. Any specifier that reaches the db directory is now
+    // refused, by alias or by relative path, with or without a subpath.
+    expect(roles).not.toMatch(/from\s+"[^"]*db\//)
     expect(roles).not.toMatch(/from\s+"\.\.\/\.\.\/db"/)
+
+    // Same widening for `next/`: the old pattern missed `"next/headers.js"`
+    // and any subpath, for the same reason.
+    expect(roles).not.toMatch(/from\s+"next\/(headers|server)[^"]*"/)
 
     // And the definition must live in ONE place — a second copy is a second
     // spelling, which is the defect class itself.
@@ -343,6 +357,40 @@ describe("no surface reaches around the declared set", () => {
  * working tree.
  */
 describe("the wiring check fails when it should", () => {
+  // The widened specifier patterns above are the pin that would catch a future
+  // `roles.ts` reaching the database — which is the only thing stopping #357's
+  // proposed derivation from putting drizzle in the client bundle. A pin that
+  // has never been shown to fail is the exact defect this ticket was opened
+  // for, so every accepted import form is asserted against the real patterns
+  // here, and a control asserts a legitimate one still passes.
+  it("catches every form by which roles.ts could reach the db", () => {
+    const reachesDb = /from\s+"[^"]*db\//
+    const reachesNext = /from\s+"next\/(headers|server)[^"]*"/
+
+    // The forms a future implementer would actually write — the alias this
+    // repo uses everywhere, and the path form the #357 ticket itself writes.
+    expect(reachesDb.test('import { roleEnum } from "@/db/schema/enums"')).toBe(
+      true
+    )
+    expect(
+      reachesDb.test('import { roleEnum } from "../../db/schema/enums"')
+    ).toBe(true)
+    expect(reachesDb.test('import { roleEnum } from "@/db"')).toBe(false)
+    expect(reachesNext.test('import { headers } from "next/headers"')).toBe(true)
+    expect(reachesNext.test('import { headers } from "next/headers.js"')).toBe(
+      true
+    )
+
+    // CONTROL: the import roles.ts legitimately has must stay legal, or the
+    // widened pattern would be refusing correct code.
+    expect(reachesDb.test('import { lienFileAttente } from "../workflow"')).toBe(
+      false
+    )
+    expect(
+      reachesNext.test('import { lienFileAttente } from "../workflow"')
+    ).toBe(false)
+  })
+
   it("catches a NEW administration surface that names Roles", () => {
     // What a #284-style surface looked like before the fix: a single Role.
     const defect = `

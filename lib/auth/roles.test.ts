@@ -308,12 +308,17 @@ describe("lireRole", () => {
 // list, so these are the SAME set by construction and this block is what says
 // so at runtime.
 describe("the reader's accepted set and the Role union are the same set", () => {
-  it("accepts exactly the Roles the union names — neither more nor fewer", () => {
-    // The union's own runtime witness: derived from `TOUS_LES_ROLES`, which is
-    // the one list the `Role` type is read off, so a widening of one is a
-    // widening of both.
-    expect([...TOUS_LES_ROLES].sort()).toEqual([...ROLE_UNION].sort())
-  })
+  // There is deliberately NO case here comparing `TOUS_LES_ROLES` against
+  // `ROLE_UNION`. It used to read « neither more nor fewer », and after the
+  // union became derived from the list it compared a value with ITSELF:
+  // emptying `TOUS_LES_ROLES` left it green, which was measured, not assumed.
+  // A case that cannot fail inside a block titled « THE LOCKOUT GUARD — the
+  // acceptance criterion that is not negotiable » is worse than no case, so it
+  // was deleted rather than kept for appearances. The claim that the accepted
+  // set and the union agree is now a TYPE-level fact (`Role` is
+  // `(typeof TOUS_LES_ROLES)[number]`, so `tsc` holds it), and the claim that
+  // matters — that the accepted set is the DATABASE's vocabulary — is a runtime
+  // one, in the witness block below.
 
   it("accepts every Role the navigation declares, and no other", () => {
     // `NAV_LANES` is declared `Record<Role, NavItem[]>`, so adding a Role to the
@@ -340,12 +345,13 @@ describe("the reader's accepted set and the Role union are the same set", () => 
 // `demande-types.row-types.test.ts:81` does for `Etape` and `Decision`.
 //
 // `TOUS_LES_ROLES` is NOT derived from `roleEnum` here even though that would be
-// the shorter way to write it: `lib/auth/roles.ts` is imported by a `"use client"`
-// page (`demandes/page.tsx` asks `hasAnyRole` in the browser), so importing
-// `db/schema/enums` there would pull drizzle into the client bundle — and
-// `scripts/management-wiring.test.ts` already pins that. So the two declarations
-// are written independently and tied together HERE, which is also the only
-// arrangement in which this test is capable of failing.
+// the shorter way to write it: `db/schema/enums.ts` imports `pgEnum` from
+// `drizzle-orm/pg-core`, and this module is reachable from two `"use client"`
+// pages, so a value import would pull the ORM into the browser bundle.
+// `scripts/management-wiring.test.ts` pins that, in both the alias and the
+// relative-path form. The reason is argued once, in full, in `roles.ts` — it is
+// repeated here only because the reader of a witness needs to know WHY the two
+// sides are separate, and two copies of one argument drift.
 describe("the reader's accepted set is the vocabulary the database declares", () => {
   const ROLES_THE_COLUMN_DECLARES = [...roleEnum.enumValues] as Role[]
 
@@ -386,35 +392,75 @@ describe("the reader's accepted set is the vocabulary the database declares", ()
   })
 
   // The witness must READ the column. Set-equality alone cannot tell a witness
-  // apart from a transcription: swap the two sources and every case above still
-  // passes, because a list compared against itself is trivially equal — which is
-  // the pre-#357 defect (a constant compared against another copy of itself)
-  // surviving in a new location, and it was measured going green before this
-  // case existed.
-  //
-  // So the SOURCE is pinned: this file must read `roleEnum.enumValues`, and the
-  // reading must be inside the witness declaration rather than somewhere the
-  // assertions cannot see. The slice is anchored and both indices are asserted,
-  // because `source.slice(a, b)` yields `""` when a needle is missing and
-  // `expect("").not.toContain(x)` passes for every x — a pin that disarms itself
-  // silently.
-  it("reads the witness off the column rather than off a restatement", () => {
-    const source = readFileSync(
-      join(REPO_ROOT, "lib/auth/roles.test.ts"),
-      "utf8"
-    )
-    const start = source.indexOf("const ROLES_THE_COLUMN_DECLARES")
-    expect(start).toBeGreaterThan(-1)
-    const end = source.indexOf("\n", start)
-    expect(end).toBeGreaterThan(start)
-    const declaration = source.slice(start, end)
-    expect(declaration).toContain("roleEnum.enumValues")
+    // apart from a transcription: swap the two sources and every case above still
+    // passes, because a list compared against itself is trivially equal — which is
+    // the pre-#357 defect (a constant compared against another copy of itself)
+    // surviving in a new location, and it was measured going green before this
+    // case existed.
+    //
+    // So the SOURCE is pinned: this file must read `roleEnum.enumValues` inside
+    // the witness DECLARATION, and nowhere else in the file — otherwise a
+    // transcript could sit in the declaration while the real reading lives in a
+    // comment two hundred lines away.
+    //
+    // The slice is normalised before it is read, because a line-based slice is
+    // formatting-coupled: splitting the declaration across prettier-legal lines
+    // made this case fail on correct code, measured before it was fixed. The
+    // needle is also the declaration's own, so renaming the constant moves the
+    // search with it instead of silently passing.
+    it("reads the witness off the column rather than off a restatement", () => {
+      // Comments are stripped first, exactly as `role-casts.test.ts` does: a
+      // comment that NAMES the reading must not be able to satisfy a pin about
+      // the reading. Stripping them also makes the slice immune to the comment
+      // block above it.
+      const source = readFileSync(
+        join(REPO_ROOT, "lib/auth/roles.test.ts"),
+        "utf8"
+      )
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/\/\/.*$/gm, "")
 
-    // And it is a SPREAD of the column, not the column object itself: the set
-    // comparisons below sort, and `enumValues` is a mutable array the column
-    // owns.
-    expect(declaration).toMatch(/\[\.\.\.roleEnum\.enumValues\]/)
-  })
+      // The whole declaration, however it is wrapped, collapsed to one line. The
+      // slice runs to the BLANK line that ends the declaration rather than to
+      // the first newline: a prettier-legal rewrap must not redden correct code,
+      // and that failure was measured before this was written.
+      const start = source.indexOf("ROLES_THE_COLUMN_DECLARES")
+      expect(start).toBeGreaterThan(-1)
+      const rest = source.slice(start)
+      const end = rest.indexOf("\n\n")
+      expect(end).toBeGreaterThan(0)
+      const declaration = rest.slice(0, end).replace(/\s+/g, " ")
+
+      expect(declaration).toContain("roleEnum.enumValues")
+
+      // And it is a SPREAD of the column, not the column object itself: the set
+      // comparisons above sort, and `enumValues` is a mutable array the column
+      // owns.
+      //
+      // The shape is matched TOLERANTLY because the declaration is read after a
+      // whitespace collapse, and prettier is free to wrap it. Measured failures
+      // that shaped this line: a strict `\[\.\.\.` went red on a rewrap that put
+      // `[` and `...` on different lines; adding `\s*` then went red on the
+      // TRAILING COMMA the same rewrap leaves before `]`. Both were correct
+      // code reddened by a formatting choice, so the pattern now accepts any
+      // legal spacing and an optional trailing comma.
+      expect(declaration).toMatch(
+        /\[\s*\.\.\.\s*roleEnum\.enumValues\s*,?\s*\]/
+      )
+
+      // The reading must be the DECLARATION's own, and the only DECLARATION
+      // that reads the column. This deliberately does not assert the literal
+      // appears nowhere else in the file: the assertion above necessarily
+      // contains it, and a pin whose own needle breaks it is a pin that always
+      // fails. What would defeat it is a SECOND witness — another `const …`
+      // bound to `[...roleEnum.enumValues]` — so those are counted rather than
+      // searched for.
+      const declarations = source.match(
+        /const\s+\w+\s*=\s*\[?\s*\.\.\.roleEnum\.enumValues/g
+      )
+      expect(declarations).toHaveLength(1)
+      expect(declarations?.[0]).toContain("ROLES_THE_COLUMN_DECLARES")
+    })
 })
 
 // The carve-out: `roles.ts:136` keeps its `as Role`, because the navigation
