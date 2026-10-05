@@ -67,6 +67,22 @@ let managerB: string
 // the same thing about its own seed, and it is true here too.
 let managerInactif: string
 let managerAutreDept: string
+// #355/#356 — an inactive EMPLOYEE, and an inactive Assignataire.
+//
+// The EMPLOYEE is the read-receipt PRODUCER: `markAsRead` dispatches
+// `DEMANDE_NOTIFICATION_LUE` to the reader's Department's managers, so a seed
+// holding no inactive employee cannot tell « refused the reader » from
+// « marked the row and mailed the two managers ». The Assignataire is
+// `DEMANDE_RETIREE`'s only recipient, which is what makes the inactive
+// assignee observable through rows rather than through a returned set.
+//
+// Both are seeded Role EMPLOYEE, and the reason is that `EVENT_ROLE_MAP`
+// targets MANAGER, FINANCE_ADMIN and GENERAL_DIRECTION and nothing else: a
+// Utilisateur in one of those Roles would become a candidate for some other
+// event in this file and every set assertion here would be reading two rules
+// at once.
+let employeInactif: string
+let assigneInactif: string
 let financeId: string
 let demandeId: string
 
@@ -100,6 +116,8 @@ beforeAll(async () => {
   managerB = crypto.randomUUID()
   managerInactif = crypto.randomUUID()
   managerAutreDept = crypto.randomUUID()
+  employeInactif = crypto.randomUUID()
+  assigneInactif = crypto.randomUUID()
   financeId = crypto.randomUUID()
   demandeId = crypto.randomUUID()
 
@@ -121,6 +139,13 @@ beforeAll(async () => {
       { id: managerA, role: "MANAGER" as const, nom: "Dupont", prenom: "Jean" },
       { id: managerB, role: "MANAGER" as const, nom: "Dupont", prenom: "Jean" },
       { id: managerInactif, role: "MANAGER" as const, nom: "Petit", prenom: "Lucie", actif: false },
+      // #355/#356 — the two inactive Utilisateurs the new rule is about. The
+      // EMPLOYEE is in the reader's own Departement, so if `markAsRead` ever
+      // dispatched a read receipt for them the two MANAGERs beside them would
+      // receive it, and the assertion « no extra row » below would fail for a
+      // reason the test can name.
+      { id: employeInactif, role: "EMPLOYEE" as const, nom: "Roux", prenom: "Rena", actif: false },
+      { id: assigneInactif, role: "EMPLOYEE" as const, nom: "Blanc", prenom: "Basile", actif: false },
       {
         id: managerAutreDept,
         role: "MANAGER" as const,
@@ -558,6 +583,136 @@ describe("markAsRead reads the row and then reports on it", { timeout: TIMEOUT }
     const rows = await notificationRows()
     expect(rows).toHaveLength(1)
     expect(rows[0].lu).toBe(true)
+    expectNoMail()
+  })
+
+  /**
+   * #356 — the activity rule on the read path, and the reason it belongs in
+   * this module rather than at its one route.
+   *
+   * `app/api/notifications/[id]/route.ts` is already closed to an inactive
+   * Utilisateur: `requireAuth()` → `currentUser()` asks `peutAgir` and answers
+   * 401 « Non autorisé » before this entry is reached. That is a property of a
+   * CALLER, and a module-level invariant that holds only because a caller
+   * remembered a check is the defect class #309/#310 were opened for — this
+   * entry takes a handle, so tests and any future caller reach it directly.
+   * The check therefore lives here, and this test is the pin that says so.
+   *
+   * The refusal is stated as OUTCOMES rather than as a thrown class alone: the
+   * row is still unread AND no second row exists. Both halves are load-bearing
+   * — `lu` is written BEFORE the receipt dispatch, so an implementation that
+   * checked activity only where the receipt is decided would set `lu` and
+   * still pass a `rejects` assertion.
+   *
+   * The reader here OWNS the notification and is in the reader's own
+   * Departement with two active MANAGERs beside them, so the receipt really
+   * would have landed. The candidate is read back out of the table rather than
+   * assumed from the seed, because without that line a resolver that ignored
+   * `actif` entirely would pass every assertion here.
+   */
+  it("refuses an inactive reader and changes nothing", async () => {
+    expect(await theSeededUtilisateur(employeInactif)).toMatchObject({
+      role: "EMPLOYEE",
+      departementId,
+      actif: false,
+    })
+
+    const notificationId = await givenANotification({
+      utilisateurId: employeInactif,
+    })
+
+    await expect(
+      markAsRead(notificationId, employeInactif, pgliteDb as never)
+    ).rejects.toBeInstanceOf(UnauthorizedActionError)
+    await expect(
+      markAsRead(notificationId, employeInactif, pgliteDb as never)
+    ).rejects.toMatchObject({ status: 403 })
+
+    // The state, which is the half a thrown class does not tell you: the row is
+    // exactly as it was, and no read receipt was written to anybody.
+    const rows = await notificationRows()
+    expect(rows).toHaveLength(1)
+    expect(rows[0].lu).toBe(false)
+    expectNoMail()
+  })
+
+  /**
+   * The same refusal for a reader whose Notification would produce no receipt
+   * at all, and whose ownership is not in question. Without it, an
+   * implementation that refused only inside the `role === "EMPLOYEE"` branch —
+   * or only where the receipt is decided — would pass the case above for the
+   * wrong reason, and this one would be the only thing holding it: the rule is
+   * asked about the READER, not about the branch they happen to take
+   * afterwards.
+   *
+   * The reader OWNS this notification (`utilisateurId: employeInactif`). An
+   * earlier draft of this case left the default owner, and it passed for a
+   * reason worth naming: the call then hit the OWNERSHIP refusal at
+   * `index.ts:216` and threw the same class, so the case was green before the
+   * fix and would have stayed green with the activity check deleted entirely.
+   * A refusal case that passes for the wrong reason is the one failure mode an
+   * assertion on the thrown class cannot see.
+   *
+   * `lu: true` makes the check the FIRST one to fire. On the other side of the
+   * fix the already-read branch returns without throwing, so a refusal here can
+   * only have come from the activity check — and a check placed AFTER that
+   * branch would be unreachable rather than merely wrong.
+   */
+  it("refuses an inactive reader whose notification would produce no receipt", async () => {
+    const notificationId = await givenANotification({
+      utilisateurId: employeInactif,
+      demandeId: null,
+      lu: true,
+    })
+
+    await expect(
+      markAsRead(notificationId, employeInactif, pgliteDb as never)
+    ).rejects.toBeInstanceOf(UnauthorizedActionError)
+
+    // Still exactly one row, still read — the refusal happened before the
+    // already-read no-op, which is the order that makes « refused » and « had
+    // nothing to do » different answers to the same call.
+    const rows = await notificationRows()
+    expect(rows).toHaveLength(1)
+    expect(rows[0].lu).toBe(true)
+    expectNoMail()
+  })
+})
+
+/**
+ * #355, observed through rows rather than through the resolver's return value:
+ * the Assignataire is `DEMANDE_RETIREE`'s ONLY recipient — `EVENT_ROLE_MAP` is
+ * empty for the event — so an inactive one means the dispatch writes nothing at
+ * all. The pair of cases around it is what keeps this from passing vacuously.
+ */
+describe("an inactive Utilisateur named by the payload is not written a row", {
+  timeout: TIMEOUT,
+}, () => {
+  it("DEMANDE_RETIREE writes nothing when the assignee is not active", async () => {
+    expect(await theSeededUtilisateur(assigneInactif)).toMatchObject({
+      actif: false,
+    })
+
+    await dispatch(
+      "DEMANDE_RETIREE",
+      payloadFor({ assigneAId: assigneInactif }),
+      pgliteDb as never
+    )
+
+    expect(await notificationRows()).toHaveLength(0)
+    expectNoMail()
+  })
+
+  it("DEMANDE_APPROBATION_FINALE writes nothing when the employee is not active", async () => {
+    await dispatch(
+      "DEMANDE_APPROBATION_FINALE",
+      payloadFor({
+        employe: { id: employeInactif, prenom: "Rena", nom: "Roux", departementId },
+      }),
+      pgliteDb as never
+    )
+
+    expect(await notificationRows()).toHaveLength(0)
     expectNoMail()
   })
 })

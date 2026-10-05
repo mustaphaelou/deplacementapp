@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 import type { DrizzleTransactionClient } from "../../db"
 import { db } from "../../db"
 import { DrizzleNotificationAdapter } from "./adapter"
@@ -17,6 +17,15 @@ import type {
 } from "../notification-events"
 import { NotificationNotFoundError, UnauthorizedActionError } from "../errors"
 import { notifications } from "../../db/schema/notifications"
+import { utilisateurs } from "../../db/schema/utilisateurs"
+// The Utilisateur module's activity rule, composed rather than restated: this
+// module has two questions to ask about activity — which Utilisateurs receive
+// a Notification (`resolveRecipients`) and who may mark one read
+// (`markAsRead`) — and both ask the fragment the reader exports (#355, #356).
+// Spelling `eq(utilisateurs.actif, true)` here instead is what would make the
+// rule drift from « a Utilisateur may act only while active », which is the
+// drift #313 and #315 exist to prevent.
+import { conditionActif } from "../utilisateur-service"
 
 export { NotificationNotFoundError, UnauthorizedActionError } from "../errors"
 // Re-exported so the module's whole failure vocabulary reaches a caller through
@@ -187,6 +196,24 @@ export class NotificationModule {
    * through the handle the caller hands over, so all three are one unit of
    * work. The default export supplies the module's own `db` for the route that
    * has no transaction to hand.
+   *
+   * The reader must still be ACTIVE (#356), which is the producing half of the
+   * decision #355 settled for the receiving half: an inactive Utilisateur
+   * neither receives nor produces a Notification. Every other write path in
+   * this module resolves its recipients through `resolveRecipients`, which
+   * already asks that question; this one does not go through the resolver, so
+   * it asks it here — and it asks it BEFORE the `lu` write rather than where
+   * the receipt is decided, because a reader refused at the receipt would have
+   * already moved the row.
+   *
+   * The check is here rather than at the route that is its one production
+   * caller. That route IS already closed — `requireAuth()` answers 401 « Non
+   * autorisé » for an inactive Utilisateur, since `currentUser()` asks
+   * `peutAgir` (`lib/auth/session.ts:123`) — so no such reader reaches this
+   * entry today. That is a property of a CALLER, and this entry takes a handle,
+   * so tests and any future caller reach it directly: an invariant that holds
+   * only because one caller remembered a check is the defect class #309 and
+   * #310 exist for, not an invariant.
    */
   async markAsRead(
     notificationId: string,
@@ -214,6 +241,33 @@ export class NotificationModule {
     }
 
     if (notification.utilisateurId !== userId) {
+      throw new UnauthorizedActionError("Non autorisé")
+    }
+
+    /**
+     * The activity rule, asked about the READER and in the Utilisateur
+     * module's own vocabulary: the same `actif IS TRUE` predicate
+     * `resolveRecipients` composes, composed again here because the question
+     * has one owner and this is a second caller of it rather than a second
+     * spelling of it.
+     *
+     * It fires BEFORE the already-read branch, and that order is deliberate: a
+     * reader who cannot act gets the same refusal whether or not there was
+     * anything left for them to do, so « refused » and « nothing to do » stay
+     * two different answers to two different situations instead of one answer
+     * that depends on which row was in front of the caller.
+     *
+     * An identifier matching no Utilisateur reads false, so a Notification
+     * whose owner row is gone is refused rather than marked — the same answer
+     * `peutAgir` gives, and the only safe one: the row would otherwise be read
+     * on behalf of nobody.
+     */
+    const [reader] = await tx
+      .select({ id: utilisateurs.id })
+      .from(utilisateurs)
+      .where(and(eq(utilisateurs.id, userId), conditionActif))
+      .limit(1)
+    if (!reader) {
       throw new UnauthorizedActionError("Non autorisé")
     }
 

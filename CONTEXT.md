@@ -114,10 +114,10 @@ The module (`lib/demande-presentation.ts`) that owns how a DemandeDeplacement's 
 _Avoid_: Status, statut, per-surface status mappings
 
 **Notification**:
-A message sent to a Utilisateur about a DemandeDeplacement event, delivered via both an in-app alert and an email. MANAGER notifications are scoped to the employee's Departement; FINANCE_ADMIN and GENERAL_DIRECTION notifications are org-wide. The Notification module is the single writer of notification rows — via `dispatch` (rows + email) and the rows-only `dispatchRows` — no other module writes them directly.
+A message sent to a Utilisateur about a DemandeDeplacement event, delivered via both an in-app alert and an email. MANAGER notifications are scoped to the employee's Departement; FINANCE_ADMIN and GENERAL_DIRECTION notifications are org-wide. The Notification module is the single writer of notification rows — via `dispatch` (rows + email) and the rows-only `dispatchRows` — no other module writes them directly. An inactive Utilisateur neither receives nor produces one: the module applies the activity rule to all three recipient paths (role targets, the employee the payload names, the Assignataire it names), composed from `conditionActif` rather than re-spelled (#355, #356).
 
 **AccuseLecture (Read Receipt)**:
-A Notification automatically sent to the MANAGER of an Employee's Departement when that Employee marks a Notification related to a DemandeDeplacement as read (lu). Dispatched only when the reader's Role is EMPLOYEE and the Notification is linked to a DemandeDeplacement — reads by MANAGER, FINANCE_ADMIN, or GENERAL_DIRECTION (or reads of demande-less notifications) produce no AccuseLecture. The email step of the AccuseLecture is dispatched via the EmailSender module.
+A Notification automatically sent to the MANAGER of an Employee's Departement when that Employee marks a Notification related to a DemandeDeplacement as read (lu). Dispatched only when the reader's Role is EMPLOYEE and the Notification is linked to a DemandeDeplacement — reads by MANAGER, FINANCE_ADMIN, or GENERAL_DIRECTION (or reads of demande-less notifications) produce no AccuseLecture. The email step of the AccuseLecture is dispatched via the EmailSender module. Marking a Notification read requires the reader to still be active (#356), so a deactivated Utilisateur produces no AccuseLecture and their Notification stays unread — the deactivation is normally the answer, so the receipt would say nothing they need.
 
 
 **EmailSender**:

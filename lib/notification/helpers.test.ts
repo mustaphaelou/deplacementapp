@@ -14,7 +14,10 @@
  * wrong condition through.
  */
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest"
-import { sql } from "drizzle-orm"
+import { eq, sql } from "drizzle-orm"
+import { readFileSync } from "node:fs"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
 import * as schema from "../../db/schema"
 import { createPgliteDb } from "../test/create-pglite-db"
 import type { PgliteDb } from "../test/create-pglite-db"
@@ -23,6 +26,13 @@ import type { NotificationPayload } from "../notification-events"
 import type { Role } from "../auth/roles"
 
 const TIMEOUT = 30_000
+
+/**
+ * The source-reading pins below resolve the repo root from this file rather
+ * than from `process.cwd()`: vitest's root and the file's own directory are
+ * the same thing only by accident of where the run was started from.
+ */
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..")
 
 interface Seeded {
   role: Role
@@ -45,6 +55,19 @@ describe("resolveRecipients — the activity rule comes from the Utilisateur rea
   let managerActifAutreDept: string
   let financeActif: string
   let financeInactif: string
+  let employeActif: string
+  let employeInactif: string
+  // The Assignataire's pair. They are seeded with Role EMPLOYEE on purpose, and
+  // the reason is arithmetic rather than domain: `EVENT_ROLE_MAP` targets
+  // MANAGER, FINANCE_ADMIN and GENERAL_DIRECTION and nothing else, so an
+  // assignee seeded in any of those Roles would be an extra recipient of some
+  // other event in this file and the assertions above would be reading two
+  // rules at once. The resolver treats `assigneAId` as the opaque identifier
+  // it is — the Assignataire's Role decides no part of `DEMANDE_RETIREE`,
+  // which has no role targets — so the Role is chosen to keep the seed from
+  // reaching outside this case.
+  let assigneActif: string
+  let assigneInactif: string
 
   beforeAll(async () => {
     pgliteDb = await createPgliteDb()
@@ -75,6 +98,15 @@ describe("resolveRecipients — the activity rule comes from the Utilisateur rea
       { role: "FINANCE_ADMIN", departementId: rhId, actif: true },
       { role: "FINANCE_ADMIN", departementId: marketingId, actif: false },
       { role: "EMPLOYEE", departementId: rhId, actif: true },
+      // The employee and the assignee, each seeded TWICE — once active and once
+      // not, with the same Role and the same Departement. #355 exists because
+      // the employee/assignee additions asked no question at all, so the two
+      // ids below are the only ones that can tell « named by the payload »
+      // from « named by the payload AND still active ». A suite holding one
+      // employee cannot tell those apart at all.
+      { role: "EMPLOYEE", departementId: rhId, actif: false },
+      { role: "EMPLOYEE", departementId: rhId, actif: true },
+      { role: "EMPLOYEE", departementId: rhId, actif: false },
     ]
 
     const ids = new Map<Seeded, string>()
@@ -105,6 +137,10 @@ describe("resolveRecipients — the activity rule comes from the Utilisateur rea
     managerActifAutreDept = idOf(2)
     financeActif = idOf(3)
     financeInactif = idOf(4)
+    employeActif = idOf(5)
+    employeInactif = idOf(6)
+    assigneActif = idOf(7)
+    assigneInactif = idOf(8)
   })
 
   const payload = (overrides?: Partial<NotificationPayload>) =>
@@ -112,7 +148,7 @@ describe("resolveRecipients — the activity rule comes from the Utilisateur rea
       demandeId: "d-1",
       numero: "DD-2026-0001",
       employe: {
-        id: "emp-1",
+        id: employeActif,
         prenom: "Jean",
         nom: "Dupont",
         departementId: rhId,
@@ -148,23 +184,85 @@ describe("resolveRecipients — the activity rule comes from the Utilisateur rea
     expect(recipients).not.toContain(financeInactif)
   })
 
-  // The event's own additions are untouched by the activity rule: the employee
-  // and the assignee are added by the resolver's recipient rules, not filtered
-  // by them, exactly as before #315.
-  it("still adds the employee and the assignee regardless of activity", async () => {
+  /**
+   * #355 — the event's OWN additions are held to the same rule as the role
+   * targets.
+   *
+   * This case is the rewrite of #315's « still adds the employee and the
+   * assignee regardless of activity », and it is a rewrite rather than a
+   * deletion because that narrower intent was SETTLED, deliberately, by #315
+   * and is now superseded by a decision rather than by an accident. What
+   * #315 protected was the activity rule for ROLE TARGETS; what it left alone
+   * was the two additions, and the reason it is now decided the other way is
+   * that for `DEMANDE_APPROBATION_FINALE` and `DEMANDE_REJETEE` those two
+   * additions ARE the whole notification surface: `EVENT_ROLE_MAP` is empty for
+   * both events, so « only active Utilisateurs are notified » was true of no
+   * path at all for the two events where a Utilisateur most needs to hear
+   * that their own DemandeDeplacement was decided.
+   *
+   * Both halves of each pair are seeded — the active and the inactive employee,
+   * the active and the inactive assignee — so the positive assertion is a rule
+   * at work rather than an accident of the ids the payload happened to name.
+   */
+  it("drops an inactive employee and an inactive assignee from the event's own additions", async () => {
     const approbation = await resolveRecipients(
       "DEMANDE_APPROBATION_FINALE",
-      payload(),
+      payload({ employe: { ...payload().employe, id: employeInactif } }),
       pgliteDb as any
     )
-    expect(approbation).toEqual(["emp-1"])
+    expect(approbation).toEqual([])
 
-    const retiree = await resolveRecipients(
+    const retired = await resolveRecipients(
       "DEMANDE_RETIREE",
-      payload({ assigneAId: "assigne-1" }),
+      payload({ assigneAId: assigneInactif }),
       pgliteDb as any
     )
-    expect(retiree).toEqual(["assigne-1"])
+    expect(retired).toEqual([])
+  })
+
+  /**
+   * The positive half, and the one that keeps the case above from passing
+   * vacuously. An empty recipient set is a legitimate answer to an inactive
+   * reader, so the assertion that matters is the PAIR: the same payload, one
+   * Utilisateur apart in `actif`, resolves to that Utilisateur and to nobody.
+   * This is the same two-axes argument the role-target cases above make, and it
+   * is the only thing that distinguishes « filtered by activity » from « this
+   * event notifies nobody ever ».
+   */
+  it("keeps the employee and the assignee when they are active", async () => {
+    const approbation = await resolveRecipients(
+      "DEMANDE_APPROBATION_FINALE",
+      payload({ employe: { ...payload().employe, id: employeActif } }),
+      pgliteDb as any
+    )
+    expect(approbation).toEqual([employeActif])
+
+    const retired = await resolveRecipients(
+      "DEMANDE_RETIREE",
+      payload({ assigneAId: assigneActif }),
+      pgliteDb as any
+    )
+    expect(retired).toEqual([assigneActif])
+  })
+
+  /**
+   * The rule holds when the additions are combined with a role target, which
+   * is the shape every real payload has: the employee is usually active while
+   * some other Utilisateur in the set is not. Asserted as a SET because the
+   * resolver returns a set, and a set assertion is the only one that cannot
+   * pass by ordering.
+   */
+  it("keeps an active addition and drops an inactive one in the same set", async () => {
+    const recipients = await resolveRecipients(
+      "DEMANDE_APPROBATION_FINALE",
+      payload({
+        employe: { ...payload().employe, id: employeActif },
+        assigneAId: assigneInactif,
+      }),
+      pgliteDb as any
+    )
+
+    expect([...recipients].sort()).toEqual([employeActif])
   })
 
   /**
@@ -187,7 +285,9 @@ describe("resolveRecipients — the activity rule comes from the Utilisateur rea
   it("resolves a department-scoped event to nobody when the employee has no departementId", async () => {
     const recipients = await resolveRecipients(
       "DEMANDE_NOTIFICATION_LUE",
-      payload({ employe: { id: "emp-1", prenom: "Jean", nom: "Dupont" } }),
+      payload({
+        employe: { id: employeActif, prenom: "Jean", nom: "Dupont" },
+      }),
       pgliteDb as any
     )
 
@@ -283,9 +383,194 @@ describe("resolveRecipients — asks the reader for the activity condition", {
       // out and fail this line.
       expect(recipients).toContain(inactifId)
       expect(recipients).toHaveLength(2)
+
+      // The same substitution, asked about the two ADDITIONS (#355). This is
+      // the half of the rule the role-target line above cannot reach: the
+      // inactive employee and the inactive assignee come from the payload, not
+      // from a role query, so a resolver that composed the reader's condition
+      // into its `WHERE` and then added those two ids outright would still
+      // pass the assertion above.
+      const additions = await substituted(
+        "DEMANDE_APPROBATION_FINALE",
+        {
+          demandeId: "d-1",
+          numero: "DD-2026-0001",
+          employe: {
+            id: inactifId,
+            prenom: "Jean",
+            nom: "Dupont",
+            departementId: rhId,
+          },
+        } as NotificationPayload,
+        pgliteDb as any
+      )
+      expect(additions).toEqual([inactifId])
+
+      const assignee = await substituted(
+        "DEMANDE_RETIREE",
+        {
+          demandeId: "d-1",
+          numero: "DD-2026-0001",
+          employe: {
+            id: "emp-1",
+            prenom: "Jean",
+            nom: "Dupont",
+            departementId: rhId,
+          },
+          assigneAId: inactifId,
+        } as NotificationPayload,
+        pgliteDb as any
+      )
+      expect(assignee).toEqual([inactifId])
     } finally {
       vi.doUnmock("../utilisateur-service")
       vi.resetModules()
     }
+  })
+
+  /**
+   * #356's half of the same pin: `markAsRead` asks the reader's condition too,
+   * and it asks it through the SAME export.
+   *
+   * The substitution is again deliberately the opposite of the real rule — the
+   * stand-in admits every Utilisateur — so an inactive reader becomes one this
+   * entry may read for, and the read receipt really is dispatched. If
+   * `markAsRead` spelled its own `actif` predicate, or checked a role or a
+   * flag instead of the rule, the refusal this test inverts would never fire
+   * and the row would stay unread.
+   *
+   * It imports `./index` rather than `./helpers` because `markAsRead` lives in
+   * the module's entry file — the point being pinned is that the read path
+   * takes its rule from the Utilisateur reader too, which is a claim about a
+   * file the resolver case above never loads.
+   */
+  it("markAsRead follows the condition the reader's module exports", async () => {
+    const pgliteDb = await createPgliteDb()
+    const societeId = crypto.randomUUID()
+    const departementId = crypto.randomUUID()
+    await pgliteDb.insert(schema.societes).values({
+      id: societeId,
+      nom: "Acme",
+      modifieLe: new Date(),
+    })
+    await pgliteDb.insert(schema.departements).values({
+      id: departementId,
+      nom: "RH",
+      societeId,
+    })
+
+    const employe = crypto.randomUUID()
+    const manager = crypto.randomUUID()
+    await pgliteDb.insert(schema.utilisateurs).values(
+      [
+        { id: employe, nom: "Roux", prenom: "Rena", actif: false },
+        { id: manager, nom: "Petit", prenom: "Lucie", actif: true },
+      ].map((row) => ({
+        ...row,
+        email: `${row.id}@acme.ma`,
+        poste: "Dev",
+        role: row.id === employe ? ("EMPLOYEE" as const) : ("MANAGER" as const),
+        departementId,
+        societeId,
+        creeLe: new Date("2026-01-01"),
+        modifieLe: new Date("2026-01-01"),
+      }))
+    )
+
+    const notificationId = crypto.randomUUID()
+    await pgliteDb.insert(schema.notifications).values({
+      id: notificationId,
+      utilisateurId: employe,
+      demandeId: null,
+      titre: "Nouvelle demande de déplacement",
+      message: "Rena Roux a soumis une demande de déplacement.",
+      lu: false,
+    })
+
+    vi.resetModules()
+    vi.doMock("../utilisateur-service", async (importOriginal) => {
+      const actual =
+        await importOriginal<typeof import("../utilisateur-service")>()
+      return { ...actual, conditionActif: sql`true` }
+    })
+    try {
+      const { markAsRead: substituted } = await import("./index")
+      // No `await expect(...).rejects`: under the stand-in there is nothing to
+      // reject, and a case written as a refusal would then be passing for the
+      // wrong reason.
+      await substituted(notificationId, employe, pgliteDb as any)
+
+      const [row] = await pgliteDb
+        .select()
+        .from(schema.notifications)
+        .where(eq(schema.notifications.id, notificationId))
+      expect(row?.lu).toBe(true)
+    } finally {
+      vi.doUnmock("../utilisateur-service")
+      vi.resetModules()
+    }
+  })
+})
+
+/**
+ * The rule is written ONCE, in the Utilisateur module — the half of the
+ * decision that is not about behaviour at all.
+ *
+ * The substitution above proves the two entries ASK the reader's export. This
+ * proves they do not also carry their own copy, which is the failure mode the
+ * substitution cannot see: a second spelling that happens to agree today and
+ * disagrees the day the rule changes.
+ *
+ * It reads source rather than importing, because the thing being forbidden is
+ * a literal — no value at runtime can distinguish « composed the fragment »
+ * from « wrote the same predicate again ». The forbidden spelling is a
+ * reference to the COLUMN (`utilisateurs.actif`), which is what any second
+ * spelling must go through whatever it wraps the reference in, and it is
+ * matched case-sensitively so the exported name `conditionActif` — which ends
+ * in the same four letters — is not mistaken for the thing being forbidden.
+ *
+ * The slice guards are not decoration. A search returns `-1` on a miss, and a
+ * slice taken from `-1` is empty or short — so a `not.toContain` on it would
+ * pass on a file that had been renamed out from under the check. Asserting the
+ * index first is what makes the negative claim mean something.
+ */
+describe("the activity rule is written once, in the Utilisateur module", () => {
+  const readSource = (relative: string) =>
+    readFileSync(join(REPO_ROOT, relative), "utf8")
+
+  // Strip comments, so a docblock that NAMES the forbidden literal (several
+  // do — they quote it while saying it must not be written) is not mistaken
+  // for the module writing it. What remains is executable code.
+  const codeOf = (source: string) =>
+    source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "")
+
+  it("neither notification module names the column itself", () => {
+    for (const relative of [
+      "lib/notification/helpers.ts",
+      "lib/notification/index.ts",
+    ]) {
+      const body = codeOf(readSource(relative))
+
+      // Guard the guard: a miss would leave an empty slice, and an empty slice
+      // contains nothing at all.
+      const start = body.indexOf("conditionActif")
+      expect(
+        start,
+        `${relative} must still reference the rule`
+      ).toBeGreaterThan(-1)
+
+      const spelling = body.match(/utilisateurs\s*\.\s*actif/)
+      expect(spelling, `${relative} spells the rule itself`).toBeNull()
+    }
+  })
+
+  it("the one spelling is in the Utilisateur module", () => {
+    const source = readSource("lib/utilisateur-service.ts")
+
+    const start = source.indexOf("conditionActif")
+    expect(start).toBeGreaterThan(-1)
+    expect(source.slice(start, start + 120)).toContain(
+      "eq(utilisateurs.actif, true)"
+    )
   })
 })
