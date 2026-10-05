@@ -7,7 +7,6 @@ import {
 import { join, dirname, relative } from "node:path"
 import { fileURLToPath } from "node:url"
 import {
-  canTransition,
   buildTransition,
   checkTransition,
   etatCreation,
@@ -486,75 +485,144 @@ describe("enteringEffect", () => {
   })
 })
 
-// ─── canTransition (Etape-based) ─────────────────────────────────────────────
+// ─── The permission table — which transitions each Etape admits ─────────────
+//
+// This table is the guard's real contract, and it is the only place it is
+// written down. The sweep further down proves a different thing — that every
+// refusal NAMES one of the four reasons — and a named refusal says
+// nothing about which tuples are permitted at each Etape.
+//
+// The cases ask the guard itself and read its whole verdict, reason included.
+// They used to ask the boolean projection, which collapsed that verdict to
+// `true`/`false` and, in collapsing it, hardcoded `ownerMatch` to `true`: it
+// answered « may this actor act » without ever being asked whether the actor
+// owns the DemandeDeplacement. Asserting the reason is strictly stronger than
+// the `.toBe(false)` it replaces, and it is what makes this the guard's
+// contract rather than a restatement of a helper.
+//
+// Every case therefore STATES its ownership input. The old answers are
+// reproduced exactly by supplying `true` — a faithful rewrite, not a
+// weakened one — so the table keeps saying what it said while the reader can
+// finally see the fact the projection used to assert on its behalf.
 
-describe("canTransition", () => {
+describe("the permission table — the guard's verdict at each Etape", () => {
   it("allows EMPLOYEE to submit from DRAFT", () => {
-    expect(canTransition("EMPLOYEE", "DRAFT", "submit")).toBe(true)
+    expect(
+      checkTransition("EMPLOYEE", "DRAFT", "submit", undefined, true)
+    ).toEqual({ ok: true })
   })
 
   it("denies MANAGER from submitting", () => {
-    expect(canTransition("MANAGER", "DRAFT", "submit")).toBe(false)
+    expect(
+      checkTransition("MANAGER", "DRAFT", "submit", undefined, true)
+    ).toEqual({ ok: false, reason: "WRONG_ROLE" })
   })
 
   it("allows EMPLOYEE to withdraw from DRAFT", () => {
-    expect(canTransition("EMPLOYEE", "DRAFT", "retirer")).toBe(true)
+    expect(
+      checkTransition("EMPLOYEE", "DRAFT", "retirer", undefined, true)
+    ).toEqual({ ok: true })
   })
 
   it("denies EMPLOYEE from withdrawing after submission", () => {
-    expect(canTransition("EMPLOYEE", "MANAGER_REVIEW", "retirer")).toBe(false)
+    expect(
+      checkTransition("EMPLOYEE", "MANAGER_REVIEW", "retirer", undefined, true)
+    ).toEqual({ ok: false, reason: "WRONG_ROLE" })
   })
 
   it("allows MANAGER to approve at MANAGER_REVIEW", () => {
-    expect(canTransition("MANAGER", "MANAGER_REVIEW", "approuver")).toBe(true)
+    expect(
+      checkTransition("MANAGER", "MANAGER_REVIEW", "approuver", undefined, true)
+    ).toEqual({ ok: true })
   })
 
   it("allows MANAGER to reject at MANAGER_REVIEW", () => {
-    expect(canTransition("MANAGER", "MANAGER_REVIEW", "rejeter")).toBe(true)
+    expect(
+      checkTransition("MANAGER", "MANAGER_REVIEW", "rejeter", undefined, true)
+    ).toEqual({ ok: true })
   })
 
   it("denies EMPLOYEE from approving at MANAGER_REVIEW", () => {
-    expect(canTransition("EMPLOYEE", "MANAGER_REVIEW", "approuver")).toBe(false)
+    expect(
+      checkTransition(
+        "EMPLOYEE",
+        "MANAGER_REVIEW",
+        "approuver",
+        undefined,
+        true
+      )
+    ).toEqual({ ok: false, reason: "WRONG_ROLE" })
   })
 
   it("allows FINANCE_ADMIN to approve at FINANCE_REVIEW", () => {
-    expect(canTransition("FINANCE_ADMIN", "FINANCE_REVIEW", "approuver")).toBe(
-      true
-    )
+    expect(
+      checkTransition(
+        "FINANCE_ADMIN",
+        "FINANCE_REVIEW",
+        "approuver",
+        undefined,
+        true
+      )
+    ).toEqual({ ok: true })
   })
 
   it("allows FINANCE_ADMIN to reject at FINANCE_REVIEW", () => {
-    expect(canTransition("FINANCE_ADMIN", "FINANCE_REVIEW", "rejeter")).toBe(
-      true
-    )
+    expect(
+      checkTransition(
+        "FINANCE_ADMIN",
+        "FINANCE_REVIEW",
+        "rejeter",
+        undefined,
+        true
+      )
+    ).toEqual({ ok: true })
   })
 
   it("allows GENERAL_DIRECTION to approve at DIRECTION_REVIEW", () => {
     expect(
-      canTransition("GENERAL_DIRECTION", "DIRECTION_REVIEW", "approuver")
-    ).toBe(true)
+      checkTransition(
+        "GENERAL_DIRECTION",
+        "DIRECTION_REVIEW",
+        "approuver",
+        undefined,
+        true
+      )
+    ).toEqual({ ok: true })
   })
 
   it("denies action on terminal FINAL stage", () => {
-    expect(canTransition("GENERAL_DIRECTION", "FINAL", "approuver")).toBe(false)
+    expect(
+      checkTransition(
+        "GENERAL_DIRECTION",
+        "FINAL",
+        "approuver",
+        undefined,
+        true
+      )
+    ).toEqual({ ok: false, reason: "WRONG_ROLE" })
   })
 
   it("denies action on a stage with REJECTED decision", () => {
     expect(
-      canTransition("MANAGER", "MANAGER_REVIEW", "rejeter", "REJECTED")
-    ).toBe(false)
+      checkTransition("MANAGER", "MANAGER_REVIEW", "rejeter", "REJECTED", true)
+    ).toEqual({ ok: false, reason: "TERMINAL" })
   })
 
   it("denies action on a stage with WITHDRAWN decision", () => {
-    expect(canTransition("EMPLOYEE", "DRAFT", "submit", "WITHDRAWN")).toBe(
-      false
-    )
+    expect(
+      checkTransition("EMPLOYEE", "DRAFT", "submit", "WITHDRAWN", true)
+    ).toEqual({ ok: false, reason: "TERMINAL" })
   })
 
   // CONTEXT.md — Decision: APPROVED, REJECTED, and WITHDRAWN are terminal;
   // once recorded, the DemandeDeplacement cannot transition, be edited, or be
   // resubmitted. A final-approved demande (Etape FINAL + Decision APPROVED)
   // freezes for every role and every action.
+  //
+  // The second assertion in each case belongs to the OTHER projection:
+  // `buildTransition` is the creation path's `null`-shaped one (#363), not the
+  // entry this ticket deletes. It stays untouched here so that ticket finds
+  // the assertion exactly as it stands.
   it.each([
     ["EMPLOYEE", "DRAFT", "submit"],
     ["EMPLOYEE", "DRAFT", "retirer"],
@@ -564,7 +632,10 @@ describe("canTransition", () => {
   ] as const)(
     "denies %s from acting with %s on a demande whose Decision is APPROVED",
     (role, etape, action) => {
-      expect(canTransition(role, etape, action, "APPROVED")).toBe(false)
+      expect(checkTransition(role, etape, action, "APPROVED", true)).toEqual({
+        ok: false,
+        reason: "TERMINAL",
+      })
       expect(
         buildTransition(role, etape, action, { decision: "APPROVED" })
       ).toBeNull()
@@ -1177,17 +1248,6 @@ describe("resoudreTransition sweep", () => {
       expect(built !== null, `${role}/${etape}/${action}/${String(decision)}`)
         .toBe(ownerSide.ok)
       if (!ownerSide.ok) expect(built).toBeNull()
-    })
-  })
-
-  // canTransition stays the cheap owner-neutral QUERY — it is how a caller asks
-  // « can I? » without building anything — and it must never become a way to
-  // obtain a transition.
-  it("leaves canTransition an owner-neutral query that yields nothing", () => {
-    sweep((role, etape, action, decision, _ownerMatch) => {
-      expect(canTransition(role, etape, action, decision)).toBe(
-        checkTransition(role, etape, action, decision, true).ok
-      )
     })
   })
 })
