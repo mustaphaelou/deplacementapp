@@ -354,15 +354,6 @@ export function checkTransition(
   return { ok: true }
 }
 
-export function canTransition(
-  role: Role,
-  etape: Etape,
-  action: WorkflowAction,
-  decision?: Decision
-): boolean {
-  return checkTransition(role, etape, action, decision, true).ok
-}
-
 // ─── The one way in (#299) ─────────────────────────────────────────────────
 
 export interface TransitionParams {
@@ -455,46 +446,6 @@ function construireTransition(
   }
 }
 
-// ─── The creation path's projection (#299) ──────────────────────────────────
-
-/**
- * A DemandeDeplacement is born owned by its creator — the fact `etatCreation`
- * already states. It is a NAMED FACT here, not the unexamined `true` the old
- * builder hardcoded: the creation path knows who owns a row that does not
- * exist yet, because it is about to create it.
- */
-const PROPRIETAIRE_A_LA_NAISSANCE = true
-
-/**
- * A projection over the one call, kept for the creation path only.
- *
- * `etatCreation` asks « what does a submitted creation become? » and reads a
- * transition or nothing; it has no owner to compare and no Decision to weigh,
- * because the row it describes is being born. So this projection states the
- * two facts a creation holds (ownership by birth, no Decision yet) and maps the
- * refusal back to `null` — the shape `etatCreation` was written against, and
- * the one its call site keeps using.
- *
- * A caller acting on an EXISTING DemandeDeplacement does not come here: it
- * knows the owner and the Decision, so it calls `resoudreTransition` and reads
- * the reason for itself.
- */
-export function buildTransition(
-  role: Role,
-  etape: Etape,
-  action: WorkflowAction,
-  params?: { comment?: string; actorId?: string; decision?: Decision }
-): WorkflowResult | null {
-  const resolution = resoudreTransition(role, etape, action, {
-    decision: params?.decision,
-    ownerMatch: PROPRIETAIRE_A_LA_NAISSANCE,
-    comment: params?.comment,
-    actorId: params?.actorId,
-  })
-
-  return resolution.ok ? resolution.transition : null
-}
-
 // ─── Creation state (where a DemandeDeplacement is born) ────────────────────
 
 // The Decision a DemandeDeplacement is born with, and the one it keeps while
@@ -507,6 +458,14 @@ const DECISION_OUVERTURE: Decision = "PENDING"
 // nothing: the Notification event exists only once the DemandeDeplacement
 // leaves the draft lane.
 const AUDIT_CREATION = "CREATION"
+
+/**
+ * A DemandeDeplacement is born owned by its creator. It is a NAMED FACT
+ * declared here, beside the creation path that states it — not the unexamined
+ * `true` a projection used to hardcode on the caller's behalf, and not an
+ * inline literal that would read as an afterthought.
+ */
+const PROPRIETAIRE_A_LA_NAISSANCE = true
 
 export interface EtatCreation {
   etape: Etape
@@ -529,6 +488,15 @@ export interface EtatCreation {
  *
  * `champs` never carries `modifieLe`: the modification timestamp belongs to
  * the creation, not to the pipeline, and is written once (#293).
+ *
+ * A submission is the guard's question, asked at its production entry, and the
+ * creation path reads the transition the guard hands back. Read against the
+ * guard the tuple it asks with is always admitted — the opening Etape's seat
+ * submits, and the owner submits — so the refusal arm below is unreachable
+ * today. It is kept as a THROW, not as a `null` the caller would have to
+ * re-check, because the projection that used to answer `null` here destroyed
+ * the reason (#299) and left a caller unable to tell « refused » from « nothing
+ * to do » (#363).
  */
 export function etatCreation(role: Role, soumis: boolean): EtatCreation {
   const ouverture = PIPELINE[0]
@@ -547,16 +515,19 @@ export function etatCreation(role: Role, soumis: boolean): EtatCreation {
 
   // A DemandeDeplacement is born owned by its creator, so the Role that may
   // leave the opening Etape is the one the pipeline attributes to it — not the
-  // Role of whoever calls the creation.
+  // Role of whoever calls the creation. Ownership by birth is a NAMED FACT the
+  // creation path states, because it is about to create the row: there is
+  // nobody else who could own it, and the guard's `ownerMatch` is required
+  // with no default, precisely so a caller cannot obtain a transition by
+  // leaving that input out.
   const roleProprietaire = ouverture.roleCanAct ?? role
-  const transition = buildTransition(
-    roleProprietaire,
-    ouverture.id,
-    "submit"
-  )
-  if (!transition) {
+  const resolution = resoudreTransition(roleProprietaire, ouverture.id, "submit", {
+    ownerMatch: PROPRIETAIRE_A_LA_NAISSANCE,
+  })
+  if (!resolution.ok) {
     throw new Error(`Aucune soumission possible depuis l'etape: ${ouverture.id}`)
   }
+  const transition = resolution.transition
 
   return {
     etape: transition.transition.newEtape,
