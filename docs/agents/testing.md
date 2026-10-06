@@ -10,7 +10,7 @@ git status --short        # must be empty
 npm test                  # ~70s
 ```
 
-Current baseline on `main`: **796 passed / 8 skipped across 77 files**.
+Current baseline on `main`: **1167 passed / 8 skipped across 94 files**.
 
 ## Why "clean" is in the sentence
 

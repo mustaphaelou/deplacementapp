@@ -1,17 +1,6 @@
 ## Agent skills
 
-### Issue tracker
-
-Issues live as GitHub issues in `mustaphaelou/deplacementapp`. See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-Canonical role names are used as-is for GitHub labels. See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Single-context repo — one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
-
-### Testing
-
-The suite count is only meaningful on a clean tree. See `docs/agents/testing.md`.
+Working with issues → `docs/agents/issue-tracker.md`
+Exploring the codebase → `docs/agents/domain.md`
+Running tests → `docs/agents/testing.md`
+All agent docs → `docs/agents/README.md`
