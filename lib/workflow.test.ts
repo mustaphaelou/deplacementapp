@@ -30,9 +30,17 @@ import type {
   WorkflowAction,
   Resolution,
   WorkflowResult,
+  TransitionCheckReason,
 } from "./workflow"
 import type { Role } from "./auth"
 import { TOUS_LES_ROLES } from "./auth"
+// The home the reason is CARRIED TO, read here rather than restated: the reason
+// set's whole subject is that the two ends agree, so the other end has to be the
+// real table. This is a TEST importing the error module — the pipeline module
+// itself gains no runtime import, which `lib/errors.test.ts` pins on
+// `lib/workflow.ts`'s own source, and the two directions cannot form a cycle
+// (`lib/errors.ts` reaches the pipeline with `import type` and nothing else).
+import { REFUS_TRANSITION } from "./errors"
 
 // ─── The tuple space, declared once ─────────────────────────────────────────
 //
@@ -1269,6 +1277,65 @@ describe("resoudreTransition sweep", () => {
         role
       ).toEqual({ ok: false, reason: "WRONG_ROLE" })
     }
+  })
+
+  // The set is CLOSED, which is a different claim from the one above.
+  //
+  // « always names a reason when it refuses, and it is one of the four » reads
+  // its four from a list of literals written here, so it holds on exactly the
+  // addition it exists to catch: a fifth reason the sweep reaches fails that
+  // case only if the literals happen to name it, and they cannot — the four were
+  // the four when they were written. What is missing is the other direction —
+  // that the reason set the guard PRODUCES is the reason set the refusal TABLE
+  // enumerates — and only a derived comparison can say it. Both ends are read,
+  // neither is transcribed: the left is what the sweep collected, the right is
+  // the table's own keys, which the `Record<TransitionCheckReason, …>` makes a
+  // compile error if a reason is added to one and not the other (ADR-0022).
+  //
+  // Non-vacuity FIRST, and the form is the REFUSED-TUPLE COUNT rather than
+  // `raisons.length > 1` (`lib/errors.test.ts:246`): a sweep that collected
+  // nothing leaves an empty set, which is trivially equal to nothing and would
+  // pass the closure below while proving nothing at all. Counting the tuples
+  // that were refused asserts the thing that makes the set real — the sweep
+  // actually saw refusals — and the ceiling asserts the other half of the same
+  // honesty, that it also saw admissions: a guard that refused every tuple would
+  // pass a closure check just as cheaply, and would be nothing like this one.
+  //
+  // The bound a fifth reason escapes is named here rather than implied: this
+  // sweep can only catch a reason reachable over Role × Etape × action × Decision
+  // × ownership, so a reason sitting on a branch no tuple reaches stays
+  // uncovered until that branch exists — the same bound the closure claim
+  // inherits, and why the injected fifth reason in the mutation evidence is
+  // placed on a branch the sweep demonstrably reaches.
+  it("produces across the sweep exactly the reasons the refusal table names", () => {
+    const refusees = new Set<TransitionCheckReason>()
+    let tuples = 0
+    let refusals = 0
+
+    sweep((role, etape, action, decision, ownerMatch) => {
+      tuples++
+      const resolution = resoudreTransition(role, etape, action, {
+        decision,
+        ownerMatch,
+      })
+      if (!resolution.ok) {
+        refusals++
+        refusees.add(resolution.reason)
+      }
+    })
+
+    // The space is real, and it is a space the guard both refuses and admits.
+    expect(refusals, "aucun tuple refuse: le balayage n'a rien collecte").toBeGreaterThan(0)
+    expect(tuples).toBe(
+      ROLES.length * ETAPES.length * ACTIONS.length * DECISIONS.length * OWNERSHIP.length
+    )
+    expect(refusals).toBeLessThan(tuples)
+
+    // And it is closed: nothing the entry produced is unnamed by the table, and
+    // the table names nothing the entry cannot produce.
+    const produits = [...refusees].sort()
+    expect(produits.length).toBeGreaterThan(1)
+    expect(produits).toEqual(Object.keys(REFUS_TRANSITION).sort())
   })
 })
 
