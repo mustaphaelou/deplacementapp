@@ -134,6 +134,10 @@ _Avoid_: Email confirmed, verified account, e-mail validation
 An optional sign-in method: a Utilisateur signs in with their Google account instead of a password. Enabled per Utilisateur by an administrator and only for active accounts, and only offered when the deployment has Google credentials configured; it never provisions accounts — an unknown address is refused. Every sign-in revalidates existence, activity, and per-Utilisateur enablement, and a refused Google sign-in lands on the login page with a French message — never silently.
 _Avoid_: OAuth, social login, SSO
 
+**Utilisateur signable**:
+The single rule that decides whether an identity attempting to sign in corresponds to a real Utilisateur who may hold a session. Three facts, and no others: the Utilisateur **exists**; the Utilisateur is **actif**; and — for ConnexionGoogle only — Google sign-in is **enabled** for them. Absence and deactivation are distinct outcomes, not one: a Utilisateur who was deleted is not a deactivated Utilisateur, and the caller may need to say so. `proxy.ts` does **not** decide this — it asserts only that a session cookie is present, an optimistic check whose answer is provisional until the session seam is crossed. The rule is re-evaluated per attempt, never cached: turning Google off blocks the next ConnexionGoogle without revoking a live session.
+_Avoid_: Valid user, authenticated user, active user (for the concept), session check (for the rule)
+
 ### Branding
 
 **IdentiteVisuelle (Visual Identity)**:
