@@ -1,4 +1,4 @@
-import { eq, asc } from "drizzle-orm"
+import { eq, and, asc } from "drizzle-orm"
 import type { DrizzleDb } from "../db"
 import { db } from "../db"
 import { utilisateurs } from "../db/schema/utilisateurs"
@@ -8,7 +8,10 @@ import {
   avatarStorage as defaultAvatarStorage,
   type AvatarStorage,
 } from "./avatar-storage"
+import { getSocieteRow } from "./societe"
+import type { Role } from "./auth/roles"
 import {
+  AUCUNE_SOCIETE_CONFIGUREE,
   UtilisateurNotFoundError,
   MotDePasseIncorrectError,
   EmailChangeRequiresPasswordError,
@@ -16,6 +19,24 @@ import {
   AvatarError,
 } from "./errors"
 
+// What the profile read actually selects: the Utilisateur and their
+// Departement. It deliberately carries no demand count — the « Demandes »
+// stat is a DemandeDeplacement fact, so it is counted by the demande read
+// model (`countDemandes`) and asked for at the page, not here. #288 removed
+// the `_count: { demandes }` this interface used to promise.
+//
+// The blanket `as unknown as ProfileResult` that used to sit on this return
+// existed for the fabricated `_count` alone. That is measured, not assumed:
+// with `_count` still on the return value, deleting the assertion typechecks
+// clean; with `_count` gone from both the type and the value, nothing is left
+// to reconcile. So no narrowing was needed, the assertion was deleted rather
+// than replaced, and no explicit-and-local narrowing comment is owed here.
+//
+// Known, deliberately not fixed here, and recorded by the spec rather than
+// promised by this comment: the shape still mirrors a persistence row — a
+// subset of the utilisateurs table carrying departementId/societeId/actif/
+// modifieLe and friends the profile page never presents. Tightening it to
+// exactly what a profile shows is future work (#287, Further Notes).
 export interface ProfileResult {
   id: string
   email: string
@@ -28,7 +49,6 @@ export interface ProfileResult {
   departement: { nom: string }
   dateEmbauche: Date | null
   creeLe: Date
-  _count: { demandes: number }
 }
 
 export {
@@ -62,10 +82,9 @@ export class UtilisateurService {
       },
     })
     if (!user) throw new UtilisateurNotFoundError()
-    return {
-      ...user,
-      _count: { demandes: 0 },
-    } as unknown as ProfileResult
+    // The selection IS the declared shape — no reshaping, so no spread that
+    // only reads as if it narrowed one, and no assertion to reconcile it.
+    return user
   }
 
   async create(
@@ -75,8 +94,15 @@ export class UtilisateurService {
       nom: string
       prenom: string
       poste: string
-      role: string
-      societeId: string
+      // The Role union, not `string`. The parameter was `string` and the write
+      // carried an inline `as` naming the union across four lines to pull it
+      // back down — a cast `lib/auth/role-casts.test.ts` cannot see, because
+      // its regex matches the SPELLED `as Role` and this one spelled the union
+      // out inline instead of naming it. Typing the parameter as the union
+      // deletes the cast rather than widening the pin: the route validates with
+      // `utilisateurSchema` (a `z.enum` over `TOUS_LES_ROLES`), so `data.role`
+      // arrives already narrowed and the laundering has nowhere to happen.
+      role: Role
       departementId: string
       telephone?: string
       googleAuthEnabled?: boolean
@@ -87,6 +113,15 @@ export class UtilisateurService {
     const userId = crypto.randomUUID()
 
     return this._db.transaction(async (tx) => {
+      // The deployment has exactly one Societe, with an id no caller can know
+      // (ADR-0018): resolve it behind the seam, inside the same transaction.
+      const societe = await getSocieteRow(tx)
+      if (!societe) {
+        // Unreachable after Amorçage — same impossible-state contract as
+        // updateSociete.
+        throw new Error(AUCUNE_SOCIETE_CONFIGUREE)
+      }
+
       const [user] = await tx
         .insert(utilisateurs)
         .values({
@@ -99,12 +134,10 @@ export class UtilisateurService {
           nom: data.nom,
           prenom: data.prenom,
           poste: data.poste,
-          role: data.role as
-            | "EMPLOYEE"
-            | "MANAGER"
-            | "FINANCE_ADMIN"
-            | "GENERAL_DIRECTION",
-          societeId: data.societeId,
+          // No cast: the parameter is the union, so the value the route
+          // validated is the type the column declares.
+          role: data.role,
+          societeId: societe.id,
           departementId: data.departementId,
           telephone: data.telephone || null,
           modifieLe: new Date(),
@@ -304,6 +337,64 @@ export class UtilisateurService {
       throw err
     }
   }
+}
+
+/**
+ * The rule that a Utilisateur may act, in the one shape a SQL fragment can
+ * have: « the `actif` column reads true », and nothing else.
+ *
+ * This is the reader's SECOND shape, added in #315. A caller that filters a
+ * SET of Utilisateurs — the Notification recipient resolver — cannot ask
+ * {@link peutAgir} once per candidate without turning one query into many, so
+ * it needs the rule as something it can compose into its own `WHERE`. This
+ * export is that something: the resolver imports it instead of writing
+ * `eq(utilisateurs.actif, true)` a second time.
+ *
+ * It is a Drizzle `SQL` fragment built from the schema table, so this module
+ * stays what it already was — a server module that imports `db` and the
+ * schema at runtime. Nothing new reaches a client bundle through it, and
+ * `google-refusals.ts` (the login page's own vocabulary) deliberately does NOT
+ * import this module.
+ */
+export const conditionActif = eq(utilisateurs.actif, true)
+
+/**
+ * The same rule asked about ONE Utilisateur, derived from
+ * {@link conditionActif} rather than restated: the query below is « is there a
+ * Utilisateur with this identifier that the activity condition admits? ».
+ *
+ * That derivation is the point. If `peutAgir` and the condition could be
+ * written independently, a future change to one would leave the other
+ * answering a different question — two spellings of one rule, which is the
+ * defect #313 exists to remove. Because the per-Utilisateur answer is the set
+ * condition applied to a single id, they cannot disagree: a Utilisateur the
+ * condition admits is exactly one `peutAgir` answers true for. The suite pins
+ * that equivalence against a real in-process Postgres.
+ *
+ * Deliberately NOT a method on {@link UtilisateurService}: that class binds
+ * its handle at construction and the module's exported instance is built at
+ * module load, so a method there would have captured the handle before any
+ * test could substitute it. A module-level function whose handle argument
+ * defaults to this module's own `db` is redirected by exactly that
+ * substitution; #314's test does it against a real in-process Postgres.
+ *
+ * An identifier matching no Utilisateur reads `false` rather than throwing:
+ * the question asked is « may this one act », and a Utilisateur that does not
+ * exist may not. This preserves the behaviour of the private copy that
+ * `lib/auth/session.ts` used to keep (`row?.actif ?? false`); #316 retired that
+ * copy in favour of a call to here, so the three former copies of this rule
+ * are now one.
+ */
+export async function peutAgir(
+  utilisateurId: string,
+  handle: DrizzleDb = db
+): Promise<boolean> {
+  const [row] = await handle
+    .select({ id: utilisateurs.id })
+    .from(utilisateurs)
+    .where(and(eq(utilisateurs.id, utilisateurId), conditionActif))
+    .limit(1)
+  return row !== undefined
 }
 
 export const utilisateurService = new UtilisateurService(db)

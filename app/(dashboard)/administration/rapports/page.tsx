@@ -1,18 +1,13 @@
 ﻿import { getAuthUser, hasAnyRole } from "@/lib/auth/server"
+import { ROLES_MANAGEMENT } from "@/lib/auth/roles"
 import { redirect } from "next/navigation"
-import { countByEtape, aggregateBudget } from "@/lib/demande"
+import { countDemandes, aggregateBudget } from "@/lib/demande"
 import { PIPELINE } from "@/lib/workflow"
 import { formatCurrency } from "@/lib/constants"
 import { ETAPE_LABELS } from "@/lib/demande-presentation"
 import { DashboardCard } from "@/components/ui/dashboard-card"
 import { Button } from "@/components/ui/button"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
+import { PageHeader } from "@/components/page-header"
 import {
   Tooltip,
   TooltipContent,
@@ -30,7 +25,7 @@ import {
 
 export default async function RapportsPage() {
   const user = await getAuthUser()
-  if (!user || !hasAnyRole(user.role, ["FINANCE_ADMIN", "GENERAL_DIRECTION"])) {
+  if (!user || !hasAnyRole(user.role, ROLES_MANAGEMENT)) {
     redirect("/")
   }
 
@@ -41,32 +36,26 @@ export default async function RapportsPage() {
     etapes.map(async (etape) => ({
       etape,
       label: ETAPE_LABELS[etape],
-      count: await countByEtape(etape),
+      count: await countDemandes({ etape }),
     }))
   )
 
   const totalDemandes = etapeCounts.reduce((sum, s) => sum + s.count, 0)
   const totalApprouvees =
     etapeCounts.find((s) => s.etape === "FINAL")?.count ?? 0
+  const totalRejetees = await countDemandes({ decision: "REJECTED" })
   const totalBudget = await aggregateBudget(["FINAL"])
 
   return (
     <div className="space-y-6">
-      <div>
-        <div className="flex items-center justify-between">
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <span>Administration</span>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbPage className="font-medium">
-                  Rapports
-                </BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
+      {/* #261: the header geometry and the breadcrumb markup live in the
+          shared module; the page passes only what varies. */}
+      <PageHeader
+        crumbs={["Administration", "Rapports"]}
+        title="Rapports"
+        subtitle="Vue d'ensemble des demandes de déplacement"
+        icon={BarChart}
+        action={
           <Tooltip>
             <TooltipTrigger
               render={
@@ -82,21 +71,8 @@ export default async function RapportsPage() {
             />
             <TooltipContent>Exporter en CSV</TooltipContent>
           </Tooltip>
-        </div>
-        <div className="mt-6 flex items-center gap-4">
-          <div className="flex size-12 shrink-0 items-center justify-center rounded-[3px] bg-primary/10">
-            <BarChart className="size-6 text-primary" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-[40px] leading-tight font-bold tracking-[-0.01em]">
-              Rapports
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Vue d&apos;ensemble des demandes de déplacement
-            </p>
-          </div>
-        </div>
-      </div>
+        }
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <DashboardCard
@@ -109,7 +85,7 @@ export default async function RapportsPage() {
           label="Approuvées"
           value={totalApprouvees}
         />
-        <DashboardCard icon={XCircle} label="Rejetées" value={0} />
+        <DashboardCard icon={XCircle} label="Rejetées" value={totalRejetees} />
         <DashboardCard
           icon={TrendingUp}
           label="Budget total"

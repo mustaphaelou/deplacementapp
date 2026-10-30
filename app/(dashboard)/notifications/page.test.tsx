@@ -50,7 +50,6 @@ describe("Notifications page", () => {
     const html = renderToStaticMarkup(<NotificationsPage />)
 
     expect(html).toContain('aria-label="breadcrumb"')
-    expect(html).toContain("text-[40px]")
     expect(html).toContain("Notifications")
     expect(html).not.toContain('aria-label="Menu"')
     expect(html).not.toContain('data-slot="card"')
@@ -66,9 +65,14 @@ describe("Notifications page", () => {
       />
     )
 
+    // The list's OWN row separators: this page's NotificationList renders the
+    // divide-y wrapper itself (notifications/page.tsx), not the header module
+    // and not @/components/display. These stay because the hairline-not-a-card
+    // rule is a property of this list, not of the page header.
     expect(html).toContain('class="divide-y"')
     expect(html).not.toContain("divide-y rounded-lg border")
     expect(html).not.toContain("bg-muted/40")
+    // The unread/read dot tone and the title weight, from the same list.
     expect(html).toContain("bg-primary")
     expect(html).toContain("bg-muted-foreground/30")
     expect(html).toContain("font-medium text-foreground")
@@ -88,5 +92,26 @@ describe("Notifications page", () => {
     expect(html).toContain("Marquer comme lue")
     expect(html).toContain("Voir")
     expect(html).toContain(`/demandes/${UNREAD.demandeId}`)
+  })
+})
+
+// #261: the header class pins now live once, in
+// components/page-header.test.tsx, against the module that owns them. What
+// stays here is the cheap per-page guarantee: this page still renders its
+// title through the shared header.
+describe("Notifications page — the shared page header", () => {
+  it("renders the page's title", async () => {
+    const { default: NotificationsPage } = await import("./page")
+    const html = renderToStaticMarkup(<NotificationsPage />)
+
+    // This asserts the page's OWN trail rendered through the module, not that
+    // an <h1> exists somewhere: a hand-inlined header satisfies a title
+    // assertion and is exactly the regression #261 removed. What is left here
+    // is the trail the module BUILDS — the page's own crumb labels and the one
+    // separator per crumb, which only the module's breadcrumb emits. #320
+    // removed this block's duplication of the truncation contract, which
+    // components/page-header.tsx pins in full on its own suite.
+    expect(html).toContain(">Espace</span>")
+    expect(html).toContain("non lue(s)</p>")
   })
 })

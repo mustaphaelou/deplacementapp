@@ -27,11 +27,21 @@ export interface BetterAuthOptions {
  * and is gated by `user.validateUserInfo` (see `google-guard.ts`), which refuses
  * a non-matching identity by returning a coded refusal the engine redirects
  * with.  `nextCookies` is registered last.
+ *
+ * `onAPIError.errorURL` sends **every** refusal to the login page, including
+ * the ones raised before the OAuth state parses (#247).  The engine defaults
+ * that URL to `${baseURL}/error`, its own error page — and in production that
+ * page redirects to `/?error=…`, the application home.  So without this line a
+ * `state_not_found` or a `state_mismatch` (a state cookie that never came back,
+ * a second sign-in in another tab replacing it) left the user on a page that
+ * renders no French message at all, and the mapped message for those codes was
+ * unreachable.  Verified against 1.7.4 with the callback seam.
  */
 export function createAuth(db: DrizzleDb, options: BetterAuthOptions = {}) {
   return betterAuth({
     secret: options.secret ?? process.env.BETTER_AUTH_SECRET,
     baseURL: process.env.BETTER_AUTH_URL,
+    onAPIError: { errorURL: "/login" },
     database: drizzleAdapter(db, { provider: "pg", camelCase: true }),
     emailAndPassword: {
       enabled: true,
@@ -44,8 +54,7 @@ export function createAuth(db: DrizzleDb, options: BetterAuthOptions = {}) {
     },
     socialProviders: {
       google: {
-        clientId:
-          options.google?.clientId ?? process.env.AUTH_GOOGLE_ID ?? "",
+        clientId: options.google?.clientId ?? process.env.AUTH_GOOGLE_ID ?? "",
         clientSecret:
           options.google?.clientSecret ?? process.env.AUTH_GOOGLE_SECRET ?? "",
         disableImplicitSignUp: true,

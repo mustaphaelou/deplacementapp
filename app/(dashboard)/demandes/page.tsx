@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useAuthUser } from "@/lib/auth/client"
+import { hasAnyRole, ROLES_MANAGEMENT, type Role } from "@/lib/auth"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
@@ -10,14 +11,15 @@ import { Button } from "@/components/ui/button"
 import { StatusPill } from "@/components/status-pill"
 import { formatCurrency, formatDate } from "@/lib/constants"
 import { toDemandePresentation } from "@/lib/demande-presentation"
-import { queueEtapes } from "@/lib/workflow"
+import { lienFileAttente, queueEtape, type Etape } from "@/lib/workflow"
+import { PageHeader } from "@/components/page-header"
 import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
+  hideClassFor,
+  LoadingBlock,
+  rowHoverInkTint,
+  searchFieldIconClass,
+  tableShellClass,
+} from "@/components/display"
 import {
   Tooltip,
   TooltipContent,
@@ -45,8 +47,63 @@ interface Demande {
   employeId: string
 }
 
-const rowHover =
-  "hover:bg-[rgba(55,53,47,0.024)] dark:hover:bg-sidebar-accent/40"
+/** A tab: what it says, where it goes, and the Etape that makes it active. */
+export interface ListeTab {
+  label: string
+  href: string
+  /** The Etape whose rows this tab shows — `""` for « Toutes », no filter. */
+  match: Etape | ""
+}
+
+// The two tabs that are the same whatever the viewer is: the unfiltered list and
+// the Utilisateur's own finalised rows. Declared once because « Finalisées »
+// means a DIFFERENT thing per Role — a reviewer's own DemandesDeplacement is
+// not « the DemandeDeplacements waiting for me » — and writing the pair twice
+// invited the second copy to drift into the queue link this change removes.
+const TOUTES: ListeTab = { label: "Toutes", href: "/demandes", match: "" }
+const FINALISEES: ListeTab = {
+  label: "Finalisées",
+  href: "/demandes?etape=FINAL",
+  match: "FINAL",
+}
+
+/**
+ * The list's tabs, for a viewer — the « En attente » href is a VALUE a test can
+ * ask for, not a string to be hunted out of rendered markup (#304).
+ *
+ * Exported and pure, which is the whole point: before this, the only way to
+ * read the tab's href was to boot the page and search the HTML for it, so the
+ * one assertion available about this link was on its literal text. A pure
+ * function of the Role turns that into an assertion on what the link IS.
+ *
+ * The « En attente » tab is the pipeline's composition for the viewer — this
+ * page does not spell a lane or a Decision. « Brouillons » and « Finalisées »
+ * are NOT compositions of it and never were: they name the draft and final
+ * lanes for a Utilisateur's OWN DemandesDeplacement, which is a different
+ * question from « what is waiting for me ». An EMPLOYEE is offered neither the
+ * queue tab nor the pending filter — « my drafts » is not « the drafts waiting
+ * on someone else ».
+ */
+export function tabsPourRole(role: Role | undefined): ListeTab[] {
+  if (role === "EMPLOYEE") {
+    return [
+      TOUTES,
+      { label: "Brouillons", href: "/demandes?etape=DRAFT", match: "DRAFT" },
+      FINALISEES,
+    ]
+  }
+
+  // A viewer with no Role waits on nothing, and is offered no queue tab: there
+  // is no lane to name without a Role to wait for it. `queueEtape` cannot
+  // return `undefined`, so `waitingEtape` is derived from the same guard.
+  if (!role) return [TOUTES, FINALISEES]
+
+  return [
+    TOUTES,
+    { label: "En attente", href: lienFileAttente(role), match: queueEtape(role) },
+    FINALISEES,
+  ]
+}
 
 export function DemandesTable({
   demandes,
@@ -58,7 +115,7 @@ export function DemandesTable({
   const router = useRouter()
 
   return (
-    <div className="overflow-x-auto border-y border-border text-sm">
+    <div className={tableShellClass}>
       <table className="w-full min-w-[640px]">
         <thead>
           <tr className="border-b border-border text-left">
@@ -66,17 +123,32 @@ export function DemandesTable({
               N°
             </th>
             {role !== "EMPLOYEE" && (
-              <th className="hidden px-2 py-2 font-normal text-muted-foreground sm:table-cell">
+              <th
+                className={cn(
+                  "px-2 py-2 font-normal text-muted-foreground",
+                  hideClassFor({ hideAt: "sm" })
+                )}
+              >
                 Employé
               </th>
             )}
             <th className="px-2 py-2 font-normal text-muted-foreground">
               Destination
             </th>
-            <th className="hidden px-2 py-2 font-normal text-muted-foreground md:table-cell">
+            <th
+              className={cn(
+                "px-2 py-2 font-normal text-muted-foreground",
+                hideClassFor({ hideAt: "md" })
+              )}
+            >
               Dates
             </th>
-            <th className="hidden px-2 py-2 font-normal text-muted-foreground lg:table-cell">
+            <th
+              className={cn(
+                "px-2 py-2 font-normal text-muted-foreground",
+                hideClassFor({ hideAt: "lg" })
+              )}
+            >
               Total
             </th>
             <th className="px-2 py-2 font-normal text-muted-foreground">
@@ -99,20 +171,35 @@ export function DemandesTable({
                 tabIndex={0}
                 className={cn(
                   "group cursor-pointer transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  rowHover
+                  rowHoverInkTint
                 )}
               >
                 <td className="px-2 py-2.5 font-medium">{d.numero}</td>
                 {role !== "EMPLOYEE" && (
-                  <td className="hidden px-2 py-2.5 sm:table-cell">
+                  <td
+                    className={cn(
+                      "px-2 py-2.5",
+                      hideClassFor({ hideAt: "sm" })
+                    )}
+                  >
                     {d.employe.prenom} {d.employe.nom}
                   </td>
                 )}
                 <td className="px-2 py-2.5">{d.destination}</td>
-                <td className="hidden px-2 py-2.5 md:table-cell">
+                <td
+                  className={cn(
+                    "px-2 py-2.5",
+                    hideClassFor({ hideAt: "md" })
+                  )}
+                >
                   {formatDate(d.dateDepart)} → {formatDate(d.dateRetour)}
                 </td>
-                <td className="hidden px-2 py-2.5 lg:table-cell">
+                <td
+                  className={cn(
+                    "px-2 py-2.5",
+                    hideClassFor({ hideAt: "lg" })
+                  )}
+                >
                   {formatCurrency(Number(d.totalEstime ?? 0))}
                 </td>
                 <td className="px-2 py-2.5">
@@ -143,33 +230,12 @@ export default function DemandesListPage() {
   const [search, setSearch] = useState("")
 
   const etapeFilter = searchParams.get("etape") || ""
+  const decisionFilter = searchParams.get("decision") || ""
   const perPage = 10
   const role = user?.role
 
   const title = role === "EMPLOYEE" ? "Mes demandes" : "Demandes"
-  const queueEtape = role
-    ? queueEtapes(role as Parameters<typeof queueEtapes>[0])[0]
-    : undefined
-  const tabs =
-    role === "EMPLOYEE"
-      ? [
-          { label: "Toutes", href: "/demandes", match: "" },
-          { label: "Brouillons", href: "/demandes?etape=DRAFT", match: "DRAFT" },
-          { label: "Finalisées", href: "/demandes?etape=FINAL", match: "FINAL" },
-        ]
-      : [
-          { label: "Toutes", href: "/demandes", match: "" },
-          ...(queueEtape
-            ? [
-                {
-                  label: "En attente",
-                  href: `/demandes?etape=${queueEtape}`,
-                  match: queueEtape,
-                },
-              ]
-            : []),
-          { label: "Finalisées", href: "/demandes?etape=FINAL", match: "FINAL" },
-        ]
+  const tabs = tabsPourRole(role)
 
   const fetchDemandes = useCallback(async () => {
     setLoading(true)
@@ -177,6 +243,7 @@ export default function DemandesListPage() {
     params.set("page", page.toString())
     params.set("limit", perPage.toString())
     if (etapeFilter) params.set("etape", etapeFilter)
+    if (decisionFilter) params.set("decision", decisionFilter)
     if (search) params.set("recherche", search)
 
     try {
@@ -190,7 +257,7 @@ export default function DemandesListPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, search, etapeFilter])
+  }, [page, search, etapeFilter, decisionFilter])
 
   useEffect(() => {
     ;(async () => {
@@ -217,28 +284,26 @@ export default function DemandesListPage() {
     }
   }
 
-  const canExportCsv =
-    role === "FINANCE_ADMIN" || role === "GENERAL_DIRECTION"
+  // #286: this page used to decide the export question with its own inline
+  // Role comparison — the one site of the eight that reached around the guard
+  // interface, and therefore the one that could drift from /api/csv's own guard
+  // with nothing to catch it. It now asks the same question through the same
+  // interface, with the same declared set. The comparison is deleted, not
+  // wrapped: a local helper would be the re-derivation this ticket removes.
+  const canExportCsv = role ? hasAnyRole(role, ROLES_MANAGEMENT) : false
 
   return (
     <div className="space-y-6">
-      <div>
-        <div className="flex items-center justify-between">
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <span>Espace</span>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <span>Demandes de déplacement</span>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbPage className="font-medium">{title}</BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
+      {/* #261: the header geometry and the breadcrumb markup live in the
+          shared module; the page passes only what varies. The trail is three
+          deep here and two on the administration pages — a longer array, not a
+          variant of the module. */}
+      <PageHeader
+        crumbs={["Espace", "Demandes de déplacement", title]}
+        title={title}
+        subtitle={<>{total} demande(s)</>}
+        icon={FileText}
+        action={
           <div className="flex items-center gap-2">
             {canExportCsv && (
               <Tooltip>
@@ -262,21 +327,8 @@ export default function DemandesListPage() {
               </Link>
             )}
           </div>
-        </div>
-        <div className="mt-6 flex items-center gap-4">
-          <div className="flex size-12 shrink-0 items-center justify-center rounded-[3px] bg-primary/10">
-            <FileText className="size-6 text-primary" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-[40px] leading-tight font-bold tracking-[-0.01em]">
-              {title}
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {total} demande(s)
-            </p>
-          </div>
-        </div>
-      </div>
+        }
+      />
 
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-1">
@@ -299,7 +351,7 @@ export default function DemandesListPage() {
           })}
         </div>
         <div className="relative">
-          <Search className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Search className={searchFieldIconClass} />
           <Input
             className="w-60 pl-8"
             placeholder="Rechercher"
@@ -313,9 +365,7 @@ export default function DemandesListPage() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center p-8">
-          <p className="text-sm text-muted-foreground">Chargement...</p>
-        </div>
+        <LoadingBlock />
       ) : demandes.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-2 p-8">
           <FileText className="size-8 text-muted-foreground/50" />

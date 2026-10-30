@@ -6,14 +6,14 @@ import { departements } from "../../db/schema/departements"
 import { documents } from "../../db/schema/documents"
 import type { CreateDemandeData } from "../demande-utils"
 import type { Actor } from "../demande-types"
-import { checkTransition, buildTransition } from "../workflow"
-import type { Etape, Decision } from "../workflow"
+import { resoudreTransition, etatCreation } from "../workflow"
 import type { NotificationEventType } from "../notification-events"
 import { appliquerEffets } from "./effets-transition"
 import {
   DemandeNotFoundError,
+  NumeroCollisionError,
   UnauthorizedActionError,
-  InvalidTransitionError,
+  refusPourTransition,
 } from "../errors"
 
 export type DemandeDeplacementRow = typeof demandesDeplacement.$inferSelect
@@ -48,6 +48,33 @@ function computeTotalEstime(data: CreateDemandeData): number {
   )
 }
 
+/**
+ * Postgres SQLSTATE for a unique violation, on the unique index
+ * `demandes_deplacement_numero_index` that guards the numéro. Drizzle wraps
+ * the driver error in a `DrizzleQueryError` and keeps the driver error — the
+ * one carrying `code`/`constraint` — as its `cause`, so the chain is walked.
+ * Matching the code alone is deliberate: only the numéro insert can raise it
+ * inside this transaction, and a broader match would swallow an unrelated
+ * database failure into a refusal that does not describe it.
+ */
+function isNumeroUniqueViolation(e: unknown): boolean {
+  for (let cause: unknown = e; cause; cause = (cause as Error).cause) {
+    if ((cause as { code?: unknown }).code === "23505") return true
+  }
+  return false
+}
+
+/**
+ * The counter feeds a global count and a year prefix read from the clock, so
+ * two creations that interleave can read the same count and write the same
+ * numéro. The database then refuses the second one — a lost race, not a bad
+ * form — so the creation is tried again, this many times at most. Past the
+ * bound the Utilisateur is refused with the collision's own sentence and
+ * status (`NumeroCollisionError`), which is the refusal #291 made legible
+ * (#292).
+ */
+const NUMERO_COLLISION_ATTEMPTS = 3
+
 async function generateNumero(): Promise<string> {
   const [result] = await db.select({ value: count() }).from(demandesDeplacement)
   const nextNum = (result?.value ?? 0) + 1
@@ -74,85 +101,108 @@ async function createDemande(
     .limit(1)
   if (!userRow) throw new UnauthorizedActionError("Utilisateur introuvable")
 
-  const numero = await generateNumero()
   const motifArray = processMotif(data.motif, data.motifAutre)
   const totalEstime = computeTotalEstime(data)
 
-  const createValues: Record<string, unknown> = {
-    id: crypto.randomUUID(),
-    numero,
-    employeId: userRow.id,
-    etape: "DRAFT",
-    decision: "PENDING",
-    employeNom: userRow.nom,
-    employePrenom: userRow.prenom,
-    employePoste: userRow.poste,
-    employeDepartement: userRow.departementNom ?? userRow.departementId,
-    motif: JSON.stringify(motifArray),
-    dateDepart: new Date(data.dateDepart),
-    dateRetour: new Date(data.dateRetour),
-    destination: data.destination,
-    typeTransport: data.typeTransport,
-    autreTransport: data.autreTransport || null,
-    vehiculeId: data.vehiculeId || null,
-    fraisTransport: parseDecimal(data.fraisTransport).toString(),
-    fraisHebergement: parseDecimal(data.fraisHebergement).toString(),
-    fraisRepas: parseDecimal(data.fraisRepas).toString(),
-    fraisDivers: parseDecimal(data.fraisDivers).toString(),
-    totalEstime: totalEstime.toString(),
-    avanceRequise: data.avanceRequise || false,
-    montantAvance: data.avanceRequise
-      ? parseDecimal(data.montantAvance).toString()
-      : null,
-    description: data.description || null,
-    modifieLe: new Date(),
-  }
+  // The pipeline owns where a DemandeDeplacement is born: this one call
+  // answers the Etape, the Decision, the fields to write, the JournalAudit
+  // action and the Notification event, for a draft and for a submission
+  // alike. There is no Etape or Decision literal here, and no branch that
+  // reconciles a first value with a second (#293).
+  const etat = etatCreation(actor.role, submit)
+  const auditAction: string = etat.auditAction
+  const notificationEvent: NotificationEventType | null = etat.notification
 
-  let auditAction = "CREATION"
-  let notificationEvent: NotificationEventType | null = null
+  // #292: the bound wraps the WHOLE creation, not the insert. Once a
+  // statement fails inside a transaction, that transaction is poisoned —
+  // every later statement in it is refused until it ends — so a retry
+  // attempted inside the same transaction cannot succeed. So the loop below
+  // holds the read of the counter, the transaction, the row, the JournalAudit
+  // entry and the Notification, and each attempt re-reads the counter: a
+  // retry that reused the previous attempt's numéro would collide again on
+  // the very same index.
+  for (
+    let tentative = 1;
+    tentative <= NUMERO_COLLISION_ATTEMPTS;
+    tentative++
+  ) {
+    const numero = await generateNumero()
 
-  if (submit) {
-    const transition = buildTransition("EMPLOYEE", "DRAFT", "submit")
-    if (!transition) throw new InvalidTransitionError("Soumission impossible")
-    Object.assign(createValues, transition.transition.fields)
-    createValues.modifieLe = new Date()
-    auditAction = transition.auditAction
-    notificationEvent = transition.notificationEvent
-  }
-
-  const [demande] = await db.transaction(async (tx) => {
-    const [demande] = await tx
-      .insert(demandesDeplacement)
-      .values(createValues as never)
-      .returning()
-
-    await appliquerEffets(tx, {
-      audit: {
-        utilisateurId: userRow.id,
-        action: auditAction,
-        entiteId: demande.id,
-        numero,
-      },
-      notification: notificationEvent
-        ? {
-            event: notificationEvent,
-            demandeId: demande.id,
-            numero,
-            employe: {
-              id: userRow.id,
-              prenom: userRow.prenom,
-              nom: userRow.nom,
-              departementId: userRow.departementId ?? "",
-            },
-            assigneAId: null,
-          }
+    const createValues: Record<string, unknown> = {
+      id: crypto.randomUUID(),
+      numero,
+      employeId: userRow.id,
+      ...etat.champs,
+      employeNom: userRow.nom,
+      employePrenom: userRow.prenom,
+      employePoste: userRow.poste,
+      employeDepartement: userRow.departementNom ?? userRow.departementId,
+      motif: JSON.stringify(motifArray),
+      dateDepart: new Date(data.dateDepart),
+      dateRetour: new Date(data.dateRetour),
+      destination: data.destination,
+      typeTransport: data.typeTransport,
+      autreTransport: data.autreTransport || null,
+      vehiculeId: data.vehiculeId || null,
+      fraisTransport: parseDecimal(data.fraisTransport).toString(),
+      fraisHebergement: parseDecimal(data.fraisHebergement).toString(),
+      fraisRepas: parseDecimal(data.fraisRepas).toString(),
+      fraisDivers: parseDecimal(data.fraisDivers).toString(),
+      totalEstime: totalEstime.toString(),
+      avanceRequise: data.avanceRequise || false,
+      montantAvance: data.avanceRequise
+        ? parseDecimal(data.montantAvance).toString()
         : null,
-    })
+      description: data.description || null,
+      modifieLe: new Date(),
+    }
 
-    return [demande]
-  })
+    try {
+      const [demande] = await db.transaction(async (tx) => {
+        const [created] = await tx
+          .insert(demandesDeplacement)
+          .values(createValues as never)
+          .returning()
 
-  return demande
+        await appliquerEffets(tx, {
+          audit: {
+            utilisateurId: userRow.id,
+            action: auditAction,
+            entiteId: created.id,
+            numero,
+          },
+          notification: notificationEvent
+            ? {
+                event: notificationEvent,
+                demandeId: created.id,
+                numero,
+                employe: {
+                  id: userRow.id,
+                  prenom: userRow.prenom,
+                  nom: userRow.nom,
+                  departementId: userRow.departementId ?? "",
+                },
+                assigneAId: null,
+              }
+            : null,
+        })
+
+        return [created]
+      })
+
+      return demande
+    } catch (e) {
+      // The transaction has rolled back and ended here; it holds nothing of
+      // the failed attempt. Anything else is not a numbering collision and
+      // reaches the caller as itself.
+      if (!isNumeroUniqueViolation(e)) throw e
+      if (tentative === NUMERO_COLLISION_ATTEMPTS) throw new NumeroCollisionError()
+    }
+  }
+
+  // Unreachable: the last attempt either returns its DemandeDeplacement or
+  // refuses with the collision above. Written so every path returns.
+  throw new NumeroCollisionError()
 }
 
 export async function createDraft(
@@ -184,36 +234,33 @@ export async function executeTransition(
   })
   if (!demande || demande.deletedAt) throw new DemandeNotFoundError()
 
-  const etape = demande.etape as Etape
-  const decision = demande.decision as Decision
+  // No cast: the row's `etape` / `decision` are the pipeline's unions, read
+  // off a native pgEnum column through the schema's inferred row (#295).
+  const etape = demande.etape
+  const decision = demande.decision
 
   const ownerMatch = demande.employeId === actor.id
-  const check = checkTransition(actor.role, etape, action, decision, ownerMatch)
-  if (!check.ok) {
-    if (check.reason === "NOT_OWNER") {
-      throw new UnauthorizedActionError(
-        "Seul le proprietaire peut " +
-          (action === "submit" ? "soumettre" : "retirer") +
-          " la demande"
-      )
-    }
-    throw new UnauthorizedActionError()
+
+  // One call into the guard, asked with the real ownership fact: the actor
+  // either is the DemandeDeplacement's employee or is not, and the row says
+  // which. The old path asked here and then asked again inside the builder
+  // with ownership hardcoded to « yes », so a caller could reach a transition
+  // for an action it had no ownership of without ever saying so (#299).
+  const resolution = resoudreTransition(actor.role, etape, action, {
+    decision,
+    ownerMatch,
+    comment: params.comment,
+    actorId: actor.id,
+  })
+  if (!resolution.ok) {
+    // The reason names its own refusal: the sentence and the code both live in
+    // REFUS_TRANSITION beside the classes they are built from, so this call site
+    // composes nothing and chooses no class (#300). Reading the reason off the
+    // result and raising it is the writer's whole remaining job.
+    throw refusPourTransition(resolution.reason, action)
   }
 
-  const transitionParams: {
-    comment?: string
-    actorId?: string
-    decision?: Decision
-  } = { actorId: actor.id, decision }
-  if (params.comment) transitionParams.comment = params.comment
-
-  const transition = buildTransition(
-    actor.role,
-    etape,
-    action,
-    transitionParams
-  )
-  if (!transition) throw new InvalidTransitionError()
+  const transition = resolution.transition
 
   const fields = { ...transition.transition.fields, modifieLe: new Date() }
 

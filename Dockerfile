@@ -3,12 +3,25 @@
 FROM node:24-alpine AS base
 
 # --- deps stage: full install ---
+#
+# The retry flags are not decoration. The `runner` image is built for
+# linux/amd64 AND linux/arm64, and the arm64 leg runs under QEMU emulation —
+# roughly an order of magnitude slower at network I/O than a native leg. Main
+# run #195 (2026-09-29, merge of #330) died here with `npm error code
+# ETIMEDOUT` at 164s on exactly that leg, with no code change to blame: the
+# next run of the same tree was green. npm's defaults (2 retries, 10s/60s
+# bounds) are not enough to ride out an emulated fetch, so a transient
+# registry hiccup takes the whole multi-arch build — and with it `deploy` —
+# down.
 FROM base AS deps
 WORKDIR /app
 RUN --mount=type=bind,source=package.json,target=package.json \
     --mount=type=bind,source=package-lock.json,target=package-lock.json \
     --mount=type=cache,target=/root/.npm \
-    npm ci --ignore-scripts
+    npm ci --ignore-scripts \
+      --fetch-retries=5 \
+      --fetch-retry-mintimeout=20000 \
+      --fetch-retry-maxtimeout=120000
 
 # --- build environment: adds glibc compat for native build tools (tailwindcss oxide, swc, etc.) ---
 FROM base AS build-env
@@ -22,7 +35,11 @@ COPY drizzle.config.ts ./drizzle.config.ts
 COPY db ./db
 COPY drizzle ./drizzle
 ENV NODE_ENV=production
-CMD ["npx", "drizzle-kit", "push"]
+# Versioned migrations, not `push`. `push` diffs the live database against the
+# schema and applies whatever it finds missing, which is a destructive
+# operation on a non-TTY deploy container and bypasses migration review. The
+# committed chain in drizzle/ is the reviewable, ordered record (#241, ADR-0005).
+CMD ["npx", "drizzle-kit", "migrate"]
 
 # --- builder stage: build Next.js standalone output ---
 FROM build-env AS builder

@@ -115,6 +115,33 @@ describe("updateVehiculeSchema", () => {
   })
 })
 
+describe("utilisateurSchema", () => {
+  it("accepts a provisioning body without societeId", async () => {
+    const { utilisateurSchema } = await getSchemas()
+    const result = utilisateurSchema.safeParse({
+      email: "a@b.com",
+      nom: "Dupont",
+      prenom: "Jean",
+      poste: "Dev",
+      role: "EMPLOYEE",
+      departementId: "dep-1",
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it("rejects a body missing a required field", async () => {
+    const { utilisateurSchema } = await getSchemas()
+    const result = utilisateurSchema.safeParse({
+      nom: "Dupont",
+      prenom: "Jean",
+      poste: "Dev",
+      role: "EMPLOYEE",
+      departementId: "dep-1",
+    })
+    expect(result.success).toBe(false)
+  })
+})
+
 describe("updateUtilisateurSchema", () => {
   it("accepts valid update body with id", async () => {
     const { updateUtilisateurSchema } = await getSchemas()
@@ -125,7 +152,6 @@ describe("updateUtilisateurSchema", () => {
       prenom: "Jean",
       poste: "Dev",
       role: "EMPLOYEE",
-      societeId: "soc-1",
       departementId: "dep-1",
     })
     expect(result.success).toBe(true)

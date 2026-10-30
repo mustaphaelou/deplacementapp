@@ -2,12 +2,6 @@
 
 A **Release** is a git tag `vX.Y.Z` pushed to `main`. Everything else — the GHCR image tags (`vX.Y.Z`, `X.Y`), the GitHub Release object, and its changelog — derives from it. Releasing is a **ticket**, not a button: a human decides *when* a Release happens, and RALPH executes the mechanics.
 
-## Process overview
-
-1. **Human** files a release ticket titled `Cut vX.Y.Z`, labelled `ready-for-agent`, whose body lists the issues closed since the last Release.
-2. **RALPH** verifies the listed issues are closed, pushes the tag to `main`, waits for the `Docker Build & Publish` workflow, then rewrites the draft GitHub Release notes from the ticket's issue list and closes the ticket.
-3. The workflow produces runner + migrator images on GHCR tagged `vX.Y.Z` and `X.Y` (plus `latest` and the full-sha tag), auto-creates a **draft** GitHub Release with generated notes, and fires the Coolify deploy webhook so production is queued to serve the Release digest.
-
 ## When to cut a Release
 
 On-demand. There is no automated version bump. The cadence is decided by filing the ticket — a Release never happens without one.

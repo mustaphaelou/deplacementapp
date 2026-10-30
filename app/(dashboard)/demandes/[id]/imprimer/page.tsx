@@ -3,15 +3,17 @@ import { redirect } from "next/navigation"
 import { findById } from "@/lib/demande"
 import { getSocieteBranding } from "@/lib/societe"
 import { DemandeNotFoundError } from "@/lib/errors"
-import type { Role } from "@/lib/auth"
 import {
   formatCurrency,
   formatDate,
-  TRANSPORT_LABELS,
   DEFAULT_SOCIETE_NOM,
 } from "@/lib/constants"
-import { toDemandePresentation } from "@/lib/demande-presentation"
-import { parseMotif, type DemandeWithRelations } from "@/lib/demande-types"
+import {
+  toDemandePresentation,
+  toDemandeDocumentView,
+  TRANSPORT_LABELS,
+} from "@/lib/demande-presentation"
+import type { DemandeWithRelations } from "@/lib/demande-types"
 
 export default async function ImprimerPage({
   params,
@@ -26,14 +28,17 @@ export default async function ImprimerPage({
   try {
     demande = await findById(id, {
       id: user.id,
-      role: user.role as Role,
+      role: user.role,
     })
   } catch (e) {
     if (e instanceof DemandeNotFoundError) redirect("/demandes")
     throw e
   }
 
-  const motifs = parseMotif(demande.motif)
+  // The document projection is the one home of the labelled Motif list: the
+  // stored values are slugs, and the projection maps each through the label
+  // vocabulary (an « Autre » free-text entry comes out verbatim).
+  const { motifs } = toDemandeDocumentView(demande)
   const presentation = toDemandePresentation(demande)
   const societe = await getSocieteBranding()
   const societeNom = societe?.nom ?? DEFAULT_SOCIETE_NOM

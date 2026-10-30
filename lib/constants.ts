@@ -1,22 +1,3 @@
-export const TRANSPORT_LABELS: Record<string, string> = {
-  VOITURE_PERSONNELLE: "Voiture personnelle",
-  VOITURE_SOCIETE: "Voiture de la société",
-  BUS: "Bus / Car",
-  AVION: "Avion",
-  TRAIN: "Train",
-  AUTRE: "Autre",
-}
-
-export const PURPOSE_OPTIONS = [
-  { value: "mission_client", label: "Mission client" },
-  { value: "formation", label: "Formation" },
-  { value: "reunion", label: "Réunion" },
-  { value: "livraison", label: "Livraison" },
-  { value: "maintenance", label: "Maintenance / Intervention" },
-  { value: "administratif", label: "Démarche administrative" },
-  { value: "autre", label: "Autre" },
-]
-
 export const ITEMS_PER_PAGE = [10, 25, 50]
 
 export const DEFAULT_SOCIETE_NOM = "Application"

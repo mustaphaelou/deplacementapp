@@ -4,6 +4,96 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import yaml from "js-yaml"
 
+// GATE-NOTES — what this gate holds, and what it deliberately does not.
+// Three notes, kept together because each records a decision a future editor
+// would otherwise have to reverse-engineer: (1) the scope, (2) the coverage
+// this gate gave up in #323 and why, (3) what the surviving pins were measured
+// to hold in #324. Grep for "GATE-NOTES" to find them again.
+
+// NOTE 1 — SCOPE.
+//
+// This gate asserts claims about the release job: the publish chain, the two
+// jobs and their order, the exact deploy condition, malformed tags failing the
+// run and pushing nothing, the deploy as the last act. It does not assert how a
+// document is worded. Rephrasing a sentence in any document the gate reads must
+// leave it green.
+
+// NOTE 2 — THE COVERAGE THIS GATE GAVE UP (#323).
+//
+// Twelve tests here once opened a prose document — the ticket that prompted
+// this change counted seven, which was low. They split cleanly in two:
+//
+//   - A `toContain` about a chosen phrase says "this sentence must always be
+//     worded this way". That is not a property of the release. Those are
+//     dropped.
+//   - A `not.toContain` fails only if something APPEARS, so it says "this
+//     claim must never be made". That is a claim about correctness, and it
+//     survives rewrites. Those are kept, each commented at its assertion.
+//
+// Dropping the phrase tests is a TRADE OF COUPLING FOR COVERAGE, accepted on
+// purpose, and the coverage given up is named here so a reader who disagrees
+// has the argument rather than having to reconstruct it: the gate no longer
+// requires the release process overview to describe the deploy hop, and it no
+// longer requires ADR-0015 to record the publish gate as the trust precondition
+// for auto-deploy. Both were phrase assertions; neither was a property of the
+// release job. The durable form of what they half-measured — that the
+// documentation is required to describe the deploy at all — belongs to whoever
+// owns the documentation, not to the release gate.
+//
+// The other four DROPPED tests, named so the record is the real set:
+//   - `defines the publish gate term in the deployment documentation`
+//     (CONTEXT.md must name the publish gate and its three jobs)
+//   - `records the twin-block deepening candidate as closed in ADR-0004`
+//   - `records the who-pulls decision in ADR-0015 and cites ADR-0004`
+//   - `documents the deploy exactly as the workflow ships it`
+// The last is the one worth a second reading, because it also held two claims
+// about the workflow rather than about prose. Those were not lost: they are
+// subsumed by the exact `toBe` on `job("deploy").if` in `deploys only on the
+// exact single-owner gate` (see NOTE 3). Same reasoning as the three above it.
+//
+// Narrowing a test drops assertions too, and those are the larger half of what
+// went: six surviving tests each kept only their `not.toContain` guards, and
+// with them went the phrase assertions those tests used to carry — CONTEXT.md
+// naming `publish-check` and `build-and-push`, ADR-0003's "no consumer pulls an
+// arm64 migrator" and the arm64-drop consequence, ADR-0004's "non-semver tags
+// fail", release.md naming `release-gate`, "Coolify deploy webhook" and
+// "escape hatch", CONTEXT.md's Release entry naming the webhook and ADR-0015,
+// and the naming half of "secrets by name only". None of those has a new home
+// and none should: each says a sentence must be worded a particular way. They
+// are listed here so a reader reconstructing the trade is not left to infer it.
+
+// NOTE 3 — WHAT THE SURVIVING PINS WERE MEASURED TO HOLD (#324).
+//
+// #324 broke the workflow on purpose and reverted it. Three results belong to
+// the next reader, because each is an edit a careful person could make that
+// leaves every test here green:
+//
+//   - The chain is pinned as a GRAPH, not as a file layout. Moving
+//     `build-and-push` above `publish-check` with every `needs:` left intact
+//     keeps the file green. Exactly one test reads key order — `keeps deploy
+//     as the final job of the workflow` — so moving `deploy` up fails that one
+//     and nothing else changes. Both facts are correct: `needs:` is what
+//     GitHub Actions executes, and deploy-last is the one ordering that carries
+//     a meaning ("the last act"), which is why it is the one pinned as text.
+//   - The push trigger is pinned by `toContain("v*")` in two places, which
+//     says `v*` must be AMONG the patterns, not that it is the only one.
+//     `tags: ["v*", "*"]` is green; `tags: ["*"]` is red on both tests. What
+//     the gate does not see is covered at runtime instead: the release-gate
+//     step exits 1 on a non-semver tag, so an over-broad trigger turns a
+//     stray tag into a failed run rather than into a deploy.
+//   - The release file is pinned against the PARSED step, not the bytes, and
+//     that is deliberate. #324 weighed adding a raw-text
+//     `toContain("scripts/deploy-coolify.sh")` on the workflow text and
+//     rejected it on the evidence of a probe: renaming both invocations to
+//     `scripts/coolify-deploy.sh` while leaving a YAML comment naming the old
+//     file keeps `raw.includes("scripts/deploy-coolify.sh")` TRUE — a comment
+//     supplies the string — while the existing parsed pin goes RED on all three
+//     tests that call `deployScriptStep()`. The proposed assertion would have
+//     passed the defect it was written to catch; the existing one catches it.
+//     The pin in question lives in `switches between dry-run and the real
+//     webhook from the dispatch input`, which reads the parsed `run` and
+//     asserts the whole invocation — script, flags and ref — on both branches.
+
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 const WORKFLOW_PATH = join(ROOT, ".github/workflows/docker-publish.yml")
 const WRAPPER_PATH = join(ROOT, "scripts/test-docker-build.sh")
@@ -34,6 +124,12 @@ interface Job {
   needs?: string | string[]
   outputs?: Record<string, unknown>
   steps?: Step[]
+  // GitHub Actions accepts either spelling, but a YAML key is a literal string:
+  // `timeout-minutes` does NOT become `timeout_minutes` when parsed. Reading
+  // the underscored form returns undefined on a file that is fully compliant,
+  // which is how a gate teaches you to distrust itself.
+  "timeout-minutes"?: number
+  timeout_minutes?: number
   strategy?: {
     matrix?: {
       include?: Record<string, string>[]
@@ -197,21 +293,13 @@ describe(".github/workflows/docker-publish.yml", () => {
     expect(wrapper).not.toContain("npm ls --omit=dev --depth=0")
   })
 
-  it("defines the publish gate term in the deployment documentation", () => {
+  it("never names the retired publish job or the retired job ordering in the CONTEXT.md Deployment section", () => {
     const docs = readFileSync(CONTEXT_PATH, "utf8")
     const deployment = docs.split("### Deployment")[1] ?? ""
-    expect(deployment).toContain("Publish Gate")
-    expect(deployment).toContain("verify")
-    expect(deployment).toContain("publish-check")
-    expect(deployment).toContain("smoke-test")
-  })
-
-  it("describes the two-job structure in the Deployment docs with the matrix as the image map", () => {
-    const docs = readFileSync(CONTEXT_PATH, "utf8")
-    const deployment = docs.split("### Deployment")[1] ?? ""
-    expect(deployment).toContain("publish-check")
-    expect(deployment).toContain("build-and-push")
-    expect(deployment).toContain("image map")
+    // Guards of a claim that must never be made, not pins on wording: both
+    // strings name a job or an ordering the publish chain was renamed away
+    // from. A reader following either would wire the wrong job graph. They
+    // fail only if the retired name reappears, so any rewording is free.
     expect(deployment).not.toContain("build-and-publish")
     expect(deployment).not.toContain("after the publish job")
   })
@@ -297,22 +385,12 @@ describe(".github/workflows/docker-publish.yml", () => {
       expect(migrator?.platforms).toBe("linux/amd64")
     })
 
-    it("records the twin-block deepening candidate as closed in ADR-0004", () => {
-      const adr = readFileSync(ADR_0004_PATH, "utf8")
-      expect(adr).toContain("image map")
-      expect(adr).toContain("source of truth")
-      expect(adr).toContain("known wart")
-      expect(adr).toContain("deplacementapp-migrator")
-      expect(adr).toContain("Future architecture reviews should not")
-      expect(adr).toContain("twin-block deepening candidate is closed")
-    })
-
-    it("records the migrator's amd64-only scope and the absent arm64 consumers in ADR-0003", () => {
+    it("forbids ADR-0003 from listing the migrator's platforms in the reversed order", () => {
       const adr = readFileSync(ADR_0003_PATH, "utf8")
-      expect(adr).toContain("linux/amd64")
-      expect(adr).toContain("no consumer pulls an arm64 migrator")
-      expect(adr).toContain("linux/amd64,linux/arm64")
-      expect(adr).toContain("arm64 drop is this consequence's direct outcome")
+      // Guard of a claim that must never be made, not a pin on wording: the
+      // reversed list would state that the arm64 build is the primary and
+      // amd64 the variant, which is the opposite of what the matrix ships. It
+      // fails only if the wrong order appears, so rewording is free.
       expect(adr).not.toContain("linux/arm64,linux/amd64")
     })
 
@@ -343,7 +421,76 @@ describe(".github/workflows/docker-publish.yml", () => {
       expect(tags).toContain("type=sha,format=long")
       expect(tags).toContain("value=latest")
       expect(tags).toContain("needs.publish-check.outputs.is_release")
-      expect(tags).toContain("github.event.repository.default_branch")
+
+      // `latest` must move ONLY on a Release. This arm used to be a union with
+      // `github.ref == refs/heads/<default_branch>`, which meant every merge to
+      // main republished a public rolling alias of unreviewed code — the exact
+      // hole ADR-0015 closed by moving release-ness behind a gate. With
+      // build-and-push now gated on is_release, that arm was dead weight, and
+      // leaving it in place would silently re-open the hole the day the gate
+      // was ever loosened. Asserted as an ABSENCE so the union cannot be
+      // restored by appending it back: a `toContain("default_branch")` pin
+      // would pass on the very string that causes the defect.
+      expect(tags).not.toContain("github.event.repository.default_branch")
+      expect(tags).not.toContain("refs/heads/")
+    })
+
+    it("gates the only image-pushing job on is_release, with the dry-run dispatch as its sole other arm", () => {
+      const push = job("build-and-push").if ?? ""
+      // Branch pushes must never reach this job. `is_release` is the single
+      // owner of release-ness (release-gate), so the gate is that output and
+      // not a second spelling of "is this a release".
+      expect(push).toContain("needs.publish-check.outputs.is_release == 'true'")
+      // The dry-run arm is load-bearing, not decorative: `deploy` needs
+      // build-and-push, so without this arm a dry-run dispatch finds a skipped
+      // dependency and the documented dry run silently never runs.
+      expect(push).toContain("inputs.deploy-dry-run == 'true'")
+      expect(push).toContain("github.event_name")
+      // Both arms are required — either one alone is a different workflow.
+      expect(push).toContain("||")
+      expect(push).toContain("!=")
+    })
+
+    it("still smoke-tests on a branch push, so verify coverage does not depend on a Release", () => {
+      // The image PUSH is release-gated; the smoke test deliberately is not.
+      // If both were gated, a Dockerfile or compose regression would sit on
+      // main until the next Release — and the first tag cut would be the run
+      // that discovered it. publish-check must keep running on branch pushes.
+      const check = job("publish-check").if ?? ""
+      expect(check).toContain("github.event_name != 'pull_request'")
+      expect(check).not.toContain("is_release")
+      expect(job("build-and-push").needs).toContain("publish-check")
+    })
+
+    it("caps every job with a timeout so a wedged runner cannot hold its concurrency group for 6h", () => {
+      const jobs = loadWorkflow().jobs ?? {}
+      for (const name of ["verify", "publish-check", "build-and-push", "release", "deploy"]) {
+        const minutes = jobs[name]?.["timeout-minutes"]
+        expect(minutes, `${name} has no timeout-minutes`).toBeTypeOf("number")
+        expect(minutes as number).toBeGreaterThan(0)
+        expect(minutes as number).toBeLessThanOrEqual(60)
+      }
+    })
+
+    it("runs CI on the Node version the production image runs", () => {
+      // Dockerfile pins node:24-alpine. A CI runner on a different major tests
+      // a runtime production never executes, so a failure rate that says
+      // "green" can mean "never ran here". Both workflows, or the drift returns.
+      const dockerfile = readFileSync(join(ROOT, "Dockerfile"), "utf8")
+      const image = /^FROM node:(\d+)/m.exec(dockerfile)?.[1]
+      expect(image, "could not read the Node major out of the Dockerfile").toBeTruthy()
+      const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"))
+      expect(pkg.engines?.node).toContain(image as string)
+      for (const path of [
+        WORKFLOW_PATH,
+        join(ROOT, ".github/workflows/frontend-sweep.yml"),
+      ]) {
+        const workflow = readFileSync(path, "utf8")
+        expect(
+          workflow,
+          `${path} pins a Node major other than ${image}`
+        ).not.toMatch(/node-version:\s*(?!24)\d+/)
+      }
     })
 
     it("keeps a matrix job output out of gating (last-to-finish semantics)", () => {
@@ -418,13 +565,17 @@ describe(".github/workflows/docker-publish.yml", () => {
       expect(loadWorkflow().on?.push?.tags).toContain("v*")
     })
 
-    it("documents that malformed tags fail the run and push nothing", () => {
+    it("never lets the deploy docs call a malformed tag harmless or name a retired release-check step", () => {
       const releaseDocs = readFileSync(RELEASE_DOCS_PATH, "utf8")
       const adr = readFileSync(ADR_0004_PATH, "utf8")
-      expect(releaseDocs).toContain("release-gate")
+      // Guards of a claim that must never be made, not pins on wording:
+      // calling a malformed tag "harmless" tells a releaser the run can be
+      // ignored when it in fact fails the gate, and "release-check" is the
+      // step id the gate was renamed away from, so its reappearance means the
+      // documentation describes a workflow that no longer exists. Each fails
+      // only if the wrong thing appears, so rewording the docs is free.
       expect(releaseDocs).not.toContain("harmless")
       expect(releaseDocs).not.toContain("release-check")
-      expect(adr.toLowerCase()).toContain("non-semver tags fail")
       expect(adr).not.toContain("release-check")
     })
   })
@@ -486,6 +637,11 @@ describe(".github/workflows/docker-publish.yml", () => {
     it("switches between dry-run and the real webhook from the dispatch input, passing the ref on both paths", () => {
       const step = deployScriptStep()
       const run = step.run ?? ""
+      // These two lines are the pin on the release file. #324 asked whether
+      // the file should ALSO be pinned against the raw workflow text and
+      // concluded no — see GATE-NOTES: "the release file is pinned against
+      // the parsed step, not the bytes" for that argument and the probe that
+      // decided it.
       expect(run).toContain(
         'scripts/deploy-coolify.sh --dry-run --ref "$GITHUB_REF_NAME"'
       )
@@ -512,69 +668,52 @@ describe(".github/workflows/docker-publish.yml", () => {
   })
 
   describe("deploy docs (ADR-0015 + docs sync)", () => {
-    const adr = readFileSync(ADR_0015_PATH, "utf8")
     const releaseDocs = readFileSync(RELEASE_DOCS_PATH, "utf8")
 
-    it("records the who-pulls decision in ADR-0015 and cites ADR-0004", () => {
-      expect(adr).toContain("Coolify deploy webhook")
-      expect(adr).toContain("Release tags")
-      expect(adr).toContain("Bearer")
-      expect(adr).toContain("HTTP 2xx")
-      expect(adr).toContain("latest")
-      expect(adr).toContain("ADR-0004")
-    })
-
-    it("records the publish gate as the trust precondition for auto-deploy", () => {
-      expect(adr.toLowerCase()).toContain("trust precondition")
-      expect(adr.toLowerCase()).toContain("publish gate")
-    })
-
-    it("release.md drops the no-Coolify-changes claim and documents the deploy + escape hatch", () => {
-      expect(releaseDocs).not.toContain(
-        "no Coolify changes are needed for a Release"
+    it("never lets release.md claim a Release needs no Coolify changes", () => {
+      // A guard of a claim that must never be made, not a pin on wording. A
+      // Release DOES need a Coolify change: the deploy fires off the Release
+      // output, so a reader who believes no Coolify work is required waits for
+      // a deploy that never comes. This is the one prose guard the spec keeps
+      // by name, and it survives any rewrite — it fails only if the misleading
+      // claim is made, never because the sentence around it changed.
+      //
+      // Compared lowercased, and that is load-bearing rather than fussy. The
+      // claim reads as a sentence, so it appears capitalised in at least half
+      // its natural forms — at the start of a sentence, a bullet, or a heading.
+      // A case-sensitive `not.toContain` here was measured going GREEN against
+      // "No Coolify changes are needed for a Release.", i.e. the guard the spec
+      // names as the one survivor was defeatable by typing the claim the
+      // ordinary way. Lowercasing both sides keeps the claim a guard and stops
+      // capitalisation from being a bypass.
+      expect(releaseDocs.toLowerCase()).not.toContain(
+        "no coolify changes are needed for a release"
       )
-      expect(releaseDocs).not.toContain("no Coolify changes")
-      expect(releaseDocs).toContain("Coolify deploy webhook")
-      expect(releaseDocs).toContain("escape hatch")
+      expect(releaseDocs.toLowerCase()).not.toContain("no coolify changes")
     })
 
-    it("describes the deploy hop in the release process overview", () => {
-      const overview =
-        releaseDocs
-          .split("## Process overview")[1]
-          ?.split("## When to cut a Release")[0] ?? ""
-      expect(overview).toContain("Coolify deploy webhook")
-      expect(overview).toContain("queued to serve")
-    })
-
-    it("CONTEXT.md Release entry gains the deploy-step consequence without a new term", () => {
+    it("does not let CONTEXT.md promote the deploy hop to a term of its own", () => {
       const context = readFileSync(CONTEXT_PATH, "utf8")
       const deployment = context.split("### Deployment")[1] ?? ""
-      const releaseEntry = deployment.split("**Release**")[1] ?? ""
-      expect(releaseEntry).toContain("Coolify deploy webhook")
-      expect(releaseEntry).toContain("ADR-0015")
+      // Guard of a claim that must never be made, not a pin on wording: a
+      // "**Deploy step**" entry would present the deploy as a peer of the
+      // existing vocabulary rather than a consequence of the Release entry,
+      // which is the shape of argument this file is not supposed to make. It
+      // fails only if that heading appears, so rewording is free.
       expect(deployment).not.toContain("**Deploy step**")
     })
 
-    it("references the Coolify secrets by name only across the deploy docs", () => {
+    it("keeps every Coolify secret's value out of the deploy docs", () => {
       const docs = [ADR_0015_PATH, RELEASE_DOCS_PATH, CONTEXT_PATH]
         .map((path) => readFileSync(path, "utf8"))
         .join("\n")
-      expect(docs).toContain("COOLIFY_WEBHOOK")
-      expect(docs).toContain("COOLIFY_TOKEN")
+      // Guards of absence, not pins on wording. Naming a secret in prose is
+      // required — the deploy cannot be documented without saying which
+      // secrets it reads — but its VALUE must never be pasted into a document
+      // that ships. These fail only if a value appears, so a document can be
+      // reworded freely.
       expect(docs).not.toContain("COOLIFY_WEBHOOK=")
       expect(docs).not.toContain("COOLIFY_TOKEN=")
-    })
-
-    it("documents the deploy exactly as the workflow ships it", () => {
-      const deploy = job("deploy")
-      expect(releaseDocs).toContain("needs: build-and-push")
-      expect(releaseDocs).toContain("deploy-coolify.sh")
-      expect(releaseDocs).toContain("HTTP 2xx")
-      expect(releaseDocs).toContain("Branch pushes")
-      expect(releaseDocs).toContain("deploy nothing")
-      expect(deploy.if).toContain("is_release")
-      expect(deploy.if).toContain("deploy-dry-run")
     })
   })
 })

@@ -4,9 +4,8 @@ import { findById } from "@/lib/demande"
 import { DemandeNotFoundError } from "@/lib/errors"
 import { DemandeDetail } from "@/components/demande-detail"
 import type { DemandeWithRelations } from "@/lib/demande-types"
-import type { Role } from "@/lib/auth"
 import { notFound } from "next/navigation"
-import { getAllowedActions, type Etape, type Decision } from "@/lib/workflow"
+import { getAllowedActions } from "@/lib/workflow"
 
 export default async function DemandeDetailPage({
   params,
@@ -21,7 +20,9 @@ export default async function DemandeDetailPage({
   try {
     demande = await findById(id, {
       id: user.id,
-      role: user.role as Role,
+      // The Role arrives as the union: the seam narrowed its own output in
+      // #297, so there is nothing left here to re-assert by hand.
+      role: user.role,
     })
   } catch (e) {
     if (e instanceof DemandeNotFoundError) notFound()
@@ -31,13 +32,15 @@ export default async function DemandeDetailPage({
   const userRole = user.role
   const userId = user.id
   const isOwner = demande.employeId === userId
+  // The ownership fact goes in as itself; the verdicts come back from the
+  // guard. The reader used to take a `userId` and compare it here, which put
+  // the ownership decision on this page rather than in the pipeline (#299).
   const { canApprove, canReject, canWithdraw } = getAllowedActions(
     userRole,
-    userId,
+    isOwner,
     {
-      etape: demande.etape as Etape,
-      decision: demande.decision as Decision,
-      employeId: demande.employeId,
+      etape: demande.etape,
+      decision: demande.decision,
     }
   )
 

@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm"
-import type { DrizzleDb, DrizzleTransactionClient } from "../../db"
+import type { DrizzleTransactionClient } from "../../db"
 import { notifications } from "../../db/schema/notifications"
 import { utilisateurs } from "../../db/schema/utilisateurs"
 import { emailSender } from "../email-sender"
@@ -39,9 +39,9 @@ export class DrizzleNotificationAdapter implements NotificationAdapter {
 
 export async function sendEmail(
   notification: NotificationMessage,
-  db: DrizzleDb
+  dbOrTx: DrizzleTransactionClient
 ): Promise<void> {
-  const [recipient] = await db
+  const [recipient] = await dbOrTx
     .select({
       email: utilisateurs.email,
       prenom: utilisateurs.prenom,

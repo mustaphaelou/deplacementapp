@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest"
+import { readFile } from "node:fs/promises"
 import { sql, eq } from "drizzle-orm"
 import * as schema from "../db/schema"
 import { createPgliteDb } from "./test/create-pglite-db"
@@ -13,6 +14,7 @@ import {
   UtilisateurService,
   UtilisateurNotFoundError,
 } from "./utilisateur-service"
+import type { ProfileResult } from "./utilisateur-service"
 
 vi.mock("bcryptjs", () => ({
   hash: vi.fn().mockResolvedValue("$hashed$"),
@@ -22,6 +24,43 @@ vi.mock("bcryptjs", () => ({
 import { hash, compare } from "bcryptjs"
 
 const TIMEOUT = 30_000
+
+// #288 — compile-time half of the "no fabricated count" pin.
+//
+// A type is erased at runtime, so no assertion inside `it()` can observe the
+// DECLARED shape; only the value the read returns is visible to the suite.
+// This alias is therefore the pin for the declaration, and `npm run typecheck`
+// (part of the `verify` gate) is what enforces it.
+//
+// The assertion is POSITIVE — the exact key set — rather than a denylist of
+// count-shaped names. A denylist can only catch the spellings it was written
+// with, so `nombreDemandes` or `demandesTotal` would slip past both this and
+// the runtime key check. Pinning the whole set means ANY field added to
+// `ProfileResult` fails the build, which is what "cannot be re-added
+// silently" actually asks for.
+//
+// Exported so `@typescript-eslint/no-unused-vars` does not flag it.
+type Equals<A, B> =
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2
+    ? true
+    : false
+type Assert<T extends true> = T
+export type _PinProfileResultDeclaresNoCount = Assert<
+  Equals<
+    keyof ProfileResult,
+    | "id"
+    | "email"
+    | "nom"
+    | "prenom"
+    | "poste"
+    | "telephone"
+    | "avatarUrl"
+    | "role"
+    | "departement"
+    | "dateEmbauche"
+    | "creeLe"
+  >
+>
 
 function mockAvatarStorage(): AvatarStorage & {
   save: ReturnType<typeof vi.fn>
@@ -144,6 +183,47 @@ describe("UtilisateurService", { timeout: TIMEOUT }, () => {
       expect(result.departement).toEqual({ nom: "Test Departement" })
     })
 
+    // #288. The read used to declare `_count: { demandes }` and return a
+    // fabricated `0` for every Utilisateur, admitted by a blanket
+    // `as unknown as ProfileResult`. Two pins, one per half of that:
+    // this one for the value the read returns, the type pin below for the
+    // shape it declares.
+    it("returns no fabricated count key on the row", async () => {
+      const result = await svc.findProfile(actor.id)
+
+      // `_count` is the exact key the fabrication used; the pattern also
+      // catches the obvious renames (demandesCount, nbDemandes).
+      expect(Object.keys(result)).not.toContain("_count")
+      expect(
+        Object.keys(result).filter((k) => /count|demandes/i.test(k))
+      ).toEqual([])
+    })
+
+    it("carries no blanket assertion: the selection satisfies the declaration", async () => {
+      // If the read ever needs to reconcile its selection with ProfileResult
+      // again, it must do so explicitly and locally. A blanket assertion is
+      // exactly what let the fabricated `_count` through, so the source of
+      // findProfile is pinned to contain no `as unknown as`.
+      const source = await readFile(
+        new URL("./utilisateur-service.ts", import.meta.url),
+        "utf8"
+      )
+      const start = source.indexOf("async findProfile")
+      const end = source.indexOf("async create")
+      // The anchors are asserted BEFORE slicing. `indexOf` answers -1 when a
+      // needle is absent, and `slice` then yields "" — against which both
+      // `not.toContain` assertions pass trivially. Without these two, a rename
+      // of `findProfile` or a reorder that put `create` above it would silently
+      // disarm this pin rather than fail it.
+      expect(start).toBeGreaterThan(-1)
+      expect(end).toBeGreaterThan(start)
+      const findProfileBody = source.slice(start, end)
+      expect(findProfileBody.length).toBeGreaterThan(0)
+
+      expect(findProfileBody).not.toContain("as unknown as")
+      expect(findProfileBody).not.toContain("_count")
+    })
+
     it("throws UtilisateurNotFoundError when user is not found", async () => {
       await expect(svc.findProfile("u-missing")).rejects.toThrow(
         UtilisateurNotFoundError
@@ -160,7 +240,6 @@ describe("UtilisateurService", { timeout: TIMEOUT }, () => {
           prenom: "User",
           poste: "QA",
           role: "EMPLOYEE",
-          societeId,
           departementId,
         },
         actor.id
@@ -178,6 +257,10 @@ describe("UtilisateurService", { timeout: TIMEOUT }, () => {
       // The administrator's provisioning act is the e-mail attestation: it is
       // written by the service, never hand-set and never a toggle.
       expect(row.emailVerified).toBe(true)
+
+      // The deployment's Societe is resolved behind the seam (ADR-0018):
+      // the input carried no societeId.
+      expect(row.societeId).toBe(societeId)
 
       const [auditRow] = await pgliteDb
         .select()
@@ -201,7 +284,6 @@ describe("UtilisateurService", { timeout: TIMEOUT }, () => {
             prenom: "Test",
             poste: "QA",
             role: "EMPLOYEE",
-            societeId,
             departementId,
           },
           actor.id
@@ -226,13 +308,34 @@ describe("UtilisateurService", { timeout: TIMEOUT }, () => {
           prenom: "User",
           poste: "QA",
           role: "EMPLOYEE",
-          societeId,
           departementId,
         },
         actor.id
       )
 
       expect(hash).toHaveBeenCalledWith("secret123", 12)
+    })
+
+    it("refuses when no Societe exists (unreachable after Amorçage)", async () => {
+      await pgliteDb.execute(sql`DELETE FROM account`)
+      await pgliteDb.execute(sql`DELETE FROM journal_audit`)
+      await pgliteDb.execute(sql`DELETE FROM utilisateurs`)
+      await pgliteDb.execute(sql`DELETE FROM departements`)
+      await pgliteDb.execute(sql`DELETE FROM societes`)
+
+      await expect(
+        svc.create(
+          {
+            email: "no-societe@test.com",
+            nom: "Test",
+            prenom: "User",
+            poste: "QA",
+            role: "EMPLOYEE",
+            departementId,
+          },
+          actor.id
+        )
+      ).rejects.toThrow("Aucune société configurée")
     })
   })
 
@@ -504,6 +607,200 @@ describe("UtilisateurService", { timeout: TIMEOUT }, () => {
       expect(avatarStorage.save).not.toHaveBeenCalled()
       expect(avatarStorage.delete).toHaveBeenCalledWith(oldUrl)
       expect(result.avatarUrl).toBeNull()
+    })
+  })
+
+  // #314 — the reader that owns the rule that a Utilisateur may act, and the
+  // proof that its handle can be redirected.
+  //
+  // These live here rather than in a new file because this suite already owns
+  // a PGlite instance with migrations applied and a Societe/Departement to
+  // satisfy the table's foreign keys; a second file would pay another boot for
+  // nothing. Nothing above is touched.
+  //
+  // The handle is reached by module redirection, NOT by passing it as an
+  // argument: the claim under test is that the DEFAULT handle resolves through
+  // the module binding at call time, so a test can substitute the database it
+  // reads. Passing `pgliteDb` explicitly would pass even if that default were
+  // captured at import time, which is exactly the defect #313 turned on this
+  // shape. So every case below calls `peutAgir(id)` with one argument.
+  //
+  // The module is imported dynamically rather than added to the file's import
+  // header: this block is strictly append-only, and Vite's module registry
+  // hands back the same namespace object a static import would have.
+  describe("peutAgir — the rule that a Utilisateur may act", () => {
+    let dbModule: typeof import("../db")
+    let peutAgir: typeof import("./utilisateur-service").peutAgir
+    let actifId: string
+    let inactifId: string
+
+    beforeEach(async () => {
+      dbModule = await import("../db")
+      ;({ peutAgir } = await import("./utilisateur-service"))
+      // Redirect the module's own handle. The default parameter of `peutAgir`
+      // is evaluated on every call against this binding, so the reader below
+      // goes to PGlite without being told to.
+      vi.spyOn(dbModule, "db", "get").mockReturnValue(pgliteDb as any)
+
+      actifId = crypto.randomUUID()
+      inactifId = crypto.randomUUID()
+
+      await pgliteDb.insert(schema.utilisateurs).values([
+        {
+          ...makeUser(),
+          id: actifId,
+          email: `actif-${actifId}@test.com`,
+          societeId,
+          departementId,
+          actif: true,
+        },
+        {
+          ...makeUser(),
+          id: inactifId,
+          email: `inactif-${inactifId}@test.com`,
+          societeId,
+          departementId,
+          actif: false,
+        },
+      ])
+    })
+
+    it("answers true for an active Utilisateur", async () => {
+      expect(await peutAgir(actifId)).toBe(true)
+    })
+
+    it("answers false for an inactive Utilisateur", async () => {
+      expect(await peutAgir(inactifId)).toBe(false)
+    })
+
+    // The question is « may this one act ». An identifier that matches no row
+    // is a Utilisateur that does not exist, and one that does not exist may
+    // not act — so false, not a throw. This is the behaviour the session
+    // module's private `isActif` had (`row?.actif ?? false`) and the reason
+    // the fallback exists at all.
+    it("answers false for an identifier matching nothing, without throwing", async () => {
+      expect(await peutAgir(crypto.randomUUID())).toBe(false)
+    })
+
+    // Pins the redirection itself, so a test that stopped redirecting fails
+    // here before it can pass for the wrong reason: if `db` were still the
+    // module's real handle, this assertion fails.
+    it("reads through the redirected handle, not the module's own", async () => {
+      expect(dbModule.db).toBe(pgliteDb)
+      // ...and the row the reader found exists only in PGlite.
+      const [row] = await pgliteDb
+        .select({ actif: utilisateurs.actif })
+        .from(utilisateurs)
+        .where(eq(utilisateurs.id, actifId))
+      expect(row.actif).toBe(true)
+    })
+
+    // The second parameter is part of the frozen signature, so it is pinned
+    // too — but this test is NOT the evidence for the redirection; the three
+    // above are, because they omit the argument entirely.
+    it("honours an explicitly passed handle", async () => {
+      expect(await peutAgir(inactifId, pgliteDb as any)).toBe(false)
+      expect(await peutAgir(actifId, pgliteDb as any)).toBe(true)
+    })
+  })
+
+  // #315 — the reader's second shape, `conditionActif`, and the one
+  // implementation the two shapes share.
+  //
+  // The interface is the test surface (#313), and the claim under test here is
+  // the one that makes the interface trustworthy: a per-Utilisateur answer and
+  // a reusable condition that CANNOT disagree. It is asserted as a SET
+  // EQUALITY against a real in-process Postgres, not as two separate answers —
+  // two separate answers would only prove each shape is individually right,
+  // which is exactly the state in which they could drift.
+  //
+  // If `peutAgir` were re-spelled independently of the condition, or the
+  // condition were changed to admit an inactive Utilisateur, one side of this
+  // equality moves and the other does not. Both failures are RED here.
+  describe("conditionActif — the reader's set filter, one implementation with peutAgir", () => {
+    let dbModule: typeof import("../db")
+    let peutAgir: typeof import("./utilisateur-service").peutAgir
+    let conditionActif: typeof import("./utilisateur-service").conditionActif
+    // Two of each, so a rule that admitted "some" inactive Utilisateurs — a
+    // single-row sample cannot tell that apart from admitting none.
+    let seededIds: Array<{ id: string; actif: boolean }>
+
+    beforeEach(async () => {
+      dbModule = await import("../db")
+      const reader = await import("./utilisateur-service")
+      ;({ peutAgir, conditionActif } = reader)
+      // Same redirection as the block above: the DEFAULT handle must resolve
+      // through the module binding at call time, so every `peutAgir` call in
+      // this block omits the argument.
+      vi.spyOn(dbModule, "db", "get").mockReturnValue(pgliteDb as any)
+
+      seededIds = [true, false, true, false].map((actif) => {
+        const id = crypto.randomUUID()
+        return { id, actif }
+      })
+      await pgliteDb.insert(schema.utilisateurs).values(
+        seededIds.map(({ id, actif }) => ({
+          ...makeUser({ id, email: `${id}@test.com`, actif }),
+          societeId,
+          departementId,
+        }))
+      )
+    })
+
+    /**
+     * Every Utilisateur the condition admits, read through a real query —
+     * the same composition the Notification resolver performs.
+     */
+    async function admittedByCondition(): Promise<string[]> {
+      const rows = await pgliteDb
+        .select({ id: utilisateurs.id })
+        .from(utilisateurs)
+        .where(conditionActif)
+      return rows.map((row) => row.id).sort()
+    }
+
+    it("admits every active Utilisateur and no inactive one", async () => {
+      const admitted = await admittedByCondition()
+      for (const { id, actif } of seededIds) {
+        if (actif) expect(admitted).toContain(id)
+        else expect(admitted).not.toContain(id)
+      }
+    })
+
+    // THE pin for « one implementation ». The per-Utilisateur answer and the
+    // set filter are compared as an EQUALITY OF ID SETS over every row in the
+    // table, not as two separate assertions: two separate ones would only show
+    // each shape is individually right, which is precisely the state in which
+    // they are free to drift. Here a change to one side that the other does not
+    // follow fails.
+    it("agrees with peutAgir on every Utilisateur, in both directions", async () => {
+      const everyId = (
+        await pgliteDb.select({ id: utilisateurs.id }).from(utilisateurs)
+      ).map((row) => row.id)
+
+      // The rows the reader is asked about are exactly the rows the condition
+      // is applied to — the two shapes are compared over the same population.
+      const answeredTrue: string[] = []
+      for (const id of everyId) {
+        if (await peutAgir(id)) answeredTrue.push(id)
+      }
+
+      expect(answeredTrue.sort()).toEqual(await admittedByCondition())
+    })
+
+    it("answers false for an identifier the condition admits nothing for", async () => {
+      const strangerId = crypto.randomUUID()
+      expect(await peutAgir(strangerId)).toBe(false)
+      expect(await admittedByCondition()).not.toContain(strangerId)
+    })
+
+    // The resolver composes this fragment into its OWN `where`, so it has to
+    // be a value and not a query or a function. Pinned as a positive type
+    // check rather than by inspecting internals: a re-export as a function
+    // would break every caller's query silently at the SQL level, and only
+    // `tsc` would notice.
+    it("is a SQL value a caller can compose into its own where", () => {
+      expect(conditionActif).toBeTypeOf("object")
     })
   })
 })

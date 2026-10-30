@@ -1,4 +1,5 @@
 import type { Role } from "@/lib/auth"
+import type { demandesDeplacement } from "@/db/schema/demandes-deplacement"
 import type { CreateDemandeData } from "./demande-utils"
 
 export function parseMotif(motif: string): string[] {
@@ -11,44 +12,34 @@ export function parseMotif(motif: string): string[] {
   }
 }
 
-export type DemandeDeplacement = {
-  id: string
-  numero: string
-  employeId: string
-  assigneAId: string | null
-  etape: string
-  decision: string
-  employeNom: string
-  employePrenom: string
-  employePoste: string
-  employeDepartement: string
-  motif: string
-  dateDepart: Date
-  dateRetour: Date
-  destination: string
-  typeTransport: string
-  autreTransport: string | null
-  vehiculeId: string | null
+// The row type is DERIVED from the schema's own inferred row rather than
+// transcribed by hand (#295). `etape` and `decision` are native `pgEnum`
+// columns, so the inferred row carries the pipeline's exact unions and the
+// four `as Etape` / `as Decision` casts this widening forced are gone.
+//
+// The money columns are the one deliberate exception: drizzle types a
+// `decimal` column as the string Postgres returns, while every surface that
+// consumes a DemandeDeplacement also accepts a number (the fixtures, the PDF
+// mapper's `toNumber`, the print page's `Number(...)`). Re-declaring just
+// those six keeps them honest at both ends and leaves the Etape/Decision
+// narrowing — the point of the ticket — derived rather than restated.
+type SchemaRow = typeof demandesDeplacement.$inferSelect
+
+export type DemandeDeplacement = Omit<
+  SchemaRow,
+  | "fraisTransport"
+  | "fraisHebergement"
+  | "fraisRepas"
+  | "fraisDivers"
+  | "totalEstime"
+  | "montantAvance"
+> & {
   fraisTransport: number | string | null
   fraisHebergement: number | string | null
   fraisRepas: number | string | null
   fraisDivers: number | string | null
   totalEstime: number | string | null
-  avanceRequise: boolean
   montantAvance: number | string | null
-  description: string | null
-  commentaireManager: string | null
-  commentaireFinance: string | null
-  commentaireDirection: string | null
-  soumiseLe: Date | null
-  approuveeManagerLe: Date | null
-  approuveeFinanceLe: Date | null
-  approuveeDirectionLe: Date | null
-  rejeteeLe: Date | null
-  retireeLe: Date | null
-  deletedAt: Date | null
-  creeLe: Date
-  modifieLe: Date
 }
 
 export type DemandeWithRelations = DemandeDeplacement & {

@@ -1,8 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { renderToStaticMarkup } from "react-dom/server"
+import { readFileSync } from "node:fs"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
+import { hideClassFor, rowHoverInkTint, tableShellClass } from "@/components/display"
+import { lienFileAttente } from "@/lib/workflow"
 
 const { mockSearchParams, mockUseAuthUser } = vi.hoisted(() => ({
-  mockSearchParams: { etape: "" },
+  mockSearchParams: { etape: "", decision: "" },
   mockUseAuthUser: vi.fn(),
 }))
 
@@ -12,7 +17,11 @@ vi.mock("@/lib/auth/client", () => ({
 
 vi.mock("next/navigation", () => ({
   useSearchParams: () => ({
-    get: (key: string) => (key === "etape" ? mockSearchParams.etape : null),
+    get: (key: string) => {
+      if (key === "etape") return mockSearchParams.etape
+      if (key === "decision") return mockSearchParams.decision
+      return null
+    },
   }),
   useRouter: () => ({ push: vi.fn() }),
 }))
@@ -50,6 +59,7 @@ const DEMANDE = {
 describe("Demandes list page", () => {
   beforeEach(() => {
     mockSearchParams.etape = ""
+    mockSearchParams.decision = ""
     mockUseAuthUser.mockReturnValue({ user: mockUser("MANAGER") })
   })
 
@@ -58,7 +68,6 @@ describe("Demandes list page", () => {
     const html = renderToStaticMarkup(<DemandesListPage />)
 
     expect(html).toContain('aria-label="breadcrumb"')
-    expect(html).toContain("text-[40px]")
     expect(html).toContain("Demandes")
     expect(html).toContain("demande(s)")
     expect(html).not.toContain('aria-label="Menu"')
@@ -74,9 +83,59 @@ describe("Demandes list page", () => {
     expect(html).toContain("Toutes")
     expect(html).toContain("En attente")
     expect(html).toContain("Finalisées")
-    expect(html).toContain("?etape=MANAGER_REVIEW")
     expect(html).toContain("?etape=FINAL")
     expect(html).not.toContain("Brouillons")
+  })
+
+  // #304: the « En attente » href is now a VALUE, asked of the exported pure
+  // function — the assertion no longer has to render the page and hunt for a
+  // string in the markup, and no longer spells the URL.
+  it("builds the « En attente » tab as the composition for the viewer's Role", async () => {
+    const { tabsPourRole } = await import("./page")
+
+    for (const role of ["MANAGER", "FINANCE_ADMIN", "GENERAL_DIRECTION"] as const) {
+      const onWaiting = tabsPourRole(role).find((t) => t.label === "En attente")
+
+      expect(onWaiting, `${role} has no « En attente » tab`).toBeDefined()
+      expect(onWaiting?.href, role).toBe(lienFileAttente(role))
+    }
+  })
+
+  // The scoping rule, pinned in the direction that keeps it from creeping: the
+  // links that mean something ELSE are not compositions of the waiting link, and
+  // are still named by their own lanes.
+  it("keeps « Brouillons » and « Finalisées » out of the waiting-lane composition", async () => {
+    const { tabsPourRole } = await import("./page")
+
+    const waiting = lienFileAttente("MANAGER")
+    for (const tab of tabsPourRole("MANAGER")) {
+      if (tab.label === "En attente") continue
+      expect(tab.href, tab.label).not.toBe(waiting)
+    }
+
+    const employee = tabsPourRole("EMPLOYEE")
+    expect(employee.map((t) => t.label)).toEqual([
+      "Toutes",
+      "Brouillons",
+      "Finalisées",
+    ])
+    // An EMPLOYEE waits on nobody's queue: no queue tab, no pending filter.
+    for (const tab of employee) {
+      expect(tab.href, tab.label).not.toContain("decision=")
+    }
+  })
+
+  // The rendering above proves the page still DRAWS its tabs; this proves the
+  // drawn href is the composed one, which the string assertions used to carry.
+  it("renders the composed waiting href into the tab", async () => {
+    mockUseAuthUser.mockReturnValue({ user: mockUser("MANAGER") })
+    const { default: DemandesListPage, tabsPourRole } = await import("./page")
+
+    const html = renderToStaticMarkup(<DemandesListPage />)
+    // renderToStaticMarkup escapes `&` as `&amp;`; decode to compare the href.
+    const href = tabsPourRole("MANAGER").find((t) => t.label === "En attente")?.href
+
+    expect(html.replace(/&amp;/g, "&")).toContain(href as string)
   })
 
   it("gives employees Brouillons tab and the Nouvelle demande action", async () => {
@@ -87,6 +146,7 @@ describe("Demandes list page", () => {
 
     expect(html).toContain("Brouillons")
     expect(html).toContain("?etape=DRAFT")
+    expect(html).not.toContain("&decision=")
     expect(html).toContain("Nouvelle demande")
     expect(html).not.toContain("CSV")
   })
@@ -101,12 +161,58 @@ describe("Demandes list page", () => {
     expect(html).toContain('data-slot="tooltip-trigger"')
   })
 
+  // #286: the page used to decide this with its own inline comparison. It now
+  // asks the guard over the declared set, so the export is offered to exactly
+  // the Roles the set admits — the same answer /api/csv gives, which is the
+  // whole point: a button that is offered and then refused is the defect this
+  // ticket closed. Driven by the signed-in Role, so it fails if either the page
+  // or the set is wrong.
+  it("offers the CSV export to every Role the declared set admits", async () => {
+    for (const role of ["FINANCE_ADMIN", "GENERAL_DIRECTION"]) {
+      mockUseAuthUser.mockReturnValue({ user: mockUser(role) })
+
+      const { default: DemandesListPage } = await import("./page")
+      const html = renderToStaticMarkup(<DemandesListPage />)
+
+      expect(html, role).toContain("CSV")
+    }
+  })
+
+  it("withholds the CSV export from a Role outside the declared set", async () => {
+    for (const role of ["MANAGER", "EMPLOYEE"]) {
+      mockUseAuthUser.mockReturnValue({ user: mockUser(role) })
+
+      const { default: DemandesListPage } = await import("./page")
+      const html = renderToStaticMarkup(<DemandesListPage />)
+
+      expect(html, role).not.toContain("CSV")
+    }
+  })
+
+  // The comparison is deleted, not wrapped in a local helper: this is the shape
+  // a re-derivation would take, and it must not come back.
+  it("reaches the export answer through the guard, not a local Role comparison", async () => {
+    const source = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "page.tsx"),
+      "utf8"
+    )
+
+    expect(source).toMatch(
+      /canExportCsv\s*=\s*role\s*\?\s*hasAnyRole\(\s*role\s*,\s*ROLES_MANAGEMENT\s*\)\s*:\s*false/
+    )
+    expect(source).not.toMatch(/role\s*===\s*"FINANCE_ADMIN"/)
+    expect(source).not.toMatch(/role\s*===\s*"GENERAL_DIRECTION"/)
+  })
+
   it("keeps the active tab pill highlighted from the etape param", async () => {
     mockSearchParams.etape = "FINAL"
 
     const { default: DemandesListPage } = await import("./page")
     const html = renderToStaticMarkup(<DemandesListPage />)
 
+    // The ACTIVE TAB's own state (page.tsx), not StatusPill's neutral
+    // tone: the pill spells that colour with a text tone and no
+    // font-medium. No module owns this one.
     expect(html).toContain("bg-[#F1F1EF] font-medium")
   })
 
@@ -117,12 +223,21 @@ describe("Demandes list page", () => {
     )
 
     expect(html).not.toContain('data-slot="card"')
-    expect(html).toContain("border-y border-border")
+    // #307: the shell and the row tint belong to the shared module now, so they
+    // are asserted as the module's own output rather than re-pinned as literals.
+    expect(html).toContain(tableShellClass)
+    // The cell padding and the table's min-width are this page's own
+    // shell — no module owns them, so they stay here. The row-hover
+    // tint beside them IS spec #305's display module, named below.
     expect(html).toContain("px-2 py-2 font-normal text-muted-foreground")
     expect(html).toContain("px-2 py-2.5")
-    expect(html).toContain("hover:bg-[rgba(55,53,47,0.024)]")
+    expect(html).toContain(rowHoverInkTint)
     expect(html).toContain("min-w-[640px]")
+    // StatusPill's own shape (status-pill.tsx), not the tab's.
     expect(html).toContain("rounded-full")
+    // The pill tones are components/status-pill.tsx's TONE_CLASSES
+    // (neutral/pending/success/danger); the pill's rounded-full shape is
+    // the same module. This page only chooses the tone.
     expect(html).toContain("bg-[#FBF0DB]")
     expect(html).toContain("En attente (Finance)")
     expect(html).toContain("sm:opacity-0 sm:group-hover:opacity-100")
@@ -131,18 +246,53 @@ describe("Demandes list page", () => {
     expect(html).not.toContain(">Actions</th>")
   })
 
+  // #320: the class-string assertions this file RETAINS are not header
+  // leftovers. This one and the `hideClassFor` block below belong to spec
+  // #305's shared display module, which owns the hide rule — the header module
+  // owns neither. #320 removed only the breadcrumb truncation class this file
+  // duplicated from components/page-header.tsx.
+  // #307: the three hidden columns now ask the shared rule for their half of
+  // the pair. The pin is the module's own output reaching this page's DOM at
+  // each breakpoint, plus the count and the absence of a hand-written pair — so
+  // it fails both if a migrated cell stops hiding and if the page keeps a
+  // private copy beside the import.
   it("hides the Employé column for employees but keeps it ≥sm for managers", async () => {
     const { DemandesTable } = await import("./page")
 
     const managerHtml = renderToStaticMarkup(
       <DemandesTable demandes={[DEMANDE]} role="MANAGER" />
     )
-    expect(managerHtml).toContain("hidden px-2 py-2 font-normal text-muted-foreground sm:table-cell")
+    expect(
+      managerHtml,
+      `no cell carries ${hideClassFor({ hideAt: "sm" })} — the Employé column ` +
+        `has stopped hiding on a phone`,
+    ).toContain(hideClassFor({ hideAt: "sm" }))
 
     const employeeHtml = renderToStaticMarkup(
       <DemandesTable demandes={[DEMANDE]} role="EMPLOYEE" />
     )
     expect(employeeHtml).not.toContain("Employé")
+
+    const src = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "page.tsx"),
+      "utf8"
+    )
+    for (const breakpoint of ["sm", "md", "lg"] as const) {
+      expect(
+        managerHtml,
+        `the ${breakpoint} column no longer hides — the class never reached the cell`,
+      ).toContain(hideClassFor({ hideAt: breakpoint }))
+    }
+    expect(
+      /className="[^"]*hidden[^"]*(sm|md|lg):table-cell/.test(src),
+      "the page still spells a hide pair inline instead of calling hideClassFor",
+    ).toBe(false)
+    // Six call sites: Employé, Dates and Total, each in a header and a body cell.
+    // The role-conditional Employé pair is one pair of them, not two.
+    expect(
+      (src.match(/hideClassFor\(\{\s*hideAt:/g) ?? []).length,
+      "the Demandes table hides six cells below a breakpoint (3 headers + 3 body)",
+    ).toBe(6)
   })
 
   it("renders the module's compact label for a rejected demande: Rejetée (Manager)", async () => {
@@ -156,6 +306,33 @@ describe("Demandes list page", () => {
 
     expect(html).toContain("Rejetée (Manager)")
     expect(html).not.toContain("En attente")
+    // The danger tone is components/status-pill.tsx's TONE_CLASSES.
     expect(html).toContain("bg-[#FBE9E9]")
+  })
+})
+
+// #261: the header class pins now live once, in
+// components/page-header.test.tsx, against the module that owns them. What
+// stays here is the cheap per-page guarantee: this page still renders its
+// title through the shared header.
+describe("Demandes list page — the shared page header", () => {
+  it("renders the page's title", async () => {
+    mockUseAuthUser.mockReturnValue({ user: mockUser("MANAGER") })
+
+    const { default: DemandesListPage } = await import("./page")
+    const html = renderToStaticMarkup(<DemandesListPage />)
+
+    // This asserts the page's OWN trail rendered through the module, not that
+    // an <h1> exists somewhere: a hand-inlined header satisfies a title
+    // assertion and is exactly the regression #261 removed. What is left here
+    // is the trail the module BUILDS — the page's own crumb labels and the one
+    // separator per crumb, which only the module's breadcrumb emits. #320
+    // removed this block's duplication of the truncation contract, which
+    // components/page-header.tsx pins in full on its own suite.
+    // The three-item trail is this page's own, and #262's acceptance criterion
+    // for it: one separator per crumb, last item in page treatment.
+    expect(html).toContain(">Espace</span>")
+    expect(html).toContain(">Demandes de déplacement</span>")
+    expect(html.match(/data-slot="breadcrumb-separator"/g)).toHaveLength(2)
   })
 })

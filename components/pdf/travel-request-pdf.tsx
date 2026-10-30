@@ -2,10 +2,10 @@ import ReactPDF from "@react-pdf/renderer"
 import type { PdfRenderData } from "@/lib/pdf-types"
 import {
   toDemandePresentation,
+  TRANSPORT_LABELS,
   type PresentationTone,
 } from "@/lib/demande-presentation"
 import {
-  TRANSPORT_LABELS,
   formatCurrency,
   formatDate,
   formatDateTime,
@@ -249,7 +249,7 @@ export function TravelRequestPdf({ data }: { data: PdfRenderData }) {
 
           <View style={styles.fieldFull}>
             <Text style={styles.fieldLabel}>Motif du deplacement</Text>
-            <Text style={styles.fieldValue}>{data.motif.join(", ")}</Text>
+            <Text style={styles.fieldValue}>{data.motifsLabels.join(", ")}</Text>
           </View>
 
           <View style={styles.field}>

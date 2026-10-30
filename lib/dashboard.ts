@@ -1,16 +1,17 @@
 import { formatCurrency } from "@/lib/constants"
 import {
-  findByEtapes,
-  countByEtape,
+  findPendingByEtapes,
+  countDemandes,
   findByEmployeeId,
   aggregateBudget,
 } from "./demande"
 import type { Role } from "@/lib/auth"
 import {
+  lienFileAttente,
   queueEtapes,
   committedEtapes,
-  rollupEtapes,
   laneOrderByColumn,
+  PIPELINE,
   type Etape,
 } from "./workflow"
 
@@ -72,8 +73,14 @@ async function fetchQueueDemandes(
   const queue = queueEtapes(role)
   const order = laneOrderByColumn(lane)
   const [demandes, queueCounts] = await Promise.all([
-    findByEtapes(queue, { includeEmployee: true, limit: 10, orderBy: order }),
-    Promise.all(queue.map((s) => countByEtape(s))),
+    findPendingByEtapes(queue, {
+      includeEmployee: true,
+      limit: 10,
+      orderBy: order,
+    }),
+    Promise.all(
+      queue.map((s) => countDemandes({ etape: s, decision: "PENDING" }))
+    ),
   ])
   return { demandes, enAttente: queueCounts.reduce((a, b) => a + b, 0) }
 }
@@ -86,25 +93,29 @@ export async function getDashboardPayload(
 ): Promise<DashboardPayload> {
   switch (role) {
     case "EMPLOYEE": {
-      const queue = queueEtapes(role)
-      const committed = committedEtapes(role)
-      const rollup = rollupEtapes(role)
+      // The review lanes: the pipeline stages other than the draft lane and
+      // the terminal lane — derived from PIPELINE, never re-listed.
+      const reviewLanes = PIPELINE.filter(
+        (stage) => stage.id !== "DRAFT" && stage.id !== "FINAL"
+      ).map((stage) => stage.id)
 
-      const [demandes, rollupCounts] = await Promise.all([
-        findByEmployeeId(userId, 5),
-        Promise.all(rollup.map((s) => countByEtape(s, userId))),
-      ])
-
-      const countMap = Object.fromEntries(
-        rollup.map((s, i) => [s, rollupCounts[i]])
-      )
-      const queueCount = queue.reduce((sum, s) => sum + (countMap[s] ?? 0), 0)
-      const committedCount = committed.reduce(
-        (sum, s) => sum + (countMap[s] ?? 0),
-        0
-      )
-      const total = rollupCounts.reduce((a, b) => a + b, 0)
-      const submittedCount = total - queueCount - committedCount
+      const [demandes, brouillons, soumisesCounts, approuvees, total] =
+        await Promise.all([
+          findByEmployeeId(userId, 5),
+          countDemandes({
+            etape: "DRAFT",
+            decision: "PENDING",
+            employeId: userId,
+          }),
+          Promise.all(
+            reviewLanes.map((etape) =>
+              countDemandes({ etape, decision: "PENDING", employeId: userId })
+            )
+          ),
+          countDemandes({ etape: "FINAL", employeId: userId }),
+          countDemandes({ employeId: userId }),
+        ])
+      const soumises = soumisesCounts.reduce((a, b) => a + b, 0)
 
       return {
         config: {
@@ -114,19 +125,19 @@ export async function getDashboardPayload(
             {
               icon: "clock",
               label: "Brouillons",
-              value: queueCount,
+              value: brouillons,
               color: "amber",
             },
             {
               icon: "alert-circle",
               label: "Soumises",
-              value: submittedCount,
+              value: soumises,
               color: "orange",
             },
             {
               icon: "check-circle",
               label: "Approuvées",
-              value: committedCount,
+              value: approuvees,
               color: "green",
             },
           ],
@@ -177,7 +188,7 @@ export async function getDashboardPayload(
               { id: "date", label: "Date", hideAt: "md" },
               { id: "etape", label: "Statut" },
             ],
-            viewAllHref: `/demandes?etape=${queueEtapes(role)[0]}`,
+            viewAllHref: lienFileAttente(role),
             emptyMessage: "Aucune demande en attente.",
           },
         },
@@ -210,7 +221,7 @@ export async function getDashboardPayload(
               { id: "total", label: "Total", hideAt: "md" },
               { id: "etape", label: "Statut" },
             ],
-            viewAllHref: `/demandes?etape=${queueEtapes(role)[0]}`,
+            viewAllHref: lienFileAttente(role),
             emptyMessage: "Aucune demande en attente.",
           },
         },
@@ -251,7 +262,7 @@ export async function getDashboardPayload(
               { id: "total", label: "Total", hideAt: "md" },
               { id: "etape", label: "Statut" },
             ],
-            viewAllHref: `/demandes?etape=${queueEtapes(role)[0]}`,
+            viewAllHref: lienFileAttente(role),
             emptyMessage: "Aucune demande en attente.",
           },
         },

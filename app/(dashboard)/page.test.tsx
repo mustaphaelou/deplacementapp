@@ -93,7 +93,7 @@ describe("Dashboard home page", () => {
     expect(html).not.toContain('aria-label="Menu"')
   })
 
-  it("keeps Accès rapide tiles with hairline border and ink-tint hover", async () => {
+  it("keeps Accès rapide as one hairline panel with the shell's ink-tint hover", async () => {
     const { getDashboardPayload } = await import("@/lib/dashboard")
     ;(getDashboardPayload as ReturnType<typeof vi.fn>).mockResolvedValue({
       config: CONFIG,
@@ -105,7 +105,7 @@ describe("Dashboard home page", () => {
     const html = renderToStaticMarkup(element)
 
     expect(html).toContain("border-border")
-    expect(html).toContain("hover:bg-accent")
+    expect(html).toContain("hover:bg-[rgba(55,53,47,0.06)]")
     expect(html).not.toContain("hover:border-primary/40")
     expect(html).not.toContain("shadow-md")
     expect(html).toContain("Accès rapide")
@@ -125,6 +125,8 @@ describe("Dashboard home page", () => {
     expect(html).toContain("Voir toutes")
     expect(html).not.toContain(">Voir toutes</button>")
     expect(html).not.toContain("border-dashed")
+    // The empty queue is a hairline-ruled block, not a dashed dropzone.
+    expect(html).toContain("border-y border-border")
     expect(html).toContain("Aucune demande pour le moment.")
   })
 

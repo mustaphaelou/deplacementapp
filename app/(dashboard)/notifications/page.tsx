@@ -9,13 +9,8 @@ import { cn } from "@/lib/utils"
 import { formatDateTime } from "@/lib/constants"
 import { Button } from "@/components/ui/button"
 import { useNotificationContext } from "@/components/notification-context"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
+import { PageHeader } from "@/components/page-header"
+import { LoadingBlock } from "@/components/display"
 
 type Notification = {
   id: string
@@ -167,41 +162,19 @@ export default function NotificationsPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div>
-        <div className="flex items-center justify-between">
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <span>Espace</span>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbPage className="font-medium">
-                  Notifications
-                </BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
-        </div>
-        <div className="mt-6 flex items-center gap-4">
-          <div className="flex size-12 shrink-0 items-center justify-center rounded-[3px] bg-primary/10">
-            <Bell className="size-6 text-primary" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-[40px] leading-tight font-bold tracking-[-0.01em]">
-              Notifications
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {unreadCount} non lue(s)
-            </p>
-          </div>
-        </div>
-      </div>
+      {/* #261: the header geometry and the breadcrumb markup live in the
+          shared module; the page passes only what varies. No action here —
+          the module's optional slot renders no action region at all, which is
+          the case this page has always been. */}
+      <PageHeader
+        crumbs={["Espace", "Notifications"]}
+        title="Notifications"
+        subtitle={<>{unreadCount} non lue(s)</>}
+        icon={Bell}
+      />
 
       {loading ? (
-        <div className="flex items-center justify-center p-8">
-          <p className="text-sm text-muted-foreground">Chargement...</p>
-        </div>
+        <LoadingBlock />
       ) : notifications.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-2 p-8">
           <Bell className="size-8 text-muted-foreground/50" />

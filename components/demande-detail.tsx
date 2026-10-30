@@ -3,27 +3,19 @@
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
+import { PageHeader } from "@/components/page-header"
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 
+import { formatCurrency, formatDate, formatDateTime } from "@/lib/constants"
 import {
-  formatCurrency,
-  formatDate,
-  formatDateTime,
+  toDemandePresentation,
+  toDemandeDocumentView,
   TRANSPORT_LABELS,
-} from "@/lib/constants"
-import { toDemandePresentation } from "@/lib/demande-presentation"
-import { parseMotif } from "@/lib/demande-types"
+} from "@/lib/demande-presentation"
 import type { DemandeDetail } from "@/lib/demande-types"
 import {
   CheckCircle,
@@ -89,7 +81,11 @@ export function DemandeDetail({
     handleDownloadPdf,
   } = useDemandeActions(demande.id, demande.numero)
 
-  const motifs = parseMotif(demande.motif)
+  // The Motifs are read from the document projection, not from the storage
+  // decoder: the stored values are slugs, and only the projection knows the
+  // French label each one carries. A « Autre » entry, absent from the label
+  // map, still comes out verbatim through the projection's fallback.
+  const { motifs } = toDemandeDocumentView(demande)
 
   const presentation = toDemandePresentation(demande)
   const isRejected = presentation.decision.outcome === "rejected"
@@ -97,27 +93,20 @@ export function DemandeDetail({
 
   return (
     <div className="mx-auto w-full max-w-[720px] pb-8">
-      {/* Page header */}
-      <div>
-        <div className="flex items-center justify-between">
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <Link
-                  href="/demandes"
-                  className="transition-colors hover:text-foreground"
-                >
-                  Demandes de déplacement
-                </Link>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbPage className="font-medium">
-                  N° {demande.numero}
-                </BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
+      <PageHeader
+        crumbs={[
+          { label: "Demandes de déplacement", href: "/demandes" },
+          `N° ${demande.numero}`,
+        ]}
+        title={`Demande ${demande.numero}`}
+        subtitle={
+          <>
+            Créée le {formatDateTime(demande.creeLe)} par{" "}
+            {demande.employePrenom} {demande.employeNom}
+          </>
+        }
+        icon={FileText}
+        action={
           <div className="flex items-center gap-1">
             <Tooltip>
               <TooltipTrigger
@@ -151,22 +140,8 @@ export function DemandeDetail({
               <TooltipContent>Imprimer</TooltipContent>
             </Tooltip>
           </div>
-        </div>
-        <div className="mt-6 flex items-center gap-4">
-          <div className="flex size-12 shrink-0 items-center justify-center rounded-[3px] bg-primary/10">
-            <FileText className="size-6 text-primary" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-[40px] leading-tight font-bold tracking-[-0.01em]">
-              Demande {demande.numero}
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Créée le {formatDateTime(demande.creeLe)} par{" "}
-              {demande.employePrenom} {demande.employeNom}
-            </p>
-          </div>
-        </div>
-      </div>
+        }
+      />
 
       <div className="mt-10 space-y-10">
         {/* Statut */}

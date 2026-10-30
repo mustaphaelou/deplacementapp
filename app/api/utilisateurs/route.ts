@@ -1,16 +1,15 @@
 import { NextResponse } from "next/server"
-import { requireAuth, requireAnyRole, type Role } from "@/lib/auth/server"
+import { requireAuth, requireAnyRole } from "@/lib/auth/server"
+import { ROLES_MANAGEMENT } from "@/lib/auth/roles"
 import { utilisateurService } from "@/lib/utilisateur-service"
 import { utilisateurSchema, updateUtilisateurSchema } from "@/lib/schemas"
 import { withValidation } from "@/lib/api-utils"
 import { handleServiceError } from "@/lib/errors"
 
-const ADMIN_ROLES: Role[] = ["FINANCE_ADMIN", "GENERAL_DIRECTION"]
-
 export async function GET() {
   const auth = await requireAuth()
   if (!auth.ok) return auth.response
-  const authorized = requireAnyRole(auth.user, ADMIN_ROLES)
+  const authorized = requireAnyRole(auth.user, ROLES_MANAGEMENT)
   if (!authorized.ok) return authorized.response
 
   try {
@@ -24,7 +23,7 @@ export async function GET() {
 export const POST = withValidation(
   utilisateurSchema,
   async (_req, auth, data) => {
-    const authorized = requireAnyRole(auth, ADMIN_ROLES)
+    const authorized = requireAnyRole(auth, ROLES_MANAGEMENT)
     if (!authorized.ok) return authorized.response
 
     try {
@@ -46,7 +45,7 @@ export const POST = withValidation(
 export const PUT = withValidation(
   updateUtilisateurSchema,
   async (_req, auth, data) => {
-    const authorized = requireAnyRole(auth, ADMIN_ROLES)
+    const authorized = requireAnyRole(auth, ROLES_MANAGEMENT)
     if (!authorized.ok) return authorized.response
 
     const { id, ...updateData } = data

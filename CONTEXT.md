@@ -26,8 +26,12 @@ An organizational unit within the company (e.g. HR, IT, Finance).
 _Avoid_: Division, team, unit
 
 **Role**:
-The set of permissions and responsibilities assigned to a Utilisateur. One of EMPLOYEE, MANAGER, FINANCE_ADMIN, GENERAL_DIRECTION.
+The set of permissions and responsibilities assigned to a Utilisateur. One of EMPLOYEE, MANAGER, FINANCE_ADMIN, GENERAL_DIRECTION, ADMIN.
 _Avoid_: Position, title, permission level
+
+**Administrateur**:
+The deployment's application administrator — a fifth Role beside the four organisational ones. Manages the application itself (Utilisateurs, Société, Véhicules, Rapports) and sees every DemandeDeplacement, but is never an actor in the validation pipeline. Designated by e-mail at the deployment (the `ADMIN_EMAILS` environment list): a designated address is provisioned on its first ConnexionGoogle and has that standing re-asserted at every sign-in; it signs in with Google alone — no password. Additional Administrateurs are granted — and removed — only by an existing Administrateur; removing an address from `ADMIN_EMAILS` stops the guarantee — revocation is demoting or disabling the account in Utilisateurs.
+_Avoid_: Admin, super-admin, owner
 
 **VehiculeEntreprise**:
 A company-owned vehicle that can be assigned to a DemandeDeplacement.
@@ -45,6 +49,20 @@ _Avoid_: Step, phase, status
 
 **Decision**:
 The outcome recorded at a given Etape. One of: PENDING, APPROVED, REJECTED, WITHDRAWN. APPROVED, REJECTED, and WITHDRAWN are **terminal** — once recorded, the DemandeDeplacement cannot transition any further and cannot be edited or resubmitted. To pursue the trip after a REJECTED or WITHDRAWN outcome, the Employee creates a *new* DemandeDeplacement; the rejected/withdrawn record is retained unchanged for history.
+
+PENDING is the non-terminal Decision, and the « pending » rule is defined once — beside the Etape/Decision unions in the workflow module (`TERMINAL_DECISIONS` + `isPendingDecision`). Surfaces that mean « waiting » ask for it, never for a lane alone: a decided DemandeDeplacement keeps its Etape, so an Etape filter on its own cannot mean waiting.
+_Avoid_: reading a lane alone as « waiting », re-deriving « pending » or the terminal set per surface
+
+The link that means « the DemandeDeplacements waiting for me » is also defined
+once, beside the lane it names: `lienFileAttente(role)` in the workflow module
+returns the DemandesDeplacement list filtered to that Role's single waiting
+lane and to the pending Decision (`DECISION_ATTENTE`, which is the pending value
+passed as a filter — the rule is not re-derived). Every composing site — the
+navigation table, the dashboard's « voir tout », the list's « En attente » tab —
+calls it rather than spelling the URL, so a lane rename cannot leave a stale
+link behind. What does NOT mean « waiting for me », and is not a composition of
+it: « my drafts » and « finalised », which name the draft and final lanes for a
+Utilisateur's OWN DemandesDeplacement.
 
 ### Pipeline actors
 
@@ -84,18 +102,22 @@ The Utilisateur who last recorded an approve or reject Decision on a DemandeDepl
 _Avoid_: Approver, assigné, assignee, last-actor
 
 **VisibiliteDemande (Demande Visibility)**:
-The rule determining which DemandesDeplacement a Utilisateur can view. An EMPLOYEE sees only the demandes they created; MANAGER, FINANCE_ADMIN, and GENERAL_DIRECTION see all demandes in the instance. The rule is owned by the demande query module and enforced in the WHERE clause of every read; viewing a demande outside one's visibility is indistinguishable from viewing a nonexistent demande (existence is never leaked).
+The rule determining which DemandesDeplacement a Utilisateur can view. An EMPLOYEE sees only the demandes they created; MANAGER, FINANCE_ADMIN, GENERAL_DIRECTION, and ADMIN see all demandes in the instance. The rule is owned by the demande read model (`lib/demande`) and enforced in the WHERE clause of every read; viewing a demande outside one's visibility is indistinguishable from viewing a nonexistent demande (existence is never leaked).
 _Avoid_: row-level security, permissions matrix, access control list
+
+**DemandeReadModel (Demande Read Model)**:
+The demande query module (`lib/demande`) as the one home of the read surfaces' lane counts. It owns `countDemandes({ etape?, decision?, employeId? })` — the single counting home (`countByEtape` is gone); the queue reads — `findPendingByEtapes` returns the pending rows at the queue stages; the `decision?` filter on the list's query params, threaded through `GET /api/demandes` as an additive optional query param; and the engaged budget (`aggregateBudget`) — FINAL rows always count, review-lane rows count only while pending. Every count surface — dashboard queues and pills, Rapports cards, « Répartition par étape » — asks it.
+_Avoid_: per-surface lane counting, re-hardcoded Rapports values, recreating `countByEtape`-style single-column counts
 
 **DemandePresentation (Demande Presentation)**:
 The module (`lib/demande-presentation.ts`) that owns how a DemandeDeplacement's Etape and Decision are displayed. It is the single home of the Etape and Decision labels, the stage order (derived from `PIPELINE` in the workflow module, never re-declared), the Decision outcome (pending / approved / rejected / withdrawn), the semantic tone (neutral / pending / success / danger), the pipeline strip as steps with past / current / upcoming state, and the compact decision-first label — a rejection names the stage where it happened ("Rejetée (Manager)" / "Rejetée (Finance)" / "Rejetée (Direction)"), an approval reads "Approuvée", a withdrawal "Retirée", otherwise the Etape label. Every surface that shows a demande's **current** Etape or Decision reads from `toDemandePresentation(demande)`.
 _Avoid_: Status, statut, per-surface status mappings
 
 **Notification**:
-A message sent to a Utilisateur about a DemandeDeplacement event, delivered via both an in-app alert and an email. MANAGER notifications are scoped to the employee's Departement; FINANCE_ADMIN and GENERAL_DIRECTION notifications are org-wide. The Notification module is the single writer of notification rows — via `dispatch` (rows + email) and the rows-only `dispatchRows` — no other module writes them directly.
+A message sent to a Utilisateur about a DemandeDeplacement event, delivered via both an in-app alert and an email. MANAGER notifications are scoped to the employee's Departement; FINANCE_ADMIN and GENERAL_DIRECTION notifications are org-wide. The Notification module is the single writer of notification rows — via `dispatch` (rows + email) and the rows-only `dispatchRows` — no other module writes them directly. An inactive Utilisateur neither receives nor produces one: the module applies the activity rule to all three recipient paths (role targets, the employee the payload names, the Assignataire it names), composed from `conditionActif` rather than re-spelled (#355, #356).
 
 **AccuseLecture (Read Receipt)**:
-A Notification automatically sent to the MANAGER of an Employee's Departement when that Employee marks a Notification related to a DemandeDeplacement as read (lu). Dispatched only when the reader's Role is EMPLOYEE and the Notification is linked to a DemandeDeplacement — reads by MANAGER, FINANCE_ADMIN, or GENERAL_DIRECTION (or reads of demande-less notifications) produce no AccuseLecture. The email step of the AccuseLecture is dispatched via the EmailSender module.
+A Notification automatically sent to the MANAGER of an Employee's Departement when that Employee marks a Notification related to a DemandeDeplacement as read (lu). Dispatched only when the reader's Role is EMPLOYEE and the Notification is linked to a DemandeDeplacement — reads by MANAGER, FINANCE_ADMIN, or GENERAL_DIRECTION (or reads of demande-less notifications) produce no AccuseLecture. The email step of the AccuseLecture is dispatched via the EmailSender module. Marking a Notification read requires the reader to still be active (#356), so a deactivated Utilisateur produces no AccuseLecture and their Notification stays unread — the deactivation is normally the answer, so the receipt would say nothing they need.
 
 
 **EmailSender**:
@@ -127,12 +149,13 @@ _Wikis to_: Amorçage (Setup), NomExpediteurEmail
 _Cites_: ADR-0008 (deferral), ADR-0009
 
 **EmailVérifié**:
-The organisation's attestation that a Utilisateur's e-mail address genuinely belongs to them. Written as `emailVerified = true` by the service at provisioning — the amorçage first Utilisateur included — and backfilled for pre-existing rows by migration `0007_attestation_email_verified`; there is no self-service verification flow and no administrator toggle. It is the precondition Better Auth's default linking gate requires before a first Google sign-in may link the account.
+The organisation's attestation that a Utilisateur's e-mail address genuinely belongs to them. Written as `emailVerified = true` by the service at provisioning — the amorçage first Utilisateur and the e-mail-designated Administrateur included — and backfilled for pre-existing rows by migration `0007_attestation_email_verified`; there is no self-service verification flow and no administrator toggle. It is the precondition Better Auth's default linking gate requires before a first Google sign-in may link the account.
 _Avoid_: Email confirmed, verified account, e-mail validation
 
 **ConnexionGoogle (Google Sign-In)**:
-An optional sign-in method: a Utilisateur signs in with their Google account instead of a password. Enabled per Utilisateur by an administrator and only for active accounts, and only offered when the deployment has Google credentials configured; it never provisions accounts — an unknown address is refused. Every sign-in revalidates existence, activity, and per-Utilisateur enablement, and a refused Google sign-in lands on the login page with a French message — never silently.
+An optional sign-in method: a Utilisateur signs in with their Google account instead of a password. Enabled per Utilisateur by an administrator and only for active accounts, and only offered when the deployment has Google credentials configured; it never provisions accounts — an unknown address is refused, with one exception: an address designated as the deployment's Administrateur (see Administrateur) is provisioned on its first sign-in. Every sign-in revalidates existence, activity, and per-Utilisateur enablement — a designated Administrateur's sign-in re-asserts their standing instead — and a refused Google sign-in lands on the login page with a French message — never silently. A refusal always names its cause: the gate's own codes and the engine's Google-side codes each carry a message, and the raw code is logged server-side on every refusal (ADR-0022). A code the app has no message for is the one exception to the no-zombie-parameter rule — it stays in the URL, because it is the only diagnostic the generic message does not carry.
 _Avoid_: OAuth, social login, SSO
+_Cites_: ADR-0017, ADR-0022
 
 **Utilisateur signable**:
 The single rule that decides whether an identity attempting to sign in corresponds to a real Utilisateur who may hold a session. Three facts, and no others: the Utilisateur **exists**; the Utilisateur is **actif**; and — for ConnexionGoogle only — Google sign-in is **enabled** for them. Absence and deactivation are distinct outcomes, not one: a Utilisateur who was deleted is not a deactivated Utilisateur, and the caller may need to say so. `proxy.ts` does **not** decide this — it asserts only that a session cookie is present, an optimistic check whose answer is provisional until the session seam is crossed. The rule is re-evaluated per attempt, never cached: turning Google off blocks the next ConnexionGoogle without revoking a live session.
@@ -179,7 +202,7 @@ _Avoid_: Email suffix, mail domain
 The deployment choice for Nemotron model inference. Decided in ADR-0013: **hosted NIM**, targeting `nvidia/nemotron-3-nano-30b-a3b` on `integrate.api.nvidia.com/v1` via the OpenAI-compatible SDK. Employee past-demandes (snapshots of name, department, position, travel history) egress to NVIDIA's NIM endpoint during propose-from-history calls. This is accepted under the Societe's data-protection posture and is the gate for the data-residency/consent compliance. Self-host is available as a future escape hatch if requirements change.
 
 **Provenance**:
-Per-field metadata on a DemandeDeplacement indicating how a value was sourced. One of `ai_proposed` (value came from an AI proposal, accepted by the employee) or `employee_entered` (value typed directly by the employee). Applies to each AI-proposable field: Ville, Motif, TypeTransport, avanceRequise. Written to JournalAudit at acceptance time as a single event per field (`field X set to value Y (provenance: ai_proposed, accepted by employee Z)`). Provenance is returned by the API for all roles (EMPLOYEE, MANAGER, FINANCE_ADMIN, GENERAL_DIRECTION) and may be displayed in the UI at every pipeline stage. Downstream rejection audit entries are silent on AI involvement — accountability rests with the employee per the `employee stays accountable` principle.
+Per-field metadata on a DemandeDeplacement indicating how a value was sourced. One of `ai_proposed` (value came from an AI proposal, accepted by the employee) or `employee_entered` (value typed directly by the employee). Applies to each AI-proposable field: Ville, Motif, TypeTransport, avanceRequise. Written to JournalAudit at acceptance time as a single event per field (`field X set to value Y (provenance: ai_proposed, accepted by employee Z)`). Provenance is returned by the API for all roles (EMPLOYEE, MANAGER, FINANCE_ADMIN, GENERAL_DIRECTION, ADMIN) and may be displayed in the UI at every pipeline stage. Downstream rejection audit entries are silent on AI involvement — accountability rests with the employee per the `employee stays accountable` principle.
 _Avoid_: Source, origin, AI flag, assisted
 
 ### Deployment
@@ -197,3 +220,4 @@ _Cites_: ADR-0004
 - "approved" was used to mean both a stage-level outcome (manager said yes) and a terminal outcome (whole pipeline complete). Resolved by splitting into **Etape** (where we are) and **Decision** (what happened there). Terminal approval is `Etape: FINAL, Decision: APPROVED`.
 - "status" / "statut" was previously a single-column legacy enum resolved to **StatutDemande**. As of ADR-0005, the column is split into two persisted columns: **Etape + Decision**. The old `fromLegacyStatus`/`toLegacyStatus` bridging layer is removed.
 - "retirée" (withdrawn) was initially treated as a separate StatutDemande value. Resolved: withdrawal is a **Decision** (`WITHDRAWN`) and a terminal outcome, not a stage.
+- "administrateur" was used loosely, notably for the amorçage wizard's « Compte administrateur ». Resolved: **Administrateur** is the deployment's fifth Role (see above); the wizard's first Utilisateur keeps Role GENERAL_DIRECTION.

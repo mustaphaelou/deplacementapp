@@ -10,14 +10,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { DateRangePicker } from "@/components/ui/date-range-picker"
 import { CityCombobox } from "@/components/ui/city-combobox"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
-import Link from "next/link"
+import { PageHeader } from "@/components/page-header"
 import { cn } from "@/lib/utils"
 import {
   Loader2,
@@ -26,12 +19,19 @@ import {
   Send,
   MapPin,
 } from "lucide-react"
-import { PURPOSE_OPTIONS, TRANSPORT_LABELS } from "@/lib/constants"
+import { MOTIF_LABELS, TRANSPORT_LABELS } from "@/lib/demande-presentation"
 import { useDemandeForm } from "@/hooks/use-demande-form"
 import { demandeSchema, type DemandeFormValues } from "@/lib/schemas"
 import type { Vehicule } from "@/lib/demande-types"
 
 type FormValues = DemandeFormValues
+
+// The form and the documents share one Motif vocabulary: the options derive
+// from MOTIF_LABELS, in its insertion order.
+const MOTIF_OPTIONS = Object.entries(MOTIF_LABELS).map(([value, label]) => ({
+  value,
+  label,
+}))
 
 const FIELD_INPUT =
   "h-9 rounded-[3px] focus-visible:ring-1 focus-visible:ring-(--brand)"
@@ -117,44 +117,16 @@ export function DemandeForm() {
 
   return (
     <div className="mx-auto w-full max-w-[720px] pb-8">
-      {/* Page header */}
-      <div>
-        <div className="flex items-center justify-between">
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <span>Espace</span>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <Link href="/demandes" className="transition-colors hover:text-foreground">
-                  Demandes de déplacement
-                </Link>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbPage className="font-medium">
-                  Nouvelle Demande
-                </BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
-        </div>
-        <div className="mt-6 flex items-center gap-4">
-          <div className="flex size-12 shrink-0 items-center justify-center rounded-[3px] bg-primary/10">
-            <MapPin className="size-6 text-primary" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-[40px] leading-tight font-bold tracking-[-0.01em]">
-              Nouvelle Demande
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Renseignez les informations du déplacement. Certains champs
-              peuvent être pré-remplis automatiquement.
-            </p>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        crumbs={[
+          "Espace",
+          { label: "Demandes de déplacement", href: "/demandes" },
+          "Nouvelle Demande",
+        ]}
+        title="Nouvelle Demande"
+        subtitle="Renseignez les informations du déplacement. Certains champs peuvent être pré-remplis automatiquement."
+        icon={MapPin}
+      />
 
       <form className="mt-10 space-y-10">
         {/* Motif & contexte */}
@@ -164,7 +136,7 @@ export function DemandeForm() {
             <div>
               <Label className="mb-1.5 block text-sm font-medium">Motifs</Label>
               <div className="grid gap-3 sm:grid-cols-2">
-                {PURPOSE_OPTIONS.map((opt) => {
+                {MOTIF_OPTIONS.map((opt) => {
                   const checked = selectedMotifs?.includes(opt.value)
                   return (
                     <label

@@ -1,5 +1,5 @@
 ﻿import { NextRequest, NextResponse } from "next/server"
-import { requireAuth, requireRole, type Role } from "@/lib/auth/server"
+import { requireAuth, requireRole } from "@/lib/auth/server"
 import { findMany, createDraft, createAndSubmit } from "@/lib/demande"
 import { demandeSchema, demandeQuerySchema } from "@/lib/schemas"
 import { withValidation, validateQueryParams } from "@/lib/api-utils"
@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   if (!query.ok) return query.response
   try {
     const result = await findMany(
-      { id: auth.user.id, role: auth.user.role as Role },
+      { id: auth.user.id, role: auth.user.role },
       query.data
     )
     return NextResponse.json(result)
@@ -27,7 +27,7 @@ export const POST = withValidation(
     const authorized = requireRole(auth, "EMPLOYEE")
     if (!authorized.ok) return authorized.response
     const { action, ...serviceData } = data
-    const actor = { id: auth.id, role: auth.role as Role }
+    const actor = { id: auth.id, role: auth.role }
     try {
       const demande =
         action === "submit"

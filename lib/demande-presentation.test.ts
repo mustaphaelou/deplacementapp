@@ -1,7 +1,13 @@
 import { describe, it, expect } from "vitest"
 import {
   toDemandePresentation,
+  toDemandeDocumentView,
+  DECISION_LABELS,
+  ETAPE_LABELS,
+  MOTIF_LABELS,
+  TRANSPORT_LABELS,
   type DecisionOutcome,
+  type DemandeDocumentInput,
   type PresentationTone,
   type StepState,
 } from "./demande-presentation"
@@ -334,5 +340,216 @@ describe("toDemandePresentation — unknown values", () => {
     expect(
       toDemandePresentation({ etape: "DRAFT", decision: "SUPERSEDED" }).tone
     ).toBe("neutral")
+  })
+})
+
+// ─── The display vocabulary and the document projection ─────────────────────
+//
+// The module owns the whole DemandeDeplacement display vocabulary — Etape,
+// Decision, Motif and TypeTransport — and toDemandeDocumentView, the labelled
+// document shape the PDF, the printable page and the CSV export serialize
+// from. The suites below pin the vocabulary and the uniform fallback: an
+// unmapped value comes out as its stored value verbatim — never blank, never
+// prettified.
+
+describe("MOTIF_LABELS and TRANSPORT_LABELS", () => {
+  it("pins the Motif vocabulary literally, in the form's option order", () => {
+    expect(MOTIF_LABELS).toEqual({
+      mission_client: "Mission client",
+      formation: "Formation",
+      reunion: "Réunion",
+      livraison: "Livraison",
+      maintenance: "Maintenance / Intervention",
+      administratif: "Démarche administrative",
+      autre: "Autre",
+    })
+    expect(Object.keys(MOTIF_LABELS)).toEqual([
+      "mission_client",
+      "formation",
+      "reunion",
+      "livraison",
+      "maintenance",
+      "administratif",
+      "autre",
+    ])
+  })
+
+  it("pins the TypeTransport vocabulary literally", () => {
+    expect(TRANSPORT_LABELS).toEqual({
+      VOITURE_PERSONNELLE: "Voiture personnelle",
+      VOITURE_SOCIETE: "Voiture de la société",
+      BUS: "Bus / Car",
+      AVION: "Avion",
+      TRAIN: "Train",
+      AUTRE: "Autre",
+    })
+    expect(Object.keys(TRANSPORT_LABELS)).toEqual([
+      "VOITURE_PERSONNELLE",
+      "VOITURE_SOCIETE",
+      "BUS",
+      "AVION",
+      "TRAIN",
+      "AUTRE",
+    ])
+  })
+})
+
+// A production-shaped input: the Motif as its stored JSON-encoded list, the
+// TypeTransport as its stored enum code, no Assignataire yet.
+const DOCUMENT_INPUT: DemandeDocumentInput = {
+  motif: '["mission_client","formation"]',
+  typeTransport: "AVION",
+  etape: "DRAFT",
+  decision: "PENDING",
+}
+
+describe("toDemandeDocumentView — vocabulary coverage", () => {
+  it("labels every canonical Motif stored as a one-element list", () => {
+    for (const [value, label] of Object.entries(MOTIF_LABELS)) {
+      const view = toDemandeDocumentView({
+        ...DOCUMENT_INPUT,
+        motif: JSON.stringify([value]),
+      })
+      expect(view.motifs).toEqual([label])
+    }
+  })
+
+  it("labels every canonical TypeTransport", () => {
+    for (const [value, label] of Object.entries(TRANSPORT_LABELS)) {
+      const view = toDemandeDocumentView({
+        ...DOCUMENT_INPUT,
+        typeTransport: value,
+      })
+      expect(view.transport).toBe(label)
+    }
+  })
+
+  it.each(ETAPES)(
+    "carries the %s Etape label through the presentation",
+    (etape) => {
+      const view = toDemandeDocumentView({ ...DOCUMENT_INPUT, etape })
+
+      expect(view.presentation.etape.id).toBe(etape)
+      expect(view.presentation.etape.label).toBe(ETAPE_LABELS[etape])
+      expect(view.presentation.etape.label).not.toBe("")
+    }
+  )
+
+  it.each(DECISIONS)(
+    "carries the %s Decision label through the presentation",
+    (decision) => {
+      const view = toDemandeDocumentView({ ...DOCUMENT_INPUT, decision })
+
+      expect(view.presentation.decision.value).toBe(decision)
+      expect(view.presentation.decision.label).toBe(DECISION_LABELS[decision])
+      expect(view.presentation.decision.label).not.toBe("")
+    }
+  )
+
+  it("carries exactly toDemandePresentation's output over the whole space", () => {
+    for (const etape of ETAPES) {
+      for (const decision of DECISIONS) {
+        const view = toDemandeDocumentView({
+          ...DOCUMENT_INPUT,
+          etape,
+          decision,
+        })
+        expect(view.presentation).toEqual(
+          toDemandePresentation({ etape, decision })
+        )
+      }
+    }
+  })
+})
+
+describe("toDemandeDocumentView — fallback: the stored value verbatim", () => {
+  it("presents an unmapped Motif as its stored value", () => {
+    const view = toDemandeDocumentView({
+      ...DOCUMENT_INPUT,
+      motif: JSON.stringify(["deep_sea_fishing"]),
+    })
+    expect(view.motifs).toEqual(["deep_sea_fishing"])
+  })
+
+  it("presents a stored free-text Motif verbatim", () => {
+    const view = toDemandeDocumentView({
+      ...DOCUMENT_INPUT,
+      motif: JSON.stringify(["Autre: taxi collectif"]),
+    })
+    expect(view.motifs).toEqual(["Autre: taxi collectif"])
+  })
+
+  it("presents an unmapped TypeTransport as its stored value", () => {
+    const view = toDemandeDocumentView({
+      ...DOCUMENT_INPUT,
+      typeTransport: "HOVERCRAFT",
+    })
+    expect(view.transport).toBe("HOVERCRAFT")
+  })
+
+  it("labels a mixed stored list and leaves the literal untouched", () => {
+    const view = toDemandeDocumentView({
+      ...DOCUMENT_INPUT,
+      motif: '["mission_client","Autre: taxi collectif","formation"]',
+    })
+    expect(view.motifs).toEqual([
+      "Mission client",
+      "Autre: taxi collectif",
+      "Formation",
+    ])
+  })
+
+  it("never renders a stored value as a blank", () => {
+    const motifValues = [
+      ...Object.keys(MOTIF_LABELS),
+      "deep_sea_fishing",
+      "Autre: taxi collectif",
+    ]
+    for (const value of motifValues) {
+      const view = toDemandeDocumentView({
+        ...DOCUMENT_INPUT,
+        motif: JSON.stringify([value]),
+      })
+      expect(view.motifs).toHaveLength(1)
+      expect(view.motifs[0]).not.toBe("")
+    }
+
+    const transportValues = [...Object.keys(TRANSPORT_LABELS), "HOVERCRAFT"]
+    for (const value of transportValues) {
+      const view = toDemandeDocumentView({
+        ...DOCUMENT_INPUT,
+        typeTransport: value,
+      })
+      expect(view.transport).not.toBe("")
+    }
+  })
+})
+
+describe("toDemandeDocumentView — « Traité par » and the draft marking", () => {
+  it("renders the Assignataire as « prenom nom »", () => {
+    const view = toDemandeDocumentView({
+      ...DOCUMENT_INPUT,
+      assigneA: { prenom: "Jean", nom: "Dupont" },
+    })
+    expect(view.traitePar).toBe("Jean Dupont")
+  })
+
+  it("has no « Traité par » while no approver has acted", () => {
+    expect(toDemandeDocumentView(DOCUMENT_INPUT).traitePar).toBeNull()
+    expect(
+      toDemandeDocumentView({ ...DOCUMENT_INPUT, assigneA: null }).traitePar
+    ).toBeNull()
+  })
+
+  it("marks the DRAFT Etape as a draft and no other", () => {
+    expect(
+      toDemandeDocumentView({ ...DOCUMENT_INPUT, etape: "DRAFT" }).isDraft
+    ).toBe(true)
+
+    for (const etape of ETAPES.filter((e) => e !== "DRAFT")) {
+      expect(toDemandeDocumentView({ ...DOCUMENT_INPUT, etape }).isDraft).toBe(
+        false
+      )
+    }
   })
 })

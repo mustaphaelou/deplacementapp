@@ -20,14 +20,29 @@ export function useAuthUser(): {
   refetch: () => void
 } {
   const { data: session, isPending, refetch } = authClient.useSession()
+  // Read through the SAME `toAuthUser` the server seam reads through, so the
+  // two halves cannot drift: a stored Role `lireRole` cannot name is a `null`
+  // here exactly as it is in `currentUser` (#297). `user` was already nullable,
+  // so the refusal needed no new shape.
   const user = session?.user
     ? toAuthUser(session.user as BetterAuthSessionUser)
     : null
   return { user, isPending, refetch }
 }
 
-export async function signInWithCredentials(email: string, password: string) {
-  return authClient.signIn.email({ email, password })
+export async function signInWithCredentials(
+  email: string,
+  password: string,
+  rememberMe = true
+) {
+  // `rememberMe` is a documented field of the sign-in request body.  It must
+  // default to `true`, not `false`: the engine's schema is
+  // `rememberMe: z.boolean().default(true)` and it decides the session with
+  // `createSession(userId, rememberMe === false)`.  Omitting the field — what
+  // every caller did before #245 — therefore yields a LONG-LIVED session, so a
+  // `false` default here would silently shorten every session to 24h, the
+  // setup wizard's post-Amorçage sign-in included.
+  return authClient.signIn.email({ email, password, rememberMe })
 }
 
 export async function signInWithGoogle() {

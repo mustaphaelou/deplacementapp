@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { requireAuth, requireRole } from "@/lib/auth/server"
+import { requireAuth, requireAnyRole } from "@/lib/auth/server"
+import { ROLES_MANAGEMENT } from "@/lib/auth/roles"
 import { vehiculeService } from "@/lib/vehicule-service"
 import {
   vehiculeSchema,
@@ -9,6 +10,10 @@ import {
 import { withValidation } from "@/lib/api-utils"
 import { handleServiceError } from "@/lib/errors"
 
+// The fleet READ is deliberately unguarded beyond the session: the
+// DemandeDeplacement creation form reads it to populate its VehiculeEntreprise
+// picker, so every signed-in Utilisateur must reach it. Only the writes below
+// are reserved to the declared set (ROLES_MANAGEMENT, spec #281).
 export async function GET() {
   const auth = await requireAuth()
   if (!auth.ok) return auth.response
@@ -22,7 +27,7 @@ export async function GET() {
 }
 
 export const POST = withValidation(vehiculeSchema, async (_req, auth, data) => {
-  const authorized = requireRole(auth, "FINANCE_ADMIN")
+  const authorized = requireAnyRole(auth, ROLES_MANAGEMENT)
   if (!authorized.ok) return authorized.response
 
   try {
@@ -36,7 +41,7 @@ export const POST = withValidation(vehiculeSchema, async (_req, auth, data) => {
 export const PUT = withValidation(
   updateVehiculeSchema,
   async (_req, auth, data) => {
-    const authorized = requireRole(auth, "FINANCE_ADMIN")
+    const authorized = requireAnyRole(auth, ROLES_MANAGEMENT)
     if (!authorized.ok) return authorized.response
 
     const { id, ...updateData } = data
@@ -52,7 +57,7 @@ export const PUT = withValidation(
 export const DELETE = withValidation(
   deleteVehiculeSchema,
   async (_req, auth, data) => {
-    const authorized = requireRole(auth, "FINANCE_ADMIN")
+    const authorized = requireAnyRole(auth, ROLES_MANAGEMENT)
     if (!authorized.ok) return authorized.response
 
     try {

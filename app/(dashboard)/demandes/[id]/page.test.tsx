@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { renderToStaticMarkup } from "react-dom/server"
 import type { DemandeDetail } from "@/lib/demande-types"
+import {
+  STORED_MOTIF_JSON,
+  MOTIF_CANONICAL_LABEL,
+  MOTIF_CANONICAL_SLUG,
+  MOTIF_FREE_TEXT,
+  MOTIF_LABELS_EXPECTED_TEXT,
+} from "@/lib/test/demande-motif-fixtures"
 
 vi.mock("@/lib/auth/server", () => ({
   getAuthUser: vi.fn(),
@@ -34,7 +41,10 @@ const mockDemande: DemandeDetail = {
   employeNom: "Dupont",
   employePoste: "Développeur",
   employeDepartement: "IT",
-  motif: '["Réunion client"]',
+  // Production-shaped: a canonical slug plus an « Autre » free-text entry,
+  // exactly as lib/demande/mutations.ts writes them. Seeding a stored literal
+  // instead would read identically labelled or unlabelled, and hide the defect.
+  motif: STORED_MOTIF_JSON,
   dateDepart: "2025-06-01",
   dateRetour: "2025-06-05",
   destination: "Casablanca",
@@ -130,6 +140,14 @@ function factLine(html: string, label: string): string {
   return html.slice(labelIndex, end)
 }
 
+/** The value the « Motif(s) » property renders, not the whole page. */
+function motifCell(html: string): string {
+  const labelIndex = html.indexOf(">Motif(s)</p>")
+  const start = html.indexOf(">", html.indexOf("</p>", labelIndex) + 4) + 1
+  const end = html.indexOf("</p>", start)
+  return html.slice(start, end)
+}
+
 describe("Demande detail page", () => {
   beforeEach(() => {
     vi.resetAllMocks()
@@ -137,6 +155,7 @@ describe("Demande detail page", () => {
 
   it("renders the 720px document column", async () => {
     const html = await renderPage()
+    // The page's OWN 720px document column — no module owns this one.
     expect(html).toContain("max-w-[720px]")
   })
 
@@ -144,8 +163,9 @@ describe("Demande detail page", () => {
     const html = await renderPage()
 
     expect(html).toContain('aria-label="breadcrumb"')
-    expect(html).toContain("text-[40px]")
     expect(html).toContain("Demande DD-2025-0001")
+    // The header module's OWN icon tile, not this page's stepper pills below —
+    // those carry their own bg-primary/10 text-primary runs.
     expect(html).toContain("bg-primary/10")
     expect(html).toContain("Créée le")
   })
@@ -268,5 +288,117 @@ describe("Demande detail page", () => {
     })
 
     expect(html).toContain("Retirer la demande")
+  })
+
+  // #299 (review finding 1): the owner case above cannot catch a predicate
+  // that is wrong in the permissive direction, because it also satisfies
+  // `demande.employeId === userId`. This holds EVERY other field constant —
+  // same role, same etape, same decision — and varies only the predicate's
+  // input, so the ownership comparison is the only thing that can decide it.
+  // Without this, `demande.employeId === userId || demande.etape === "DRAFT"`
+  // ships green and shows « Retirer la demande » to a non-owner.
+  it("hides withdraw from a non-owner on a DRAFT", async () => {
+    const html = await renderPage({
+      role: "EMPLOYEE",
+      etape: "DRAFT",
+      employeId: "u-9",
+    })
+
+    expect(html).not.toContain("Retirer la demande")
+  })
+
+  // The mirror of the case above, so the pin cannot be satisfied by a
+  // predicate that denies everyone: the owner at the SAME etape still sees it.
+  it("hides withdraw from a non-owner at a DRAFT while the owner still sees it", async () => {
+    const owner = await renderPage({
+      role: "EMPLOYEE",
+      etape: "DRAFT",
+      employeId: "u-1",
+    })
+    const other = await renderPage({
+      role: "EMPLOYEE",
+      etape: "DRAFT",
+      employeId: "u-9",
+    })
+
+    expect(owner).toContain("Retirer la demande")
+    expect(other).not.toContain("Retirer la demande")
+  })
+
+  // #299: the page no longer decides ownership and hands the verdict to
+  // getAllowedActions as `isOwner`. The distinction is invisible in the
+  // owner's markup — both draw the button — so the page's own source is what
+  // pins it: the fact crosses the boundary, and the verdict crosses back.
+  it("passes the ownership fact in and reads the verdicts back", async () => {
+    const { readFile } = await import("node:fs/promises")
+    const source = await readFile(new URL("./page.tsx", import.meta.url), "utf8")
+
+    expect(source).toMatch(/getAllowedActions\(\s*userRole,\s*isOwner,/)
+    // The reader used to receive the userId and the employeId and compare them
+    // itself, which put the ownership decision on this page rather than in the
+    // pipeline. The comparison stays where the guard can see it.
+    expect(source).not.toMatch(/getAllowedActions\([^)]*userId/)
+  })
+})
+
+// #274: the detail page displayed the Motif list straight out of the storage
+// decoder (parseMotif), so it showed raw slugs to the employee. The projection
+// (toDemandeDocumentView) is the one home of the labelled list. The suite
+// previously seeded `["Réunion client"]` — a stored literal that reads the same
+// either way — so it could not see the defect; the seed is now production-shaped
+// (a canonical slug + an « Autre » free-text entry), which makes it observable.
+describe("Demande detail page — the Motif list comes from the projection", () => {
+  it("renders the French label of a stored slug, not the slug", async () => {
+    const html = await renderPage()
+
+    expect(motifCell(html)).toContain(MOTIF_CANONICAL_LABEL)
+    expect(motifCell(html)).not.toContain(MOTIF_CANONICAL_SLUG)
+  })
+
+  it("renders an « Autre » free-text entry verbatim", async () => {
+    const html = await renderPage()
+
+    // It is absent from MOTIF_LABELS: the projection's fallback carries it
+    // through untouched, and the page must do the same — never blank, never
+    // prettified.
+    expect(motifCell(html)).toContain(MOTIF_FREE_TEXT)
+  })
+
+  it("lists every motif in the stored order, joined", async () => {
+    const html = await renderPage()
+
+    expect(motifCell(html)).toBe(MOTIF_LABELS_EXPECTED_TEXT)
+  })
+
+  it("shows the raw stored JSON nowhere on the page", async () => {
+    const html = await renderPage()
+
+    // A surface that forgot to decode at all would leak the column value; the
+    // projection renders labels, so neither the encoded list nor the slug is
+    // on screen.
+    expect(html).not.toContain(STORED_MOTIF_JSON)
+    expect(html).not.toContain(MOTIF_CANONICAL_SLUG)
+  })
+})
+
+// #261: the header class pins now live once, in
+// components/page-header.test.tsx, against the module that owns them. What
+// stays here is the cheap per-page guarantee: this page still renders its
+// title through the shared header.
+describe("Demande detail page — the shared page header", () => {
+  it("renders the page's title", async () => {
+    const html = await renderPage()
+
+    // This asserts the page's OWN trail rendered through the module, not that
+    // an <h1> exists somewhere: a hand-inlined header satisfies a title
+    // assertion and is exactly the regression #261 removed. What is left here
+    // is the trail the module BUILDS — the page's own crumb labels and the one
+    // separator per crumb, which only the module's breadcrumb emits. #320
+    // removed this block's duplication of the truncation contract, which
+    // components/page-header.tsx pins in full on its own suite.
+    // The detail page's own trail: a link crumb back to the list, then this
+    // demande's numero in page treatment.
+    expect(html).toContain('href="/demandes"')
+    expect(html.match(/data-slot="breadcrumb-separator"/g)).toHaveLength(1)
   })
 })
